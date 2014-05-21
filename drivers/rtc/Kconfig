@@ -679,4 +679,10 @@ config RTC_DRV_STARFIRE
 	  If you say Y here you will get support for the RTC found on
 	  Starfire systems.
 
+config RTC_DRV_ASPEED
+	bool "ASPEED RTC"
+	depends on ARM
+	help
+	  RTC driver for ASPEED chips.
+
 endif # RTC_CLASS

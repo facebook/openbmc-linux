@@ -581,6 +581,7 @@ static int ehci_run (struct usb_hcd *hcd)
 	 * Scsi_Host.highmem_io, and so forth.  It's readonly to all
 	 * host side drivers though.
 	 */
+
 	hcc_params = ehci_readl(ehci, &ehci->caps->hcc_params);
 	if (HCC_64BIT_ADDR(hcc_params)) {
 		ehci_writel(ehci, 0, &ehci->regs->segment);
@@ -1036,6 +1037,11 @@ MODULE_LICENSE ("GPL");
 #define	PLATFORM_DRIVER		ixp4xx_ehci_driver
 #endif
 
+#ifdef CONFIG_USB_EHCI_AST
+#include "ehci-ast.c"
+#define	PLATFORM_DRIVER		ehci_hcd_ast_driver
+#endif
+
 #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER) && \
     !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER)
 #error "missing bus glue for ehci-hcd"
@@ -1117,7 +1123,10 @@ err_debug:
 	clear_bit(USB_EHCI_LOADED, &usb_hcds_loaded);
 	return retval;
 }
-module_init(ehci_hcd_init);
+
+//ehci must after uhci driver module load. Ryan Modify
+late_initcall(ehci_hcd_init);
+//module_init(ehci_hcd_init);
 
 static void __exit ehci_hcd_cleanup(void)
 {

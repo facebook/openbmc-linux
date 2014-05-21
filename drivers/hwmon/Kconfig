@@ -854,6 +854,22 @@ config SENSORS_LIS3LV02D
 	  This driver can also be built as a module.  If so, the module
 	  will be called lis3lv02d.
 
+config SENSORS_AST_ADC
+	tristate "ASPEED ADC Controller Driver"
+        depends on ARCH_ASPEED
+	default n
+	help
+          This driver provides support for the ASPEED ADC
+          Controller, which provides an Voltage Sensor.
+
+config SENSORS_AST_PWM_FAN
+        tristate "ASPEED PWM & FAN Tacho Controller Driver"
+        depends on ARCH_ASPEED
+        default n
+        help
+          This driver provides support for the ASPEED PWM & FAN Tacho
+          Controller, which provides an Sensor, fan control.
+
 config SENSORS_APPLESMC
 	tristate "Apple SMC (Motion sensor, light sensor, keyboard backlight)"
 	depends on INPUT && X86

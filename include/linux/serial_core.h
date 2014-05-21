@@ -158,6 +158,8 @@
 /* SH-SCI */
 #define PORT_SCIFA	83
 
+#define PORT_GUCMVP2000	255
+
 #ifdef __KERNEL__
 
 #include <linux/compiler.h>

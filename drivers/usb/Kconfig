@@ -56,6 +56,7 @@ config USB_ARCH_HAS_EHCI
 	default y if PPC_83xx
 	default y if SOC_AU1200
 	default y if ARCH_IXP4XX
+	default y if ARCH_ASPEED
 	default PCI
 
 # ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
@@ -101,6 +102,8 @@ source "drivers/usb/mon/Kconfig"
 source "drivers/usb/wusbcore/Kconfig"
 
 source "drivers/usb/host/Kconfig"
+
+source "drivers/usb/gucuhci/Kconfig"
 
 source "drivers/usb/musb/Kconfig"
 

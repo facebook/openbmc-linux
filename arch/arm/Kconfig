@@ -199,6 +199,14 @@ choice
 	prompt "ARM system type"
 	default ARCH_VERSATILE
 
+config ARCH_ASPEED
+	bool "ASPEED AST Family"
+	select ARM_AMBA
+	select PLAT_ASPEED
+        select GENERIC_GPIO
+        select ARCH_REQUIRE_GPIOLIB
+
+
 config ARCH_AAEC2000
 	bool "Agilent AAEC-2000 based"
 	select ARM_AMBA
@@ -551,6 +559,8 @@ config ARCH_MSM
 
 endchoice
 
+source "arch/arm/mach-aspeed/Kconfig"
+
 source "arch/arm/mach-clps711x/Kconfig"
 
 source "arch/arm/mach-ep93xx/Kconfig"
@@ -635,6 +645,9 @@ config PLAT_IOP
 	bool
 
 config PLAT_ORION
+	bool
+
+config PLAT_ASPEED
 	bool
 
 source arch/arm/mm/Kconfig

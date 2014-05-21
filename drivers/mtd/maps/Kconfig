@@ -351,6 +351,10 @@ config MTD_ARM_INTEGRATOR
 	tristate "CFI Flash device mapped on ARM Integrator/P720T"
 	depends on ARM && MTD_CFI
 
+config MTD_AST
+        tristate "CFI Flash device mapped on ASPEED"
+        depends on ARCH_ASPEED && MTD_CFI
+
 config MTD_CDB89712
 	tristate "Cirrus CDB89712 evaluation board mappings"
 	depends on MTD_CFI && ARCH_CDB89712

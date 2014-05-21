@@ -1889,6 +1889,16 @@ menuconfig NETDEV_1000
 
 if NETDEV_1000
 
+config FARADAYMAC
+        tristate "FARADAY AMBA MAC support"
+
+if ARCH_ASPEED
+
+config MAC0_PHY_LINK
+        bool "Mac0 phy link pin enable"
+
+endif
+
 config ACENIC
 	tristate "Alteon AceNIC/3Com 3C985/NetGear GA620 Gigabit support"
 	depends on PCI

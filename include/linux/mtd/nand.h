@@ -599,6 +599,12 @@ struct platform_nand_ctrl {
 	void		(*select_chip)(struct mtd_info *mtd, int chip);
 	void		(*cmd_ctrl)(struct mtd_info *mtd, int dat,
 				    unsigned int ctrl);
+	int 	(*calculate)(struct mtd_info *mtd,
+					 const uint8_t *dat,
+					 uint8_t *ecc_code);
+	int 		(*correct)(struct mtd_info *mtd, uint8_t *dat,
+					   uint8_t *read_ecc,
+					   uint8_t *calc_ecc);
 	void		*priv;
 };
 

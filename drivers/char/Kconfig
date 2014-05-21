@@ -665,6 +665,7 @@ config IBM_BSR
 	  between several cores on a system
 
 source "drivers/char/ipmi/Kconfig"
+source "drivers/char/aspeed/Kconfig"
 
 config DS1620
 	tristate "NetWinder thermometer support"

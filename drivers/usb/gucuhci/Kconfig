@@ -1,0 +1,56 @@
+#
+# USB Host Controller Drivers
+#
+comment "GUC USB Drivers"
+	depends on USB
+
+
+config GUC_USB_UHCI_HCD
+	tristate "GUC UHCI (USB 1.1) support (EXPERIMENTAL)"
+	depends on USB
+	---help---
+	  The GUC Universal Host Controller Interface (UHCI) is standard for 
+	  USB 1.1 host controller hardware. It is an embedded HC based on AMBA bus.
+	  You may want to read <file:Documentation/usb/uhci.txt>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called uhci-hcd.
+
+choice
+	prompt "Config GUC USB UHCI Number of Ports"
+	default GUC_USB_UHCI_MULTIPORT_4
+
+config GUC_USB_UHCI_MULTIPORT_1
+	bool "GUC UHCI support 1 ports"
+	depends on GUC_USB_UHCI_HCD
+
+config GUC_USB_UHCI_MULTIPORT_2
+	bool "GUC UHCI support 2 ports"
+	depends on GUC_USB_UHCI_HCD
+
+config GUC_USB_UHCI_MULTIPORT_4
+	bool "GUC UHCI support 4 ports"
+	depends on GUC_USB_UHCI_HCD
+
+endchoice
+
+config USB_EHCI_SPLIT_ISO
+	bool "Full speed ISO transactions (EXPERIMENTAL)"
+	depends on USB_EHCI_HCD
+	default n
+	---help---
+	  This code is new and hasn't been used with many different
+	  EHCI or USB 2.0 transaction translator implementations.
+	  It should work for ISO-OUT transfers, like audio.
+
+config USB_EHCI_ROOT_HUB_TT
+	bool "Root Hub Transaction Translators (EXPERIMENTAL)"
+	depends on USB_EHCI_HCD
+	---help---
+	  Some EHCI chips have vendor-specific extensions to integrate
+	  transaction translators, so that no OHCI or UHCI companion
+	  controller is needed.  It's safe to say "y" even if your
+	  controller doesn't support this feature.
+
+	  This supports the EHCI implementation from TransDimension Inc.
+

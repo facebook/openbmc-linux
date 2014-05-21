@@ -56,6 +56,12 @@ config MTD_NAND_H1900
 	help
 	  This enables the driver for the iPAQ h1900 flash.
 
+config MTD_NAND_AST
+	tristate "AST NAND flash"
+	depends on MTD_NAND && ARCH_ASPEED && MTD_PARTITIONS
+	help
+	  This enables the driver for the ASPEED NAND flash.
+
 config MTD_NAND_GPIO
 	tristate "GPIO NAND Flash driver"
 	depends on GENERIC_GPIO && ARM

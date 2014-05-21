@@ -1473,6 +1473,30 @@ config FB_SAVAGE_ACCEL
           the resulting framebuffer console has bothersome glitches, then
           choose N here.
 
+menuconfig FB_AST
+        tristate "ASPEED Framebuffer Driver"
+        depends on FB
+        select FB_CFB_FILLRECT
+        select FB_CFB_COPYAREA
+        select FB_CFB_IMAGEBLIT
+        default n
+
+if FB_AST
+
+config AST_DAC
+        bool "CRT DAC output"
+
+config AST_DVO
+        bool "CRT DVO output"
+
+config HDMI_CAT6613
+       bool "Enable CAT6613 HDMI TX"
+       depends on FB_AST && AST_DVO
+       help
+          This option will support CAT6613 HDMI TX driver
+
+endif
+
 config FB_SIS
 	tristate "SiS/XGI display support"
 	depends on FB && PCI

@@ -1670,3 +1670,16 @@ FORCE:
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable se we can use it in if_changed and friends.
 .PHONY: $(PHONY)
+
+pub:
+	cp arch/arm/boot/uImage /tftpboot/
+
+m68:
+	m68k-uclinux-objcopy vmlinux -O binary uc.bin
+	mv uc.bin /tftpboot/
+
+opub:
+	cp arch/arm/boot/Image .
+	gzip -f -9 Image
+	mkimage -A arm -O linux -T kernel -C gzip -a 40008000 -e 40008000 -d Image.gz uImage
+	cp uImage /tftpboot/

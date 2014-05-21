@@ -1,0 +1,52 @@
+#
+# MISC configuration for ASPEED SOCs
+#
+
+if ARCH_ASPEED
+menuconfig AST_MISC
+	tristate 'MISC drivers for ASPEED SOCs'
+	help
+	  We can select misc drivers for ASPEED SOC in this sub-function.
+
+if AST_MISC
+config AST_VIDEO
+	tristate "ASPEED Video Engine driver"
+	default n
+	help
+	  Driver for AST Video Engine 
+
+config ADC_CAT9883
+	tristate "CAT 9883 ADC driver"
+	default n
+	help
+	  Driver for CAT 9883
+
+config AST_SPI_BIOS
+	tristate "ASPEED SPI BIOS flash register"
+	default n
+	help 
+	  Driver for SPI BIOS flash register 
+
+config AST_PECI
+	tristate "ASPEED PECI Controller"
+	default n
+	help
+	  Driver for PECI Controller
+
+config AST_KCS
+	tristate 'ASPEED KCS support'
+	help
+	  Support for the KCS channels on the ASPEED chips,
+	  providing /dev/kcs0, 1 and 2 (note, some machines may not
+	  provide all of these ports, depending on how the serial port
+	  pins are configured.
+
+config AST_GPIO
+	tristate "ASPEED GPIO Controller"
+	default n
+	help
+	  Driver for GPIO Controller included in ASPEED SOCs.
+
+endif	# CONFIG_AST_MISC
+endif	# CONFIG_AST
+

@@ -37,6 +37,10 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR
+#include <asm/arch/ast_i2c.h>
+#endif
+
 static struct i2c_driver i2cdev_driver;
 
 /*
@@ -414,6 +418,11 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case I2C_RDWR:
 		return i2cdev_ioctl_rdrw(client, arg);
+
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR
+	case I2C_SLAVE_RDWR:
+		return i2cdev_ioctl_slave_rdrw(client->adapter, (struct i2c_msg __user *)arg);
+#endif		
 
 	case I2C_SMBUS:
 		return i2cdev_ioctl_smbus(client, arg);

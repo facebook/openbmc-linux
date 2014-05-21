@@ -1,0 +1,214 @@
+if ARCH_ASPEED
+
+choice
+        prompt "ASPEED Processor Family"
+        default CONFIG_IRMP
+
+config IRMP
+        bool "IRMP Serials"
+
+config PCEXT
+	bool "PC Extender Serials"
+
+config REMOTEFX
+	bool "RemoteFX Zero-Client Serials"
+
+endchoice
+
+if IRMP
+
+choice
+        prompt "IRMP Serials"
+        default CONFIG_ARCH_AST2300
+
+config ARCH_AST1100
+        bool "AST1100"
+
+config ARCH_AST2100
+        bool "AST2100"
+
+config ARCH_AST2200
+        bool "AST2200"
+
+config ARCH_AST2300
+        bool "AST2300"
+
+config ARCH_AST2400
+	select USB_ARCH_HAS_EHCI
+        bool "AST2400"
+
+config ARCH_AST2500
+	select USB_ARCH_HAS_EHCI
+        bool "AST2500"
+
+endchoice
+
+endif
+
+if PCEXT
+
+choice
+        prompt "PC Extender Serials"
+        default CONFIG_ARCH_AST1510
+
+config ARCH_AST1500
+        bool "AST1500"
+
+config ARCH_AST1510
+        bool "AST1510"
+
+config ARCH_AST1520
+	select USB_ARCH_HAS_EHCI
+	bool "AST1520"
+
+endchoice
+
+endif
+
+if REMOTEFX
+
+choice
+        prompt "RemoteFX Zero-Client Serials"
+        default CONFIG_ARCH_AST3100
+
+config ARCH_AST3100
+	select USB_ARCH_HAS_EHCI
+        bool "AST3100"
+
+config ARCH_AST3200
+	select USB_ARCH_HAS_EHCI
+        bool "AST3200"
+
+endchoice
+
+endif
+
+menu "FLASH Chip Select"
+
+choice
+        prompt "CS0 Config"
+        default CONFIG_AST_CS0_SPI
+
+config AST_CS0_NOR
+        bool "NOR"
+
+config AST_CS0_NAND
+        bool "NAND"
+
+config AST_CS0_SPI
+        bool "SPI_NOR"
+
+config AST_CS0_NONE
+	bool "NONE"
+
+endchoice
+
+choice
+        prompt "CS1 Config"
+        default CONFIG_AST_CS1_SPI
+
+config AST_CS1_NOR
+        bool "NOR"
+
+config AST_CS1_NAND
+        bool "NAND"
+
+config AST_CS1_SPI
+        bool "SPI_NOR"
+
+config AST_CS1_NONE
+        bool "NONE"
+
+endchoice
+
+choice
+        prompt "CS2 Config"
+        default CONFIG_AST_CS2_SPI
+
+config AST_CS2_NOR
+        bool "NOR"
+
+config AST_CS2_NAND
+        bool "NAND"
+
+config AST_CS2_SPI
+        bool "SPI_NOR"
+
+config AST_CS2_NONE
+        bool "NONE"
+
+endchoice
+
+choice
+        prompt "CS3 Config"
+        default CONFIG_AST_CS3_SPI
+
+config AST_CS3_NOR
+        bool "NOR"
+
+config AST_CS3_NAND
+        bool "NAND"
+
+config AST_CS3_SPI
+        bool "SPI_NOR"
+
+config AST_CS3_NONE
+        bool "NONE"
+
+endchoice
+
+choice
+        prompt "CS4 Config"
+        default CONFIG_AST_CS4_SPI
+
+config AST_CS4_NOR
+        bool "NOR"
+
+config AST_CS4_NAND
+        bool "NAND"
+
+config AST_CS4_SPI
+        bool "SPI_NOR"
+
+config AST_CS4_NONE
+        bool "NONE"
+
+endchoice
+
+endmenu
+
+config ARCH_AST1070
+	bool "AST1070 Comapnion chip combination"
+
+config AST1070_NR
+	int "Number of AST1070 Comapniion Chip combination"
+	depends on ARCH_AST1070
+	default "1"
+	help
+	  Set this to the number of ast1070
+
+choice
+        prompt "Connect Bus Interface"
+	depends on ARCH_AST1070
+        default CONFIG_AST_LPC_PLUS
+
+config AST_LPC_PLUS
+        bool "LPC PLUS"
+
+config AST_LPC
+        bool "LPC"
+
+endchoice
+
+config AST_SCU_LOCK
+	bool "AST SCU Protection Key"
+
+# Support PCIE
+config PCIE
+        bool "ASPEED PCIE support"
+        depends on PCI && ARCH_ASPEED
+        select ARCH_SUPPORTS_MSI
+        help
+          Socle PCIE support
+
+endif
