@@ -49,6 +49,18 @@ static struct plat_serial8250_port ast_uart_data[] = {
 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},
 //UART 1 ,2 default to LPC
+// tfang: UART1 is connected to uS
+#ifdef AST_UART1_BASE
+	{
+		.mapbase	= AST_UART1_BASE,
+		.membase	= (char*)(IO_ADDRESS(AST_UART1_BASE)),
+		.irq		= IRQ_UART1,
+		.uartclk	= (24*1000000L),
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+#endif
 #ifdef AST_UART3_BASE
 	{
 		.mapbase	= AST_UART3_BASE,

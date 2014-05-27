@@ -38,7 +38,7 @@ init_fnc_t __initdata *init_all_device[] = {
 	ast_add_device_i2c,
 	ast_add_device_ci2c,
 	ast_add_device_spi,
-	ast_add_device_ehci,
+//ast_add_device_ehci, disabled by tfang for USB HUB mode
 	ast_add_device_nand,
 	ast_add_device_flash,
 	ast_add_device_pwm_fan,
