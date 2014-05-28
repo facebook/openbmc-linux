@@ -50,7 +50,6 @@ static struct plat_serial8250_port ast_uart_data[] = {
 	},
 //UART 1 ,2 default to LPC
 // tfang: UART1 is connected to uS
-#ifdef AST_UART1_BASE
 	{
 		.mapbase	= AST_UART1_BASE,
 		.membase	= (char*)(IO_ADDRESS(AST_UART1_BASE)),
@@ -60,7 +59,6 @@ static struct plat_serial8250_port ast_uart_data[] = {
 		.iotype		= UPIO_MEM,
 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},
-#endif
 #ifdef AST_UART3_BASE
 	{
 		.mapbase	= AST_UART3_BASE,
@@ -96,6 +94,7 @@ struct platform_device ast_uart_device = {
 
 void __init ast_add_device_uart(void)
 {
+	ast_scu_multi_func_uart(1);		
 	ast_scu_multi_func_uart(3);		
 	ast_scu_multi_func_uart(4);	
 	platform_device_register(&ast_uart_device);

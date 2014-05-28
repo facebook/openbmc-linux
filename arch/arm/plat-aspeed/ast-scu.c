@@ -739,7 +739,7 @@ ast_scu_multi_func_uart(u8 uart)
 {
 	switch(uart) {
 		case 1:
-			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
+			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) |
 						SCU_FUN_PIN_UART1_RXD |
 						SCU_FUN_PIN_UART1_TXD |
 						SCU_FUN_PIN_UART1_NRTS |
@@ -748,10 +748,10 @@ ast_scu_multi_func_uart(u8 uart)
 						SCU_FUN_PIN_UART1_NDSR |
 						SCU_FUN_PIN_UART1_NDCD |
 						SCU_FUN_PIN_UART1_NCTS, 
-				AST_SCU_FUN_PIN_CTRL1); 
+				AST_SCU_FUN_PIN_CTRL2); 
 			break;		
 		case 2:
-			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
+			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) |
 						SCU_FUN_PIN_UART2_RXD |
 						SCU_FUN_PIN_UART2_TXD |
 						SCU_FUN_PIN_UART2_NRTS |
@@ -760,7 +760,7 @@ ast_scu_multi_func_uart(u8 uart)
 						SCU_FUN_PIN_UART2_NDSR |
 						SCU_FUN_PIN_UART2_NDCD |
 						SCU_FUN_PIN_UART2_NCTS, 
-				AST_SCU_FUN_PIN_CTRL1); 
+				AST_SCU_FUN_PIN_CTRL2); 
 			break;		
 		case 3:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
