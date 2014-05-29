@@ -31,6 +31,7 @@
 typedef void (init_fnc_t) (void);
 
 init_fnc_t __initdata *init_all_device[] = {
+	ast_add_device_lpc,
 	ast_add_device_uart,
 	ast_add_device_vuart,
 	ast_add_device_watchdog,

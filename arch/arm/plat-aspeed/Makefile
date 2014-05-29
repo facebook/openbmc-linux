@@ -15,7 +15,7 @@ obj-y			+= dev-uart.o dev-vuart.o dev-wdt.o dev-rtc.o dev-gpio.o dev-sgpio.o  de
 obj-y 	                += dev-nor.o dev-nand.o dev-sdhci.o
 
 #bus
-obj-y                   += dev-i2c.o dev-ci2c.o dev-spi.o dev-ehci.o dev-uhci.o dev-clpc.o dev-peci.o dev-kcs.o dev-mbx.o dev-snoop.o
+obj-y                   += dev-i2c.o dev-ci2c.o dev-spi.o dev-ehci.o dev-uhci.o dev-clpc.o dev-peci.o dev-kcs.o dev-mbx.o dev-snoop.o dev-lpc.o
 
 #dev
 #obj-y			+= dev-udc11.o

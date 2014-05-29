@@ -186,6 +186,12 @@
 #define GET_LPC_SNPD1(x)			((x >> 7) & 0xff)
 #define GET_LPC_SNPD0(x)			(x & 0xff)
 
+/* AST_LPC_HICR9				0x098	- LPC Host Interface Control Register 9 */
+#define LPC_HICR9_SOURCE_UART1			(1 << 4)
+#define LPC_HICR9_SOURCE_UART2			(1 << 5)
+#define LPC_HICR9_SOURCE_UART3			(1 << 6)
+#define LPC_HICR9_SOURCE_UART4			(1 << 7)
+
 /*AST_LPC_PCCR0				0x130	- Post Code Contol Register 0 */
 #define LPC_POST_DMA_INT_EN			(1 << 31)
 #define LPC_POST_DMA_MODE_EN		(1 << 14)
