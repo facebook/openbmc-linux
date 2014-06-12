@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.28.9
-# Thu May 22 15:19:39 2014
+# Wed Jun 11 23:30:41 2014
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -569,7 +569,7 @@ CONFIG_NETDEVICES=y
 CONFIG_BONDING=y
 # CONFIG_MACVLAN is not set
 # CONFIG_EQUALIZER is not set
-# CONFIG_TUN is not set
+CONFIG_TUN=m
 # CONFIG_VETH is not set
 # CONFIG_NET_ETHERNET is not set
 CONFIG_NETDEV_1000=y
