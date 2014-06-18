@@ -88,6 +88,7 @@ struct ast_i2c_dev {
 
 struct i2c_msg		slave_rx_msg[I2C_S_RX_BUF_NUM + 1];
 struct i2c_msg		slave_tx_msg;	
+static spinlock_t	slave_rx_lock = SPIN_LOCK_UNLOCKED;
 #endif
 
 
@@ -243,8 +244,9 @@ static void ast_i2c_slave_buff_init(struct ast_i2c_dev *i2c_dev)
 static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 {
 	int i;
-	spinlock_t	lock;
-	spin_lock(&lock);	
+	unsigned long flags;
+
+	spin_lock_irqsave(&slave_rx_lock, flags);	
 	
 	switch(i2c_dev->slave_event) {
 		case I2C_SLAVE_EVENT_START_WRITE:
@@ -291,7 +293,7 @@ static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 			i2c_dev->slave_msgs = &slave_tx_msg;
 			break;
 	}
-	spin_unlock(&lock);	
+	spin_unlock_irqrestore(&slave_rx_lock, flags);	
 
 }
 
@@ -299,11 +301,14 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 {
 	struct ast_i2c_dev *i2c_dev = adap->algo_data;
 	int ret=0, i;
+	unsigned long flags;
 
 	switch(msgs->flags) {
 		case 0:
 //			printk("slave read \n");
 			//cur_msg = get_free_msg;
+			spin_lock_irqsave(&slave_rx_lock, flags);	
+
 			for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
 				if((slave_rx_msg[i].addr == 0) && (slave_rx_msg[i].flags == BUFF_FULL)) {
 					memcpy(msgs->buf, slave_rx_msg[i].buf, slave_rx_msg[i].len);
@@ -313,6 +318,7 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 					break;
 				}
 			}
+			spin_unlock_irqrestore(&slave_rx_lock, flags);	
 			
 			if(i == I2C_S_RX_BUF_NUM) {
 				printk("No buffer ........ \n");

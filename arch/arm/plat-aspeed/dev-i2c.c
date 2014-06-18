@@ -46,7 +46,8 @@
 
 #if defined (CONFIG_ARCH_AST2400)
 #define I2C_PAGE_SIZE 8
-struct buf_page page_info[I2C_PAGE_SIZE] = 
+static spinlock_t page_info_lock = SPIN_LOCK_UNLOCKED;
+static struct buf_page page_info[I2C_PAGE_SIZE] = 
 {  
 	[0] = {
 		.flag = 0,
@@ -117,9 +118,10 @@ static void pool_buff_page_init(u32 buf_pool_addr)
 static u8 request_pool_buff_page(struct buf_page **req_page)
 {
 	int i;
+        unsigned long flags;
 	//TODO
-	spinlock_t	lock;
-	spin_lock(&lock);	
+
+        spin_lock_irqsave(&page_info_lock, flags);
 	for(i=0;i<I2C_PAGE_SIZE;i++) {
 		if(page_info[i].flag ==0) {
 			page_info[i].flag = 1;
@@ -128,21 +130,26 @@ static u8 request_pool_buff_page(struct buf_page **req_page)
 			break;
 		}
 	}
-	spin_unlock(&lock);	
-	return 0;
+	spin_unlock_irqrestore(&page_info_lock, flags);	
+	return (i >= I2C_PAGE_SIZE);
 }
 
 static void free_pool_buff_page(struct buf_page *req_page)
 {
+        unsigned long flags;
+        spin_lock_irqsave(&page_info_lock, flags);
+
 	req_page->flag = 0;
 //	I2CDBUG( "free page addr %x \n", req_page->page_addr);	
 	req_page = NULL;
+	spin_unlock_irqrestore(&page_info_lock, flags);	
 }
 
 #elif defined (CONFIG_ARCH_AST2300)
 #define I2C_PAGE_SIZE 5
 
-struct buf_page page_info[I2C_PAGE_SIZE] = 
+static spinlock_t page_info_lock = SPIN_LOCK_UNLOCKED;
+static struct buf_page page_info[I2C_PAGE_SIZE] = 
 {  
 	[0] = {
 		.flag = 0,
@@ -186,27 +193,31 @@ static void pool_buff_page_init(u32 buf_pool_addr)
 static u8 request_pool_buff_page(struct buf_page **req_page)
 {
 	int i;
+        unsigned long flags;
 	//TODO
-	spinlock_t	lock;
-	spin_lock(&lock);	
+
+        spin_lock_irqsave(&page_info_lock, flags);
 	for(i=0;i<I2C_PAGE_SIZE;i++) {
 		if(page_info[i].flag ==0) {
 			page_info[i].flag = 1;
 			*req_page = &page_info[i];
-			spin_unlock(&lock);
-			return 1;
+			spin_unlock_irqrestore(&page_info_lock, flags);	
+			return 0;
 		}
 	}
-	spin_unlock(&lock);	
-	return 0;
+	spin_unlock_irqrestore(&page_info_lock, flags);	
+	return 1;
 
 }
 
 //TODO check free ?
 static void free_pool_buff_page(struct buf_page *req_page)
 {
+        unsigned long flags;
+        spin_lock_irqsave(&page_info_lock, flags);
 	req_page->flag = 0;
 	req_page = NULL;
+	spin_unlock_irqrestore(&page_info_lock, flags);	
 }
 
 #else 
