@@ -222,24 +222,25 @@ static struct platform_device ast_spi_device5 = {
 };
 #endif	//CONFIG_SPI_AST
 
+/* All partitions must be within 16M */
 static struct mtd_partition ast_spi_flash_partitions[] = {
 		{
 			.name	= "u-boot",
-			.offset = 0,
-			.size	= 0x60000,
+			.offset = 0, /* From 0 */
+			.size	= 0x60000, /* Size 384K */
 			.mask_flags	= MTD_WRITEABLE,
                 }, {
                         .name   = "env",
-                        .offset = 0x60000,
-                        .size   = 0x10000,
+                        .offset = 0x60000, /* From 384K */
+                        .size   = 0x10000, /* Size 64K, one sector */
 		}, {
 		        .name   = "kernel",
-			.offset = 0x80000,
-            		.size   = 0x200000,     
+			.offset = 0x80000,  /* From 512K */
+            		.size   = 0x200000, /* Size 2M */
         }, {
             		.name   = "rootfs",
-			.offset = 0x300000,
-            		.size   = 0x4F0000,
+			.offset = 0x300000, /* From 3M */
+            		.size   = 0xC00000, /* Size 12M */
 		}, {
 			.name	= "data0",
 			.offset = MTDPART_OFS_APPEND,
@@ -257,7 +258,16 @@ static struct flash_platform_data ast_spi_flash_data = {
         .parts          = ast_spi_flash_partitions,
 };
 
+#ifdef CONFIG_ARCH_AST2400
+static struct flash_platform_data wedge_spi_flash_data = {
+		.type 		  = "n25q128a",
+    .nr_parts       = ARRAY_SIZE(ast_spi_flash_partitions),
+    .parts          = ast_spi_flash_partitions,
+};
+#endif
+
 static struct spi_board_info ast_spi_devices[] = {
+#if 0
     {
         .modalias    = "m25p80",
 		.platform_data  = &ast_spi_flash_data,
@@ -266,6 +276,17 @@ static struct spi_board_info ast_spi_devices[] = {
         .bus_num    = 0, //  This chooses if SPI0 or SPI1 of the SoC is used.
      	.mode = SPI_MODE_0,
     }, 
+#endif
+#ifdef CONFIG_ARCH_AST2400
+    {
+        .modalias    = "m25p80",
+        .platform_data  = &wedge_spi_flash_data,
+        .chip_select    = 0, //.chip_select This tells your device driver which chipselect to use.
+        .max_speed_hz    = 50 * 1000 * 1000,
+        .bus_num    = 0, //  This chooses if SPI0 or SPI1 of the SoC is used.
+        .mode = SPI_MODE_0,
+    },
+#endif
     {
         .modalias    = "spidev",
         .chip_select    = 0,
@@ -330,5 +351,3 @@ void __init ast_add_device_spi(void)
 #else
 void __init ast_add_device_spi(void) {}
 #endif
-
-

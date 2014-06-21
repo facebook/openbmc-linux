@@ -512,6 +512,9 @@ static struct flash_info __devinitdata m25p_data [] = {
 	{ "mx25l12855e", 0xc22618, 0, 64 * 1024, 256, 0 },
 	{ "mx25l25635e", 0xc22019, 0, 64 * 1024, 512, 0 },
 
+	/* Micrno */
+	{ "n25q128a", 0x20ba18, 0, 64 * 1024, 256, 0 },
+
 	/* Spansion -- single (large) sector size only, at least
 	 * for the chips listed here (without boot sectors).
 	 */
@@ -637,7 +640,7 @@ static int __devinit m25p_probe(struct spi_device *spi)
 				dev_warn(&spi->dev, "found %s, expected %s\n",
 						chip ? chip->name : "UNKNOWN",
 						info->name);
-				info = NULL;
+				dev_warn(&spi->dev, "Force to use %s", info->name);
 			}
 		}
 	} else

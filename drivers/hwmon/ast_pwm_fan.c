@@ -724,7 +724,7 @@ ast_get_tacho_rpm(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 tacho_ch)
 	else
 		clk_source = 24*1000*1000;
 	
-	printk("raw_data %d, clk_source %d, tacho_clk_div %d \n",raw_data, clk_source, tacho_clk_div);
+	//	printk("raw_data %d, clk_source %d, tacho_clk_div %d \n",raw_data, clk_source, tacho_clk_div);
 	rpm = (clk_source * 60) / (2 * raw_data * tacho_clk_div);
 	
     return rpm; 
