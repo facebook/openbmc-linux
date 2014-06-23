@@ -384,13 +384,15 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 		dev_dbg(i2c_dev->dev, "I2C's master is locking the bus, try to stop it.\n");
 //
 		init_completion(&i2c_dev->cmd_complete);
+		i2c_dev->cmd_err = 0;
 
 		ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
 
 		r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
 													   i2c_dev->adap.timeout*HZ);
 
-		if(i2c_dev->cmd_err) {
+		if(i2c_dev->cmd_err &&
+		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
 			dev_dbg(i2c_dev->dev, "recovery error \n");
 			return -1;
 		}
@@ -417,7 +419,8 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 			
 			r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
 														   i2c_dev->adap.timeout*HZ);			
-			if (i2c_dev->cmd_err != 0) {
+			if (i2c_dev->cmd_err != 0 &&
+			   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
 				dev_dbg(i2c_dev->dev, "ERROR!! Failed to do recovery command(0x%08x)\n", i2c_dev->cmd_err);
 				return -1;
 			}
@@ -1257,12 +1260,11 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			} else {
 				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_TX_NAK = %x\n",sts);
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK, I2C_INTR_STS_REG);
-				if(i2c_dev->master_msgs->flags == I2C_M_IGNORE_NAK) {
+				if(i2c_dev->master_msgs->flags & I2C_M_IGNORE_NAK) {
 					dev_dbg(i2c_dev->dev, "I2C_M_IGNORE_NAK next send\n");
-					i2c_dev->cmd_err = 0;
 				} else {
 					dev_dbg(i2c_dev->dev, "NAK error\n");
-					i2c_dev->cmd_err = AST_I2CD_INTR_STS_TX_NAK;
+					i2c_dev->cmd_err |= AST_I2CD_INTR_STS_TX_NAK;
 				}
 				complete(&i2c_dev->cmd_complete);
 			}
@@ -1276,7 +1278,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_TX_NAK| AST_I2CD_INTR_STS_NORMAL_STOP = %x\n",sts);
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
 				dev_dbg(i2c_dev->dev, "M TX NAK | NORMAL STOP \n");
-				i2c_dev->cmd_err = AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP;
+				i2c_dev->cmd_err |= AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP;
 				complete(&i2c_dev->cmd_complete);
 			}
 			break;
@@ -1322,7 +1324,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			} else {							
 				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_NORMAL_STOP = %x\n",sts);
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);			
-				i2c_dev->cmd_err = 0;
+				i2c_dev->cmd_err |= AST_I2CD_INTR_STS_NORMAL_STOP;
 				complete(&i2c_dev->cmd_complete);
 			}
 			break;
@@ -1341,20 +1343,20 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 		case AST_I2CD_INTR_STS_ARBIT_LOSS:
 			dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_ARBIT_LOSS = %x\n",sts);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
-			i2c_dev->cmd_err = AST_I2CD_INTR_STS_ARBIT_LOSS;
+			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
 			complete(&i2c_dev->cmd_complete);					
 			break;
 		case AST_I2CD_INTR_STS_ABNORMAL:
-			i2c_dev->cmd_err = AST_I2CD_INTR_STS_ABNORMAL;
+			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ABNORMAL;
 			complete(&i2c_dev->cmd_complete);					
 			break;
 		case AST_I2CD_INTR_STS_SCL_TO:
-			i2c_dev->cmd_err = AST_I2CD_INTR_STS_SCL_TO;
+			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_SCL_TO;
 			complete(&i2c_dev->cmd_complete);					
 			
 			break;
  		case AST_I2CD_INTR_STS_GCALL_ADDR:
-			i2c_dev->cmd_err = AST_I2CD_INTR_STS_GCALL_ADDR;
+			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_GCALL_ADDR;
 			complete(&i2c_dev->cmd_complete);					
 
 			break;
@@ -1371,7 +1373,6 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 		case AST_I2CD_INTR_STS_BUS_RECOVER:
 			dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_BUS_RECOVER= %x\n",sts);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_BUS_RECOVER, I2C_INTR_STS_REG);
-			i2c_dev->cmd_err = 0;
 			complete(&i2c_dev->cmd_complete);				
 			break;
 		default:
@@ -1413,6 +1414,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 
 		i2c_dev->blk_r_flag = 0;
 		init_completion(&i2c_dev->cmd_complete);
+		i2c_dev->cmd_err = 0;
 
 		if(i2c_dev->master_msgs->flags & I2C_M_NOSTART)
 			i2c_dev->master_xfer_cnt = 0;
@@ -1432,20 +1434,24 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 			goto stop;
 		}
 		
-		if(i2c_dev->cmd_err != 0) {
+		if(i2c_dev->cmd_err != 0 &&
+		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
 			ret = -EAGAIN;
 			goto stop;
 		}
 		
 	}
 
-	if(i2c_dev->cmd_err == 0) {
+	if(i2c_dev->cmd_err == 0 ||
+	   i2c_dev->cmd_err == AST_I2CD_INTR_STS_NORMAL_STOP) {
 		ret = num;
 		goto out;
 		
 	}
 stop:
 	init_completion(&i2c_dev->cmd_complete);
+	if(i2c_dev->cmd_err & AST_I2CD_INTR_STS_NORMAL_STOP)
+		goto out;
 	ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
 	wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
 											   i2c_dev->adap.timeout*HZ);

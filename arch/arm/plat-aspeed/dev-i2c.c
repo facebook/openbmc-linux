@@ -229,7 +229,7 @@ static void free_pool_buff_page(struct buf_page *req_page) {}
 
 static struct ast_i2c_driver_data ast_i2c_data = {
 	.bus_clk = 100000,		//bus clock 100KHz	
-	.master_dma = BYTE_MODE,
+	.master_dma = BUFF_MODE,
 	.slave_dma = BYTE_MODE,
 	.request_pool_buff_page = request_pool_buff_page,
 	.free_pool_buff_page = free_pool_buff_page,
