@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.28.9
-# Wed Jun 18 14:06:44 2014
+# Thu Jun 26 13:12:48 2014
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -734,7 +734,7 @@ CONFIG_AST_I2C_SLAVE_EEPROM=y
 # CONFIG_DS1682 is not set
 CONFIG_AT24=y
 # CONFIG_SENSORS_EEPROM is not set
-# CONFIG_SENSORS_PCF8574 is not set
+CONFIG_SENSORS_PCF8574=y
 # CONFIG_PCF8575 is not set
 # CONFIG_SENSORS_PCA9539 is not set
 # CONFIG_SENSORS_PCF8591 is not set
@@ -811,7 +811,7 @@ CONFIG_HWMON=y
 # CONFIG_SENSORS_IT87 is not set
 # CONFIG_SENSORS_LM63 is not set
 # CONFIG_SENSORS_LM70 is not set
-# CONFIG_SENSORS_LM75 is not set
+CONFIG_SENSORS_LM75=y
 # CONFIG_SENSORS_LM77 is not set
 # CONFIG_SENSORS_LM78 is not set
 # CONFIG_SENSORS_LM80 is not set

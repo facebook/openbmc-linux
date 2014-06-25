@@ -605,12 +605,43 @@ static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
 
 //Under I2C Dev 4
 static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
+	// Temperature sensors on Wedge:
 	{
-		I2C_BOARD_INFO("24c128", 0x50),						
-
-		
+		I2C_BOARD_INFO("tmp75", 0x48),
+	},
+	{
+		I2C_BOARD_INFO("tmp75", 0x49),
+	},
+	{
+		I2C_BOARD_INFO("tmp75", 0x4a),
+	},
+	// AST2400 EVB:
+	{
+		I2C_BOARD_INFO("24c128", 0x50),
 	}
 };
+
+//Under I2C Dev 7
+static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
+	// Wedge devices
+	{
+		// address from the schematic, doesn't work
+		I2C_BOARD_INFO("pcf8574", 0x27),
+	},
+	{
+		// placeholder, there is not yet a max127 driver
+		I2C_BOARD_INFO("max127", 0x28),
+	},
+	{
+		// address from i2cdetect, gives the right number
+		I2C_BOARD_INFO("pcf8574", 0x3f),
+	},
+	{
+		I2C_BOARD_INFO("24c64", 0x50),
+	}
+};
+
+
 //Under I2C Dev 8
 static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
 	{
@@ -659,6 +690,7 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev5_device);
 	platform_device_register(&ast_i2c_dev6_device);
 	platform_device_register(&ast_i2c_dev7_device);
+	i2c_register_board_info(6, ast_i2c_board_info_7, ARRAY_SIZE(ast_i2c_board_info_7));
 	platform_device_register(&ast_i2c_dev8_device);
 	i2c_register_board_info(7, ast_i2c_board_info_8, ARRAY_SIZE(ast_i2c_board_info_8));
 	platform_device_register(&ast_i2c_dev9_device);	
