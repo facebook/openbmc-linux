@@ -232,7 +232,7 @@ static struct mtd_partition ast_spi_flash_partitions[] = {
                 }, {
                         .name   = "env",
                         .offset = 0x60000, /* From 384K */
-                        .size   = 0x10000, /* Size 64K, one sector */
+                        .size   = 0x20000, /* Size 128K, two sectors */
 		}, {
 		        .name   = "kernel",
 			.offset = 0x80000,  /* From 512K */
