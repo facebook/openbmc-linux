@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.28.9
-# Mon Jul  7 10:29:23 2014
+# Thu Jul 10 16:14:03 2014
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -559,7 +559,7 @@ CONFIG_SCSI_ISCSI_ATTRS=m
 # CONFIG_MD is not set
 CONFIG_NETDEVICES=y
 # CONFIG_DUMMY is not set
-CONFIG_BONDING=y
+CONFIG_BONDING=m
 # CONFIG_MACVLAN is not set
 # CONFIG_EQUALIZER is not set
 CONFIG_TUN=m
