@@ -621,19 +621,26 @@ static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
 	}
 };
 
+//Under I2C Dev 5
+static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
+	// Temperature sensor on uServer:
+	{
+		I2C_BOARD_INFO("tmp75", 0x4c),
+	},
+	{
+		I2C_BOARD_INFO("ads7828", 0x4b),
+	}
+};
+
 //Under I2C Dev 7
 static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 	// Wedge devices
-	{
-		// address from the schematic, doesn't work
-		I2C_BOARD_INFO("pcf8574", 0x27),
-	},
 	{
 		// placeholder, there is not yet a max127 driver
 		I2C_BOARD_INFO("max127", 0x28),
 	},
 	{
-		// address from i2cdetect, gives the right number
+		// Differs from the schematic, but appears to be correct
 		I2C_BOARD_INFO("pcf8574", 0x3f),
 	},
 	{
@@ -688,6 +695,7 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev4_device);
 	i2c_register_board_info(3, ast_i2c_board_info_4, ARRAY_SIZE(ast_i2c_board_info_4));
 	platform_device_register(&ast_i2c_dev5_device);
+	i2c_register_board_info(4, ast_i2c_board_info_5, ARRAY_SIZE(ast_i2c_board_info_5));
 	platform_device_register(&ast_i2c_dev6_device);
 	platform_device_register(&ast_i2c_dev7_device);
 	i2c_register_board_info(6, ast_i2c_board_info_7, ARRAY_SIZE(ast_i2c_board_info_7));
