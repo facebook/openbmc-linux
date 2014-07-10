@@ -576,6 +576,17 @@ union i2c_smbus_data {
 			       /* and one more for user-space compatibility */
 };
 
+/*
+ * Large SMBus block data io, which is not defined in the SMBus standard,
+ * but used by some NIC (i.e. Intel I354) sideband SMBus interface.
+ */
+#define I2C_SMBUS_BLOCK_LARGE_MAX	240	/* extra large block size */
+union i2c_smbus_large_data {
+  union i2c_smbus_data data;
+  __u8 block[I2C_SMBUS_BLOCK_LARGE_MAX + 2]; /* block[0] is used for length */
+                                             /* and one more for PEC */
+};
+
 /* i2c_smbus_xfer read or write markers */
 #define I2C_SMBUS_READ	1
 #define I2C_SMBUS_WRITE	0
@@ -591,6 +602,7 @@ union i2c_smbus_data {
 #define I2C_SMBUS_I2C_BLOCK_BROKEN  6
 #define I2C_SMBUS_BLOCK_PROC_CALL   7		/* SMBus 2.0 */
 #define I2C_SMBUS_I2C_BLOCK_DATA    8
+#define I2C_SMBUS_BLOCK_LARGE_DATA    9
 
 
 #ifdef __KERNEL__

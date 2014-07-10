@@ -290,7 +290,7 @@ static noinline int i2cdev_ioctl_smbus(struct i2c_client *client,
 		unsigned long arg)
 {
 	struct i2c_smbus_ioctl_data data_arg;
-	union i2c_smbus_data temp;
+	union i2c_smbus_large_data temp;
 	int datasize, res;
 
 	if (copy_from_user(&data_arg,
@@ -303,6 +303,7 @@ static noinline int i2cdev_ioctl_smbus(struct i2c_client *client,
 	    (data_arg.size != I2C_SMBUS_WORD_DATA) &&
 	    (data_arg.size != I2C_SMBUS_PROC_CALL) &&
 	    (data_arg.size != I2C_SMBUS_BLOCK_DATA) &&
+	    (data_arg.size != I2C_SMBUS_BLOCK_LARGE_DATA) &&
 	    (data_arg.size != I2C_SMBUS_I2C_BLOCK_BROKEN) &&
 	    (data_arg.size != I2C_SMBUS_I2C_BLOCK_DATA) &&
 	    (data_arg.size != I2C_SMBUS_BLOCK_PROC_CALL)) {
@@ -343,6 +344,8 @@ static noinline int i2cdev_ioctl_smbus(struct i2c_client *client,
 	else if ((data_arg.size == I2C_SMBUS_WORD_DATA) ||
 		 (data_arg.size == I2C_SMBUS_PROC_CALL))
 		datasize = sizeof(data_arg.data->word);
+  else if (data_arg.size == I2C_SMBUS_BLOCK_LARGE_DATA)
+    datasize = sizeof(union i2c_smbus_large_data);
 	else /* size == smbus block, i2c block, or block proc. call */
 		datasize = sizeof(data_arg.data->block);
 
@@ -422,7 +425,7 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
 	case I2C_SLAVE_RDWR:
 		return i2cdev_ioctl_slave_rdrw(client->adapter, (struct i2c_msg __user *)arg);
-#endif		
+#endif
 
 	case I2C_SMBUS:
 		return i2cdev_ioctl_smbus(client, arg);

@@ -1842,8 +1842,8 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter * adapter, u16 addr,
 	  need to use only one message; when reading, we need two. We initialize
 	  most things with sane defaults, to keep the code below somewhat
 	  simpler. */
-	unsigned char msgbuf0[I2C_SMBUS_BLOCK_MAX+3];
-	unsigned char msgbuf1[I2C_SMBUS_BLOCK_MAX+2];
+	unsigned char msgbuf0[I2C_SMBUS_BLOCK_LARGE_MAX+3];
+	unsigned char msgbuf1[I2C_SMBUS_BLOCK_LARGE_MAX+2];
 	int num = read_write == I2C_SMBUS_READ?2:1;
 	struct i2c_msg msg[2] = { { addr, flags, 1, msgbuf0 },
 	                          { addr, flags | I2C_M_RD, 0, msgbuf1 }
@@ -1903,6 +1903,23 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter * adapter, u16 addr,
 			if (msg[0].len > I2C_SMBUS_BLOCK_MAX + 2) {
 				dev_err(&adapter->dev,
 					"Invalid block write size %d\n",
+					data->block[0]);
+				return -EINVAL;
+			}
+			for (i = 1; i < msg[0].len; i++)
+				msgbuf0[i] = data->block[i-1];
+		}
+		break;
+	case I2C_SMBUS_BLOCK_LARGE_DATA:
+		if (read_write == I2C_SMBUS_READ) {
+			msg[1].flags |= I2C_M_RECV_LEN;
+			msg[1].len = 1; /* block length will be added by
+					   the underlying bus driver */
+		} else {
+			msg[0].len = data->block[0] + 2;
+			if (msg[0].len > I2C_SMBUS_BLOCK_LARGE_MAX + 2) {
+				dev_err(&adapter->dev,
+					"Invalid large block write size %d\n",
 					data->block[0]);
 				return -EINVAL;
 			}
@@ -1989,6 +2006,7 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter * adapter, u16 addr,
 					data->block[i+1] = msgbuf1[i];
 				break;
 			case I2C_SMBUS_BLOCK_DATA:
+			case I2C_SMBUS_BLOCK_LARGE_DATA:
 			case I2C_SMBUS_BLOCK_PROC_CALL:
 				for (i = 0; i < msgbuf1[0] + 1; i++)
 					data->block[i] = msgbuf1[i];
