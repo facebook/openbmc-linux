@@ -245,8 +245,7 @@ static noinline int i2cdev_ioctl_rdrw(struct i2c_client *client,
 	for (i = 0; i < rdwr_arg.nmsgs; i++) {
 		/* Limit the size of the message to a sane amount;
 		 * and don't let length change either. */
-		if ((rdwr_pa[i].len > 8192) ||
-		    (rdwr_pa[i].flags & I2C_M_RECV_LEN)) {
+		if (rdwr_pa[i].len > 8192) {
 			res = -EINVAL;
 			break;
 		}
