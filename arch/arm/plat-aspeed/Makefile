@@ -30,3 +30,6 @@ obj-y			+= dev-fb.o dev-video.o
 #obj-m                  :=
 #obj-n                  :=
 #obj-                   :=
+
+#usbdevicegadgetthing
+obj-y			+= dev-virthub.o

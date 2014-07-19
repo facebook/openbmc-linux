@@ -419,6 +419,17 @@ config USB_GOKU
 	default USB_GADGET
 	select USB_GADGET_SELECTED
 
+config USB_GADGET_ASPEED_AST
+  boolean "ASPEED AST Virtual Hub"
+  depends on ARCH_ASPEED
+  help
+    USB debice controller for ASPEED AST
+
+config USB_ASPEED_AST
+  tristate
+  depends on USB_GADGET_ASPEED_AST
+  default USB_GADGET
+  select USB_GADGET_SELECTED
 
 #
 # LAST -- dummy/emulated controller

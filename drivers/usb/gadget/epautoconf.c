@@ -182,6 +182,9 @@ ep_matches (
 		/* min() doesn't work on bitfields with gcc-3.5 */
 		if (size > 64)
 			size = 64;
+    if (gadget->is_dualspeed) {
+      size = 512;
+    }
 		desc->wMaxPacketSize = cpu_to_le16(size);
 	}
 	return 1;

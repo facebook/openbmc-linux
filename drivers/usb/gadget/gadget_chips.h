@@ -158,6 +158,13 @@
 #define gadget_is_fsl_qe(g)	0
 #endif
 
+/* ASPEED BMC Support */
+#ifdef CONFIG_USB_GADGET_ASPEED_AST
+#define gadget_is_aspeed(g)	!strcmp("aspeed_udc", (g)->name)
+#else
+#define gadget_is_aspeed(g)	0
+#endif
+
 
 // CONFIG_USB_GADGET_SX2
 // CONFIG_USB_GADGET_AU1X00
@@ -225,6 +232,8 @@ static inline int usb_gadget_controller_number(struct usb_gadget *gadget)
 		return 0x21;
 	else if (gadget_is_fsl_qe(gadget))
 		return 0x22;
+	else if (gadget_is_aspeed(gadget))
+		return 0x23;
 	return -ENOENT;
 }
 

@@ -42,7 +42,7 @@ extern void __init ast_add_device_uhci(void);
 extern void __init ast_add_device_gmac(void);
 extern void __init ast_add_device_udc11(void);
 extern void __init ast_add_device_lpc(void);
-
+extern void __init ast_add_device_virthub(void);
 
 extern void __init ast_add_device_peci(void);
 

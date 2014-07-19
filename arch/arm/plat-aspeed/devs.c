@@ -55,6 +55,7 @@ init_fnc_t __initdata *init_all_device[] = {
 	ast_add_device_kcs,
 	ast_add_device_mailbox,
 	ast_add_device_snoop,
+  ast_add_device_virthub,
 //	ast_add_device_nand,
 	NULL,
 };

@@ -251,6 +251,15 @@ ast_scu_init_usb20(void)
 
 }
 
+extern void
+ast_scu_init_vhub(void) {
+	//start USB20 clock
+	ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) | SCU_USB20_CLK_EN, AST_SCU_CLK_STOP);
+  mdelay(10);
+	//disable USB20 reset
+	ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_USB20, AST_SCU_RESET);
+}
+
 EXPORT_SYMBOL(ast_scu_init_usb20);
 
 extern void

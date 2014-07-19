@@ -49,6 +49,7 @@ extern void ast_scu_init_lpc(void);
 extern u8 ast_scu_get_lpc_plus_enable(void);
 extern void ast_scu_init_udc11(void);
 extern void ast_scu_init_usb20(void);
+extern void ast_scu_init_vhub(void);
 extern void ast_scu_init_uhci(void);
 extern void ast_scu_init_sdhci(void);
 extern void ast_scu_init_i2c(void);
