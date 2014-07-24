@@ -603,6 +603,23 @@ static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
 	}
 };
 
+
+//Under I2C Dev 2
+static struct i2c_board_info __initdata ast_i2c_board_info_2[] = {
+	{
+		I2C_BOARD_INFO("ncp4200", 0x60),
+	},
+};
+
+
+//Under I2C Dev 3
+static struct i2c_board_info __initdata ast_i2c_board_info_3[] = {
+	{
+		I2C_BOARD_INFO("ncp4200", 0x60),
+	},
+};
+
+
 //Under I2C Dev 4
 static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
 	// Temperature sensors on Wedge:
@@ -636,7 +653,6 @@ static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
 static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 	// Wedge devices
 	{
-		// placeholder, there is not yet a max127 driver
 		I2C_BOARD_INFO("max127", 0x28),
 	},
 	{
@@ -652,8 +668,23 @@ static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 //Under I2C Dev 8
 static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
 	{
+		// Eval board:
 		I2C_BOARD_INFO("lm75b", 0x4a),						
+	},
+	{
+		I2C_BOARD_INFO("pmbus", 0x58),
+	},
+	{
+		I2C_BOARD_INFO("pmbus", 0x5b),
 	}
+};
+
+
+//Under I2C Dev 9
+static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
+	{
+		I2C_BOARD_INFO("ncp4200", 0x63),
+	},
 };
 
 #endif
@@ -691,7 +722,9 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev1_device);
 	i2c_register_board_info(0, ast_i2c_board_info_1, ARRAY_SIZE(ast_i2c_board_info_1));
 	platform_device_register(&ast_i2c_dev2_device);
+	i2c_register_board_info(1, ast_i2c_board_info_2, ARRAY_SIZE(ast_i2c_board_info_2));
 	platform_device_register(&ast_i2c_dev3_device);
+	i2c_register_board_info(2, ast_i2c_board_info_3, ARRAY_SIZE(ast_i2c_board_info_3));
 	platform_device_register(&ast_i2c_dev4_device);
 	i2c_register_board_info(3, ast_i2c_board_info_4, ARRAY_SIZE(ast_i2c_board_info_4));
 	platform_device_register(&ast_i2c_dev5_device);
@@ -702,6 +735,7 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev8_device);
 	i2c_register_board_info(7, ast_i2c_board_info_8, ARRAY_SIZE(ast_i2c_board_info_8));
 	platform_device_register(&ast_i2c_dev9_device);	
+	i2c_register_board_info(8, ast_i2c_board_info_9, ARRAY_SIZE(ast_i2c_board_info_9));
 
 #if defined(CONFIG_ARCH_AST2400)
 	platform_device_register(&ast_i2c_dev10_device);
