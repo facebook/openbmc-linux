@@ -388,6 +388,22 @@ ast_set_adc_en(struct ast_adc_data *ast_adc, u8 adc_ch, u8 enable)
 }
 
 
+/* NAME sysfs */
+static ssize_t 
+show_name(struct device *dev, struct device_attribute *devattr,
+                         char *buf)
+{
+  return sprintf(buf, "ast_adc\n");
+}
+static SENSOR_DEVICE_ATTR_2(name, S_IRUGO, show_name, NULL, 0, 0);
+static struct attribute *name_attributes[] = {
+	&sensor_dev_attr_name.dev_attr.attr,
+	NULL
+};
+static const struct attribute_group name_attribute_groups = {
+	.attrs = name_attributes,
+};
+
 /* attr ADC sysfs 0~max adc channel 
 *	 0 - show/store channel enable
 *	 1 - show value 
@@ -399,12 +415,25 @@ ast_set_adc_en(struct ast_adc_data *ast_adc, u8 adc_ch, u8 enable)
 *	 7 - show/store hystersis low  
 */
 
+static u32 
+ast_get_voltage(int idx) {
+  u16 tmp;
+  u32 voltage, tmp1, tmp2, tmp3;
+  tmp = ast_get_adc_value(ast_adc, idx);
+  // Voltage Sense Method
+  tmp1 = (adc_vcc_ref[REST_DESIGN].r1 + adc_vcc_ref[REST_DESIGN].r2) * tmp * 25 * 10;
+  tmp2 = adc_vcc_ref[REST_DESIGN].r2 * 1023 ;
+  tmp3 = (adc_vcc_ref[REST_DESIGN].r1 * adc_vcc_ref[REST_DESIGN].v2) / adc_vcc_ref[REST_DESIGN].r2;
+  // printk("tmp3 = %d \n",tmp3);
+  voltage = (tmp1/tmp2) - tmp3;
+  return voltage;
+}
+
 static ssize_t 
 ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 {
 	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
-	u16 tmp;
-	u32 voltage,tmp1, tmp2,tmp3;
+	u32 voltage;
 
 	//sensor_attr->index : pwm_ch#
 	//sensor_attr->nr : attr#
@@ -414,15 +443,7 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 			return sprintf(sysfsbuf, "%d : %s\n", ast_get_adc_en(ast_adc,sensor_attr->index),ast_get_adc_en(ast_adc,sensor_attr->index) ? "Enable":"Disable");
 			break;
 		case 1: //value
-			tmp = ast_get_adc_value(ast_adc, sensor_attr->index);
-			//Voltage Sense Method
-			tmp1 = (adc_vcc_ref[REST_DESIGN].r1 + adc_vcc_ref[REST_DESIGN].r2) * tmp * 25 * 10;
-			tmp2 = adc_vcc_ref[REST_DESIGN].r2 * 1023 ;
-		
-			tmp3 = (adc_vcc_ref[REST_DESIGN].r1 * adc_vcc_ref[REST_DESIGN].v2) / adc_vcc_ref[REST_DESIGN].r2;
-		//	printk("tmp3 = %d \n",tmp3);
-			voltage = (tmp1/tmp2) - tmp3;
-			
+			voltage = ast_get_voltage(sensor_attr->index);
 			return sprintf(sysfsbuf, "%d.%d (V)\n",voltage/100, voltage%100);
 			break;
 		case 2: //alarm
@@ -443,6 +464,9 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 		case 7: //hystersis lower
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_hyster_lower(ast_adc,sensor_attr->index));
 			break;			
+		case 8: 
+			voltage = ast_get_voltage(sensor_attr->index);
+			return sprintf(sysfsbuf, "%d\n",voltage * 10);
 
 		default:
 			return -EINVAL;
@@ -504,6 +528,7 @@ ast_store_adc(struct device *dev, struct device_attribute *attr, const char *sys
 *	 5 - show/store hystersis enable  
 *	 6 - show/store hystersis upper  
 *	 7 - show/store hystersis low  
+*	 8 - show value as 1000s, expected by lm-sensors
 */
 
 #define sysfs_adc_ch(index) \
@@ -531,6 +556,9 @@ static SENSOR_DEVICE_ATTR_2(adc##index##_hyster_upper, S_IRUGO | S_IWUSR, \
 static SENSOR_DEVICE_ATTR_2(adc##index##_hyster_lower, S_IRUGO | S_IWUSR, \
 	ast_show_adc, ast_store_adc, 7, index); \
 \
+static SENSOR_DEVICE_ATTR_2(in##index##_input, S_IRUGO | S_IWUSR, \
+	ast_show_adc, NULL, 8, index); \
+\
 static struct attribute *adc##index##_attributes[] = { \
 	&sensor_dev_attr_adc##index##_en.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_value.dev_attr.attr, \
@@ -540,6 +568,7 @@ static struct attribute *adc##index##_attributes[] = { \
 	&sensor_dev_attr_adc##index##_hyster_en.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_hyster_upper.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_hyster_lower.dev_attr.attr, \
+	&sensor_dev_attr_in##index##_input.dev_attr.attr, \
 	NULL \
 };
 
@@ -637,10 +666,14 @@ ast_adc_probe(struct platform_device *pdev)
 		goto out_region;
 	}
 
+	err = sysfs_create_group(&pdev->dev.kobj, &name_attribute_groups);
+	if (err)
+		goto out_region;
+
 	for(i=0; i<MAX_CH_NO; i++) {
 		err = sysfs_create_group(&pdev->dev.kobj, &adc_attribute_groups[i]);
 		if (err)
-			goto out_region;
+			goto out_sysfs00;
 	}
 
 	ast_adc_ctrl_init();
@@ -652,6 +685,8 @@ ast_adc_probe(struct platform_device *pdev)
 
 //out_irq:
 //	free_irq(ast_adc->irq, NULL);
+out_sysfs00:
+	sysfs_remove_group(&pdev->dev.kobj, &name_attribute_groups);
 out_region:
 	release_mem_region(res->start, res->end - res->start + 1);
 out_mem:
@@ -673,6 +708,8 @@ ast_adc_remove(struct platform_device *pdev)
 
 	for(i=0; i<5; i++)
 		sysfs_remove_group(&pdev->dev.kobj, &adc_attribute_groups[i]);
+
+	sysfs_remove_group(&pdev->dev.kobj, &name_attribute_groups);
 
 	platform_set_drvdata(pdev, NULL);
 //	free_irq(ast_adc->irq, ast_adc);
