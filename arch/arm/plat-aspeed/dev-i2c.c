@@ -742,10 +742,11 @@ void __init ast_add_device_i2c(void)
 #if defined(CONFIG_MMC_AST)
 	//Due to share pin with SD 
 #else
-	platform_device_register(&ast_i2c_dev11_device);
-	platform_device_register(&ast_i2c_dev12_device);
+	/*
+	 * On wedge, only bus 13 is used as i2c bus. Pins for bus 11, 12,
+	 * and 14 are used as GPIOs.
+	 */
 	platform_device_register(&ast_i2c_dev13_device);
-	platform_device_register(&ast_i2c_dev14_device);
 #endif	
 #endif
 }
