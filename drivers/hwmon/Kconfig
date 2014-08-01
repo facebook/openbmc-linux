@@ -880,6 +880,15 @@ config SENSORS_AST_PWM_FAN
           This driver provides support for the ASPEED PWM & FAN Tacho
           Controller, which provides an Sensor, fan control.
 
+config SENSORS_FB_PANTHER_PLUS
+	tristate "Facebook Panther+ Microserver Driver"
+	depends on ARCH_ASPEED && I2C
+	default n
+	help
+    This driver provides support for Facebook Panther+ microserver.
+
+	  Say Y here if you run on the BMC which connects to Panther+ microserver
+
 config SENSORS_APPLESMC
 	tristate "Apple SMC (Motion sensor, light sensor, keyboard backlight)"
 	depends on INPUT && X86

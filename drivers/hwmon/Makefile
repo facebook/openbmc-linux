@@ -31,6 +31,7 @@ obj-$(CONFIG_SENSORS_ADT7473)	+= adt7473.o
 obj-$(CONFIG_SENSORS_APPLESMC)	+= applesmc.o
 obj-$(CONFIG_SENSORS_AST_ADC)	+= ast_adc.o
 obj-$(CONFIG_SENSORS_AST_PWM_FAN)	+= ast_pwm_fan.o
+obj-$(CONFIG_SENSORS_FB_PANTHER_PLUS)	+= fb_panther_plus.o
 obj-$(CONFIG_SENSORS_AMS)	+= ams/
 obj-$(CONFIG_SENSORS_ATXP1)	+= atxp1.o
 obj-$(CONFIG_SENSORS_CORETEMP)	+= coretemp.o
@@ -87,4 +88,3 @@ obj-$(CONFIG_PMBUS)             += pmbus/
 ifeq ($(CONFIG_HWMON_DEBUG_CHIP),y)
 EXTRA_CFLAGS += -DDEBUG
 endif
-

@@ -640,6 +640,10 @@ static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
 
 //Under I2C Dev 5
 static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
+	/* Panther+ microserver */
+	{
+		I2C_BOARD_INFO("fb_panther_plus", 0x40),
+	},
 	// Temperature sensor on uServer:
 	{
 		I2C_BOARD_INFO("tmp75", 0x4c),
