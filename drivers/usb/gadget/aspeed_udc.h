@@ -59,6 +59,7 @@
 
 #define AST_EP_DL_RESET (1 << 2)
 #define AST_EP_SINGLE_STAGE (1 << 1)
+#define AST_EP_STALL_ENABLED (1 << 12)
 
 #define AST_EP_TYPE_DISABLED 0
 #define AST_EP_TYPE_BULK_IN  2
@@ -103,6 +104,7 @@ struct aspeed_udc {
   int irq;
   unsigned int ep0_out_wait;
   unsigned int setting_address;
+  unsigned int pullup_on;
 };
 
 struct ast_usb_request {

@@ -421,9 +421,10 @@ config USB_GOKU
 
 config USB_GADGET_ASPEED_AST
   boolean "ASPEED AST Virtual Hub"
+	select USB_GADGET_DUALSPEED
   depends on ARCH_ASPEED
   help
-    USB debice controller for ASPEED AST
+    USB device controller for ASPEED AST
 
 config USB_ASPEED_AST
   tristate
