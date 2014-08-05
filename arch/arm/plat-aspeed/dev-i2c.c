@@ -632,10 +632,6 @@ static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
 	{
 		I2C_BOARD_INFO("tmp75", 0x4a),
 	},
-	// AST2400 EVB:
-	{
-		I2C_BOARD_INFO("24c128", 0x50),
-	}
 };
 
 //Under I2C Dev 5
@@ -650,7 +646,10 @@ static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
 	},
 	{
 		I2C_BOARD_INFO("ads7828", 0x4b),
-	}
+	},
+	{
+		I2C_BOARD_INFO("24c128", 0x51),
+	},
 };
 
 //Under I2C Dev 7
