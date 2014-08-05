@@ -1223,6 +1223,18 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 		sts &= ~AST_I2CD_SMBUS_ALT_INTR_EN; 
 	}
 	
+	if(AST_I2CD_INTR_STS_ABNORMAL & sts) {
+		i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ABNORMAL;
+		// Turn off interrupts for further abnormal
+		// conditions until we fix this one.
+		ast_i2c_write(i2c_dev,
+			ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) &
+			~AST_I2CD_ABNORMAL_INTR_EN,
+			I2C_INTR_CTRL_REG);
+		complete(&i2c_dev->cmd_complete);
+		sts &= ~AST_I2CD_INTR_STS_ABNORMAL;
+	}
+
 	switch(sts) {
 		case AST_I2CD_INTR_STS_TX_ACK:
 			if(i2c_dev->slave_operation == 1) {
@@ -1344,10 +1356,6 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_ARBIT_LOSS = %x\n",sts);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
-			complete(&i2c_dev->cmd_complete);					
-			break;
-		case AST_I2CD_INTR_STS_ABNORMAL:
-			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ABNORMAL;
 			complete(&i2c_dev->cmd_complete);					
 			break;
 		case AST_I2CD_INTR_STS_SCL_TO:
