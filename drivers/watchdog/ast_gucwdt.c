@@ -20,7 +20,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */                      
+ */
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -55,7 +55,7 @@
 #include <mach/platform.h>
 #endif
 
-#define TICKS_PER_uSEC                  1 
+#define TICKS_PER_uSEC                  1
 
 
 typedef unsigned char bool_T;
@@ -95,7 +95,7 @@ typedef unsigned char bool_T;
 #define WDT_CLK_SRC_PCLK	1
 
 //Global Variables
-#define WD_TIMO 6			/* Default heartbeat = 6 seconds */
+#define WD_TIMO 11			/* Default heartbeat = 11 seconds */
 
 static int heartbeat = WD_TIMO;
 module_param(heartbeat, int, 0);
@@ -107,6 +107,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 
 static unsigned long wdt_is_open;
 static char expect_close;
+static char wdt_disabled = 0; // setting this to 1 will disable the wdt timer
 
 //Function Declaration
 int __init wdt_init(void);
@@ -122,7 +123,7 @@ static irqreturn_t wdt_isr(int irq, void *devid, struct pt_regs *regs)
 void wdt_disable(void)
 {
     register unsigned int regVal;
-                                                                                     
+
     /* reset WDT_Ctrl[0] as 0 */
     regVal = UMVP_READ_REG(WDT_Ctrl);
     regVal &= 0xFFFFFFFE;
@@ -132,7 +133,7 @@ void wdt_disable(void)
 void wdt_sel_clk_src(unsigned char sourceClk)
 {
     register unsigned int regVal;
-                                                                                     
+
     regVal = UMVP_READ_REG(WDT_Ctrl);
     if (sourceClk == WDT_CLK_SRC_PCLK)
     {
@@ -147,7 +148,7 @@ void wdt_sel_clk_src(unsigned char sourceClk)
     UMVP_WRITE_REG(WDT_Ctrl, regVal);
 }
 
-void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys, bool_T bResetSys)
+void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys, bool_T bResetSys, bool_T bResetARMOnly)
 {
 	register unsigned int regVal;
 
@@ -186,40 +187,58 @@ void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys, bool_T bResetSys)
 		regVal &= 0xFFFFFFFD;
 	}
 
+  if (bResetARMOnly)
+  {
+    /* set WDT_Ctrl[6..5] = 10 ie, reset ARM only */
+    regVal |= (1 << 6);
+  }
+  else
+  {
+    /* reset WDT_CTrl[6..5] = 00 ie, SOC system */
+    regVal &= ~((1 << 5) | (1 << 6));
+  }
+
 	UMVP_WRITE_REG(WDT_Ctrl, regVal);
 }
 
 void wdt_enable(void)
 {
-	register unsigned int regVal;
+  if (wdt_disabled == 0) {
 
-	/* set WDT_Ctrl[0] as 1 */
-	regVal = UMVP_READ_REG(WDT_Ctrl);
-	regVal |= 1;
-	UMVP_WRITE_REG(WDT_Ctrl, regVal);
+  	register unsigned int regVal;
+
+  	/* set WDT_Ctrl[0] as 1 */
+  	regVal = UMVP_READ_REG(WDT_Ctrl);
+  	regVal |= 1;
+  	UMVP_WRITE_REG(WDT_Ctrl, regVal);
+  }
 }
 
-void wdt_restart_new(unsigned int nPeriod, int sourceClk, bool_T bResetOut, bool_T bIntrSys, bool_T bResetSys, bool_T bUpdated)
+void wdt_restart_new(unsigned int nPeriod, int sourceClk, bool_T bResetOut, bool_T bIntrSys, bool_T bResetSys, bool_T bUpdated, bool_T bResetARMOnly)
 {
-	wdt_disable();
+  if (wdt_disabled == 0) {
+  	wdt_disable();
 
-	UMVP_WRITE_REG(WDT_Reload, nPeriod);
+  	UMVP_WRITE_REG(WDT_Reload, nPeriod);
 
-	wdt_sel_clk_src(sourceClk);
+  	wdt_sel_clk_src(sourceClk);
 
-	wdt_set_timeout_action(bResetOut, bIntrSys, bResetSys);
+  	wdt_set_timeout_action(bResetOut, bIntrSys, bResetSys, bResetARMOnly);
 
-	UMVP_WRITE_REG(WDT_Restart, 0x4755);	/* reload! */
+  	UMVP_WRITE_REG(WDT_Restart, 0x4755);	/* reload! */
 
-	if (!bUpdated)
-  	  wdt_enable();
+	  if (!bUpdated)
+  	    wdt_enable();
+  }
 }
 
 void wdt_restart(void)
 {
-	wdt_disable();
-	UMVP_WRITE_REG(WDT_Restart, 0x4755);	/* reload! */
-	wdt_enable();
+  if (wdt_disabled == 0) {
+  	wdt_disable();
+	  UMVP_WRITE_REG(WDT_Restart, 0x4755);	/* reload! */
+  	wdt_enable();
+  }
 }
 
 
@@ -235,10 +254,10 @@ static int wdt_set_heartbeat(int t)
 {
   if ((t < 1) || (t > 1000))
       return -EINVAL;
-      
+
   heartbeat=t;
-      
-  wdt_restart_new(TICKS_PER_uSEC*1000000*t, WDT_CLK_SRC_EXT, FALSE, TRUE, FALSE, FALSE);
+
+  wdt_restart_new(TICKS_PER_uSEC*1000000*t, WDT_CLK_SRC_EXT, FALSE, FALSE, TRUE, FALSE, TRUE);
   return 0;
 }
 
@@ -247,41 +266,57 @@ static int wdt_set_heartbeat(int t)
 */
 
 /**
- *	umvp2500_wdt_write: 
+ *	umvp2500_wdt_write:
  *	@file: file handle to the watchdog
  *	@buf: buffer to write (unused as data does not matter here
  *	@count: count of bytes
  *	@ppos: pointer to the position to write. No seeks allowed
  *
- *	A write to a watchdog device is defined as a keepalive signal. Any
- *	write of data will do, as we we don't define content meaning.
+ *	A write to a watchdog device is defined as a keepalive signal. Any data will
+ *	do, except for the reserved letters 'V' (to enable magic close), the
+ *	letter 'X' (to override the current watchdog settings and disable it), or the
+ *	letter 'x' (to turn off override and restore its old settings).
+ *
  */
-         
- static ssize_t umvp2500_wdt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
- {
-   if(count) 
-   {
-     if (!nowayout)
-     {
-        size_t i;
-             
-        /* In case it was set long ago */
-        expect_close = 0;
-                         
-        for (i = 0; i != count; i++) 
-        {
-          char c;
-          if (get_user(c, buf + i))
-            return -EFAULT;
-          if (c == 'V')
-            expect_close = 42;
-        }
-      }
-      wdt_restart();
+
+static ssize_t umvp2500_wdt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+{
+  if(count)
+  {
+    if (!nowayout)
+    {
+       size_t i;
+
+       /* In case it was set long ago */
+       expect_close = 0;
+
+       for (i = 0; i != count; i++)
+       {
+         char c;
+         if (get_user(c, buf + i))
+           return -EFAULT;
+
+         switch(c) {
+           case 'V':
+             expect_close = 42;
+             break;
+           case 'X':
+             wdt_disabled = 1;
+             wdt_disable();
+             break;
+           case 'x':
+             wdt_disabled = 0;
+             break;
+           default:
+             break;
+         }
+       }
+     }
+     wdt_restart();
    }
-   return count; 
+   return count;
  }
- 
+
 /**
  *	umvp2500_wdt_ioctl:
  *	@inode: inode of the device
@@ -292,14 +327,14 @@ static int wdt_set_heartbeat(int t)
  *	according to their available features. We only actually usefully support
  *	querying capabilities and current status.
  */
-          
+
 static int umvp2500_wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
   void __user *argp = (void __user *)arg;
   int __user *p = argp;
   int new_heartbeat;
-      
-  static struct watchdog_info ident = 
+
+  static struct watchdog_info ident =
   {
     .options 		= WDIOF_SETTIMEOUT|
                           WDIOF_MAGICCLOSE|
@@ -307,13 +342,13 @@ static int umvp2500_wdt_ioctl(struct inode *inode, struct file *file, unsigned i
     .firmware_version 	= 1,
     .identity 		= "UMVP2500 WDT",
   };
-  
+
   switch(cmd)
   {
     default:
       return -ENOIOCTLCMD;
     case WDIOC_GETSUPPORT:
-      return copy_to_user(argp, &ident, sizeof(ident))?-EFAULT:0;                      
+      return copy_to_user(argp, &ident, sizeof(ident))?-EFAULT:0;
     case WDIOC_GETSTATUS:
     case WDIOC_GETBOOTSTATUS:
       return put_user(0, p);
@@ -329,7 +364,7 @@ static int umvp2500_wdt_ioctl(struct inode *inode, struct file *file, unsigned i
 
       /* Fall */
     case WDIOC_GETTIMEOUT:
-      return put_user(heartbeat, p);      
+      return put_user(heartbeat, p);
   }
 }
 /**
@@ -343,18 +378,16 @@ static int umvp2500_wdt_ioctl(struct inode *inode, struct file *file, unsigned i
 *	triggers counter 2 downcounts the length of the reset pulse which
 *	set set to be as long as possible.
 */
-          
+
 static int umvp2500_wdt_open(struct inode *inode, struct file *file)
 {
-  if(test_and_set_bit(0, &wdt_is_open))
-      return -EBUSY;
   /*
    *	Activate
    */
- // wdt_init(); 
+ // wdt_init();
   wdt_restart();
   return nonseekable_open(inode, file);
-} 
+}
 
 /**
 *	umvp2500_wdt_release:
@@ -367,19 +400,28 @@ static int umvp2500_wdt_open(struct inode *inode, struct file *file)
 *	reboots. In the former case we disable the counters, in the latter
 *	case you have to open it again very soon.
 */
-          
+
 static int umvp2500_wdt_release(struct inode *inode, struct file *file)
 {
-  if (expect_close == 42 || !nowayout) 
+  if (expect_close != 42 && !nowayout)
   {
-      wdt_disable();
-      clear_bit(0, &wdt_is_open);
-  } 
-  else 
-  {
-      printk(KERN_CRIT "wdt: WDT device closed unexpectedly.  WDT will not stop!\n");
-      wdt_restart();
+    /* handles the case where the device is closed without the "magic
+     * close" character (anything that is not 'V' qualifies -- see the
+     * original Linux watchdog spec for more about this). closing the
+     * device in this case must disable the timer too, so automatic
+     * restarts are inhibited.
+     */
+    wdt_disable();
   }
+  else
+  {
+    /* handles the case where the kernel is compiled with nowayout, or
+     * if the user specifies that the watchdog should continue ticking
+     * after device closure (by writing a 'V' before closing the device)
+     */
+    wdt_restart();
+  }
+
   expect_close = 0;
   return 0;
 }
@@ -395,10 +437,10 @@ static int umvp2500_wdt_release(struct inode *inode, struct file *file)
 *	test or worse yet during the following fsck. This would suck, in fact
 *	trust me - if it happens it does suck.
 */
-          
+
 static int umvp2500_wdt_notify_sys(struct notifier_block *this, unsigned long code, void *unused)
 {
-   if(code==SYS_DOWN || code==SYS_HALT) 
+   if(code==SYS_DOWN || code==SYS_HALT)
    {
      /* Turn the WDT off */
      wdt_disable();
@@ -415,7 +457,7 @@ extern void ast_soc_wdt_reset(void)
 
 EXPORT_SYMBOL(ast_soc_wdt_reset);
 
-static struct file_operations umvp2500_wdt_fops = 
+static struct file_operations umvp2500_wdt_fops =
 {
   .owner	= THIS_MODULE,
   .llseek	= no_llseek,
@@ -425,26 +467,26 @@ static struct file_operations umvp2500_wdt_fops =
   .release	= umvp2500_wdt_release,
 };
 
-static struct miscdevice ast_wdt_miscdev = 
+static struct miscdevice ast_wdt_miscdev =
 {
    .minor	= WATCHDOG_MINOR,
    .name	= "watchdog",
    .fops	= &umvp2500_wdt_fops,
 };
-     
-static struct notifier_block umvp2500_wdt_notifier = 
+
+static struct notifier_block umvp2500_wdt_notifier =
 {
    .notifier_call=umvp2500_wdt_notify_sys,
 };
 
 static int ast_wdt_probe(struct platform_device *pdev)
 {
-   int ret;  
-    
+   int ret;
+
    wdt_disable();
    wdt_sel_clk_src(WDT_CLK_SRC_EXT);
-   wdt_set_timeout_action(FALSE, FALSE, FALSE);
-	
+   wdt_set_timeout_action(FALSE, FALSE, FALSE, TRUE);
+
    /* register ISR */
    if (request_irq(IRQ_WDT, (void *)wdt_isr, IRQF_DISABLED, "WDT", NULL))
    {
@@ -455,7 +497,7 @@ static int ast_wdt_probe(struct platform_device *pdev)
      printk("success to register interrupt for INT_WDT (%d)\n", IRQ_WDT);
 
    ret = register_reboot_notifier(&umvp2500_wdt_notifier);
-   if(ret) 
+   if(ret)
    {
      printk(KERN_ERR "wdt: cannot register reboot notifier (err=%d)\n", ret);
      free_irq(IRQ_WDT, NULL);
@@ -463,16 +505,16 @@ static int ast_wdt_probe(struct platform_device *pdev)
    }
 
    ret = misc_register(&ast_wdt_miscdev);
-   if (ret) 
+   if (ret)
    {
       printk(KERN_ERR "wdt: cannot register miscdev on minor=%d (err=%d)\n",WATCHDOG_MINOR, ret);
-      unregister_reboot_notifier(&umvp2500_wdt_notifier);   
+      unregister_reboot_notifier(&umvp2500_wdt_notifier);
       return ret;
    }
 
    /* interrupt the system while WDT timeout */
-   wdt_restart_new(TICKS_PER_uSEC*1000000*heartbeat, WDT_CLK_SRC_EXT, FALSE, TRUE, FALSE, TRUE);
-   
+   wdt_restart_new(TICKS_PER_uSEC*1000000*heartbeat, WDT_CLK_SRC_EXT, FALSE, TRUE, TRUE, TRUE, TRUE);
+
    printk(KERN_INFO "UMVP2500 WDT is installed.(irq = %d, heartbeat = %d secs, nowayout = %d)\n",IRQ_WDT,heartbeat,nowayout);
 
    return (0);
@@ -482,7 +524,7 @@ static int ast_wdt_remove(struct platform_device *dev)
 {
 	misc_deregister(&ast_wdt_miscdev);
 	disable_irq(IRQ_WDT);
-	free_irq(IRQ_WDT, NULL);		
+	free_irq(IRQ_WDT, NULL);
 	return 0;
 }
 
@@ -495,10 +537,10 @@ static struct platform_driver ast_wdt_driver = {
         .probe          = ast_wdt_probe,
         .remove         = ast_wdt_remove,
         .shutdown       = ast_wdt_shutdown,
-#if 0        
+#if 0
         .suspend                = ast_wdt_suspend,
         .resume         = ast_wdt_resume,
-#endif        
+#endif
         .driver         = {
                 .owner  = THIS_MODULE,
                 .name   = "ast-wdt",
