@@ -690,6 +690,13 @@ static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
 	},
 };
 
+//Under I2C Dev 13
+static struct i2c_board_info __initdata ast_i2c_board_info_13[] = {
+	{
+		I2C_BOARD_INFO("adm1278", 0x10),
+	},
+};
+
 #endif
 
 /*-------------------------------------*/
@@ -750,6 +757,7 @@ void __init ast_add_device_i2c(void)
 	 * and 14 are used as GPIOs.
 	 */
 	platform_device_register(&ast_i2c_dev13_device);
+	i2c_register_board_info(12, ast_i2c_board_info_13, ARRAY_SIZE(ast_i2c_board_info_13));
 #endif	
 #endif
 }
