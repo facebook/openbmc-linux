@@ -674,11 +674,22 @@ static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
 		// Eval board:
 		I2C_BOARD_INFO("lm75b", 0x4a),						
 	},
+	// There are some issues with the pfe1100 devices -- they
+	// show up at 0x5a and 0x5b when external power is applied,
+	// but they show up at 0x58 when no power is applied (obviously,
+	// they have to be getting power from their peer power supply to
+	// show up as I2C devices).
+
+	// So we have a 0x58 entry here, so that the device can be
+	// accessed, but we really shouldn't count on that.
 	{
-		I2C_BOARD_INFO("pmbus", 0x58),
+		I2C_BOARD_INFO("pfe1100", 0x58),
 	},
 	{
-		I2C_BOARD_INFO("pmbus", 0x5b),
+		I2C_BOARD_INFO("pfe1100", 0x5a),
+	},
+	{
+		I2C_BOARD_INFO("pfe1100", 0x5b),
 	}
 };
 
