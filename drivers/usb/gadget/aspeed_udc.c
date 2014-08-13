@@ -640,6 +640,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver) {
     return -ENODEV;
 
   spin_lock_irqsave(&udc.lock, flags);
+  udc.pullup_on = 1;
   if (udc.driver) {
     err = -EBUSY;
     goto err;
