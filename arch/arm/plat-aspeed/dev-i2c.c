@@ -682,8 +682,16 @@ static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
 
 	// So we have a 0x58 entry here, so that the device can be
 	// accessed, but we really shouldn't count on that.
+	
+	// Looks like ODM has HW modification to have device addresses 
+	// at 0x59 and 0x5a. The HW modification we did here fixes the
+	// addresses at 0x5a and 0x5b. For now, list all possible
+	// addresses here.
 	{
 		I2C_BOARD_INFO("pfe1100", 0x58),
+	},
+	{
+		I2C_BOARD_INFO("pfe1100", 0x59),
 	},
 	{
 		I2C_BOARD_INFO("pfe1100", 0x5a),
