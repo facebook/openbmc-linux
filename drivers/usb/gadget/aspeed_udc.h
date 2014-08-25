@@ -102,9 +102,15 @@ struct aspeed_udc {
 
   u16 hub_address;
   int irq;
-  unsigned int ep0_out_wait;
-  unsigned int setting_address;
   unsigned int pullup_on;
+
+  enum {
+    EP0_STAGE_SETUP,
+    EP0_STAGE_DATA,
+    EP0_STAGE_STATUS,
+  } ep0_stage;
+  /* either USB_DIR_OUT or USB_DIR_IN, valid if it is in data or status stage */
+  u8 ep0_dir;
 };
 
 struct ast_usb_request {

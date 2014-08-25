@@ -1,6 +1,11 @@
 /*
- * aspeed_udc
+ * aspeed_udc - Driver for Aspeed virtual hub (usb gadget)
+ *
+ * Copyright 2004-present Facebook. All Rights Reserved.
  */
+
+//#define DEBUG
+//#define VERBOSE_DEBUG
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -29,6 +34,7 @@
 #include "aspeed_udc.h"
 
 #define NUM_ENDPOINTS 14
+#define AST_UDC_EP0_MAXPACKET 64
 
 struct ast_ep *eps;
 static const struct usb_ep_ops ast_ep_ops;
@@ -37,6 +43,10 @@ static void ep_txrx_check_done(struct ast_ep* ep);
 static void enable_upstream_port(void);
 static void disable_upstream_port(void);
 static int ast_udc_pullup(struct usb_gadget* gadget, int on);
+
+static inline const char* ast_udc_dir2str(u8 dir) {
+  return (dir & USB_DIR_IN) ? "IN" : "OUT";
+}
 
 static int ast_udc_get_frame(struct usb_gadget* gadget) {
   return -EOPNOTSUPP;
@@ -61,28 +71,52 @@ static struct aspeed_udc udc = {
       .release = norelease,
     },
   },
-  .ep0_out_wait = 0,
   .pullup_on = 1,
+  .ep0_stage = EP0_STAGE_SETUP,
+  .ep0_dir = USB_DIR_IN,
 };
 
-static void enable_hub_interrupts(u32 interrupts) {
-  ast_hwritel(&udc, INTERRUPT_ENABLE, ast_hreadl(&udc, INTERRUPT_ENABLE) | interrupts);
+static inline struct ast_usb_request *to_ast_req(struct usb_request* rq)
+{
+  return container_of(rq, struct ast_usb_request, req);
 }
 
-static void disable_hub_interrupts(u32 interrupts) {
-  ast_hwritel(&udc, INTERRUPT_ENABLE, ast_hreadl(&udc, INTERRUPT_ENABLE) &~ interrupts);
+static inline struct ast_ep *to_ast_ep(struct usb_ep* ep)
+{
+  return container_of(ep, struct ast_ep, ep);
+}
+
+static void* ast_alloc_dma_memory(int sz, enum dma_data_direction dir,
+                                  dma_addr_t *phys)
+{
+  void* mem;
+  mem = kmalloc(sz, GFP_KERNEL | GFP_DMA);
+  if (!mem) {
+    return NULL;
+  }
+
+  *phys = dma_map_single(udc.gadget.dev.parent, mem, sz, dir);
+  return mem;
+}
+
+static void ast_free_dma_memory(int sz, enum dma_data_direction dir,
+                                void *mem, dma_addr_t phys)
+{
+  if (phys) {
+    dma_unmap_single(udc.gadget.dev.parent, phys, sz, dir);
+  }
+  if (mem) {
+    kfree(mem);
+  }
 }
 
 static int ast_udc_pullup(struct usb_gadget* gadget, int on) {
-  unsigned long flags;
   if(on) {
     enable_upstream_port();
   } else {
     disable_upstream_port();
   }
-  spin_lock_irqsave(&udc.lock, flags);
   udc.pullup_on = on;
-  spin_unlock_irqrestore(&udc.lock, flags);
   return 0;
 }
 
@@ -91,7 +125,7 @@ static struct ast_ep ep0_ep = {
   .ep = {
     .name = "ep0",
     .ops = &ast_ep_ops,
-    .maxpacket = 64,
+    .maxpacket = AST_UDC_EP0_MAXPACKET,
   },
   .queue = LIST_HEAD_INIT(ep0_ep.queue),
   .lock = SPIN_LOCK_UNLOCKED,
@@ -102,16 +136,17 @@ static void clear_isr(u32 flag) {
   ast_hwritel(&udc, ISR, flag);
 }
 
-static void ep0_stall(void) {
+static void ep0_stall_ready(void) {
   ast_hwritel(&udc, EP0_STATUS, AST_EP0_STALL);
 }
 
-static void ep0_rxwait(void) {
-  udc.ep0_out_wait = 1;
-  ast_hwritel(&udc, EP0_DMA_ADDR, udc.ep0_dma_phys);
-  ast_hwritel(&udc, EP0_STATUS, ast_hreadl(&udc, EP0_STATUS) |
-      AST_EP0_OUT_READY);
-  ep0_ep.dma_busy = 1;
+static void ep0_out_ready(void) {
+  ast_hwritel(&udc, EP0_STATUS, AST_EP0_OUT_READY);
+}
+
+static void ep0_in_ready(size_t size) {
+  ast_hwritel(&udc, EP0_STATUS, (size << 8));
+  ast_hwritel(&udc, EP0_STATUS, (size << 8) | AST_EP0_IN_READY);
 }
 
 static void enable_upstream_port(void) {
@@ -120,17 +155,6 @@ static void enable_upstream_port(void) {
 
 static void disable_upstream_port(void) {
   ast_hwritel(&udc, STATUS, ast_hreadl(&udc, STATUS) &~ 0x5);
-}
-
-// send up to 64 bytes from ep0
-static void ep0_tx(u8* data, size_t size) {
-  if(size != 0)
-    memcpy(udc.ep0_dma_virt, data, size);
-  ast_hwritel(&udc, EP0_DMA_ADDR, udc.ep0_dma_phys);
-  dma_sync_single_for_device(udc.gadget.dev.parent, udc.ep0_dma_phys, 64, DMA_TO_DEVICE);
-  ast_hwritel(&udc, EP0_STATUS, (size << 8));
-  ast_hwritel(&udc, EP0_STATUS, (size << 8) | AST_EP0_IN_READY);
-  disable_hub_interrupts(AST_INT_EP0_OUT_NAK);
 }
 
 struct ast_usb_request empty_rq = {
@@ -157,22 +181,155 @@ struct ast_ep* ep_by_addr(int addr) {
   return ep;
 }
 
-static int handle_ep0_setup(void) {
+static void ep0_stall(void) {
+  pr_debug("Prepare for EP0 stall, Reset EP0 stage to SETUP\n");
+  /* reply stall on next pkt */
+  ep0_stall_ready();
+  /* expect SETUP after */
+  udc.ep0_stage = EP0_STAGE_SETUP;
+  udc.ep0_dir = USB_DIR_IN;
+}
+
+static void ep0_next_stage(int has_data_phase, u8 data_dir) {
+#ifdef DEBUG
+  int prev_stage = udc.ep0_stage;
+  int prev_dir = udc.ep0_dir;
+#endif
+
+  switch (udc.ep0_stage) {
+  case EP0_STAGE_SETUP:
+    if (has_data_phase) {
+      udc.ep0_stage = EP0_STAGE_DATA;
+      udc.ep0_dir = (data_dir == USB_DIR_IN) ? USB_DIR_IN : USB_DIR_OUT;
+    } else {
+      udc.ep0_stage = EP0_STAGE_STATUS;
+      udc.ep0_dir = USB_DIR_IN;
+    }
+    break;
+  case EP0_STAGE_DATA:
+    udc.ep0_stage = EP0_STAGE_STATUS;
+    udc.ep0_dir = (udc.ep0_dir == USB_DIR_IN) ? USB_DIR_OUT : USB_DIR_IN;
+    break;
+  case EP0_STAGE_STATUS:
+    udc.ep0_stage = EP0_STAGE_SETUP;
+    udc.ep0_dir = USB_DIR_IN;
+    break;
+  default:
+    pr_err("Wrong EP0 stage %d\n", udc.ep0_stage);
+    break;
+  }
+
+#ifdef DEBUG
+  pr_debug("EP0 stage is changed from %d (%s) to %d (%s)\n",
+           prev_stage, ast_udc_dir2str(prev_dir),
+           udc.ep0_stage, ast_udc_dir2str(udc.ep0_dir));
+#endif
+}
+
+static void ep0_queue_run(void) {
+  struct ast_ep *ep = &ep0_ep;
+
+  /* if ep0 is still doing DMA or no request pending, nothing to do */
+  if (ep->dma_busy || list_empty(&ep->queue)) {
+    return;
+  }
+
+  if (udc.ep0_dir == USB_DIR_OUT) {
+    /* just tell HW we are ready for OUT */
+    ep0_out_ready();
+  } else {
+    size_t sendable;
+    struct ast_usb_request *req;
+
+    req = list_entry(ep->queue.next, struct ast_usb_request, queue);
+    sendable = req->req.length - req->req.actual;
+    if (sendable > AST_UDC_EP0_MAXPACKET) {
+      sendable = AST_UDC_EP0_MAXPACKET;
+    }
+    if (sendable) {
+      memcpy(udc.ep0_dma_virt, req->req.buf + req->req.actual, sendable);
+    }
+    dma_sync_single_for_device(udc.gadget.dev.parent, udc.ep0_dma_phys,
+                               AST_UDC_EP0_MAXPACKET, DMA_TO_DEVICE);
+    ep0_in_ready(sendable);
+    req->lastpacket = sendable;
+  }
+  ep->dma_busy = 1;
+}
+
+static int ep0_enqueue(struct usb_ep* _ep, struct usb_request *_rq,
+                       gfp_t gfp_flags) {
+  struct ast_usb_request *req = to_ast_req(_rq);
+  struct ast_ep *ep = to_ast_ep(_ep);
+  unsigned long flags;
+  int rc = 0;
+
+  _rq->status = -EINPROGRESS;
+  req->req.actual = 0;
+
+  pr_debug("EP0 enqueue %d bytes at stage %d, %s\n",
+           req->req.length, udc.ep0_stage, ast_udc_dir2str(udc.ep0_dir));
+
+  spin_lock_irqsave(&ep->lock, flags);
+
+  /* shall only happen when in data or status stage */
+  if (udc.ep0_stage != EP0_STAGE_DATA && udc.ep0_stage != EP0_STAGE_STATUS) {
+    pr_err("EP0 enqueue happens at wrong stage %d\n", udc.ep0_stage);
+    rc = -EINPROGRESS;
+    goto out;
+  }
+
+  /* ep0 shall only have one pending request a time */
+  if (!list_empty(&ep->queue)) {
+    pr_err("EP0 enqueue happens with an existing entry on queue\n");
+  } else {
+    list_add_tail(&req->queue, &ep->queue);
+    ep0_queue_run();
+  }
+
+ out:
+  if (rc < 0) {
+    ep0_stall();
+  }
+  spin_unlock_irqrestore(&ep->lock, flags);
+  return rc;
+}
+
+static int ep0_handle_setup(void) {
+  struct ast_ep *ep = &ep0_ep;
   struct usb_ctrlrequest crq;
-  int ret = 0;
+  int rc = 0;
   u16 val, idx, len;
+  unsigned long flags;
+
+  /* make sure we are expecting setup packet */
+  if (udc.ep0_stage != EP0_STAGE_SETUP) {
+    pr_err("Received SETUP pkt on wrong stage %d\n", udc.ep0_stage);
+    ep0_stall();
+    rc = -EINPROGRESS;
+    goto out;
+  }
+
   memcpy_fromio(&crq, udc.regs + AST_HUB_ROOT_SETUP_BUFFER, sizeof(crq));
   val = le16_to_cpu(crq.wValue);
   idx = le16_to_cpu(crq.wIndex);
   len = le16_to_cpu(crq.wLength);
+
+  pr_debug("request=%d, reqType=0x%x val=0x%x idx=%d len=%d %s\n",
+           crq.bRequest, crq.bRequestType, val, idx, len,
+           ast_udc_dir2str(crq.bRequestType));
+
+  spin_lock_irqsave(&ep->lock, flags);
+  ep0_next_stage(
+      len, (crq.bRequestType & USB_DIR_IN) ? USB_DIR_IN : USB_DIR_OUT);
+  spin_unlock_irqrestore(&ep->lock, flags);
+
   switch (crq.bRequest) {
     case USB_REQ_SET_ADDRESS:
       udc.hub_address = val;
-      //udc.setting_address = 1;
       ast_hwritel(&udc, ROOT_CONFIG, udc.hub_address);
-      //respond with an empty IN pkt
-      ast_ep_queue(&ep0_ep.ep, &empty_rq.req, GFP_KERNEL);
-      return 0;
+      // reply with an empty pkt for STATUS
+      ep0_enqueue(&ep0_ep.ep, &empty_rq.req, GFP_KERNEL);
       break;
 
     case USB_REQ_CLEAR_FEATURE:
@@ -181,37 +338,121 @@ static int handle_ep0_setup(void) {
         break;
       if ((crq.bRequestType & USB_RECIP_MASK) == USB_RECIP_ENDPOINT) {
         int epaddr = idx & USB_ENDPOINT_NUMBER_MASK;
-        struct ast_ep *ep;
-        if(val != 0 || len != 0 || epaddr > 15)
+        struct ast_ep *ep2;
+        if(val != 0 || len != 0 || epaddr > 15) {
+          ep0_stall();
           break;
-        ep = ep_by_addr(epaddr);
-        if(ep) {
+        }
+        ep2 = ep_by_addr(epaddr);
+        if (ep2) {
           if(crq.bRequest == USB_REQ_SET_FEATURE) {
-            usb_ep_set_halt(&ep->ep);
+            usb_ep_set_halt(&ep2->ep);
           } else {
-            usb_ep_clear_halt(&ep->ep);
+            usb_ep_clear_halt(&ep2->ep);
           }
         }
       }
-      ast_ep_queue(&ep0_ep.ep, &empty_rq.req, GFP_KERNEL);
-    break;
+      // reply with an empty pkt for STATUS
+      ep0_enqueue(&ep0_ep.ep, &empty_rq.req, GFP_KERNEL);
+      break;
+
     default:
-      ret = udc.driver->setup(&udc.gadget, &crq);
-      if (ret < 0) {
-        printk("req %02x, %02x; fail: %d\n", crq.bRequestType, crq.bRequest, ret);
+      rc = udc.driver->setup(&udc.gadget, &crq);
+      if (rc < 0) {
+        printk("req %02x, %02x; fail: %d\n", crq.bRequestType,
+               crq.bRequest, rc);
         ep0_stall();
       }
       break;
   }
-  return 0;
+
+ out:
+
+  return rc;
 }
 
-static inline struct ast_usb_request *to_ast_req(struct usb_request* rq) {
-  return container_of(rq, struct ast_usb_request, req);
+static void ep0_handle_ack(void) {
+  struct ast_usb_request *req;
+  struct ast_ep *ep = &ep0_ep;
+  unsigned long status;
+  unsigned long flags;
+  int done = 0;
+
+  spin_lock_irqsave(&ep->lock, flags);
+
+  if (!ep->dma_busy) {
+    goto out;
+  }
+
+  status = ast_hreadl(&udc, EP0_STATUS);
+
+  pr_debug("Check done with status 0x%lx: stage=%d %s\n", status,
+           udc.ep0_stage, ast_udc_dir2str((udc.ep0_dir)));
+
+  if (list_empty(&ep->queue)) {
+    /* we requested DMA but no request */
+    ep->dma_busy = 0;
+    pr_debug("Empty request queue with ep0 status: 0x%lx\n", status);
+    goto out;
+  }
+
+  if ((udc.ep0_dir == USB_DIR_IN && (!(status & AST_EP0_IN_READY)))
+      || (udc.ep0_dir == USB_DIR_OUT && (!(status & AST_EP0_OUT_READY)))) {
+    /* something is ready */
+    ep->dma_busy = 0;
+    req = container_of(ep->queue.next, struct ast_usb_request, queue);
+    req->in_transit = 0;
+    if (udc.ep0_dir == USB_DIR_OUT) {
+      req->lastpacket = (status >> 16) & 0x3F;
+      __cpuc_flush_kern_all();
+      if (req->lastpacket) {
+        memcpy(req->req.buf + req->req.actual, udc.ep0_dma_virt,
+               req->lastpacket);
+      }
+    }
+    req->req.actual += req->lastpacket;
+    pr_debug("EP0 req actual=%d length=%d lastpacket=%d\n",
+             req->req.actual, req->req.length, req->lastpacket);
+    if (req->req.actual >= req->req.length
+        || req->lastpacket < AST_UDC_EP0_MAXPACKET) {
+      list_del_init(&req->queue);
+      done = 1;
+      ep0_next_stage(0, 0);
+    } else {
+      /* the request is not done yet, restart the queue */
+      ep0_queue_run();
+    }
+  }
+
+ out:
+
+  spin_unlock_irqrestore(&ep->lock, flags);
+
+  if (done) {
+    req->req.status = 0;
+    if (req->req.complete) {
+      req->req.complete(&ep->ep, &req->req);
+    }
+  }
 }
 
-static inline struct ast_ep *to_ast_ep(struct usb_ep* ep) {
-  return container_of(ep, struct ast_ep, ep);
+static void ep0_handle_status(void) {
+  struct ast_ep *ep = &ep0_ep;
+  unsigned long flags;
+
+  spin_lock_irqsave(&ep->lock, flags);
+
+  /*
+   * If we expect a STATUS from host (OUT), enqueue a reqeust to get it going.
+   * For STATUS to host (IN), the SETUP packet handler needs to enqueue a
+   * STATUS message, therefore, no need to handle it here.
+   */
+  if (udc.ep0_stage == EP0_STAGE_STATUS && udc.ep0_dir == USB_DIR_OUT) {
+    // request with an empty pkt for STATUS from host
+    ep0_enqueue(&ep0_ep.ep, &empty_rq.req, GFP_KERNEL);
+  }
+
+  spin_unlock_irqrestore(&ep->lock, flags);
 }
 
 static struct usb_request *ast_alloc_request(struct usb_ep *ep, gfp_t gfp_flags) {
@@ -236,6 +477,7 @@ static int ast_ep_enable(struct usb_ep* _ep, const struct usb_endpoint_descripto
   size_t maxpacket = le16_to_cpu(desc->wMaxPacketSize);
   int eptype = 0;
   if(ep->active) {
+    pr_err("Enable an already enabled ep: %s\n", ep->ep.name);
     return -EBUSY;
   }
   ep->maxpacket = maxpacket;
@@ -277,8 +519,9 @@ static int ast_ep_enable(struct usb_ep* _ep, const struct usb_endpoint_descripto
   ep_hwritel(ep, DMA_CONTROL, AST_EP_DL_RESET);
   ep_hwritel(ep, DMA_CONTROL, AST_EP_SINGLE_STAGE);
 
-  ep->txbuf = kmalloc(ep->maxpacket, GFP_DMA | GFP_ATOMIC);
-  ep->txbuf_phys = 0;
+  ep->txbuf = ast_alloc_dma_memory(
+      ep->maxpacket, ep->to_host ? DMA_TO_DEVICE : DMA_FROM_DEVICE,
+      &ep->txbuf_phys);
 
   if (maxpacket == 1024)
     maxpacket = 0;
@@ -298,13 +541,6 @@ static void ep_dequeue_locked(struct ast_ep* ep, struct ast_usb_request *req) {
   if(req->in_transit) {
     req->in_transit = 0;
     ep->dma_busy = 0;
-    if(ep->txbuf_phys) {
-      dma_unmap_single(udc.gadget.dev.parent,
-          ep->txbuf_phys,
-          ep->to_host ? req->lastpacket : ep->maxpacket,
-          ep->to_host ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
-      ep->txbuf_phys = 0;
-    }
     ep_hwritel(ep, DESC_STATUS, 0);
     list_del_init(&req->queue);
   }
@@ -314,6 +550,8 @@ static int ast_ep_dequeue(struct usb_ep* _ep, struct usb_request *_rq) {
   struct ast_usb_request *req = to_ast_req(_rq);
   struct ast_ep *ep = to_ast_ep(_ep);
   unsigned long flags;
+  pr_debug("Dequeue a request (%d bytes) from %s\n",
+           req->req.length, ep->ep.name);
   spin_lock_irqsave(&ep->lock, flags);
   ep_dequeue_locked(ep, req);
   if(req->req.complete) {
@@ -326,7 +564,8 @@ static int ast_ep_dequeue(struct usb_ep* _ep, struct usb_request *_rq) {
 static int ast_ep_disable(struct usb_ep* _ep) {
   struct ast_ep *ep = to_ast_ep(_ep);
   unsigned long flags;
-  if(!ep->active)
+  pr_debug("Disable %s\n", ep->ep.name);
+  if (!ep->active)
     return 0;
   spin_lock_irqsave(ep->lock, flags);
   while(!list_empty(&ep->queue)) {
@@ -339,7 +578,10 @@ static int ast_ep_disable(struct usb_ep* _ep) {
       spin_lock_irqsave(ep->lock, flags);
     }
   }
-  kfree(ep->txbuf);
+  ast_free_dma_memory(ep->maxpacket,
+                      ep->to_host ? DMA_TO_DEVICE : DMA_FROM_DEVICE,
+                      ep->txbuf, ep->txbuf_phys);
+  ep->txbuf_phys = 0;
   ep->txbuf = NULL;
   ep->active = 0;
   ep_hwritel(ep, CONFIG, 0);
@@ -356,50 +598,10 @@ static void disable_all_endpoints(void) {
   }
 }
 
-static int ast_ep0_queue_run(void) {
-  struct ast_ep *ep = &ep0_ep;
-  struct ast_usb_request *req;
-  unsigned long flags, status;
-  spin_lock_irqsave(&ep->lock, flags);
-  status = ast_hreadl(&udc, EP0_STATUS);
-  if(!ep->dma_busy &&
-      (status & (AST_EP0_IN_READY  |
-                 AST_EP0_OUT_READY |
-                 AST_EP0_STALL)) == 0) {
-    //ep0 isn't busy..
-    if(list_empty(&ep->queue)) {
-      // nothing
-    } else {
-      size_t sendable;
-      req = list_entry(ep->queue.next, struct ast_usb_request, queue);
-      sendable = req->req.length - req->req.actual;
-      if (sendable > 64) {
-        sendable = 64;
-      }
-      ep0_tx(req->req.buf + req->req.actual, sendable);
-      req->req.actual += sendable;
-      req->in_transit = 1;
-      ep->dma_busy = 1;
-    }
-  }
-  spin_unlock_irqrestore(&ep->lock, flags);
-  return 0;
-}
-
 static void ep_txrx(struct ast_ep* ep, void* buf, size_t len) {
   if(ep->to_host) {
     memcpy(ep->txbuf, buf, len);
-    ep->txbuf_phys = dma_map_single(udc.gadget.dev.parent,
-                                    ep->txbuf,
-                                    len,
-                                    DMA_TO_DEVICE);
-  } else {
-    ep->txbuf_phys = dma_map_single(udc.gadget.dev.parent,
-                                    ep->txbuf,
-                                    ep->maxpacket,
-                                    DMA_FROM_DEVICE);
   }
-  ep_hwritel(ep, DESC_BASE, ep->txbuf_phys);
   ep_hwritel(ep, DESC_STATUS, len << 16);
   ep_hwritel(ep, DESC_STATUS, (len << 16) | 1);
 }
@@ -424,13 +626,8 @@ static void ep_txrx_check_done(struct ast_ep* ep) {
     if(!ep->to_host) {
       req->lastpacket = (status >> 16) & 0x3ff;
       __cpuc_flush_kern_all();
-      dma_unmap_single(udc.gadget.dev.parent, ep->txbuf_phys, ep->maxpacket, DMA_FROM_DEVICE);
       memcpy(req->req.buf + req->req.actual, ep->txbuf, req->lastpacket);
       //print_hex_dump(KERN_DEBUG, "epXrx: ", DUMP_PREFIX_OFFSET, 16, 1, ep->txbuf, req->lastpacket, 0);
-      ep->txbuf_phys = 0;
-    } else {
-      dma_unmap_single(udc.gadget.dev.parent, ep->txbuf_phys, req->lastpacket, DMA_TO_DEVICE);
-      ep->txbuf_phys = 0;
     }
     req->req.actual += req->lastpacket;
     if(req->req.actual == req->req.length ||
@@ -480,12 +677,17 @@ static int ast_ep_queue_run(struct ast_ep* ep) {
 
 static void run_all_ep_queues(unsigned long data) {
   int i;
+  unsigned long flags;
+  spin_lock_irqsave(&udc.lock, flags);
+
   for(i = 0; i < NUM_ENDPOINTS; i++) {
     if(eps[i].active) {
       ep_txrx_check_done(&eps[i]);
       ast_ep_queue_run(&eps[i]);
     }
   }
+
+  spin_unlock_irqrestore(&udc.lock, flags);
 }
 
 DECLARE_TASKLET(check_ep_queues, run_all_ep_queues, 0);
@@ -494,16 +696,17 @@ static int ast_ep_queue(struct usb_ep* _ep, struct usb_request *_rq, gfp_t gfp_f
   struct ast_usb_request *req = to_ast_req(_rq);
   struct ast_ep *ep = to_ast_ep(_ep);
   unsigned long flags;
+
+  if (ep == &ep0_ep) {
+    return ep0_enqueue(_ep, _rq, gfp_flags);
+  }
+
   _rq->status = -EINPROGRESS;
   spin_lock_irqsave(&ep->lock, flags);
   list_add_tail(&req->queue, &ep->queue);
   req->req.actual = 0;
   spin_unlock_irqrestore(&ep->lock, flags);
-  if(ep == &ep0_ep) {
-    ast_ep0_queue_run();
-  } else {
-    ast_ep_queue_run(ep);
-  }
+  ast_ep_queue_run(ep);
 
   return 0;
 }
@@ -531,83 +734,37 @@ static const struct usb_ep_ops ast_ep_ops = {
   .free_request = ast_free_request,
 };
 
-static void ep0_txrx_check_done(void) {
-  struct ast_usb_request *req;
-  struct ast_ep *ep = &ep0_ep;
-  unsigned long flags, status, flagsudc;
-  spin_lock_irqsave(&ep->lock, flags);
-  spin_lock_irqsave(&udc.lock, flagsudc);
-  status = ast_hreadl(&udc, EP0_STATUS);
-
-  if(ep->dma_busy &&
-      udc.ep0_out_wait &&
-      (status & (AST_EP0_IN_READY  |
-                 AST_EP0_OUT_READY |
-                 AST_EP0_STALL)) == 0) {
-    udc.ep0_out_wait = 0;
-    ep->dma_busy = 0;
-    enable_hub_interrupts(AST_INT_EP0_OUT_NAK);
-  } else if(ep->dma_busy &&
-      !list_empty(&ep->queue) &&
-      (status & (AST_EP0_IN_READY  |
-                 AST_EP0_OUT_READY |
-                 AST_EP0_STALL)) == 0) {
-    req = container_of(ep->queue.next, struct ast_usb_request, queue);
-    //head rq completed
-    req->in_transit = 0;
-    ep->dma_busy = 0;
-    enable_hub_interrupts(AST_INT_EP0_OUT_NAK);
-    if(req->req.actual == req->req.length) {
-      list_del_init(&req->queue);
-      spin_unlock_irqrestore(&udc.lock, flagsudc);
-      spin_unlock_irqrestore(&ep->lock, flags);
-      req->req.status = 0;
-      if(req->req.complete) {
-        req->req.complete(&ep->ep, &req->req);
-      }
-      return;
-    }
-  }
-  spin_unlock_irqrestore(&udc.lock, flagsudc);
-  spin_unlock_irqrestore(&ep->lock, flags);
-}
-
 static irqreturn_t ast_vhub_udc_irq(int irq, void* devid) {
   irqreturn_t status = IRQ_NONE;
-  u32 istatus, enabled;
-  unsigned long flagsep0;
+  u32 istatus;
   (void) devid;
+
   istatus = ast_hreadl(&udc, ISR);
-  enabled = ast_hreadl(&udc, INTERRUPT_ENABLE);
+
+  /*
+   * Must handle IN/OUT ACK first.
+   * For example, in the case of SETUP request DATA IN, after we send out data,
+   * we enqueue a request for STATUS ack from host, and stage will be
+   * STATUS(IN). When host receives the data, it sends out the STATUS msg
+   * and then a new SETUP. In this case, if we process the SETUP first,
+   * that will confuse the stage state machine, as it expects STATUS msg
+   * for now.
+   */
   if(istatus & AST_IRQ_EP0_OUT_ACK) {
     clear_isr(AST_IRQ_EP0_OUT_ACK);
-    ast_ep0_queue_run();
+    ep0_handle_ack();
     status = IRQ_HANDLED;
   }
 
-  if(istatus & AST_IRQ_EP0_OUT_NAK &&
-     enabled & AST_INT_EP0_OUT_NAK) {
-    spin_lock_irqsave(&ep0_ep.lock, flagsep0);
-    if(!ep0_ep.dma_busy) {
-      ep0_rxwait();
-    } else {
-      disable_hub_interrupts(AST_INT_EP0_OUT_NAK);
-    }
-    clear_isr(AST_IRQ_EP0_OUT_NAK);
-    spin_unlock_irqrestore(&ep0_ep.lock, flagsep0);
+  if(istatus & AST_IRQ_EP0_IN_ACK) {
+    clear_isr(AST_IRQ_EP0_IN_ACK);
+    ep0_handle_ack();
     status = IRQ_HANDLED;
   }
 
   if(istatus & AST_IRQ_EP0_SETUP) {
     clear_isr(AST_IRQ_EP0_SETUP);
-    handle_ep0_setup();
-    status = IRQ_HANDLED;
-  }
-
-  if(istatus & AST_IRQ_EP0_IN_ACK) {
-    ep0_txrx_check_done();
-    clear_isr(AST_IRQ_EP0_IN_ACK);
-    ast_ep0_queue_run();
+    ep0_handle_setup();
     status = IRQ_HANDLED;
   }
 
@@ -620,15 +777,17 @@ static irqreturn_t ast_vhub_udc_irq(int irq, void* devid) {
   }
 
   if(istatus & AST_IRQ_EP_POOL_NAK) {
-    printk("Got NAK on the EP pool");
     clear_isr(AST_IRQ_EP_POOL_NAK);
+    printk("Got NAK on the EP pool");
     status = IRQ_HANDLED;
   }
 
-  ep0_txrx_check_done();
-  if(status != IRQ_HANDLED) {
+  if (status != IRQ_HANDLED) {
     printk("vhub: unhandled interrupts! ISR: %08x\n", istatus);
+  } else {
+    ep0_handle_status();
   }
+
   return status;
 }
 
@@ -675,9 +834,10 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver) {
   if(!udc.pdev)
     return -ENODEV;
   if(driver != udc.driver || !driver->unbind) {
-    err = -EINVAL;
-    goto cleanup;
+    return -EINVAL;
   }
+
+  spin_lock_irqsave(&udc.lock, flags);
 
   // disappear from the host
   ast_udc_pullup(&udc.gadget, 0);
@@ -687,13 +847,11 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver) {
 
   driver->unbind(&udc.gadget);
   // turn off the EPs
-  spin_lock_irqsave(&udc.lock, flags);
   disable_all_endpoints();
 
   udc.gadget.dev.driver = NULL;
   udc.driver = NULL;
 
-cleanup:
   spin_unlock_irqrestore(&udc.lock, flags);
   return err;
 }
@@ -735,13 +893,14 @@ static int __init ast_vhub_udc_probe(struct platform_device *pdev) {
     dev_err(&pdev->dev, "failed to get irq %d: %d\n", irq, err);
     goto error;
   }
-  udc.ep0_dma_virt = kmalloc(64, GFP_KERNEL | GFP_DMA);
+
+  udc.ep0_dma_virt = ast_alloc_dma_memory(
+      AST_UDC_EP0_MAXPACKET, DMA_BIDIRECTIONAL, &udc.ep0_dma_phys);
   if (!udc.ep0_dma_virt) {
     printk("vhub fatal: Couldn't get DMA memory!\n");
     goto error;
-  } else {
-    udc.ep0_dma_phys = dma_map_single(&pdev->dev, udc.ep0_dma_virt, 64, DMA_BIDIRECTIONAL);
   }
+  ast_hwritel(&udc, EP0_DMA_ADDR, udc.ep0_dma_phys);
 
   printk("virthub init...\n");
   ast_hwritel(&udc, SOFTRESET_ENABLE, 0x33f);
@@ -749,12 +908,6 @@ static int __init ast_vhub_udc_probe(struct platform_device *pdev) {
   ast_hwritel(&udc, ISR, 0x1ffff);
   ast_hwritel(&udc, EP_ACK_ISR, 0xffffffff);
   ast_hwritel(&udc, EP_NAK_ISR, 0xffffffff);
-  enable_hub_interrupts(
-      AST_INT_EP_POOL_ACK |
-      AST_INT_EP0_IN_ACK |
-      AST_INT_EP0_OUT_NAK |
-      AST_INT_EP0_OUT_ACK |
-      AST_INT_EP0_SETUP_ACK);
 
   ast_hwritel(&udc, EP1_STATUS, 0x1);
   ast_hwritel(&udc, STATUS, AST_HUB_RESET_DISABLE);
@@ -784,6 +937,14 @@ static int __init ast_vhub_udc_probe(struct platform_device *pdev) {
     ep->lock = SPIN_LOCK_UNLOCKED;
     list_add_tail(&ep->ep.ep_list, &udc.gadget.ep_list);
   }
+
+  /* enable interrupts */
+  ast_hwritel(&udc, INTERRUPT_ENABLE,
+              AST_INT_EP_POOL_ACK
+              | AST_INT_EP0_IN_ACK
+              | AST_INT_EP0_OUT_ACK
+              | AST_INT_EP0_SETUP_ACK);
+
   err = device_add(&udc.gadget.dev);
   if(err) {
     dev_dbg(&pdev->dev, "Could not add gadget: %d\n", err);
@@ -794,7 +955,7 @@ error:
   if(udc.regs)
     iounmap(udc.regs);
   platform_set_drvdata(pdev, NULL);
-	return err;
+  return err;
 }
 
 static int ast_vhub_udc_remove(struct platform_device *pdev) {
@@ -821,11 +982,13 @@ static int __init ast_udc_init(void) {
 module_init(ast_udc_init);
 
 static void __exit ast_udc_exit(void) {
+  ast_free_dma_memory(AST_UDC_EP0_MAXPACKET, DMA_BIDIRECTIONAL,
+                      udc.ep0_dma_virt, udc.ep0_dma_phys);
   platform_driver_unregister(&ast_vhub_udc_driver);
 }
 module_exit(ast_udc_exit);
 
 MODULE_DESCRIPTION("AST2400/1250 USB UDC Driver");
 MODULE_AUTHOR("");
-MODULE_LICENSE("");
+MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:aspeed_udc");
