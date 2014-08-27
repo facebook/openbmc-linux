@@ -135,6 +135,68 @@ static int panther_plus_read_fbid(struct i2c_client *client,
   return 0;
 }
 
+#define PP_GPIO_POWER_ON 0x1
+#define PP_GPIO_PWRGD_P1V35 (0x1 << 1)
+#define PP_GPIO_RST_EAGE_N (0x1 << 2)
+#define PP_GPIO_FM_BIOS_POST_CMPLT_N (0x1 << 3)
+#define PP_GPIO_IERR_FPGA (0x1 << 4)
+#define PP_GPIO_AVN_PLD_PROCHOT_N (0x1 << 5)
+#define PP_GPIO_BUS1_ERROR (0x1 << 6)
+#define PP_GPIO_AVN_PLD_THERMTRIP_N (0x1 << 7)
+#define PP_GPIO_MCERR_FPGA (0x1 << 8)
+#define PP_GPIO_ERROR_AVN_2 (0x1 << 9)
+#define PP_GPIO_ERROR_AVN_1 (0x1 << 10)
+#define PP_GPIO_ERROR_AVN_0 (0x1 << 11)
+#define PP_GPIO_H_MEMHOT_CO_N (0x1 << 12)
+#define PP_GPIO_SLP_S45_N (0x1 << 13)
+#define PP_GPIO_PLTRST_FPGA_N (0x1 << 14)
+#define PP_GPIO_FPGA_GPI_PWD_FAIL (0x1 << 15)
+#define PP_GPIO_FPGA_GPI_NMI (0x1 << 16)
+#define PP_GPIO_GPI_VCCP_VRHOT_N (0x1 << 17)
+#define PP_GPIO_FPGA_GPI_TMP75_ALERT (0x1 << 18)
+#define PP_GPIO_LPC_CLKRUN_N (0x1 << 19)
+
+static int panther_plus_read_gpio_inputs_value(
+    struct i2c_client *client, u32 *val)
+{
+  int rc;
+  u8 read_buf[5];
+
+  rc = panther_plus_read_fbid(client, PANTHER_PLUS_FBID_GPIO_INPUTS,
+                              NULL, 0, read_buf, sizeof(read_buf));
+  if (rc < 0) {
+    return rc;
+  }
+
+  /*
+   * expect receiving 5 bytes as:
+   * 0xd 0x3 <gpio0-7> <gpio8-15> <gpio9-23>
+   */
+  if (read_buf[1] != 0x3) {
+    PP_DEBUG("Unexpected length %d != 3", read_buf[1]);
+    return -EIO;
+  }
+
+  *val = read_buf[2] | (read_buf[3] << 8) | (read_buf[4] << 16);
+
+  return 0;
+}
+
+static int panther_plus_is_in_post(struct i2c_client *client)
+{
+  u32 val;
+  int rc;
+
+  rc = panther_plus_read_gpio_inputs_value(client, &val);
+  if (rc < 0) {
+    /* failed to read gpio, treat it as in post */
+    return 1;
+  }
+
+  /* if PP_GPIO_FM_BIOS_POST_CMPLT_N is set, post is _not_ done yet */
+  return (val & PP_GPIO_FM_BIOS_POST_CMPLT_N);
+}
+
 static int panther_plus_read_register(struct i2c_client *client,
                                       u8 reg_idx, u32 *reg_val)
 {
@@ -190,6 +252,16 @@ static int panther_plus_read_cpu_temp(struct i2c_client *client, char *ret)
   int val;
   int temp;
 
+  /*
+   * make sure POST is done, accessing CPU temperature during POST phase could
+   * confusing POST and make it hang
+   */
+  if (panther_plus_is_in_post(client)) {
+    return -EBUSY;
+  }
+
+  mdelay(10);
+
   /* first read Tjmax: register 0, bit[16-23] */
   rc = panther_plus_read_register(client, PANTHER_PLUS_REG_SOC_TJMAX, &tjmax);
   if (rc < 0) {
@@ -232,6 +304,16 @@ static int panther_plus_read_dimm_temp(struct i2c_client *client,
   u32 val;
   int temp;
 
+  /*
+   * make sure POST is done, accessing DIMM temperature will fail anyway if
+   * POST is not done.
+   */
+  if (panther_plus_is_in_post(client)) {
+    return -EBUSY;
+  }
+
+  mdelay(10);
+
   rc = panther_plus_read_register(client, dimm, &val);
   if (rc < 0) {
     return rc;
@@ -260,27 +342,13 @@ static int panther_plus_read_dimm_temp(struct i2c_client *client,
 
 static int panther_plus_read_gpio_inputs(struct i2c_client *client, char *ret)
 {
-  int rc;
-  u8 read_buf[5];
   u32 val;
+  int rc;
 
-  rc = panther_plus_read_fbid(client, PANTHER_PLUS_FBID_GPIO_INPUTS,
-                              NULL, 0, read_buf, sizeof(read_buf));
+  rc = panther_plus_read_gpio_inputs_value(client, &val);
   if (rc < 0) {
     return rc;
   }
-
-  /*
-   * expect receiving 5 bytes as:
-   * 0xd 0x3 <gpio0-7> <gpio8-15> <gpio9-23>
-   */
-  if (read_buf[1] != 0x3) {
-    PP_DEBUG("Unexpected length %d != 3", read_buf[1]);
-    return -EIO;
-  }
-
-  val = read_buf[2] | (read_buf[3] << 8) | (read_buf[4] << 16);
-
   return sprintf(ret, "0x%x\n", val);
 }
 
