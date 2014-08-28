@@ -503,18 +503,6 @@ static struct flash_info __devinitdata m25p_data [] = {
 	{ "at26df161a", 0x1f4601, 0, 64 * 1024, 32, SECT_4K, },
 	{ "at26df321",  0x1f4701, 0, 64 * 1024, 64, SECT_4K, },
 
-		  /* Macronix */
-	{ "mx25l4005a",	0xc22013, 0, 64 * 1024,   8, SECT_4K },
-	{ "mx25l3205d",	0xc22016, 0, 64 * 1024,  64, 0 },
-	{ "mx25l6405d",	0xc22017, 0, 64 * 1024, 128, 0 },
-	{ "mx25l12805d", 0xc22018, 0, 64 * 1024, 256, 0 },
-
-	{ "mx25l12855e", 0xc22618, 0, 64 * 1024, 256, 0 },
-	{ "mx25l25635e", 0xc22019, 0, 64 * 1024, 512, 0 },
-
-	/* Micrno */
-	{ "n25q128a", 0x20ba18, 0, 64 * 1024, 256, 0 },
-
 	/* Spansion -- single (large) sector size only, at least
 	 * for the chips listed here (without boot sectors).
 	 */
@@ -523,7 +511,7 @@ static struct flash_info __devinitdata m25p_data [] = {
 	{ "s25sl016a", 0x010214, 0, 64 * 1024, 32, },
 	{ "s25sl032a", 0x010215, 0, 64 * 1024, 64, },
 	{ "s25sl064a", 0x010216, 0, 64 * 1024, 128, },
-    { "s25sl12800", 0x012018, 0x0300, 256 * 1024, 64, },
+        { "s25sl12800", 0x012018, 0x0300, 256 * 1024, 64, },
 	{ "s25sl12801", 0x012018, 0x0301, 64 * 1024, 256, },
 
 	/* SST -- large erase sizes are "overlays", "sectors" are 4K */
@@ -640,7 +628,7 @@ static int __devinit m25p_probe(struct spi_device *spi)
 				dev_warn(&spi->dev, "found %s, expected %s\n",
 						chip ? chip->name : "UNKNOWN",
 						info->name);
-				dev_warn(&spi->dev, "Force to use %s", info->name);
+				info = NULL;
 			}
 		}
 	} else
