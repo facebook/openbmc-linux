@@ -260,7 +260,7 @@ static struct flash_platform_data ast_spi_flash_data = {
 
 #ifdef CONFIG_ARCH_AST2400
 static struct flash_platform_data wedge_spi_flash_data = {
-		.type 		  = "n25q128a",
+		.type 		  = "n25q128a13",
     .nr_parts       = ARRAY_SIZE(ast_spi_flash_partitions),
     .parts          = ast_spi_flash_partitions,
 };

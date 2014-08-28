@@ -628,7 +628,12 @@ static int __devinit m25p_probe(struct spi_device *spi)
 				dev_warn(&spi->dev, "found %s, expected %s\n",
 						chip ? chip->name : "UNKNOWN",
 						info->name);
-				info = NULL;
+				if (chip) {
+				  dev_warn(&spi->dev, "Use %s instead\n", chip->name);
+				  info = chip;
+				} else {
+				  dev_warn(&spi->dev, "Force to use %s\n", info->name);
+				}
 			}
 		}
 	} else
