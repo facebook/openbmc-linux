@@ -480,8 +480,8 @@ static int ast_ep_enable(struct usb_ep* _ep, const struct usb_endpoint_descripto
     pr_err("Enable an already enabled ep: %s\n", ep->ep.name);
     return -EBUSY;
   }
-  ep->maxpacket = maxpacket;
-  printk("Enabling endpoint %s (%p), maxpacket %d: ", ep->ep.name, ep->ep_regs, ep->maxpacket);
+  ep->ep.maxpacket = maxpacket;
+  printk("Enabling endpoint %s (%p), maxpacket %d: ", ep->ep.name, ep->ep_regs, ep->ep.maxpacket);
   if (desc->bEndpointAddress & USB_DIR_IN) {
     ep->to_host = 1;
     switch (desc->bmAttributes) {
@@ -520,7 +520,7 @@ static int ast_ep_enable(struct usb_ep* _ep, const struct usb_endpoint_descripto
   ep_hwritel(ep, DMA_CONTROL, AST_EP_SINGLE_STAGE);
 
   ep->txbuf = ast_alloc_dma_memory(
-      ep->maxpacket, ep->to_host ? DMA_TO_DEVICE : DMA_FROM_DEVICE,
+      ep->ep.maxpacket, ep->to_host ? DMA_TO_DEVICE : DMA_FROM_DEVICE,
       &ep->txbuf_phys);
 
   if (maxpacket == 1024)
@@ -542,8 +542,8 @@ static void ep_dequeue_locked(struct ast_ep* ep, struct ast_usb_request *req) {
     req->in_transit = 0;
     ep->dma_busy = 0;
     ep_hwritel(ep, DESC_STATUS, 0);
-    list_del_init(&req->queue);
   }
+  list_del_init(&req->queue);
 }
 
 static int ast_ep_dequeue(struct usb_ep* _ep, struct usb_request *_rq) {
@@ -563,27 +563,29 @@ static int ast_ep_dequeue(struct usb_ep* _ep, struct usb_request *_rq) {
 
 static int ast_ep_disable(struct usb_ep* _ep) {
   struct ast_ep *ep = to_ast_ep(_ep);
+  struct ast_usb_request *req;
+  struct ast_usb_request *n;
   unsigned long flags;
   pr_debug("Disable %s\n", ep->ep.name);
   if (!ep->active)
     return 0;
   spin_lock_irqsave(ep->lock, flags);
-  while(!list_empty(&ep->queue)) {
-    struct ast_usb_request *req;
-    req = list_entry(ep->queue.next, struct ast_usb_request, queue);
+  list_for_each_entry_safe(req, n, &ep->queue, queue) {
     ep_dequeue_locked(ep, req);
+    req->req.status = -ESHUTDOWN;
     if(req->req.complete) {
       spin_unlock_irqrestore(ep->lock, flags);
       req->req.complete(&ep->ep, &req->req);
       spin_lock_irqsave(ep->lock, flags);
     }
   }
-  ast_free_dma_memory(ep->maxpacket,
-                      ep->to_host ? DMA_TO_DEVICE : DMA_FROM_DEVICE,
-                      ep->txbuf, ep->txbuf_phys);
+  ast_free_dma_memory(ep->ep.maxpacket,
+      ep->to_host ? DMA_TO_DEVICE : DMA_FROM_DEVICE,
+      ep->txbuf, ep->txbuf_phys);
   ep->txbuf_phys = 0;
   ep->txbuf = NULL;
   ep->active = 0;
+  ep->ep.maxpacket = 1024;
   ep_hwritel(ep, CONFIG, 0);
   spin_unlock_irqrestore(ep->lock, flags);
   return 0;
@@ -631,7 +633,7 @@ static void ep_txrx_check_done(struct ast_ep* ep) {
     }
     req->req.actual += req->lastpacket;
     if(req->req.actual == req->req.length ||
-        req->lastpacket < ep->maxpacket) {
+        req->lastpacket < ep->ep.maxpacket) {
       list_del_init(&req->queue);
       spin_unlock_irqrestore(&ep->lock, flags);
       //printk("rq done ep%d\n", ep->addr);
@@ -657,8 +659,8 @@ static int ast_ep_queue_run(struct ast_ep* ep) {
     } else {
       req = list_entry(ep->queue.next, struct ast_usb_request, queue);
       req->lastpacket = req->req.length - req->req.actual;
-      if (req->lastpacket > ep->maxpacket) {
-        req->lastpacket = ep->maxpacket;
+      if (req->lastpacket > ep->ep.maxpacket) {
+        req->lastpacket = ep->ep.maxpacket;
       }
       //printk("ep%d%sx:%d-%d/%d\n",
       //    ep->addr,

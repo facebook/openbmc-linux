@@ -127,7 +127,6 @@ struct ast_ep {
   u8 index;
   char epname[7];
   void __iomem *ep_regs;
-  size_t maxpacket;
 
   spinlock_t lock;
   struct list_head queue;
