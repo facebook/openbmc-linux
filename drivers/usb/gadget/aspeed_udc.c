@@ -39,6 +39,7 @@
 struct ast_ep *eps;
 static const struct usb_ep_ops ast_ep_ops;
 static int ast_ep_queue(struct usb_ep* _ep, struct usb_request *_rq, gfp_t gfp_flags);
+static void ep_dequeue_all(struct ast_ep* ep, int status);
 static void ep_txrx_check_done(struct ast_ep* ep);
 static void enable_upstream_port(void);
 static void disable_upstream_port(void);
@@ -181,13 +182,18 @@ struct ast_ep* ep_by_addr(int addr) {
   return ep;
 }
 
+static inline void ep0_init_stage(void)
+{
+  /* expect SETUP after */
+  udc.ep0_stage = EP0_STAGE_SETUP;
+  udc.ep0_dir = USB_DIR_IN;
+}
+
 static void ep0_stall(void) {
   pr_debug("Prepare for EP0 stall, Reset EP0 stage to SETUP\n");
   /* reply stall on next pkt */
   ep0_stall_ready();
-  /* expect SETUP after */
-  udc.ep0_stage = EP0_STAGE_SETUP;
-  udc.ep0_dir = USB_DIR_IN;
+  ep0_init_stage();
 }
 
 static void ep0_next_stage(int has_data_phase, u8 data_dir) {
@@ -295,6 +301,16 @@ static int ep0_enqueue(struct usb_ep* _ep, struct usb_request *_rq,
   return rc;
 }
 
+static void ep0_cancel_current(void)
+{
+  struct ast_ep *ep = &ep0_ep;
+  unsigned long flags;
+  ep_dequeue_all(ep, -ECONNRESET);
+  spin_lock_irqsave(&ep->lock, flags);
+  ep0_init_stage();
+  spin_unlock_irqrestore(&ep->lock, flags);
+}
+
 static int ep0_handle_setup(void) {
   struct ast_ep *ep = &ep0_ep;
   struct usb_ctrlrequest crq;
@@ -304,10 +320,9 @@ static int ep0_handle_setup(void) {
 
   /* make sure we are expecting setup packet */
   if (udc.ep0_stage != EP0_STAGE_SETUP) {
-    pr_err("Received SETUP pkt on wrong stage %d\n", udc.ep0_stage);
-    ep0_stall();
-    rc = -EINPROGRESS;
-    goto out;
+    pr_warning("Received SETUP pkt on wrong stage %d. Cancelling "
+               "the current SETUP\n", udc.ep0_stage);
+    ep0_cancel_current();
   }
 
   memcpy_fromio(&crq, udc.regs + AST_HUB_ROOT_SETUP_BUFFER, sizeof(crq));
@@ -365,8 +380,6 @@ static int ep0_handle_setup(void) {
       }
       break;
   }
-
- out:
 
   return rc;
 }
@@ -546,6 +559,23 @@ static void ep_dequeue_locked(struct ast_ep* ep, struct ast_usb_request *req) {
   list_del_init(&req->queue);
 }
 
+static void ep_dequeue_all(struct ast_ep* ep, int status) {
+  struct ast_usb_request *req;
+  struct ast_usb_request *n;
+  unsigned long flags;
+  spin_lock_irqsave(ep->lock, flags);
+  list_for_each_entry_safe(req, n, &ep->queue, queue) {
+    ep_dequeue_locked(ep, req);
+    req->req.status = status;
+    if(req->req.complete) {
+      spin_unlock_irqrestore(ep->lock, flags);
+      req->req.complete(&ep->ep, &req->req);
+      spin_lock_irqsave(ep->lock, flags);
+    }
+  }
+  spin_unlock_irqrestore(ep->lock, flags);
+}
+
 static int ast_ep_dequeue(struct usb_ep* _ep, struct usb_request *_rq) {
   struct ast_usb_request *req = to_ast_req(_rq);
   struct ast_ep *ep = to_ast_ep(_ep);
@@ -563,22 +593,12 @@ static int ast_ep_dequeue(struct usb_ep* _ep, struct usb_request *_rq) {
 
 static int ast_ep_disable(struct usb_ep* _ep) {
   struct ast_ep *ep = to_ast_ep(_ep);
-  struct ast_usb_request *req;
-  struct ast_usb_request *n;
   unsigned long flags;
   pr_debug("Disable %s\n", ep->ep.name);
   if (!ep->active)
     return 0;
+  ep_dequeue_all(ep, -ESHUTDOWN);
   spin_lock_irqsave(ep->lock, flags);
-  list_for_each_entry_safe(req, n, &ep->queue, queue) {
-    ep_dequeue_locked(ep, req);
-    req->req.status = -ESHUTDOWN;
-    if(req->req.complete) {
-      spin_unlock_irqrestore(ep->lock, flags);
-      req->req.complete(&ep->ep, &req->req);
-      spin_lock_irqsave(ep->lock, flags);
-    }
-  }
   ast_free_dma_memory(ep->ep.maxpacket,
       ep->to_host ? DMA_TO_DEVICE : DMA_FROM_DEVICE,
       ep->txbuf, ep->txbuf_phys);
