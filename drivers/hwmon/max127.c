@@ -50,6 +50,10 @@ static const unsigned short normal_i2c[] = {
 
 I2C_CLIENT_INSMOD_1(max127);
 
+static int scaling;
+module_param(scaling, int, 0);
+MODULE_PARM_DESC(scaling, "Fixed-point scaling factor (* 10000), ie 24414");
+
 
 /*
  * The MAX127 I2C messages
@@ -127,7 +131,7 @@ static ssize_t show_in(struct device *dev, struct device_attribute *attr,
 	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
 	int which = sensor_attr->index;
 	int valid;
-	u16 voltage;
+	unsigned voltage;
 
 	mutex_lock(&data->update_lock);
 	max127_update_device(dev, which);
@@ -135,9 +139,12 @@ static ssize_t show_in(struct device *dev, struct device_attribute *attr,
 	voltage = data->voltage;
 	mutex_unlock(&data->update_lock);
 
+	if (scaling)
+		voltage = voltage * scaling / 10000;
+
 	if (!valid)
 		return -EIO;
-	return sprintf(buf, "%hu\n", voltage);
+	return sprintf(buf, "%u\n", voltage);
 }
 
 
