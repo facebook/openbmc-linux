@@ -28,6 +28,7 @@
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
 #include <linux/jiffies.h>
+#include <linux/delay.h>
 #include <linux/i2c/pmbus.h>
 #include "pmbus.h"
 
@@ -104,6 +105,8 @@ struct pmbus_data {
 	bool valid;
 	unsigned long last_updated;	/* in jiffies */
 
+	ktime_t access;
+
 	/*
 	 * A single status register covers multiple attributes,
 	 * so we keep them all together.
@@ -113,6 +116,35 @@ struct pmbus_data {
 
 	u8 currpage;
 };
+
+/* Some chips need a delay between accesses */
+void pmbus_wait(struct i2c_client *client)
+{
+	struct pmbus_data *data = i2c_get_clientdata(client);
+	const struct pmbus_driver_info *info = data->info;
+
+	if (info->delay) {
+		s64 delta = ktime_us_delta(ktime_get(), data->access);
+		if (delta < info->delay)
+			/*
+			 * Note that udelay is busy waiting.  msleep is
+			 * quite a bit slower (it actually takes a
+			 * minimum of 20ms), but doesn't busy wait.  Hmmm.
+			 */
+			udelay(info->delay - delta);
+	}
+}
+EXPORT_SYMBOL_GPL(pmbus_wait);
+
+void pmbus_update_wait(struct i2c_client *client)
+{
+	struct pmbus_data *data = i2c_get_clientdata(client);
+	const struct pmbus_driver_info *info = data->info;
+
+	if (info->delay)
+		data->access = ktime_get();
+}
+EXPORT_SYMBOL_GPL(pmbus_update_wait);
 
 void pmbus_clear_cache(struct i2c_client *client)
 {
@@ -129,8 +161,12 @@ int pmbus_set_page(struct i2c_client *client, u8 page)
 	int newpage;
 
 	if (page != data->currpage) {
+		pmbus_wait(client);
 		rv = i2c_smbus_write_byte_data(client, PMBUS_PAGE, page);
+		pmbus_update_wait(client);
+		pmbus_wait(client);
 		newpage = i2c_smbus_read_byte_data(client, PMBUS_PAGE);
+		pmbus_update_wait(client);
 		if (newpage != page)
 			rv = -EIO;
 		else
@@ -150,7 +186,10 @@ int pmbus_write_byte(struct i2c_client *client, int page, u8 value)
 			return rv;
 	}
 
-	return i2c_smbus_write_byte(client, value);
+	pmbus_wait(client);
+	rv = i2c_smbus_write_byte(client, value);
+	pmbus_update_wait(client);
+	return rv;
 }
 EXPORT_SYMBOL_GPL(pmbus_write_byte);
 
@@ -180,7 +219,10 @@ int pmbus_write_word_data(struct i2c_client *client, u8 page, u8 reg, u16 word)
 	if (rv < 0)
 		return rv;
 
-	return i2c_smbus_write_word_data(client, reg, word);
+	pmbus_wait(client);
+	rv = i2c_smbus_write_word_data(client, reg, word);
+	pmbus_update_wait(client);
+	return rv;
 }
 EXPORT_SYMBOL_GPL(pmbus_write_word_data);
 
@@ -213,7 +255,10 @@ int pmbus_read_word_data(struct i2c_client *client, u8 page, u8 reg)
 	if (rv < 0)
 		return rv;
 
-	return i2c_smbus_read_word_data(client, reg);
+	pmbus_wait(client);
+	rv = i2c_smbus_read_word_data(client, reg);
+	pmbus_update_wait(client);
+	return rv;
 }
 EXPORT_SYMBOL_GPL(pmbus_read_word_data);
 
@@ -247,7 +292,10 @@ int pmbus_read_byte_data(struct i2c_client *client, int page, u8 reg)
 			return rv;
 	}
 
-	return i2c_smbus_read_byte_data(client, reg);
+	pmbus_wait(client);
+	rv = i2c_smbus_read_byte_data(client, reg);
+	pmbus_update_wait(client);
+	return rv;
 }
 EXPORT_SYMBOL_GPL(pmbus_read_byte_data);
 
@@ -1690,10 +1738,14 @@ static int pmbus_init_common(struct i2c_client *client, struct pmbus_data *data,
 	 * Bail out if both registers are not supported.
 	 */
 	data->status_register = PMBUS_STATUS_BYTE;
+	pmbus_wait(client);
 	ret = i2c_smbus_read_byte_data(client, PMBUS_STATUS_BYTE);
+	pmbus_update_wait(client);
 	if (ret < 0 || ret == 0xff) {
 		data->status_register = PMBUS_STATUS_WORD;
+		pmbus_wait(client);
 		ret = i2c_smbus_read_word_data(client, PMBUS_STATUS_WORD);
+		pmbus_update_wait(client);
 		if (ret < 0 || ret == 0xffff) {
 			dev_err(dev, "PMBus status register not found\n");
 			return -ENODEV;
@@ -1750,6 +1802,7 @@ int pmbus_do_probe(struct i2c_client *client, const struct i2c_device_id *id,
 	if (pdata)
 		data->flags = pdata->flags;
 	data->info = info;
+	pmbus_update_wait(client);  /* Set time of access if info->delay */
 
 	ret = pmbus_init_common(client, data, info);
 	if (ret < 0)

@@ -32,46 +32,29 @@
 #include <linux/delay.h>
 #include "pmbus.h"
 
-enum chips { pfe1100_12_054xA };
+enum chips { SPDFCBK_15G, SPAFCBK_14G };
 
 struct pfe1100_data {
 	int id;
-	ktime_t access;		/* chip access time */
-	int delay;		/* Delay between chip accesses in uS */
 	struct pmbus_driver_info info;
 };
 
 #define to_pfe1100_data(x)  container_of(x, struct pfe1100_data, info)
 
-/*
- * I'm not sure whether this is a delay required by the PFE1100 or by
- * the I2C repeater that we're using to talk to it, but it's definitely
- * necessary.  Doh.
- */
 
-#define PFE1100_WAIT_TIME		3500	/* uS	*/
+#define PFE1100_WAIT_TIME		5000	/* uS	*/
 
 static ushort delay = PFE1100_WAIT_TIME;
 module_param(delay, ushort, 0644);
 MODULE_PARM_DESC(delay, "Delay between chip accesses in uS");
 
-/* Some chips need a delay between accesses */
-
-static inline void pfe1100_wait(const struct pfe1100_data *data)
-{
-	if (data->delay) {
-		s64 delta = ktime_us_delta(ktime_get(), data->access);
-		if (delta < data->delay)
-			/*
-			 * Note that udelay is busy waiting.  With
-			 * continuous queries to the device, I saw about
-			 * 24% system CPU time.  msleep is quite a bit
-			 * slower (it actually takes a minimum of 20ms),
-			 * but doesn't busy wait.  Hmmm.
-			 */
-			udelay(data->delay - delta);
-	}
-}
+static const struct i2c_device_id pfe1100_id[] = {
+	{"pfe1100dc", SPDFCBK_15G},
+	{"pfe1100ac", SPAFCBK_14G},
+	{"pfe1100", 0},
+	{ }
+};
+MODULE_DEVICE_TABLE(i2c, pfe1100_id);
 
 static int pfe1100_read_word_data(struct i2c_client *client, int page, int reg)
 {
@@ -79,17 +62,31 @@ static int pfe1100_read_word_data(struct i2c_client *client, int page, int reg)
 	struct pfe1100_data *data = to_pfe1100_data(info);
 	int ret;
 
-	if (page > 0)
+	if (data->id != SPAFCBK_14G && page > 0)
 		return -ENXIO;
 
 	if (reg >= PMBUS_VIRT_BASE)
 		return -ENXIO;
 
-	pfe1100_wait(data);
-	ret = pmbus_read_word_data(client, page, reg);
-	data->access = ktime_get();
-
-	return ret;
+	switch (reg) {
+		case PMBUS_FAN_COMMAND_1:
+		case PMBUS_STATUS_WORD:
+		case PMBUS_READ_VIN:
+		case PMBUS_READ_IIN:
+		case PMBUS_READ_VOUT:
+		case PMBUS_READ_IOUT:
+		case PMBUS_READ_TEMPERATURE_1:
+		case PMBUS_READ_TEMPERATURE_2:
+		case PMBUS_READ_TEMPERATURE_3:
+		case PMBUS_READ_FAN_SPEED_1:
+		case PMBUS_READ_POUT:
+		case PMBUS_READ_PIN:
+		case PMBUS_MFR_LOCATION:
+			ret = pmbus_read_word_data(client, page, reg);
+			return ret;
+		default:
+			return -ENXIO;
+		}
 }
 
 static int pfe1100_read_byte_data(struct i2c_client *client, int page, int reg)
@@ -98,15 +95,30 @@ static int pfe1100_read_byte_data(struct i2c_client *client, int page, int reg)
 	struct pfe1100_data *data = to_pfe1100_data(info);
 	int ret;
 
-	if (page > 0)
+	if (data->id != SPAFCBK_14G && page > 0)
 		return -ENXIO;
 
-	pfe1100_wait(data);
-
-	ret = pmbus_read_byte_data(client, page, reg);
-	data->access = ktime_get();
-
-	return ret;
+	switch (reg) {
+		case PMBUS_PAGE:
+		case PMBUS_OPERATION:
+		case PMBUS_CLEAR_FAULTS:
+		case PMBUS_CAPABILITY:
+		case PMBUS_VOUT_MODE:
+		case PMBUS_FAN_CONFIG_12:
+		case PMBUS_STATUS_BYTE:
+		case PMBUS_STATUS_VOUT:
+		case PMBUS_STATUS_IOUT:
+		case PMBUS_STATUS_INPUT:
+		case PMBUS_STATUS_TEMPERATURE:
+		case PMBUS_STATUS_CML:
+		case PMBUS_STATUS_OTHER:
+		case PMBUS_STATUS_MFR_SPECIFIC:
+		case PMBUS_STATUS_FAN_12:
+			ret = pmbus_read_byte_data(client, page, reg);
+			return ret;
+		default:
+			return -ENXIO;
+	}
 }
 
 static int pfe1100_write_word_data(struct i2c_client *client, int page, int reg,
@@ -116,15 +128,16 @@ static int pfe1100_write_word_data(struct i2c_client *client, int page, int reg,
 	struct pfe1100_data *data = to_pfe1100_data(info);
 	int ret;
 
-	if (page > 0)
+	if (data->id != SPAFCBK_14G && page > 0)
 		return -ENXIO;
 
 	if (reg >= PMBUS_VIRT_BASE)
 		return -ENXIO;
 
-	pfe1100_wait(data);
-	ret = pmbus_write_word_data(client, page, reg, word);
-	data->access = ktime_get();
+	if (reg == PMBUS_FAN_COMMAND_1)
+		ret = pmbus_write_word_data(client, page, reg, word);
+	else
+		ret = -ENXIO;
 
 	return ret;
 }
@@ -135,47 +148,64 @@ static int pfe1100_write_byte(struct i2c_client *client, int page, u8 value)
 	struct pfe1100_data *data = to_pfe1100_data(info);
 	int ret;
 
-	if (page > 0)
+	if (data->id != SPAFCBK_14G && page > 0)
 		return -ENXIO;
 
-	pfe1100_wait(data);
-	ret = pmbus_write_byte(client, page, value);
-	data->access = ktime_get();
-
-	return ret;
+	switch (value) {
+		case PMBUS_PAGE:
+		case PMBUS_OPERATION:
+		case PMBUS_CLEAR_FAULTS:
+			ret = pmbus_write_byte(client, page, value);
+			return ret;
+		default:
+			return -ENXIO;
+	}
 }
-
-static const struct i2c_device_id pfe1100_id[] = {
-	{"pfe1100", pfe1100_12_054xA},
-	{ }
-};
-MODULE_DEVICE_TABLE(i2c, pfe1100_id);
 
 static int pfe1100_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
+	int ret;
+	int kind;
 	struct pfe1100_data *data;
 	struct pmbus_driver_info *info;
+	u8 device_id[I2C_SMBUS_BLOCK_MAX + 1];
 
 	if (!i2c_check_functionality(client->adapter,
 				     I2C_FUNC_SMBUS_READ_WORD_DATA
 				     | I2C_FUNC_SMBUS_READ_BLOCK_DATA))
 		return -ENODEV;
 
+	ret = i2c_smbus_read_block_data(client, PMBUS_MFR_MODEL, device_id);
+	if (ret < 0 || ret == 0xff) {
+		dev_err(&client->dev, "Failed to read Manufacturer ID\n");
+		kind = SPDFCBK_15G;
+	} else {
+		if (strncmp(device_id, "SPAFCBK-14G", ret))
+			kind = SPDFCBK_15G;
+		else
+			kind = SPAFCBK_14G;
+		device_id[ret] = 0;
+		dev_notice(&client->dev, "MFR_ID is [%s]\n", device_id);
+	}
+
 	data = devm_kzalloc(&client->dev, sizeof(struct pfe1100_data),
 			    GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
-	data->id = id->driver_data;
+	data->id = kind;
 
 	/*
 	 * The datasheets don't say anything about it, but it appears
 	 * that we need a pause between each query.
 	 */
-	data->delay = delay;
 	info = &data->info;
-	info->pages = 1;
+	info->delay = delay;
+	if (kind == SPAFCBK_14G)
+		info->pages = 2;
+	else
+		info->pages = 1;
 
 	/*
 	 * It seems reasonable to just scan the device for supported
@@ -189,8 +219,10 @@ static int pfe1100_probe(struct i2c_client *client,
 	  PMBUS_HAVE_TEMP3 | PMBUS_HAVE_STATUS_VOUT |
 	  PMBUS_HAVE_STATUS_IOUT | PMBUS_HAVE_STATUS_INPUT |
 	  PMBUS_HAVE_STATUS_TEMP | PMBUS_HAVE_STATUS_FAN12;
-
-	data->access = ktime_get();
+	if (kind == SPAFCBK_14G)
+		info->func[1] = PMBUS_HAVE_VOUT | PMBUS_HAVE_IOUT |
+		  PMBUS_HAVE_POUT | PMBUS_HAVE_STATUS_VOUT |
+		  PMBUS_HAVE_STATUS_IOUT;
 
 	info->read_word_data = pfe1100_read_word_data;
 	info->read_byte_data = pfe1100_read_byte_data;

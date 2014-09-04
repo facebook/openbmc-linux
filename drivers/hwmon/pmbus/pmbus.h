@@ -354,6 +354,7 @@ enum pmbus_data_format { linear = 0, direct, vid };
 
 struct pmbus_driver_info {
 	int pages;		/* Total number of pages */
+	ushort delay;
 	enum pmbus_data_format format[PSC_NUM_CLASSES];
 	/*
 	 * Support one set of coefficients for each sensor type
@@ -391,6 +392,7 @@ struct pmbus_driver_info {
 
 /* Function declarations */
 
+void pmbus_wait(struct i2c_client *client);
 void pmbus_clear_cache(struct i2c_client *client);
 int pmbus_set_page(struct i2c_client *client, u8 page);
 int pmbus_read_word_data(struct i2c_client *client, u8 page, u8 reg);
