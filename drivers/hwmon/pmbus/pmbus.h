@@ -349,6 +349,7 @@ enum pmbus_sensor_classes {
 #define PMBUS_HAVE_STATUS_FAN34	(1 << 17)
 #define PMBUS_HAVE_VMON		(1 << 18)
 #define PMBUS_HAVE_STATUS_VMON	(1 << 19)
+#define PMBUS_HAVE_MFRDATA	(1 << 20)
 
 enum pmbus_data_format { linear = 0, direct, vid };
 

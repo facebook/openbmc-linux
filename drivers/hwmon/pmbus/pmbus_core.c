@@ -933,7 +933,11 @@ static int pmbus_add_label(struct pmbus_data *data,
 
 	a = &label->attribute;
 
-	snprintf(label->name, sizeof(label->name), "%s%d_label", name, seq);
+	if (seq == -1)
+		snprintf(label->name, sizeof(label->name), "%s_label", name);
+	else
+		snprintf(label->name, sizeof(label->name), "%s%d_label",
+			 name, seq);
 	if (!index)
 		strncpy(label->label, lstring, sizeof(label->label) - 1);
 	else
@@ -1652,6 +1656,63 @@ static int pmbus_add_fan_attributes(struct i2c_client *client,
 	return 0;
 }
 
+static const u32 pmbus_mfr_registers[] = {
+	PMBUS_MFR_ID,
+	PMBUS_MFR_MODEL,
+	PMBUS_MFR_REVISION,
+	PMBUS_MFR_LOCATION,
+	PMBUS_MFR_DATE,
+	PMBUS_MFR_SERIAL,
+};
+
+static const char *pmbus_mfr_names[] = {
+	"mfr_id",
+	"mfr_model",
+	"mfr_revision",
+	"mfr_location",
+	"mfr_date",
+	"mfr_serial",
+};
+
+/* MFR info */
+static int pmbus_add_mfr_attributes(struct i2c_client *client,
+				    struct pmbus_data *data)
+{
+	int f;
+	char buf[I2C_SMBUS_BLOCK_MAX + 1];
+
+	if ((data->info->func[0] & PMBUS_HAVE_MFRDATA) == 0 ||
+	    !i2c_check_functionality(client->adapter,
+				     I2C_FUNC_SMBUS_READ_BLOCK_DATA))
+		return 0;
+
+	for (f = 0; f < ARRAY_SIZE(pmbus_mfr_registers); f++) {
+		int ret;
+
+		pmbus_wait(client);
+		ret = i2c_smbus_read_block_data(client, pmbus_mfr_registers[f],
+						buf);	
+		pmbus_update_wait(client);
+		if (ret <= 0)
+			continue;
+
+		buf[ret] = 0;
+		if (!(data->flags & PMBUS_SKIP_STATUS_CHECK)) {
+			ret = pmbus_check_status_cml(client);
+			pmbus_clear_fault_page(client, -1);
+			if (ret < 0)
+				continue;
+		}
+
+		/* Note that the label code truncates to PMBUS_NAME_SIZE */
+
+		ret = pmbus_add_label(data, pmbus_mfr_names[f], -1, buf, 0);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
 static int pmbus_find_attributes(struct i2c_client *client,
 				 struct pmbus_data *data)
 {
@@ -1683,6 +1744,11 @@ static int pmbus_find_attributes(struct i2c_client *client,
 
 	/* Fans */
 	ret = pmbus_add_fan_attributes(client, data);
+	if (ret)
+		return ret;
+
+	/* Manufacturer strings */
+	ret = pmbus_add_mfr_attributes(client, data);
 	return ret;
 }
 
@@ -1737,16 +1803,16 @@ static int pmbus_init_common(struct i2c_client *client, struct pmbus_data *data,
 	 * to use PMBUS_STATUS_WORD instead if that is the case.
 	 * Bail out if both registers are not supported.
 	 */
-	data->status_register = PMBUS_STATUS_BYTE;
+	data->status_register = PMBUS_STATUS_WORD;
 	pmbus_wait(client);
-	ret = i2c_smbus_read_byte_data(client, PMBUS_STATUS_BYTE);
+	ret = i2c_smbus_read_word_data(client, PMBUS_STATUS_WORD);
 	pmbus_update_wait(client);
-	if (ret < 0 || ret == 0xff) {
-		data->status_register = PMBUS_STATUS_WORD;
+	if (ret < 0 || ret == 0xffff) {
+		data->status_register = PMBUS_STATUS_BYTE;
 		pmbus_wait(client);
-		ret = i2c_smbus_read_word_data(client, PMBUS_STATUS_WORD);
+		ret = i2c_smbus_read_byte_data(client, PMBUS_STATUS_BYTE);
 		pmbus_update_wait(client);
-		if (ret < 0 || ret == 0xffff) {
+		if (ret < 0 || ret == 0xff) {
 			dev_err(dev, "PMBus status register not found\n");
 			return -ENODEV;
 		}
