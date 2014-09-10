@@ -1660,7 +1660,18 @@ static const u32 pmbus_mfr_registers[] = {
 	PMBUS_MFR_ID,
 	PMBUS_MFR_MODEL,
 	PMBUS_MFR_REVISION,
-	PMBUS_MFR_LOCATION,
+	/* 
+	 * PMBUS_MFR_LOCATION is not implemented according to spec
+	 * in the pfe1100;  rather than showing up as a block read,
+	 * it's a word read.  Even worse, our block read implementation
+	 * will get the first byte, 'A', and stomp all over our buffer,
+	 * rather than politely declining to read 65 bytes, as it should.
+	 *
+	 * Clearly, we should fix the implementation rather than hack it
+	 * in here, but we want to get this out the door.  With more
+	 * experience, hopefully we can come up with a more general
+	 * implmentation of the MFR register reads.
+	 */
 	PMBUS_MFR_DATE,
 	PMBUS_MFR_SERIAL,
 };
@@ -1669,7 +1680,7 @@ static const char *pmbus_mfr_names[] = {
 	"mfr_id",
 	"mfr_model",
 	"mfr_revision",
-	"mfr_location",
+	/* "mfr_location", as mentioned above, is not readable */
 	"mfr_date",
 	"mfr_serial",
 };

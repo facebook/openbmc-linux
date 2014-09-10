@@ -394,6 +394,7 @@ struct pmbus_driver_info {
 /* Function declarations */
 
 void pmbus_wait(struct i2c_client *client);
+void pmbus_update_wait(struct i2c_client *client);
 void pmbus_clear_cache(struct i2c_client *client);
 int pmbus_set_page(struct i2c_client *client, u8 page);
 int pmbus_read_word_data(struct i2c_client *client, u8 page, u8 reg);

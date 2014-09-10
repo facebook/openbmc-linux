@@ -177,15 +177,15 @@ static int pfe1100_probe(struct i2c_client *client,
 		return -ENODEV;
 
 	ret = i2c_smbus_read_block_data(client, PMBUS_MFR_MODEL, device_id);
-	if (ret < 0 || ret == 0xff) {
+	if (ret < 0) {
 		dev_err(&client->dev, "Failed to read Manufacturer ID\n");
 		kind = SPDFCBK_15G;
 	} else {
+		device_id[ret] = 0;
 		if (strncmp(device_id, "SPAFCBK-14G", ret))
 			kind = SPDFCBK_15G;
 		else
 			kind = SPAFCBK_14G;
-		device_id[ret] = 0;
 		dev_notice(&client->dev, "MFR_ID is [%s]\n", device_id);
 	}
 
@@ -196,10 +196,6 @@ static int pfe1100_probe(struct i2c_client *client,
 
 	data->id = kind;
 
-	/*
-	 * The datasheets don't say anything about it, but it appears
-	 * that we need a pause between each query.
-	 */
 	info = &data->info;
 	info->delay = delay;
 	if (kind == SPAFCBK_14G)
@@ -210,7 +206,7 @@ static int pfe1100_probe(struct i2c_client *client,
 	/*
 	 * It seems reasonable to just scan the device for supported
 	 * values, but most drivers just seem to jam these values in
-	 * there.
+	 * there, so that's what we'll do.
 	 */
 
 	info->func[0] = PMBUS_HAVE_VIN | PMBUS_HAVE_VOUT | PMBUS_HAVE_IIN |
