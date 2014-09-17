@@ -23,12 +23,20 @@
 #include <linux/i2c.h>
 #include "pmbus.h"
 
-enum chips { adm1075, adm1275, adm1276 };
+enum chips { adm1075, adm1275, adm1276, adm1278 };
 
 #define ADM1275_PEAK_IOUT		0xd0
 #define ADM1275_PEAK_VIN		0xd1
 #define ADM1275_PEAK_VOUT		0xd2
+#define ADM1278_PMON_CONTROL		0xd3
 #define ADM1275_PMON_CONFIG		0xd4
+
+#define ADM1278_CFG_TSFLT		(1 << 15)
+#define ADM1278_CFG_SIMULTANEOUS	(1 << 14)
+#define ADM1278_CFG_PMON_MODE		(1 << 4)
+#define ADM1278_CFG_TEMP1_EN		(1 << 3)
+#define ADM1278_CFG_VIN_EN		(1 << 2)
+#define ADM1278_CFG_VOUT_EN		(1 << 1)
 
 #define ADM1275_VIN_VOUT_SELECT		(1 << 6)
 #define ADM1275_VRANGE			(1 << 5)
@@ -60,6 +68,13 @@ struct adm1275_data {
 };
 
 #define to_adm1275_data(x)  container_of(x, struct adm1275_data, info)
+
+#define ADM1278_R_SENSE	500	/* R_sense resistor value in microohms   */
+
+static int r_sense = ADM1278_R_SENSE;
+module_param(r_sense, int, 0644);
+MODULE_PARM_DESC(r_sense, "Rsense resistor value in microohms");
+
 
 static int adm1275_read_word_data(struct i2c_client *client, int page, int reg)
 {
@@ -221,6 +236,7 @@ static const struct i2c_device_id adm1275_id[] = {
 	{ "adm1075", adm1075 },
 	{ "adm1275", adm1275 },
 	{ "adm1276", adm1276 },
+	{ "adm1278", adm1278 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, adm1275_id);
@@ -290,16 +306,47 @@ static int adm1275_probe(struct i2c_client *client,
 	info->format[PSC_VOLTAGE_IN] = direct;
 	info->format[PSC_VOLTAGE_OUT] = direct;
 	info->format[PSC_CURRENT_OUT] = direct;
-	info->m[PSC_CURRENT_OUT] = 807;
+	if (data->id == adm1278)
+		info->m[PSC_CURRENT_OUT] = 807 * r_sense / 1000;
+	else
+		info->m[PSC_CURRENT_OUT] = 807;
 	info->b[PSC_CURRENT_OUT] = 20475;
 	info->R[PSC_CURRENT_OUT] = -1;
 	info->func[0] = PMBUS_HAVE_IOUT | PMBUS_HAVE_STATUS_IOUT;
 
-	info->read_word_data = adm1275_read_word_data;
-	info->read_byte_data = adm1275_read_byte_data;
-	info->write_word_data = adm1275_write_word_data;
+	if (data->id == adm1278) {
+		/* Configure monitoring */
+		ret = i2c_smbus_write_byte_data(client,
+						ADM1278_PMON_CONTROL, 0);
+		if (ret < 0)
+			return ret;
+		ret = i2c_smbus_read_word_data(client, ADM1275_PMON_CONFIG);
+		ret = i2c_smbus_write_word_data(client, ADM1275_PMON_CONFIG,
+						ADM1278_CFG_PMON_MODE |
+						ADM1278_CFG_TEMP1_EN |
+						ADM1278_CFG_VIN_EN |
+						ADM1278_CFG_VOUT_EN);
+		if (ret < 0)
+			return ret;
+		ret = i2c_smbus_read_word_data(client, ADM1275_PMON_CONFIG);
+		ret = i2c_smbus_write_byte_data(client, ADM1278_PMON_CONTROL, 1);
+		if (ret < 0)
+			return ret;
+	} else {
+		/* TODO klahey -- there might be adm1278 issues here, too. */
+		info->read_word_data = adm1275_read_word_data;
+		info->read_byte_data = adm1275_read_byte_data;
+		info->write_word_data = adm1275_write_word_data;
+	}
 
-	if (data->id == adm1075) {
+	if (data->id == adm1278) {
+		info->m[PSC_VOLTAGE_IN] = 19599;
+		info->b[PSC_VOLTAGE_IN] = 0;
+		info->R[PSC_VOLTAGE_IN] = -2;
+		info->m[PSC_VOLTAGE_OUT] = 19599;
+		info->b[PSC_VOLTAGE_OUT] = 0;
+		info->R[PSC_VOLTAGE_OUT] = -2;
+	} else if (data->id == adm1075) {
 		info->m[PSC_VOLTAGE_IN] = 27169;
 		info->b[PSC_VOLTAGE_IN] = 0;
 		info->R[PSC_VOLTAGE_IN] = -1;
@@ -375,6 +422,19 @@ static int adm1275_probe(struct i2c_client *client,
 			info->b[PSC_POWER] = 0;
 			info->R[PSC_POWER] = -1;
 		}
+		break;
+	case adm1278:
+		info->format[PSC_POWER] = direct;
+		info->format[PSC_TEMPERATURE] = direct;
+		info->func[0] |= PMBUS_HAVE_VIN | PMBUS_HAVE_VOUT
+		  | PMBUS_HAVE_STATUS_INPUT
+		  | PMBUS_HAVE_TEMP | PMBUS_HAVE_STATUS_TEMP;
+		info->m[PSC_POWER] = 6123 * r_sense / 1000;
+		info->b[PSC_POWER] = 0;
+		info->R[PSC_POWER] = -2;
+		info->m[PSC_TEMPERATURE] = 42;
+		info->b[PSC_TEMPERATURE] = 31880;
+		info->R[PSC_TEMPERATURE] = -1;
 		break;
 	}
 
