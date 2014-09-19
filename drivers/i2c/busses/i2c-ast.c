@@ -1341,15 +1341,14 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			}
 			break;
 		case (AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP):
-			if((i2c_dev->xfer_last == 1) && (i2c_dev->slave_operation == 0)) {
+			/* Whether or not we're done, the hardware thinks we're done, so bail. */
+			if(i2c_dev->slave_operation == 0) {
 				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP = %x\n",sts);
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
 				//take care
 				ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
 									AST_I2CD_RX_DOWN_INTR_EN, I2C_INTR_CTRL_REG);
 				ast_i2c_master_xfer_done(i2c_dev);
-			} else {
-				printk("TODO .. .. ..\n");
 			}
 			break;
 		case AST_I2CD_INTR_STS_ARBIT_LOSS:
