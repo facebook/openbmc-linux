@@ -563,17 +563,17 @@ static void ep_dequeue_all(struct ast_ep* ep, int status) {
   struct ast_usb_request *req;
   struct ast_usb_request *n;
   unsigned long flags;
-  spin_lock_irqsave(ep->lock, flags);
+  spin_lock_irqsave(&ep->lock, flags);
   list_for_each_entry_safe(req, n, &ep->queue, queue) {
     ep_dequeue_locked(ep, req);
     req->req.status = status;
     if(req->req.complete) {
-      spin_unlock_irqrestore(ep->lock, flags);
+      spin_unlock_irqrestore(&ep->lock, flags);
       req->req.complete(&ep->ep, &req->req);
-      spin_lock_irqsave(ep->lock, flags);
+      spin_lock_irqsave(&ep->lock, flags);
     }
   }
-  spin_unlock_irqrestore(ep->lock, flags);
+  spin_unlock_irqrestore(&ep->lock, flags);
 }
 
 static int ast_ep_dequeue(struct usb_ep* _ep, struct usb_request *_rq) {
@@ -598,7 +598,7 @@ static int ast_ep_disable(struct usb_ep* _ep) {
   if (!ep->active)
     return 0;
   ep_dequeue_all(ep, -ESHUTDOWN);
-  spin_lock_irqsave(ep->lock, flags);
+  spin_lock_irqsave(&ep->lock, flags);
   ast_free_dma_memory(ep->ep.maxpacket,
       ep->to_host ? DMA_TO_DEVICE : DMA_FROM_DEVICE,
       ep->txbuf, ep->txbuf_phys);
@@ -607,7 +607,7 @@ static int ast_ep_disable(struct usb_ep* _ep) {
   ep->active = 0;
   ep->ep.maxpacket = 1024;
   ep_hwritel(ep, CONFIG, 0);
-  spin_unlock_irqrestore(ep->lock, flags);
+  spin_unlock_irqrestore(&ep->lock, flags);
   return 0;
 }
 
@@ -736,6 +736,10 @@ static int ast_ep_queue(struct usb_ep* _ep, struct usb_request *_rq, gfp_t gfp_f
 static int ast_ep_set_halt(struct usb_ep* _ep, int value) {
   struct ast_ep *ep = to_ast_ep(_ep);
   unsigned long flags;
+  if (ep == &ep0_ep) {
+    /* cannot halt ep0, just return */
+    return 0;
+  }
   spin_lock_irqsave(&ep->lock, flags);
   if(value) {
     ep_hwritel(ep, CONFIG, ep_hreadl(ep, CONFIG) | AST_EP_STALL_ENABLED);
@@ -908,6 +912,10 @@ static int __init ast_vhub_udc_probe(struct platform_device *pdev) {
 
   udc.gadget.dev.parent = &pdev->dev;
   udc.gadget.dev.dma_mask = pdev->dev.dma_mask;
+
+  /* disable all interrupts first */
+  ast_hwritel(&udc, INTERRUPT_ENABLE, 0);
+
   ast_hwritel(&udc, ISR, 0x1ffff);
   err = request_irq(irq, ast_vhub_udc_irq, 0, "aspeed_udc", &udc);
 
@@ -956,7 +964,7 @@ static int __init ast_vhub_udc_probe(struct platform_device *pdev) {
     snprintf(ep->epname, 7, "ep%d", ep->addr);
     ep->ep.name = ep->epname;
     ep->ep.maxpacket = 1024;
-    ep->lock = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&ep->lock);
     list_add_tail(&ep->ep.ep_list, &udc.gadget.ep_list);
   }
 
