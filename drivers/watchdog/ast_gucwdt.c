@@ -95,7 +95,7 @@ typedef unsigned char bool_T;
 #define WDT_CLK_SRC_PCLK	1
 
 //Global Variables
-#define WD_TIMO 11			/* Default heartbeat = 11 seconds */
+#define WD_TIMO 30			/* Default heartbeat = 30 seconds */
 
 static int heartbeat = WD_TIMO;
 module_param(heartbeat, int, 0);
