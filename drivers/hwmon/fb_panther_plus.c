@@ -57,14 +57,20 @@ struct panther_plus_data {
 };
 
 enum {
-  PANTHER_PLUS_SHOW_CPU_TEMP,
-  PANTHER_PLUS_SHOW_DIMM_TEMP,
-  PANTHER_PLUS_SHOW_GPIO_INPUTS,
+  PANTHER_PLUS_SYSFS_CPU_TEMP,
+  PANTHER_PLUS_SYSFS_DIMM_TEMP,
+  PANTHER_PLUS_SYSFS_GPIO_INPUTS,
+  PANTHER_PLUS_SYSFS_SMS_KCS,
+  PANTHER_PLUS_SYSFS_ALERT_CONTROL,
+  PANTHER_PLUS_SYSFS_ALERT_STATUS,
 };
 
 enum panther_plus_fbid_en {
+  PANTHER_PLUS_FBID_IPMI_SMS_KCS = 0x0,
   PANTHER_PLUS_FBID_GPIO_INPUTS = 0xd,
   PANTHER_PLUS_FBID_READ_REGISTER = 0x10,
+  PANTHER_PLUS_FBID_ALERT_CONTROL = 0xFD,
+  PANTHER_PLUS_FBID_ALERT_STATUS = 0xFE,
 };
 
 static inline void panther_plus_make_read(struct i2c_msg *msg,
@@ -89,15 +95,16 @@ static inline void panther_plus_make_write(struct i2c_msg *msg,
   msg->len = len;
 }
 
-static int panther_plus_read_fbid(struct i2c_client *client,
+static int panther_plus_fbid_io(struct i2c_client *client,
                                   enum panther_plus_fbid_en fbid,
-                                  u8 *write_buf, u8 write_len,
+                                  const u8 *write_buf, u8 write_len,
                                   u8 *read_buf, u8 read_len)
 {
   struct i2c_msg msg[2];
   u8 buf[255];
   u8 buf_len;
   int rc;
+  u8 num_msgs = 1;
 
   if (write_len + 1 > sizeof(buf)) {
     return -EINVAL;
@@ -113,21 +120,25 @@ static int panther_plus_read_fbid(struct i2c_client *client,
   panther_plus_make_write(&msg[0], client->addr, buf, buf_len);
 
   /* then, read */
-  panther_plus_make_read(&msg[1], client->addr, read_buf, read_len);
+  if (read_buf) {
+    panther_plus_make_read(&msg[1], client->addr, read_buf, read_len);
+    num_msgs = 2;
+  }
 
-  rc = i2c_transfer(client->adapter, msg, 2);
+  rc = i2c_transfer(client->adapter, msg, num_msgs);
   if (rc < 0) {
     PP_DEBUG("Failed to read FBID: %d, error=%d", fbid, rc);
     return rc;
   }
 
-  if (rc != 2) { /* expect 2 */
-    PP_DEBUG("Unexpected rc (%d != 2) when reading FBID: %d", rc, fbid);
+  if (rc != num_msgs) { /* expect 2 */
+    PP_DEBUG("Unexpected rc (%d != %d) when reading FBID: %d", rc, num_msgs, fbid);
     return -EIO;
   }
 
   /* the first byte read should match fbid */
-  if (read_buf[0] != fbid) {
+
+  if (read_buf && read_buf[0] != fbid) {
     PP_DEBUG("Unexpected FBID returned (%d != %d)", read_buf[0], fbid);
     return -EIO;
   }
@@ -162,7 +173,7 @@ static int panther_plus_read_gpio_inputs_value(
   int rc;
   u8 read_buf[5];
 
-  rc = panther_plus_read_fbid(client, PANTHER_PLUS_FBID_GPIO_INPUTS,
+  rc = panther_plus_fbid_io(client, PANTHER_PLUS_FBID_GPIO_INPUTS,
                               NULL, 0, read_buf, sizeof(read_buf));
   if (rc < 0) {
     return rc;
@@ -208,7 +219,7 @@ static int panther_plus_read_register(struct i2c_client *client,
   write_buf[0] = 0x1;           /* one byte */
   write_buf[1] = reg_idx;
 
-  rc = panther_plus_read_fbid(client, PANTHER_PLUS_FBID_READ_REGISTER,
+  rc = panther_plus_fbid_io(client, PANTHER_PLUS_FBID_READ_REGISTER,
                               write_buf, sizeof(write_buf),
                               read_buf, sizeof(read_buf));
   if (rc < 0) {
@@ -352,6 +363,80 @@ static int panther_plus_read_gpio_inputs(struct i2c_client *client, char *ret)
   return sprintf(ret, "0x%x\n", val);
 }
 
+static int panther_plus_read_sms_kcs(struct i2c_client *client, char *ret)
+{
+  int rc;
+  u8 read_buf[255] = {0x0};
+
+  rc = panther_plus_fbid_io(client, PANTHER_PLUS_FBID_IPMI_SMS_KCS,
+                              NULL, 0, read_buf, sizeof(read_buf));
+  if (rc < 0) {
+    return rc;
+  }
+
+  memcpy(ret, read_buf, read_buf[1]+2);
+
+  return (read_buf[1]+2);
+}
+
+static int panther_plus_write_sms_kcs(struct i2c_client *client, const char *buf, u8 count)
+{
+  int rc;
+
+  rc = panther_plus_fbid_io(client, PANTHER_PLUS_FBID_IPMI_SMS_KCS,
+                              buf, count, NULL, 0);
+  if (rc < 0) {
+    return rc;
+  }
+
+  return count;
+}
+
+static int panther_plus_read_alert_status(struct i2c_client *client, char *ret)
+{
+  int rc;
+  u8 rbuf[5] = {0};
+
+  rc = panther_plus_fbid_io(client, PANTHER_PLUS_FBID_ALERT_STATUS,
+                              NULL, 0, rbuf, sizeof(rbuf));
+  if (rc < 0) {
+    return rc;
+  }
+
+  memcpy(ret, rbuf, rbuf[1]+2);
+
+  return (rbuf[1]+2);
+}
+
+static int panther_plus_read_alert_control(struct i2c_client *client, char *ret)
+{
+  int rc;
+  u8 rbuf[5] = {0};
+
+  rc = panther_plus_fbid_io(client, PANTHER_PLUS_FBID_ALERT_CONTROL,
+                              NULL, 0, rbuf, sizeof(rbuf));
+  if (rc < 0) {
+    return rc;
+  }
+
+  memcpy(ret, rbuf, rbuf[1]+2);
+
+  return (rbuf[1]+2);
+}
+
+static int panther_plus_write_alert_control(struct i2c_client *client, const char *buf, u8 count)
+{
+  int rc;
+
+  rc = panther_plus_fbid_io(client, PANTHER_PLUS_FBID_ALERT_CONTROL,
+                              buf, count, NULL, 0);
+  if (rc < 0) {
+    return rc;
+  }
+
+  return count;
+}
+
 static ssize_t panther_plus_show(struct device *dev,
                                  struct device_attribute *attr,
                                  char *buf)
@@ -364,14 +449,23 @@ static ssize_t panther_plus_show(struct device *dev,
 
   mutex_lock(&data->update_lock);
   switch (which) {
-  case PANTHER_PLUS_SHOW_CPU_TEMP:
+  case PANTHER_PLUS_SYSFS_CPU_TEMP:
     rc = panther_plus_read_cpu_temp(client, buf);
     break;
-  case PANTHER_PLUS_SHOW_DIMM_TEMP:
+  case PANTHER_PLUS_SYSFS_DIMM_TEMP:
     rc = panther_plus_read_dimm_temp(client, sensor_attr->nr, buf);
     break;
-  case PANTHER_PLUS_SHOW_GPIO_INPUTS:
+  case PANTHER_PLUS_SYSFS_GPIO_INPUTS:
     rc = panther_plus_read_gpio_inputs(client, buf);
+    break;
+  case PANTHER_PLUS_SYSFS_SMS_KCS:
+    rc = panther_plus_read_sms_kcs(client, buf);
+    break;
+  case PANTHER_PLUS_SYSFS_ALERT_STATUS:
+    rc = panther_plus_read_alert_status(client, buf);
+    break;
+  case PANTHER_PLUS_SYSFS_ALERT_CONTROL:
+    rc = panther_plus_read_alert_control(client, buf);
     break;
   default:
     break;
@@ -388,22 +482,57 @@ static ssize_t panther_plus_show(struct device *dev,
   return rc;
 }
 
+static ssize_t panther_plus_set(struct device *dev,
+                                 struct device_attribute *attr,
+                                 const char *buf, size_t count)
+{
+  struct i2c_client *client = to_i2c_client(dev);
+  struct panther_plus_data *data = i2c_get_clientdata(client);
+  struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
+  int which = sensor_attr->index;
+
+  int rc = -EIO;
+  mutex_lock(&data->update_lock);
+  switch (which) {
+    case PANTHER_PLUS_SYSFS_SMS_KCS:
+      rc = panther_plus_write_sms_kcs(client, buf, count);
+      break;
+    case PANTHER_PLUS_SYSFS_ALERT_CONTROL:
+      rc = panther_plus_write_alert_control(client, buf, count);
+      break;
+    default:
+      break;
+  }
+
+  mdelay(10);
+
+  mutex_unlock(&data->update_lock);
+
+  return rc;
+}
+
 static SENSOR_DEVICE_ATTR_2(temp1_input, S_IRUGO, panther_plus_show, NULL,
-                            0, PANTHER_PLUS_SHOW_CPU_TEMP);
+                            0, PANTHER_PLUS_SYSFS_CPU_TEMP);
 static SENSOR_DEVICE_ATTR_2(temp2_input, S_IRUGO, panther_plus_show, NULL,
                             PANTHER_PLUS_REG_SOC_DIMM0_A_TEMP,
-                            PANTHER_PLUS_SHOW_DIMM_TEMP);
+                            PANTHER_PLUS_SYSFS_DIMM_TEMP);
 static SENSOR_DEVICE_ATTR_2(temp3_input, S_IRUGO, panther_plus_show, NULL,
                             PANTHER_PLUS_REG_SOC_DIMM0_B_TEMP,
-                            PANTHER_PLUS_SHOW_DIMM_TEMP);
+                            PANTHER_PLUS_SYSFS_DIMM_TEMP);
 static SENSOR_DEVICE_ATTR_2(temp4_input, S_IRUGO, panther_plus_show, NULL,
                             PANTHER_PLUS_REG_SOC_DIMM1_A_TEMP,
-                            PANTHER_PLUS_SHOW_DIMM_TEMP);
+                            PANTHER_PLUS_SYSFS_DIMM_TEMP);
 static SENSOR_DEVICE_ATTR_2(temp5_input, S_IRUGO, panther_plus_show, NULL,
                             PANTHER_PLUS_REG_SOC_DIMM1_B_TEMP,
-                            PANTHER_PLUS_SHOW_DIMM_TEMP);
+                            PANTHER_PLUS_SYSFS_DIMM_TEMP);
 static SENSOR_DEVICE_ATTR_2(gpio_inputs, S_IRUGO, panther_plus_show, NULL,
-                            0, PANTHER_PLUS_SHOW_GPIO_INPUTS);
+                            0, PANTHER_PLUS_SYSFS_GPIO_INPUTS);
+static SENSOR_DEVICE_ATTR_2(sms_kcs, S_IWUSR | S_IRUGO, panther_plus_show, panther_plus_set,
+                            0, PANTHER_PLUS_SYSFS_SMS_KCS);
+static SENSOR_DEVICE_ATTR_2(alert_status, S_IRUGO, panther_plus_show, NULL,
+                            0, PANTHER_PLUS_SYSFS_ALERT_STATUS);
+static SENSOR_DEVICE_ATTR_2(alert_control, S_IWUSR | S_IRUGO, panther_plus_show, panther_plus_set,
+                            0, PANTHER_PLUS_SYSFS_ALERT_CONTROL);
 
 static struct attribute *panther_plus_attributes[] = {
   &sensor_dev_attr_temp1_input.dev_attr.attr,
@@ -412,6 +541,9 @@ static struct attribute *panther_plus_attributes[] = {
   &sensor_dev_attr_temp4_input.dev_attr.attr,
   &sensor_dev_attr_temp5_input.dev_attr.attr,
   &sensor_dev_attr_gpio_inputs.dev_attr.attr,
+  &sensor_dev_attr_sms_kcs.dev_attr.attr,
+  &sensor_dev_attr_alert_status.dev_attr.attr,
+  &sensor_dev_attr_alert_control.dev_attr.attr,
   NULL
 };
 
