@@ -266,6 +266,24 @@ static struct flash_platform_data wedge_spi_flash_data = {
 };
 #endif
 
+
+/* Device info for the flash on ast-spi */
+#ifdef CONFIG_ARCH_AST2400
+static struct mtd_partition ast_spi5_flash_partitions[] = {
+  {
+    .name = "led-fpga",
+    .offset = 0, /* From 0 */
+    .size = MTDPART_SIZ_FULL,
+  },
+};
+
+static struct flash_platform_data wedge_spi5_flash_data = {
+  .type = "at45db011d",
+  .nr_parts = ARRAY_SIZE(ast_spi5_flash_partitions),
+  .parts = ast_spi5_flash_partitions,
+};
+#endif
+
 static struct spi_board_info ast_spi_devices[] = {
 #if 0
     {
@@ -278,6 +296,14 @@ static struct spi_board_info ast_spi_devices[] = {
     }, 
 #endif
 #ifdef CONFIG_ARCH_AST2400
+    {
+        .modalias    = "mtd_dataflash",
+        .platform_data  = &wedge_spi5_flash_data,
+        .chip_select    = 0,
+        .max_speed_hz    = 33 * 1000 * 1000,
+        .bus_num    = 5,
+        .mode = SPI_MODE_0,
+    },
     {
         .modalias    = "m25p80",
         .platform_data  = &wedge_spi_flash_data,
