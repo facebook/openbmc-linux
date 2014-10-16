@@ -745,6 +745,13 @@ static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
 	},
 };
 
+//Under I2C Dev 12
+static struct i2c_board_info __initdata ast_i2c_board_info_12[] = {
+	{
+		I2C_BOARD_INFO("pfe3000", 0x10),
+	},
+};
+
 //Under I2C Dev 13
 static struct i2c_board_info __initdata ast_i2c_board_info_13[] = {
 	{
@@ -808,9 +815,13 @@ void __init ast_add_device_i2c(void)
 	//Due to share pin with SD 
 #else
 	/*
-	 * On wedge, only bus 13 is used as i2c bus. Pins for bus 11, 12,
-	 * and 14 are used as GPIOs.
+	 * On Wedge, bus 13 is used as i2c bus.  Bus 12 is used on other
+	 * hardware.  Pins for bus 11, 12, and 14 are used as GPIOs, on
+	 * various hardware, but enabling the i2c bus does not seem to
+	 * interfere with the GPIOs.
 	 */
+	platform_device_register(&ast_i2c_dev12_device);
+	i2c_register_board_info(11, ast_i2c_board_info_12, ARRAY_SIZE(ast_i2c_board_info_12));
 	platform_device_register(&ast_i2c_dev13_device);
 	i2c_register_board_info(12, ast_i2c_board_info_13, ARRAY_SIZE(ast_i2c_board_info_13));
 #endif	
