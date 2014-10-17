@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.28.9
-# Thu Sep 11 17:25:15 2014
+# Mon Oct 13 13:36:17 2014
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -854,6 +854,7 @@ CONFIG_SENSORS_ADM1275=m
 # CONFIG_SENSORS_MAX34440 is not set
 # CONFIG_SENSORS_MAX8688 is not set
 CONFIG_SENSORS_PFE1100=m
+CONFIG_SENSORS_PFE3000=m
 # CONFIG_SENSORS_UCD9000 is not set
 # CONFIG_SENSORS_UCD9200 is not set
 # CONFIG_SENSORS_ZL6100 is not set
