@@ -42,7 +42,7 @@
 #include <plat/ast-scu.h>
 
 
-#define REST_DESIGN		0
+#define REST_DESIGN		5
 
 struct adc_vcc_ref_data {
 	int v2;
@@ -50,7 +50,7 @@ struct adc_vcc_ref_data {
 	int r2;	
 };
 
-static struct adc_vcc_ref_data adc_vcc_ref[5] = {
+static struct adc_vcc_ref_data adc_vcc_ref[6] = {
 	[0] = {
 		.v2 = 0,
 		.r1 = 5600,
@@ -76,7 +76,19 @@ static struct adc_vcc_ref_data adc_vcc_ref[5] = {
 		.r1 = 56000,
 		.r2 = 1000,
 	},
+	[5] = {
+		.v2 = 0,
+		.r1 = 1000,
+		.r2 = 1000,
+	},
 };
+
+/* Divisors for voltage sense;  right now adc5 & adc6 divide by 2 */
+
+static int adc_divisor[] = { 1, 1, 1, 1,
+			     1, 2, 2, 1,
+			     1, 1, 1, 1,
+			     1, 1, 1, 1};
 
 struct ast_adc_data {
 	struct device			*hwmon_dev;
@@ -422,10 +434,16 @@ ast_get_voltage(int idx) {
   tmp = ast_get_adc_value(ast_adc, idx);
   // Voltage Sense Method
   tmp1 = (adc_vcc_ref[REST_DESIGN].r1 + adc_vcc_ref[REST_DESIGN].r2) * tmp * 25 * 10;
-  tmp2 = adc_vcc_ref[REST_DESIGN].r2 * 1023 ;
+  tmp2 = adc_vcc_ref[REST_DESIGN].r2 * 1024 ;
   tmp3 = (adc_vcc_ref[REST_DESIGN].r1 * adc_vcc_ref[REST_DESIGN].v2) / adc_vcc_ref[REST_DESIGN].r2;
   // printk("tmp3 = %d \n",tmp3);
   voltage = (tmp1/tmp2) - tmp3;
+
+  // Higher voltage inputs require a divisor
+
+  if (adc_divisor[idx])
+	voltage /= adc_divisor[idx];
+
   return voltage;
 }
 
