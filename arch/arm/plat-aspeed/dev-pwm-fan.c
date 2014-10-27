@@ -65,14 +65,6 @@ struct platform_device ast_pwm_fan_device = {
 
 void __init ast_add_device_pwm_fan(void)
 {
-	//SCU Initial 
-
-	//SCU Pin-MUX 	//PWM & TACHO 
-	ast_scu_multi_func_pwm_tacho();
-
-	//SCU PWM CTRL Reset
-	ast_scu_init_pwm_tacho();	
-
 	platform_device_register(&ast_pwm_fan_device);
 }
 #else

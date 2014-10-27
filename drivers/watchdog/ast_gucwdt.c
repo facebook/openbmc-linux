@@ -86,6 +86,16 @@ typedef unsigned char bool_T;
 #define WDT_Clr                 (WDT_BASE_VA+0x14)
 #define WDT_RstWd               (WDT_BASE_VA+0x18)
 
+#define WDT_CTRL_B_SECOND_BOOT  (0x1 << 7)
+#define WDT_CTRL_B_RESET_FULL (0x01 << 5)
+#define WDT_CTRL_B_RESET_ARM (0x2 << 5)
+#define WDT_CTRL_B_RESET_MASK (0x3 << 5)
+#define WDT_CTRL_B_1MCLK (0x1 << 4)
+#define WDT_CTRL_B_EXT  (0x1 << 3)
+#define WDT_CTRL_B_INTR  (0x1 << 2)
+#define WDT_CTRL_B_CLEAR_AFTER  (0x1 << 1)
+#define WDT_CTRL_B_ENABLE  (0x1 << 0)
+
 
 #define UMVP_READ_REG(r)		(*((volatile unsigned int *) (r)))
 #define UMVP_WRITE_REG(r,v)		(*((volatile unsigned int *) (r)) = ((unsigned int)   (v)))
@@ -105,7 +115,6 @@ static int nowayout = WATCHDOG_NOWAYOUT;
 module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
-static unsigned long wdt_is_open;
 static char expect_close;
 static char wdt_disabled = 0; // setting this to 1 will disable the wdt timer
 
@@ -126,7 +135,7 @@ void wdt_disable(void)
 
     /* reset WDT_Ctrl[0] as 0 */
     regVal = UMVP_READ_REG(WDT_Ctrl);
-    regVal &= 0xFFFFFFFE;
+    regVal &= ~(WDT_CTRL_B_ENABLE);
     UMVP_WRITE_REG(WDT_Ctrl, regVal);
 }
 
@@ -138,17 +147,18 @@ void wdt_sel_clk_src(unsigned char sourceClk)
     if (sourceClk == WDT_CLK_SRC_PCLK)
     {
         /* reset WDT_Ctrl[4] as 0 */
-        regVal &= 0xFFFFFFEF;
+      regVal &= ~(WDT_CTRL_B_1MCLK);
     }
     else
     {
         /* set WDT_Ctrl[4] as 1 */
-        regVal |= 0x00000010;
+      regVal |= WDT_CTRL_B_1MCLK;
     }
     UMVP_WRITE_REG(WDT_Ctrl, regVal);
 }
 
-void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys, bool_T bResetSys, bool_T bResetARMOnly)
+void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys,
+                            bool_T bClrAfter, bool_T bResetARMOnly)
 {
 	register unsigned int regVal;
 
@@ -157,45 +167,47 @@ void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys, bool_T bResetSys,
 	if (bResetOut)
 	{
 		/* set WDT_Ctrl[3] = 1 */
-		regVal |= 0x00000008;
+		regVal |= WDT_CTRL_B_EXT;
 	}
 	else
 	{
 		/* reset WDT_Ctrl[3] = 0 */
-		regVal &= 0xFFFFFFF7;
+		regVal &= ~WDT_CTRL_B_EXT;
 	}
 
 	if (bIntrSys)
 	{
 		/* set WDT_Ctrl[2] = 1 */
-		regVal |= 0x00000004;
+		regVal |= WDT_CTRL_B_INTR;
 	}
 	else
 	{
 		/* reset WDT_Ctrl[2] = 0 */
-		regVal &= 0xFFFFFFFB;
+		regVal &= ~WDT_CTRL_B_INTR;
 	}
 
-	if (bResetSys)
+	if (bClrAfter)
 	{
 		/* set WDT_Ctrl[1] = 1 */
-		regVal |= 0x00000002;
+		regVal |= WDT_CTRL_B_CLEAR_AFTER;
 	}
 	else
 	{
 		/* reset WDT_Ctrl[1] = 0 */
-		regVal &= 0xFFFFFFFD;
+		regVal &= ~WDT_CTRL_B_CLEAR_AFTER;
 	}
 
   if (bResetARMOnly)
   {
     /* set WDT_Ctrl[6..5] = 10 ie, reset ARM only */
-    regVal |= (1 << 6);
+    regVal &= WDT_CTRL_B_RESET_MASK;
+    regVal |= WDT_CTRL_B_RESET_ARM;
   }
   else
   {
-    /* reset WDT_CTrl[6..5] = 00 ie, SOC system */
-    regVal &= ~((1 << 5) | (1 << 6));
+    /* reset WDT_CTrl[6..5] = 01, full chip */
+    regVal &= WDT_CTRL_B_RESET_MASK;
+    regVal |= WDT_CTRL_B_RESET_FULL;
   }
 
 	UMVP_WRITE_REG(WDT_Ctrl, regVal);
@@ -209,12 +221,14 @@ void wdt_enable(void)
 
   	/* set WDT_Ctrl[0] as 1 */
   	regVal = UMVP_READ_REG(WDT_Ctrl);
-  	regVal |= 1;
+  	regVal |= WDT_CTRL_B_ENABLE;
   	UMVP_WRITE_REG(WDT_Ctrl, regVal);
   }
 }
 
-void wdt_restart_new(unsigned int nPeriod, int sourceClk, bool_T bResetOut, bool_T bIntrSys, bool_T bResetSys, bool_T bUpdated, bool_T bResetARMOnly)
+void wdt_restart_new(unsigned int nPeriod, int sourceClk, bool_T bResetOut,
+                     bool_T bIntrSys, bool_T bClrAfter, bool_T bResetARMOnly,
+                     bool_T bUpdated)
 {
   if (wdt_disabled == 0) {
   	wdt_disable();
@@ -223,7 +237,7 @@ void wdt_restart_new(unsigned int nPeriod, int sourceClk, bool_T bResetOut, bool
 
   	wdt_sel_clk_src(sourceClk);
 
-  	wdt_set_timeout_action(bResetOut, bIntrSys, bResetSys, bResetARMOnly);
+  	wdt_set_timeout_action(bResetOut, bIntrSys, bClrAfter, bResetARMOnly);
 
   	UMVP_WRITE_REG(WDT_Restart, 0x4755);	/* reload! */
 
@@ -257,7 +271,10 @@ static int wdt_set_heartbeat(int t)
 
   heartbeat=t;
 
-  wdt_restart_new(TICKS_PER_uSEC*1000000*t, WDT_CLK_SRC_EXT, FALSE, FALSE, TRUE, FALSE, TRUE);
+  wdt_restart_new(TICKS_PER_uSEC*1000000*t, WDT_CLK_SRC_EXT,
+                  /* No Ext, No intr, Self clear, Full chip reset */
+                  FALSE, FALSE, TRUE, FALSE,
+                  FALSE);
   return 0;
 }
 
@@ -448,14 +465,25 @@ static int umvp2500_wdt_notify_sys(struct notifier_block *this, unsigned long co
    return NOTIFY_DONE;
 }
 
-extern void ast_soc_wdt_reset(void)
+extern void ast_wdt_reset_soc(void)
 {
-	writel(0x10 , WDT_BASE_VA+0x04);
-	writel(0x4755, WDT_BASE_VA+0x08);
-	writel(0x3, WDT_BASE_VA+0x0c);
+	writel(0x10 , WDT_Reload);
+	writel(0x4755, WDT_Restart);
+	writel(WDT_CTRL_B_RESET_FULL|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE,
+         WDT_Ctrl);
 }
 
-EXPORT_SYMBOL(ast_soc_wdt_reset);
+EXPORT_SYMBOL(ast_wdt_reset_soc);
+
+extern void ast_wdt_reset_full(void)
+{
+	writel(0x10 , WDT_Reload);
+	writel(0x4755, WDT_Restart);
+	writel(WDT_CTRL_B_RESET_FULL|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE,
+         WDT_Ctrl);
+}
+
+EXPORT_SYMBOL(ast_wdt_reset_full);
 
 static struct file_operations umvp2500_wdt_fops =
 {
@@ -485,7 +513,7 @@ static int ast_wdt_probe(struct platform_device *pdev)
 
    wdt_disable();
    wdt_sel_clk_src(WDT_CLK_SRC_EXT);
-   wdt_set_timeout_action(FALSE, FALSE, FALSE, TRUE);
+   wdt_set_timeout_action(FALSE, FALSE, FALSE, FALSE);
 
    /* register ISR */
    if (request_irq(IRQ_WDT, (void *)wdt_isr, IRQF_DISABLED, "WDT", NULL))
@@ -513,7 +541,10 @@ static int ast_wdt_probe(struct platform_device *pdev)
    }
 
    /* interrupt the system while WDT timeout */
-   wdt_restart_new(TICKS_PER_uSEC*1000000*heartbeat, WDT_CLK_SRC_EXT, FALSE, TRUE, TRUE, TRUE, TRUE);
+   wdt_restart_new(TICKS_PER_uSEC*1000000*heartbeat, WDT_CLK_SRC_EXT,
+                   /* No Ext, No intr, Self clear, Full chip reset */
+                   FALSE, FALSE, TRUE, FALSE,
+                   TRUE);
 
    printk(KERN_INFO "UMVP2500 WDT is installed.(irq = %d, heartbeat = %d secs, nowayout = %d)\n",IRQ_WDT,heartbeat,nowayout);
 

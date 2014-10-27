@@ -1,5 +1,5 @@
 /*
- *  ast_wdt_h  
+ *  ast_wdt_h
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -8,4 +8,4 @@
  * your option) any later version.
  */
 
- extern void ast_soc_wdt_reset(void);
+ extern void ast_wdt_reset_full(void);

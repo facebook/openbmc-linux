@@ -39,8 +39,8 @@ static inline void arch_reset(char mode)
 	/*
 	 * Use WDT to restart system
 	 */
-#if defined(CONFIG_AST_WATCHDOG) || defined(CONFIG_AST_WATCHDOG_MODULE)	
-	ast_soc_wdt_reset();
+#if defined(CONFIG_AST_WATCHDOG) || defined(CONFIG_AST_WATCHDOG_MODULE)
+	ast_wdt_reset_full();
 #endif
 }
 
