@@ -710,6 +710,7 @@ typedef struct
 #define PHYID_RTL8201EL     0x001cc810
 #define PHYID_RTL8211     0x001cc910
 #define PHYID_BCM54612E             0x03625E6A
+#define PHYID_BCM54616S             0x03625D12
 
 /* store this information for the driver.. */
 

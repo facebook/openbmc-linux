@@ -164,6 +164,8 @@ static const char version[] =
 // #define IPNAME   FTGMAC1000
 //struct tq_struct rcv_tq;
 
+#define PHY_DEFAULT_ADDR 0x1F
+
 /*-----------------------------------------------------------------
   .
   .  The driver can be entered at any of the following entry points.
@@ -293,7 +295,7 @@ static unsigned long IP_irq[2] = {IRQ_MAC0, IRQ_MAC1};
 // Values 0..31 are the PHY chip address on the MDC+MDIO bus driven by this
 // MAC.  Values 32..63 mean this MAC's PHY is on the _MAC1_ MDC+MDIO bus.
 // Value 255 prevents this MAC from accessing PHY chip; assume 100 Mbit/s FDX.
-static unsigned char IP_phy_addr[2] = { 0x0, 0x0 };
+static unsigned char IP_phy_addr[2] = { PHY_DEFAULT_ADDR, PHY_DEFAULT_ADDR };
 
 static struct net_device *ftgmac100_netdev[IP_COUNT];
 //static struct resource ftgmac100_resource[IP_COUNT];
@@ -302,16 +304,7 @@ static unsigned int DF_support = 0;
 
 static void auto_get_mac(int id, char *mac_addr)
 {
-
-//FIX MAC ADDRESS
-  mac_addr[0] = 0;
-  mac_addr[1] = 0x84;
-  mac_addr[2] = 0x14;
-  mac_addr[3] = 0xA0;
-  mac_addr[4] = 0xB0;
-  mac_addr[5] = 0x22 + id;
-
-  return;
+  random_ether_addr(mac_addr);
 }
 
 void put_mac(int base, char *mac_addr)
@@ -1145,7 +1138,8 @@ static void aspeed_mac_timer(unsigned long data)
       duplex = (tmp & PHY_DUPLEX_mask)>>13;
       speed  = (tmp & PHY_SPEED_mask)>>14;
     }
-    else if (lp->ids.miiPhyId == PHYID_BCM54612E) {
+    else if (lp->ids.miiPhyId == PHYID_BCM54612E
+             || lp->ids.miiPhyId == PHYID_BCM54616S) {
       // Get link status
       // First Switch shadow register selector
       ftgmac100_write_phy_register(ioaddr, lp->ids.phyAddr, 0x1C, 0x2000);
@@ -1375,9 +1369,6 @@ static void getMacHwConfig( struct net_device* dev, struct AstMacHwConfig* out )
     if (out->miiPhyId == 0xFFFF) { //Realtek PHY at address 1
       out->phyAddr = 1;
     }
-    if (out->miiPhyId == 0x0362) {
-      out->phyAddr = 1;
-    }
     out->miiPhyId = ftgmac100_read_phy_register(ioaddr, out->phyAddr, 0x02);
     out->miiPhyId = (out->miiPhyId & 0xffff) << 16;
     out->miiPhyId |= ftgmac100_read_phy_register(ioaddr, out->phyAddr, 0x03) & 0xffff;
@@ -1386,7 +1377,7 @@ static void getMacHwConfig( struct net_device* dev, struct AstMacHwConfig* out )
     case 0x0040:  // Broadcom
     case 0x0141:  // Marvell
     case 0x001c:  // Realtek
-    case 0x0362:    // BCM54612
+    case 0x0362:    // BCM54612, BCM54616
       break;
 
     default:
@@ -1456,7 +1447,8 @@ static void ftgmac100_reset( struct net_device* dev )
     speed  = (tmp & PHY_SPEED_mask)>>14;
     netif_carrier_on(dev);
   }
-  else if (lp->ids.miiPhyId == PHYID_BCM54612E) {
+  else if (lp->ids.miiPhyId == PHYID_BCM54612E
+           || lp->ids.miiPhyId == PHYID_BCM54616S) {
     // Get link status
     // First Switch shadow register selector
     ftgmac100_write_phy_register(ioaddr, lp->ids.phyAddr, 0x1C, 0x2000);
@@ -1691,7 +1683,8 @@ static void ftgmac100_enable( struct net_device *dev )
         ,ioaddr + IER_REG
     );
   }
-  else if (lp->ids.miiPhyId == PHYID_BCM54612E) {
+  else if (lp->ids.miiPhyId == PHYID_BCM54612E
+           || lp->ids.miiPhyId == PHYID_BCM54616S) {
     outl(
 // no link PHY link status pin            PHYSTS_CHG_bit      |
         AHB_ERR_bit         |
@@ -2210,7 +2203,8 @@ static int ftgmac100_open(struct net_device *dev)
 
   if (((lp->ids.miiPhyId & PHYID_VENDOR_MASK) == PHYID_VENDOR_BROADCOM) ||
       ((lp->ids.miiPhyId & PHYID_VENDOR_MODEL_MASK) == PHYID_RTL8201EL) ||
-      (lp->ids.miiPhyId == PHYID_BCM54612E)) {
+      (lp->ids.miiPhyId == PHYID_BCM54612E) ||
+      (lp->ids.miiPhyId == PHYID_BCM54616S)) {
 
     init_timer(&lp->timer);
     lp->timer.data = (unsigned long)dev;
@@ -2318,7 +2312,8 @@ static irqreturn_t ftgmac100_interrupt(int irq, void * dev_id,  struct pt_regs *
         // Bits [3:1] are {duplex, speed, link} change interrupts.
         tmp &= 0x000e;
       }
-      else if (lp->ids.miiPhyId == PHYID_BCM54612E) {
+      else if (lp->ids.miiPhyId == PHYID_BCM54612E
+              || lp->ids.miiPhyId == PHYID_BCM54616S) {
         tmp = ftgmac100_read_phy_register(ioaddr, lp->ids.phyAddr, 0x1A);
         PRINTK("%s: PHY interrupt status, read_phy_reg(0x1A) = 0x%04x\n",
                dev->name, tmp);
@@ -3145,7 +3140,8 @@ static void ftgmac100_phy_configure(struct net_device* dev)
 
     tmp = ftgmac100_read_phy_register(ioaddr, lp->ids.phyAddr, 0x13 );
   }
-  else if (lp->ids.miiPhyId == PHYID_BCM54612E) {
+  else if (lp->ids.miiPhyId == PHYID_BCM54612E
+           || lp->ids.miiPhyId == PHYID_BCM54616S) {
 
     ftgmac100_write_phy_register(ioaddr, lp->ids.phyAddr, 0x1C, 0x8C00); // Disable GTXCLK Clock Delay Enable
     ftgmac100_write_phy_register(ioaddr, lp->ids.phyAddr, 0x18, 0xF0E7); // Disable RGMII RXD to RXC Skew
