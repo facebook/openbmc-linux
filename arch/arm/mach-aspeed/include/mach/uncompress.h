@@ -14,8 +14,8 @@
 #include <mach/platform.h>
 #include <mach/aspeed_serial.h>
 
-#define UART_PUT_CHAR   (*(volatile unsigned char *)(AST_UART0_BASE + UART_THR))
-#define UART_GET_LSR   (*(volatile unsigned char *)(AST_UART0_BASE + UART_LSR))
+#define UART_PUT_CHAR   (*(volatile unsigned char *)(AST_UART3_BASE + UART_THR))
+#define UART_GET_LSR   (*(volatile unsigned char *)(AST_UART3_BASE + UART_LSR))
 
 static void putc(int c)
 {

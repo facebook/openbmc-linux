@@ -21,7 +21,6 @@
 #include <asm/memory.h>
 #include <asm/thread_info.h>
 #include <asm/system.h>
-#include <asm/mach-types.h>
 
 #if (PHYS_OFFSET & 0x001fffff)
 #error "PHYS_OFFSET must be at an even 2MiB boundary!"
@@ -77,14 +76,13 @@
  */
 	.section ".text.head", "ax"
 ENTRY(stext)
-	ldr	r5, =machine_arch_type		@ find the machine type
 	msr	cpsr_c, #PSR_F_BIT | PSR_I_BIT | SVC_MODE @ ensure svc mode
 						@ and irqs disabled
 	mrc	p15, 0, r9, c0, c0		@ get processor id
 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
 	movs	r10, r5				@ invalid processor (r5=0)?
 	beq	__error_p			@ yes, error 'p'
-@	bl	__lookup_machine_type		@ r5=machinfo
+	bl	__lookup_machine_type		@ r5=machinfo
 	movs	r8, r5				@ invalid machine (r5=0)?
 	beq	__error_a			@ yes, error 'a'
 	bl	__vet_atags
