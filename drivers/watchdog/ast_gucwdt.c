@@ -87,6 +87,7 @@ typedef unsigned char bool_T;
 #define WDT_RstWd               (WDT_BASE_VA+0x18)
 
 #define WDT_CTRL_B_SECOND_BOOT  (0x1 << 7)
+#define WDT_CTRL_B_RESET_SOC (0x00 << 5) /* yes, 0x00 */
 #define WDT_CTRL_B_RESET_FULL (0x01 << 5)
 #define WDT_CTRL_B_RESET_ARM (0x2 << 5)
 #define WDT_CTRL_B_RESET_MASK (0x3 << 5)
@@ -200,13 +201,13 @@ void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys,
   if (bResetARMOnly)
   {
     /* set WDT_Ctrl[6..5] = 10 ie, reset ARM only */
-    regVal &= WDT_CTRL_B_RESET_MASK;
+    regVal &= ~WDT_CTRL_B_RESET_MASK;
     regVal |= WDT_CTRL_B_RESET_ARM;
   }
   else
   {
     /* reset WDT_CTrl[6..5] = 01, full chip */
-    regVal &= WDT_CTRL_B_RESET_MASK;
+    regVal &= ~WDT_CTRL_B_RESET_MASK;
     regVal |= WDT_CTRL_B_RESET_FULL;
   }
 
@@ -469,7 +470,7 @@ extern void ast_wdt_reset_soc(void)
 {
 	writel(0x10 , WDT_Reload);
 	writel(0x4755, WDT_Restart);
-	writel(WDT_CTRL_B_RESET_FULL|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE,
+	writel(WDT_CTRL_B_RESET_SOC|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE,
          WDT_Ctrl);
 }
 
