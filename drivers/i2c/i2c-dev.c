@@ -261,6 +261,31 @@ static noinline int i2cdev_ioctl_rdrw(struct i2c_client *client,
 				res = -EFAULT;
 			break;
 		}
+
+		/* From Linux 3.5: */
+		/*
+		 * If the message length is received from the slave (similar
+		 * to SMBus block read), we must ensure that the buffer will
+		 * be large enough to cope with a message length of
+		 * I2C_SMBUS_BLOCK_MAX as this is the maximum underlying bus
+		 * drivers allow. The first byte in the buffer must be
+		 * pre-filled with the number of extra bytes, which must be
+		 * at least one to hold the message length, but can be
+		 * greater (for example to account for a checksum byte at
+		 * the end of the message.)
+		 */
+	       if (rdwr_pa[i].flags & I2C_M_RECV_LEN) {
+		       if (!(rdwr_pa[i].flags & I2C_M_RD) ||
+			   rdwr_pa[i].buf[0] < 1 ||
+			   rdwr_pa[i].len < rdwr_pa[i].buf[0] +
+					    I2C_SMBUS_BLOCK_MAX) {
+			       res = -EINVAL;
+			       break;
+		       }
+
+		       rdwr_pa[i].len = rdwr_pa[i].buf[0];
+	       }
+
 	}
 	if (res < 0) {
 		int j;
