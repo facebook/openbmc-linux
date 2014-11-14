@@ -55,9 +55,6 @@
 #include <mach/platform.h>
 #endif
 
-#define TICKS_PER_uSEC                  1
-
-
 typedef unsigned char bool_T;
 
 #ifdef TRUE
@@ -106,18 +103,26 @@ typedef unsigned char bool_T;
 #define WDT_CLK_SRC_PCLK	1
 
 //Global Variables
-#define WD_TIMO 30			/* Default heartbeat = 30 seconds */
+#define WDT_TIMO 30             /* Default timeout, 30 seconds */
+#define WDT_INITIAL_TIMO (8*60) /* Initial timeout, 8m */
 
-static int heartbeat = WD_TIMO;
+#define TICKS_PER_uSEC 1        /* 1MHz clock */
+#define WDT_TIMO2TICKS(t) (TICKS_PER_uSEC * 1000000 * (t))
+
+static int heartbeat = WDT_TIMO;
 module_param(heartbeat, int, 0);
-MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds. (0<heartbeat<65536, default=" __MODULE_STRING(WD_TIMO) ")");
+MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds. (0<heartbeat<65536, default=" __MODULE_STRING(WDT_TIMO) ")");
 
 static int nowayout = WATCHDOG_NOWAYOUT;
 module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
+static int force_disable = 0; // setting this to 1 will disable the wdt timer
+module_param(force_disable, int, 0);
+MODULE_PARM_DESC(force_disable, "Disable watchdog by default "
+                 "(default=0, enable watchdog)");
+
 static char expect_close;
-static char wdt_disabled = 0; // setting this to 1 will disable the wdt timer
 
 //Function Declaration
 int __init wdt_init(void);
@@ -216,8 +221,7 @@ void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys,
 
 void wdt_enable(void)
 {
-  if (wdt_disabled == 0) {
-
+  if (!force_disable) {
   	register unsigned int regVal;
 
   	/* set WDT_Ctrl[0] as 1 */
@@ -227,29 +231,38 @@ void wdt_enable(void)
   }
 }
 
-void wdt_restart_new(unsigned int nPeriod, int sourceClk, bool_T bResetOut,
-                     bool_T bIntrSys, bool_T bClrAfter, bool_T bResetARMOnly,
-                     bool_T bUpdated)
+bool_T wdt_is_enabled(void)
 {
-  if (wdt_disabled == 0) {
+  unsigned int reg;
+  reg = UMVP_READ_REG(WDT_Ctrl);
+  return reg & WDT_CTRL_B_ENABLE;
+}
+
+void wdt_restart_new(unsigned int nPeriod, int sourceClk, bool_T bResetOut,
+                     bool_T bIntrSys, bool_T bClrAfter, bool_T bResetARMOnly)
+{
+  bool_T enabled = wdt_is_enabled();
+
+  if (enabled) {
   	wdt_disable();
+  }
 
-  	UMVP_WRITE_REG(WDT_Reload, nPeriod);
+  UMVP_WRITE_REG(WDT_Reload, nPeriod);
 
-  	wdt_sel_clk_src(sourceClk);
+  wdt_sel_clk_src(sourceClk);
 
-  	wdt_set_timeout_action(bResetOut, bIntrSys, bClrAfter, bResetARMOnly);
+  wdt_set_timeout_action(bResetOut, bIntrSys, bClrAfter, bResetARMOnly);
 
-  	UMVP_WRITE_REG(WDT_Restart, 0x4755);	/* reload! */
+  UMVP_WRITE_REG(WDT_Restart, 0x4755);	/* reload! */
 
-	  if (!bUpdated)
-  	    wdt_enable();
+  if (enabled) {
+    wdt_enable();
   }
 }
 
 void wdt_restart(void)
 {
-  if (wdt_disabled == 0) {
+  if (!force_disable) {
   	wdt_disable();
 	  UMVP_WRITE_REG(WDT_Restart, 0x4755);	/* reload! */
   	wdt_enable();
@@ -272,10 +285,9 @@ static int wdt_set_heartbeat(int t)
 
   heartbeat=t;
 
-  wdt_restart_new(TICKS_PER_uSEC*1000000*t, WDT_CLK_SRC_EXT,
+  wdt_restart_new(WDT_TIMO2TICKS(t), WDT_CLK_SRC_EXT,
                   /* No Ext, No intr, Self clear, Full chip reset */
-                  FALSE, FALSE, TRUE, FALSE,
-                  FALSE);
+                  FALSE, FALSE, TRUE, FALSE);
   return 0;
 }
 
@@ -319,11 +331,11 @@ static ssize_t umvp2500_wdt_write(struct file *file, const char __user *buf, siz
              expect_close = 42;
              break;
            case 'X':
-             wdt_disabled = 1;
+             force_disable = 1;
              wdt_disable();
              break;
            case 'x':
-             wdt_disabled = 0;
+             force_disable = 0;
              break;
            default:
              break;
@@ -512,10 +524,6 @@ static int ast_wdt_probe(struct platform_device *pdev)
 {
    int ret;
 
-   wdt_disable();
-   wdt_sel_clk_src(WDT_CLK_SRC_EXT);
-   wdt_set_timeout_action(FALSE, FALSE, FALSE, FALSE);
-
    /* register ISR */
    if (request_irq(IRQ_WDT, (void *)wdt_isr, IRQF_DISABLED, "WDT", NULL))
    {
@@ -542,12 +550,22 @@ static int ast_wdt_probe(struct platform_device *pdev)
    }
 
    /* interrupt the system while WDT timeout */
-   wdt_restart_new(TICKS_PER_uSEC*1000000*heartbeat, WDT_CLK_SRC_EXT,
+   wdt_restart_new(WDT_TIMO2TICKS(WDT_INITIAL_TIMO), WDT_CLK_SRC_EXT,
                    /* No Ext, No intr, Self clear, Full chip reset */
-                   FALSE, FALSE, TRUE, FALSE,
-                   TRUE);
+                   FALSE, FALSE, TRUE, FALSE);
 
-   printk(KERN_INFO "UMVP2500 WDT is installed.(irq = %d, heartbeat = %d secs, nowayout = %d)\n",IRQ_WDT,heartbeat,nowayout);
+   /* enable it by default */
+   if (!force_disable) {
+     wdt_enable();
+   }
+
+   /* change the reload value back to regular */
+   UMVP_WRITE_REG(WDT_Reload, WDT_TIMO2TICKS(heartbeat));
+
+   printk(KERN_INFO "UMVP2500 WDT is installed. (irq:%d, initial timeout:%ds, "
+          "timeout:%ds nowayout:%d enabled:%s)\n",
+          IRQ_WDT, WDT_INITIAL_TIMO, heartbeat, nowayout,
+          wdt_is_enabled() ? "yes" : "no");
 
    return (0);
 }
