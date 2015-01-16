@@ -56,6 +56,7 @@ struct panther_plus_data {
   struct mutex update_lock;
 };
 
+// Identifies the sysfs attribute panther_plus_show is requesting.
 enum {
   PANTHER_PLUS_SYSFS_CPU_TEMP,
   PANTHER_PLUS_SYSFS_DIMM_TEMP,
@@ -63,14 +64,21 @@ enum {
   PANTHER_PLUS_SYSFS_SMS_KCS,
   PANTHER_PLUS_SYSFS_ALERT_CONTROL,
   PANTHER_PLUS_SYSFS_ALERT_STATUS,
+  PANTHER_PLUS_SYSFS_DISCOVERY_SPEC_VER,
+  PANTHER_PLUS_SYSFS_DISCOVERY_HW_VER,
+  PANTHER_PLUS_SYSFS_DISCOVERY_MANUFACTURER_ID,
+  PANTHER_PLUS_SYSFS_DISCOVERY_DEVICE_ID,
+  PANTHER_PLUS_SYSFS_DISCOVERY_PRODUCT_ID,
 };
 
+// Function Block ID identifiers.
 enum panther_plus_fbid_en {
   PANTHER_PLUS_FBID_IPMI_SMS_KCS = 0x0,
   PANTHER_PLUS_FBID_GPIO_INPUTS = 0xd,
   PANTHER_PLUS_FBID_READ_REGISTER = 0x10,
   PANTHER_PLUS_FBID_ALERT_CONTROL = 0xFD,
   PANTHER_PLUS_FBID_ALERT_STATUS = 0xFE,
+  PANTHER_PLUS_FBID_DISCOVERY = 0xFF,
 };
 
 static inline void panther_plus_make_read(struct i2c_msg *msg,
@@ -100,6 +108,10 @@ static int panther_plus_fbid_io(struct i2c_client *client,
                                   const u8 *write_buf, u8 write_len,
                                   u8 *read_buf, u8 read_len)
 {
+  // The Intel uServer Module Management Interface Spec defines SMBus blocks,
+  // but block sizes exceed the SMBus maximum block sizes
+  // (32, see I2C_SMBUS_BLOCK_MAX).  So we basically have to re-implement the
+  // smbus functions with a larger max.
   struct i2c_msg msg[2];
   u8 buf[255];
   u8 buf_len;
@@ -424,6 +436,40 @@ static int panther_plus_read_alert_control(struct i2c_client *client, char *ret)
   return (rbuf[1]+2);
 }
 
+static int panther_plus_read_discovery(struct i2c_client *client, char *ret,
+                                       int which_attribute)
+{
+  int rc;
+  u8 datalen;
+#define DISCOVERY_DATA_SIZE 10
+  u8 rbuf[DISCOVERY_DATA_SIZE+2] = {0};
+  rc = panther_plus_fbid_io(client, PANTHER_PLUS_FBID_DISCOVERY,
+                            NULL, 0, rbuf, sizeof(rbuf));
+  if (rc < 0) {
+    return rc;
+  }
+  datalen = rbuf[1];
+  if (datalen < DISCOVERY_DATA_SIZE) {
+    return -EINVAL;
+  }
+  switch (which_attribute) {
+    case PANTHER_PLUS_SYSFS_DISCOVERY_SPEC_VER:
+      return scnprintf(ret, PAGE_SIZE, "%u.%u\n", rbuf[2], rbuf[3]);
+    case PANTHER_PLUS_SYSFS_DISCOVERY_HW_VER:
+      return scnprintf(ret, PAGE_SIZE, "%u.%u\n", rbuf[4], rbuf[5]);
+    case PANTHER_PLUS_SYSFS_DISCOVERY_MANUFACTURER_ID:
+      return scnprintf(ret, PAGE_SIZE, "0x%02X%02X%02X\n", rbuf[8], rbuf[7],
+                       rbuf[6]);
+    case PANTHER_PLUS_SYSFS_DISCOVERY_DEVICE_ID:
+      return scnprintf(ret, PAGE_SIZE, "0x%02X\n", rbuf[9]);
+    case PANTHER_PLUS_SYSFS_DISCOVERY_PRODUCT_ID:
+      return scnprintf(ret, PAGE_SIZE, "0x%02X%02X\n", rbuf[11], rbuf[10]);
+    default:
+      return -EINVAL;
+  }
+  return -EINVAL;
+}
+
 static int panther_plus_write_alert_control(struct i2c_client *client, const char *buf, u8 count)
 {
   int rc;
@@ -467,6 +513,12 @@ static ssize_t panther_plus_show(struct device *dev,
   case PANTHER_PLUS_SYSFS_ALERT_CONTROL:
     rc = panther_plus_read_alert_control(client, buf);
     break;
+  case PANTHER_PLUS_SYSFS_DISCOVERY_SPEC_VER:
+  case PANTHER_PLUS_SYSFS_DISCOVERY_HW_VER:
+  case PANTHER_PLUS_SYSFS_DISCOVERY_MANUFACTURER_ID:
+  case PANTHER_PLUS_SYSFS_DISCOVERY_DEVICE_ID:
+  case PANTHER_PLUS_SYSFS_DISCOVERY_PRODUCT_ID:
+    rc = panther_plus_read_discovery(client, buf, which);
   default:
     break;
   }
@@ -533,6 +585,16 @@ static SENSOR_DEVICE_ATTR_2(alert_status, S_IRUGO, panther_plus_show, NULL,
                             0, PANTHER_PLUS_SYSFS_ALERT_STATUS);
 static SENSOR_DEVICE_ATTR_2(alert_control, S_IWUSR | S_IRUGO, panther_plus_show, panther_plus_set,
                             0, PANTHER_PLUS_SYSFS_ALERT_CONTROL);
+static SENSOR_DEVICE_ATTR_2(spec_ver, S_IRUGO, panther_plus_show, NULL,
+                            0, PANTHER_PLUS_SYSFS_DISCOVERY_SPEC_VER);
+static SENSOR_DEVICE_ATTR_2(hw_ver, S_IRUGO, panther_plus_show, NULL,
+                            0, PANTHER_PLUS_SYSFS_DISCOVERY_HW_VER);
+static SENSOR_DEVICE_ATTR_2(manufacturer_id, S_IRUGO, panther_plus_show, NULL,
+                            0, PANTHER_PLUS_SYSFS_DISCOVERY_MANUFACTURER_ID);
+static SENSOR_DEVICE_ATTR_2(device_id, S_IRUGO, panther_plus_show, NULL,
+                            0, PANTHER_PLUS_SYSFS_DISCOVERY_DEVICE_ID);
+static SENSOR_DEVICE_ATTR_2(product_id, S_IRUGO, panther_plus_show, NULL,
+                            0, PANTHER_PLUS_SYSFS_DISCOVERY_PRODUCT_ID);
 
 static struct attribute *panther_plus_attributes[] = {
   &sensor_dev_attr_temp1_input.dev_attr.attr,
@@ -544,6 +606,11 @@ static struct attribute *panther_plus_attributes[] = {
   &sensor_dev_attr_sms_kcs.dev_attr.attr,
   &sensor_dev_attr_alert_status.dev_attr.attr,
   &sensor_dev_attr_alert_control.dev_attr.attr,
+  &sensor_dev_attr_spec_ver.dev_attr.attr,
+  &sensor_dev_attr_hw_ver.dev_attr.attr,
+  &sensor_dev_attr_manufacturer_id.dev_attr.attr,
+  &sensor_dev_attr_device_id.dev_attr.attr,
+  &sensor_dev_attr_product_id.dev_attr.attr,
   NULL
 };
 
