@@ -91,6 +91,7 @@ struct i2c_msg		slave_tx_msg;
 static spinlock_t	slave_rx_lock = SPIN_LOCK_UNLOCKED;
 #endif
 
+static spinlock_t g_master_lock = SPIN_LOCK_UNLOCKED;
 
 static inline void
 ast_i2c_write(struct ast_i2c_dev *i2c_dev, u32 val, u32 reg)
@@ -630,7 +631,9 @@ static void ast_i2c_do_dma_xfer(struct ast_i2c_dev *i2c_dev)
 		}else {
 			//should send next msg
 			 if(i2c_dev->master_xfer_cnt != i2c_dev->master_msgs->len)
-					 printk("complete rx ... ERROR \n");
+					 printk("complete rx ... bus=%d addr=0x%x (%d vs. %d) ERROR\n",
+					 i2c_dev->bus_id, i2c_dev->master_msgs->addr,
+					 i2c_dev->master_xfer_cnt, i2c_dev->master_msgs->len);
 
 			 dev_dbg(i2c_dev->dev, "ast_i2c_do_byte_xfer complete \n");
 			 i2c_dev->cmd_err = 0;
@@ -821,7 +824,9 @@ static void ast_i2c_do_pool_xfer(struct ast_i2c_dev *i2c_dev)
 		} else {
 			//should send next msg
 			if(i2c_dev->master_xfer_cnt != i2c_dev->master_msgs->len)
-				printk("complete rx ... ERROR \n");
+				printk("complete rx ... bus=%d addr=0x%x (%d vs. %d) ERROR\n",
+				i2c_dev->bus_id, i2c_dev->master_msgs->addr,
+				i2c_dev->master_xfer_cnt, i2c_dev->master_msgs->len);
 
 			dev_dbg(i2c_dev->dev, "ast_i2c_do_byte_xfer complete \n");
 			i2c_dev->cmd_err = 0;
@@ -918,7 +923,9 @@ static void ast_i2c_do_byte_xfer(struct ast_i2c_dev *i2c_dev)
 		} else {
 			//should send next msg
 			if(i2c_dev->master_xfer_cnt != i2c_dev->master_msgs->len)
-				printk("CNT ERROR \n");
+				printk("CNT ERROR bus=%d addr=0x%x (%d vs. %d)\n",
+				       i2c_dev->bus_id, i2c_dev->master_msgs->addr,
+				       i2c_dev->master_xfer_cnt, i2c_dev->master_msgs->len);
 
 			dev_dbg(i2c_dev->dev, "ast_i2c_do_byte_xfer complete \n");
 			i2c_dev->cmd_err = 0;
@@ -1048,6 +1055,18 @@ static void ast_i2c_master_xfer_done(struct ast_i2c_dev *i2c_dev)
 	u32 xfer_len;
 	int i;
 	u8 *pool_buf;
+	unsigned long flags;
+
+	spin_lock_irqsave(&g_master_lock, flags);
+
+	/*
+	 * This function shall be involked during interrupt handling.
+	 * Since the interrupt could be fired at anytime, we will need to make sure
+	 * we have the buffer (i2c_dev->master_msgs) to handle the results.
+	 */
+	if (!i2c_dev->master_msgs) {
+		goto unlock_out;
+	}
 
 	dev_dbg(i2c_dev->dev, "ast_i2c_master_xfer_done mode[%d]\n",i2c_dev->master_xfer_mode);
 
@@ -1127,7 +1146,9 @@ next_xfer:
 
 	if(xfer_len !=i2c_dev->master_xfer_len) {
 		//TODO..
-		printk(" ** xfer error \n");
+		printk(" ** xfer error bus=%d addr=0x%x (%d vs. %d)\n",
+		       i2c_dev->bus_id, i2c_dev->master_msgs->addr,
+		       xfer_len, i2c_dev->master_xfer_len);
 		//should goto stop....
 		i2c_dev->cmd_err = 1;
 		goto done_out;
@@ -1151,6 +1172,9 @@ done_out:
 		dev_dbg(i2c_dev->dev,"msgs complete \n");
 		complete(&i2c_dev->cmd_complete);
 	}
+
+unlock_out:
+	spin_unlock_irqrestore(&g_master_lock, flags);
 }
 
 static void ast_i2c_slave_addr_match(struct ast_i2c_dev *i2c_dev)
@@ -1272,7 +1296,8 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			} else {
 				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_TX_NAK = %x\n",sts);
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK, I2C_INTR_STS_REG);
-				if(i2c_dev->master_msgs->flags & I2C_M_IGNORE_NAK) {
+				if (i2c_dev->master_msgs
+				    && i2c_dev->master_msgs->flags & I2C_M_IGNORE_NAK) {
 					dev_dbg(i2c_dev->dev, "I2C_M_IGNORE_NAK next send\n");
 				} else {
 					dev_dbg(i2c_dev->dev, "NAK error\n");
@@ -1396,6 +1421,9 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 {
 	int i;
 	int ret = 1;
+	unsigned long flags;
+
+	spin_lock_irqsave(&g_master_lock, flags);
 
 	//request
 	if(i2c_dev->ast_i2c_data->master_dma == BYTE_MODE)
@@ -1430,24 +1458,32 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 
 		i2c_dev->do_master_xfer(i2c_dev);
 
+		spin_unlock_irqrestore(&g_master_lock, flags);
+
 		ret = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
 													   i2c_dev->adap.timeout*HZ);
+
+		spin_lock_irqsave(&g_master_lock, flags);
+		i2c_dev->master_msgs = NULL;
 
 		if (ret == 0) {
 			dev_dbg(i2c_dev->dev, "controller timed out\n");
 			i2c_dev->state = (ast_i2c_read(i2c_dev,I2C_CMD_REG) >> 19) & 0xf;
 //			printk("sts [%x], isr sts [%x] \n",i2c_dev->state, ast_i2c_read(i2c_dev,I2C_INTR_STS_REG));
 			ret = -ETIMEDOUT;
+			spin_unlock_irqrestore(&g_master_lock, flags);
 			goto stop;
 		}
 
 		if(i2c_dev->cmd_err != 0 &&
 		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
 			ret = -EAGAIN;
+			spin_unlock_irqrestore(&g_master_lock, flags);
 			goto stop;
 		}
-
 	}
+
+	spin_unlock_irqrestore(&g_master_lock, flags);
 
 	if(i2c_dev->cmd_err == 0 ||
 	   i2c_dev->cmd_err == AST_I2CD_INTR_STS_NORMAL_STOP) {
