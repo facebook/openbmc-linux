@@ -320,8 +320,12 @@ static int ep0_handle_setup(void) {
 
   /* make sure we are expecting setup packet */
   if (udc.ep0_stage != EP0_STAGE_SETUP) {
-    pr_warning("Received SETUP pkt on wrong stage %d. Cancelling "
-               "the current SETUP\n", udc.ep0_stage);
+    /*
+     * with g_cdc, we are seeing this message pretty often. could be an
+     * issue on g_cdc. make the log message as debug now
+     */
+    pr_debug("Received SETUP pkt on wrong stage %d. Cancelling "
+             "the current SETUP\n", udc.ep0_stage);
     ep0_cancel_current();
   }
 
@@ -494,20 +498,21 @@ static int ast_ep_enable(struct usb_ep* _ep, const struct usb_endpoint_descripto
     return -EBUSY;
   }
   ep->ep.maxpacket = maxpacket;
-  printk("Enabling endpoint %s (%p), maxpacket %d: ", ep->ep.name, ep->ep_regs, ep->ep.maxpacket);
+  pr_debug("Enabling endpoint %s (%p), maxpacket %d: ",
+           ep->ep.name, ep->ep_regs, ep->ep.maxpacket);
   if (desc->bEndpointAddress & USB_DIR_IN) {
     ep->to_host = 1;
     switch (desc->bmAttributes) {
       case USB_ENDPOINT_XFER_BULK:
-        printk("bulk to host\n");
+        pr_debug("bulk to host\n");
         eptype = AST_EP_TYPE_BULK_IN;
         break;
       case USB_ENDPOINT_XFER_INT:
-        printk("int to host\n");
+        pr_debug("int to host\n");
         eptype = AST_EP_TYPE_BULK_IN;
         break;
       case USB_ENDPOINT_XFER_ISOC:
-        printk("isoc to host\n");
+        pr_debug("isoc to host\n");
         eptype = AST_EP_TYPE_ISO_IN;
         break;
     }
@@ -515,15 +520,15 @@ static int ast_ep_enable(struct usb_ep* _ep, const struct usb_endpoint_descripto
     ep->to_host = 0;
     switch (desc->bmAttributes) {
       case USB_ENDPOINT_XFER_BULK:
-        printk("bulk from host\n");
+        pr_debug("bulk from host\n");
         eptype = AST_EP_TYPE_BULK_OUT;
         break;
       case USB_ENDPOINT_XFER_INT:
-        printk("int from host\n");
+        pr_debug("int from host\n");
         eptype = AST_EP_TYPE_INT_OUT;
         break;
       case USB_ENDPOINT_XFER_ISOC:
-        printk("isoc from host\n");
+        pr_debug("isoc from host\n");
         eptype = AST_EP_TYPE_ISO_OUT;
         break;
     }
