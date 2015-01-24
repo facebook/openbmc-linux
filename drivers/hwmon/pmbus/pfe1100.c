@@ -212,14 +212,18 @@ static int pfe1100_probe(struct i2c_client *client,
 	info->func[0] = PMBUS_HAVE_VIN | PMBUS_HAVE_VOUT | PMBUS_HAVE_IIN |
 	  PMBUS_HAVE_IOUT | PMBUS_HAVE_PIN | PMBUS_HAVE_POUT |
 	  PMBUS_HAVE_FAN12 | PMBUS_HAVE_TEMP | PMBUS_HAVE_TEMP2 |
-	  PMBUS_HAVE_TEMP3 | PMBUS_HAVE_STATUS_VOUT |
-	  PMBUS_HAVE_STATUS_IOUT | PMBUS_HAVE_STATUS_INPUT |
-	  PMBUS_HAVE_STATUS_TEMP | PMBUS_HAVE_STATUS_FAN12 |
-	  PMBUS_HAVE_MFRDATA;
-	if (kind == SPAFCBK_14G)
+	  PMBUS_HAVE_STATUS_VOUT | PMBUS_HAVE_STATUS_IOUT |
+	  PMBUS_HAVE_STATUS_INPUT | PMBUS_HAVE_STATUS_TEMP |
+	  PMBUS_HAVE_STATUS_FAN12 | PMBUS_HAVE_MFRDATA;
+
+	/* AC units have a third temperature sensor, and data from 3V input: */
+
+	if (kind == SPAFCBK_14G) {
+		info->func[0] |= PMBUS_HAVE_TEMP3;
 		info->func[1] = PMBUS_HAVE_VOUT | PMBUS_HAVE_IOUT |
 		  PMBUS_HAVE_POUT | PMBUS_HAVE_STATUS_VOUT |
 		  PMBUS_HAVE_STATUS_IOUT;
+	}
 
 	info->read_word_data = pfe1100_read_word_data;
 	info->read_byte_data = pfe1100_read_byte_data;
