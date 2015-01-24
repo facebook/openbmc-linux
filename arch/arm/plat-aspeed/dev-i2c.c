@@ -698,21 +698,12 @@ static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
 		// Eval board:
 		I2C_BOARD_INFO("lm75b", 0x4a),						
 	},
-	// There are some issues with the pfe1100 devices -- they
-	// show up at 0x5a and 0x5b when external power is applied,
-	// but they show up at 0x58 when no power is applied (obviously,
-	// they have to be getting power from their peer power supply to
-	// show up as I2C devices).
-
-	// So we have a 0x58 entry here, so that the device can be
-	// accessed, but we really shouldn't count on that.
-	
-	// Looks like ODM has HW modification to have device addresses 
-	// at 0x59 and 0x5a. The HW modification we did here fixes the
-	// addresses at 0x5a and 0x5b. For now, list all possible
-	// addresses here.
+	// EEPROMS on the pfe1100 power supplies
 	{
-		I2C_BOARD_INFO("pfe1100", 0x58),
+		I2C_BOARD_INFO("24c64", 0x51),
+	},
+	{
+		I2C_BOARD_INFO("24c64", 0x52),
 	},
 	{
 		I2C_BOARD_INFO("pfe1100", 0x59),
@@ -720,9 +711,6 @@ static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
 	{
 		I2C_BOARD_INFO("pfe1100", 0x5a),
 	},
-	{
-		I2C_BOARD_INFO("pfe1100", 0x5b),
-	}
 };
 
 
