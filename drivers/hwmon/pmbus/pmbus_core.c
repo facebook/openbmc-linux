@@ -762,6 +762,8 @@ static ssize_t pmbus_show_boolean(struct device *dev,
 	val = pmbus_get_boolean(data, boolean, attr->index);
 	if (val < 0)
 		return val;
+	if (val == 0xff)
+		return 0;
 	return snprintf(buf, PAGE_SIZE, "%d\n", val);
 }
 
@@ -773,6 +775,8 @@ static ssize_t pmbus_show_sensor(struct device *dev,
 
 	if (sensor->data < 0)
 		return sensor->data;
+	if (sensor->data == 0xffff) 
+		return 0;
 
 	return snprintf(buf, PAGE_SIZE, "%ld\n", pmbus_reg2data(data, sensor));
 }
