@@ -21,6 +21,18 @@
 #ifndef _AST1070_IRQS_H_
 #define _AST1070_IRQS_H_                 1
 
+#define IRQ_C0_VIC_CHAIN					IRQ_EXT0
+#define IRQ_C0_VIC_CHAIN_START			(AST_VIC_NUM)
+
+#define IRQ_C1_VIC_CHAIN					IRQ_EXT1
+#define IRQ_C1_VIC_CHAIN_START			(IRQ_C0_VIC_CHAIN_START + AST_CVIC_NUM)
+
+#define IRQ_C2_VIC_CHAIN					IRQ_EXT2
+#define IRQ_C2_VIC_CHAIN_START			(IRQ_C1_VIC_CHAIN_START + AST_CVIC_NUM)
+
+#define IRQ_C3_VIC_CHAIN					IRQ_EXT3
+#define IRQ_C3_VIC_CHAIN_START			(IRQ_C2_VIC_CHAIN_START + AST_CVIC_NUM)
+
 #define AST_CVIC_NUM 					25
 
 #define IRQ_C0_N1_KCS                     (IRQ_C0_VIC_CHAIN_START + 0)
@@ -49,7 +61,6 @@
 #define IRQ_C0_N4_UART_DMA                (IRQ_C0_VIC_CHAIN_START + 23)
 #define IRQ_C0_I2C						(IRQ_C0_VIC_CHAIN_START + 24)
 
-#if (CONFIG_AST1070_NR >= 2)
 #define IRQ_C1_N1_KCS                     (IRQ_C1_VIC_CHAIN_START + 0)
 #define IRQ_C1_N1_UART                    (IRQ_C1_VIC_CHAIN_START + 1)
 #define IRQ_C1_N1_MAILBOX                 (IRQ_C1_VIC_CHAIN_START + 2)
@@ -75,9 +86,7 @@
 #define IRQ_C1_N3_UART_DMA                (IRQ_C1_VIC_CHAIN_START + 22)
 #define IRQ_C1_N4_UART_DMA                (IRQ_C1_VIC_CHAIN_START + 23)
 #define IRQ_C1_I2C						(IRQ_C1_VIC_CHAIN_START + 24)
-#endif
 
-#if (CONFIG_AST1070_NR >= 3)
 #define IRQ_C2_N1_KCS                     (IRQ_C2_VIC_CHAIN_START + 0)
 #define IRQ_C2_N1_UART                    (IRQ_C2_VIC_CHAIN_START + 1)
 #define IRQ_C2_N1_MAILBOX                 (IRQ_C2_VIC_CHAIN_START + 2)
@@ -103,9 +112,7 @@
 #define IRQ_C2_N3_UART_DMA                (IRQ_C2_VIC_CHAIN_START + 22)
 #define IRQ_C2_N4_UART_DMA                (IRQ_C2_VIC_CHAIN_START + 23)
 #define IRQ_C2_I2C						(IRQ_C2_VIC_CHAIN_START + 24)
-#endif
 
-#if (CONFIG_AST1070_NR >= 4)
 #define IRQ_C3_N1_KCS                     (IRQ_C3_VIC_CHAIN_START + 0)
 #define IRQ_C3_N1_UART                    (IRQ_C3_VIC_CHAIN_START + 1)
 #define IRQ_C3_N1_MAILBOX                 (IRQ_C3_VIC_CHAIN_START + 2)
@@ -131,6 +138,5 @@
 #define IRQ_C3_N3_UART_DMA                (IRQ_C3_VIC_CHAIN_START + 22)
 #define IRQ_C3_N4_UART_DMA                (IRQ_C3_VIC_CHAIN_START + 23)
 #define IRQ_C3_I2C						(IRQ_C3_VIC_CHAIN_START + 24)
-#endif
 
 #endif

@@ -1,7 +1,5 @@
 /*
- *  linux/include/asm-arm/arch-aaec2000/uncompress.h
- *
- *  Copyright (c) 2005 Nicolas Bellido Y Ortega
+ *  uncompress.h
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as

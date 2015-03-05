@@ -909,7 +909,7 @@ config EFS_FS
 
 
 # Patched by YAFFS
-source "fs/yaffs2/Kconfig"
+#source "fs/yaffs2/Kconfig"
 
 source "fs/jffs2/Kconfig"
 # UBIFS File system configuration

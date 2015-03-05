@@ -20,7 +20,7 @@
 #define AST_OLD_SMC_BASE						0x10000000		/*Legacy BMC Static Memory */
 #define AST_OLD_SMC_CTRL_BASE				0x16000000		/*Legacy BMC Static Memory Ctrl*/
 
-#define AST_AHB_CONTROLLER_BASE            0x1E600000	/* AHB CONTROLLER */
+#define AST_AHB_CTRL_BASE            0x1E600000	/* AHB CONTROLLER */
 
 #define AST_MIC_BASE                       0x1E640000	/* MIC CONTROLLER */
 #define AST_MAC1_BASE                      0x1E660000	/* MAC1 */ 
@@ -28,8 +28,8 @@
 
 #define AST_USB20_BASE                     0x1E6A0000	/* USB 2.0 VIRTUAL HUB CONTROLLER */
 #define AST_VIC_BASE                       0x1E6C0000	/* VIC */
-#define AST_MMC_BASE                       0x1E6E0000	/* MMC */
-#define AST_USB11_BASE                     0x1E6E1000	/* USB11 */
+#define AST_SDMC_BASE                       0x1E6E0000	/* MMC */
+#define AST_UDC11_BASE                     0x1E6E1000	/* USB11 */
 #define AST_SCU_BASE                       0x1E6E2000	/* SCU */
 #define AST_CRYPTO_BASE                    0x1E6E3000	/* Crypto */
 

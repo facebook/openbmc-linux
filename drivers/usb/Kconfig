@@ -103,7 +103,7 @@ source "drivers/usb/wusbcore/Kconfig"
 
 source "drivers/usb/host/Kconfig"
 
-source "drivers/usb/gucuhci/Kconfig"
+source "drivers/usb/astuhci/Kconfig"
 
 source "drivers/usb/musb/Kconfig"
 

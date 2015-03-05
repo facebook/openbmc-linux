@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/arch-ast2000/timer.c
+ *  timer.c
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
+ 
 #include <asm/io.h>
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
@@ -26,10 +26,10 @@
 #include <mach/time.h>
 #include <plat/ast-scu.h>
 
-#define ASPEED_TIMER0_VA_BASE   (IO_ADDRESS(AST_TIMER_BASE)+ASPEED_TIMER0_OFFSET)
-#define ASPEED_TIMER1_VA_BASE   (IO_ADDRESS(AST_TIMER_BASE)+ASPEED_TIMER1_OFFSET)
-#define ASPEED_TIMER2_VA_BASE   (IO_ADDRESS(AST_TIMER_BASE)+ASPEED_TIMER2_OFFSET)
-#define ASPEED_TIMERC_VA_BASE   (IO_ADDRESS(AST_TIMER_BASE)+ASPEED_TIMERRC_OFFSET)
+#define ASPEED_TIMER0_VA_BASE		(IO_ADDRESS(AST_TIMER_BASE)+ASPEED_TIMER0_OFFSET)
+#define ASPEED_TIMER1_VA_BASE		(IO_ADDRESS(AST_TIMER_BASE)+ASPEED_TIMER1_OFFSET)
+#define ASPEED_TIMER2_VA_BASE		(IO_ADDRESS(AST_TIMER_BASE)+ASPEED_TIMER2_OFFSET)
+#define ASPEED_TIMERC_VA_BASE		(IO_ADDRESS(AST_TIMER_BASE)+ASPEED_TIMERRC_OFFSET)
 
 #define ASPEED_TIMER_RELOAD_MAX 0xFFFFFFFF
 #define ASPEED_TIMER_RELOAD_MIN 1
@@ -113,9 +113,9 @@ static struct clocksource clocksource_ast = {
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
-/*
+	/*
  * clockevent
- */
+	 */
 /* IRQ handler for the timer */
 static irqreturn_t ast_clockevent_interrupt(int irq, void *dev_id)
 {
@@ -177,15 +177,15 @@ static struct clock_event_device clockevent_ast = {
  */
 static void __init ast_setup_timer(void)
 {
-  /*
-   * Initialise to a known state (all timers off)
-   */
+	/*
+	 * Initialise to a known state (all timers off)
+	 */
   ast_timer_disable_all();
 
-  /*
+	/* 
    * For clock event, set the value and reload to 0, so that no interrupt even
    * after enabling timer.
-   */
+	 */
   ast_timer_set_count(ASPEED_TIMER0_VA_BASE, 0, 0);
   /*
    * For clock source, set the value and reload to the max
@@ -197,8 +197,8 @@ static void __init ast_setup_timer(void)
   ast_timer0_ctrl(AST_TIMER_ENABLE);
   ast_timer1_ctrl(AST_TIMER_ENABLE);
 
-  ast_scu_show_system_info();
-
+	ast_scu_show_system_info();
+	
   /* irqs happen for the system timer */
   setup_irq(IRQ_TIMER0, &ast_clockevent_irq);
   setup_irq(IRQ_TIMER1, &ast_clocksource_irq);
@@ -222,5 +222,5 @@ static void __init ast_setup_timer(void)
 }
 
 struct sys_timer ast_timer = {
-  .init   = ast_setup_timer,
+	.init		= ast_setup_timer,
 };

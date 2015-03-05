@@ -1,5 +1,5 @@
 /*
- *  arch/arm/plat-aspeed/include/plat/gpio_irqs.h
+ *  file : gpio_irqs.h
  *
  *  Copyright (C) 2012-2020  ASPEED Technology Inc.
  *

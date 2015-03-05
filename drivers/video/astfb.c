@@ -143,9 +143,6 @@ struct astfb_device {
 	u32					pseudo_palette[17];
 	struct platform_device 		*pdev;
 	struct fb_var_screeninfo	new_var;	/* for mode changes */
-
-	struct omapfb_mem_desc		mem_desc;
-	struct fb_info			*fb_info[OMAPFB_PLANE_NUM];
 };
 
 

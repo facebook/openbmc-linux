@@ -1,7 +1,5 @@
 /*
- *  linux/include/asm-arm/arch-mvp2000/hardware.h
- *
- *  This file contains the hardware definitions of the MVP-2000.
+ *  hardware.h
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,27 +25,26 @@
  * and so on)
  */
 
-#define IO_BASE					0xF0000000                 // VA of IO
-#define IO_BASE2				0xE0000000                 // VA of IO2 (AST1070)
-#define IO_SIZE                 ASPEED_IO_SIZE             // How much?
-#define IO_START                ASPEED_IO_START            // PA of IO
-#define IO_SIZE2                ASPEED_IO_SIZE             // How much?
-#define IO_START2               ASPEED_IO_START2           // PA of IO
+#define IO_BASE					0xF8000000                 // VA of IO
+/*#define IO_BASE2				0xE0000000                 // VA of IO2 (AST1070) */
 
-
+#ifdef CONFIG_AST_PCIE_EXT
+#define ASPEED_IO_START2		AST_PCIE_WIN_BASE
+#else
 #define ASPEED_IO_START2		AST_LPC_BRIDGE
+#endif
 
 /* macro to get at IO space when running virtually */
 //#define IO_ADDRESS(x) (((x) >> 4) + IO_BASE) 
-#define IO_ADDRESS(x)  (x - 0x10000000 + IO_BASE) 
-#define IO_ADDRESS2(x) (x - ASPEED_IO_START2 + IO_BASE2) 
+/*#define IO_ADDRESS(x)  (x - 0x10000000 + IO_BASE)  */
+#define IO_ADDRESS(x)  (x - 0x1e600000 + IO_BASE) 
+/*#define IO_ADDRESS2(x) (x - ASPEED_IO_START2 + IO_BASE2) */
 
 //PCIE
-#ifdef CONFIG_PCIE
-#define PCIBIOS_MIN_IO		0
-#define PCIBIOS_MIN_MEM		0
-#define pcibios_assign_all_busses()	0
-#define ARCH_HAS_DMA_SET_COHERENT_MASK
+#ifdef CONFIG_AST_PCIE
+#define PCIBIOS_MIN_IO		0x0
+#define PCIBIOS_MIN_MEM		0x0
+#define pcibios_assign_all_busses()	1
 #endif
 
 #endif	/* __ASM_ARCH_HARDWARE_H END */

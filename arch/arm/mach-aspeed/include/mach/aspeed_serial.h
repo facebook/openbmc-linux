@@ -1,13 +1,5 @@
 /*
- *  linux/include/asm-arm/hardware/mvp2_serial.h
- *
- *  Internal header file for GUC-MVP2000 serial ports
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
+ *  file : aspeed_serial.h
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -17,8 +9,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#ifndef ASM_ARM_HARDWARE_GUCMVP2000_SERIAL_H
-#define ASM_ARM_HARDWARE_GUCMVP2000_SERIAL_H
+#ifndef ASM_ARM_HARDWARE_AST_SERIAL_H
+#define ASM_ARM_HARDWARE_AST_SERIAL_H
 
 #define UART_RBR            0x00    /* Receiver Buffer Register */
 #define UART_THR            0x00    /* Transmit Holding Register */

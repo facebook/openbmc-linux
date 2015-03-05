@@ -1,7 +1,5 @@
 /*
- * include/asm-arm/arch-umvp/entry-macro.S
- *
- * Low-level IRQ helper macros for GUC-MVP2000 platforms
+ * entry-macro.S
  *
  * This file is licensed under the terms of the GNU General Public
  * License version 2. This program is licensed "as is" without any

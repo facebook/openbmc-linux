@@ -32,7 +32,7 @@
 #include <mach/hardware.h>
 #include <mach/ast-uart-dma.h>
 
-#include <plat/devs.h>
+#include <plat/ast1070-devs.h>
 #include <plat/ast1070-scu.h>
 
 /* --------------------------------------------------------------------
@@ -89,7 +89,7 @@ static struct plat_serial8250_port ast1070_c_uart_data[] = {
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype		= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 		.private_data = &c0_uart0_dma_data,
 	},
 	{
@@ -99,7 +99,7 @@ static struct plat_serial8250_port ast1070_c_uart_data[] = {
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype		= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 		.private_data = &c0_uart1_dma_data,
 	},	
 	{
@@ -109,7 +109,7 @@ static struct plat_serial8250_port ast1070_c_uart_data[] = {
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype 	= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 		.private_data = &c0_uart2_dma_data,
 	},	
 	{
@@ -119,7 +119,7 @@ static struct plat_serial8250_port ast1070_c_uart_data[] = {
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype 	= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 		.private_data = &c0_uart3_dma_data,
 	},		
 #if (CONFIG_AST1070_NR >=2)
@@ -130,7 +130,7 @@ static struct plat_serial8250_port ast1070_c_uart_data[] = {
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype 	= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 		.private_data = &c1_uart0_dma_data,
 	},
 	{
@@ -140,7 +140,7 @@ static struct plat_serial8250_port ast1070_c_uart_data[] = {
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype 	= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 		.private_data = &c1_uart1_dma_data,
 	},	
 	{
@@ -150,7 +150,7 @@ static struct plat_serial8250_port ast1070_c_uart_data[] = {
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype 	= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 		.private_data = &c1_uart2_dma_data,
 	},	
 	{
@@ -160,7 +160,7 @@ static struct plat_serial8250_port ast1070_c_uart_data[] = {
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype 	= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 		.private_data = &c1_uart3_dma_data,
 	},		
 #endif

@@ -19,7 +19,7 @@
 
 #define AST_MAC0_BASE                      0x19c80000	/* MAC1 */ 
 #define AST_CRYPTO_BASE                    0x1E6E0040	/* Crypto */
-#define AST_USB11_BASE                     0x1E6E0080	/* USB11 */
+#define AST_UDC11_BASE                     0x1E6E0080	/* USB11 */
 #define AST_SCU0_BASE                      0x1E6E0100	/* SCU1 */
 #define AST_LPC_BASE                       0x1E6E0400	/* LPC */
 #define AST_I2C_BASE                       0x1E6E0800	/* I2C */

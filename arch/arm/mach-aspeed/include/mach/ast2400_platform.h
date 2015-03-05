@@ -69,13 +69,11 @@
 #define AST_UART2_BASE                     0x1E78D000	/* UART2 */
 #define AST_UART3_BASE                     0x1E78E000	/* UART3 */
 #define AST_UART4_BASE                     0x1E78F000	/* UART4 */
-#define AST_SPI_MEM						  0x30000000
+#define AST_SPI0_MEM					0x30000000
 
-#if defined(CONFIG_AST_LPC_PLUS)
-#define AST_LPC_BRIDGE						0x70000000
-#else
+#define AST_LPC_PLUS_BRIDGE						0x70000000
+
 #define AST_LPC_BRIDGE						0x60000000
-#endif
 
 
 #endif

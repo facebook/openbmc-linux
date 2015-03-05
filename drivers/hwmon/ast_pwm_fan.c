@@ -1916,7 +1916,7 @@ static SENSOR_DEVICE_ATTR_2(tacho##index##_alarm_en, S_IRUGO | S_IWUSR, \
 static struct attribute *tacho##index##_attributes[] = { \
 	&sensor_dev_attr_tacho##index##_en.dev_attr.attr, \
 	&sensor_dev_attr_tacho##index##_source.dev_attr.attr, \
-	&sensor_dev_attr_tacho##index##_rpm.dev_attr.attr,   \
+	&sensor_dev_attr_tacho##index##_rpm.dev_attr.attr, \
 	&sensor_dev_attr_tacho##index##_alarm.dev_attr.attr, \
 	&sensor_dev_attr_tacho##index##_alarm_en.dev_attr.attr, \
 	NULL \

@@ -1,8 +1,5 @@
 /*
- *  linux/include/asm-arm/arch-mvp2000/system.h
- *
- *  Copyright (C) 1999 ARM Limited
- *  Copyright (C) 2000 Deep Blue Solutions Ltd
+ *  system.h
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,7 +36,7 @@ static inline void arch_reset(char mode)
 	/*
 	 * Use WDT to restart system
 	 */
-#if defined(CONFIG_AST_WATCHDOG) || defined(CONFIG_AST_WATCHDOG_MODULE)
+#if defined(CONFIG_AST_WATCHDOG) || defined(CONFIG_AST_WATCHDOG_MODULE)	
 	ast_wdt_reset_full();
 #endif
 }

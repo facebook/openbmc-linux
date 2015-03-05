@@ -88,3 +88,4 @@ obj-$(CONFIG_PMBUS)             += pmbus/
 ifeq ($(CONFIG_HWMON_DEBUG_CHIP),y)
 EXTRA_CFLAGS += -DDEBUG
 endif
+

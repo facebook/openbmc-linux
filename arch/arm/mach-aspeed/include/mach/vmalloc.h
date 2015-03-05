@@ -1,12 +1,5 @@
 /*
- *  linux/include/asm-arm/arch-mvp2000/vmalloc.h
- *
- *  Copyright (C) 2000 Russell King.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ *  vmalloc.h
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,11 +19,11 @@
  * The vmalloc() routines leaves a hole of 4kB between each vmalloced
  * area for the same reason. ;)
  */
-#if 1
+#if 0
 #define VMALLOC_OFFSET	  (8*1024*1024)
 #define VMALLOC_START	  (((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END       (PAGE_OFFSET + 0x20000000)
 #else
-#define VMALLOC_END                     0xf6000000UL
+#define VMALLOC_END                     0xf8000000UL
 #endif

@@ -1,9 +1,7 @@
 /*
- *  linux/include/asm-arm/arch-mvp2000/timex.h
+ *  timex.h
  *
  *  Integrator architecture timex specifications
- *
- *  Copyright (C) 1999 ARM Limited
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

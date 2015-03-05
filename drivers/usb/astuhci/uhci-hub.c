@@ -1,16 +1,17 @@
-/*
- * Universal Host Controller Interface driver for USB.
- *
- * Maintainer: Alan Stern <stern@rowland.harvard.edu>
- *
- * (C) Copyright 1999 Linus Torvalds
- * (C) Copyright 1999-2002 Johannes Erdfelt, johannes@erdfelt.com
- * (C) Copyright 1999 Randy Dunlap
- * (C) Copyright 1999 Georg Acher, acher@in.tum.de
- * (C) Copyright 1999 Deti Fliegl, deti@fliegl.de
- * (C) Copyright 1999 Thomas Sailer, sailer@ife.ee.ethz.ch
- * (C) Copyright 2004 Alan Stern, stern@rowland.harvard.edu
- */
+/********************************************************************************
+* File Name     : uhci-hub.c
+* 
+* port from uhci-hub.c
+* This program is free software; you can redistribute it and/or modify 
+* it under the terms of the GNU General Public License as published by the Free Software Foundation; 
+* either version 2 of the License, or (at your option) any later version. 
+* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY; 
+* without even the implied warranty of MERCHANTABILITY or 
+* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
+* You should have received a copy of the GNU General Public License 
+* along with this program; if not, write to the Free Software 
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+********************************************************************************/
 
 static const __u8 root_hub_hub_des[] =
 {

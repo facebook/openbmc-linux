@@ -64,11 +64,6 @@ static struct map_desc ast_io_desc[] __initdata = {
 		.length 		= SZ_4K,
 		.type			= MT_DEVICE,
 	}, {
-		.virtual		= IO_ADDRESS(AST_JTAG_BASE), 
-		.pfn			= __phys_to_pfn(AST_JTAG_BASE),
-		.length 		= SZ_4K,
-		.type			= MT_DEVICE,
-	}, {
 		.virtual		= IO_ADDRESS(AST_XDMA_BASE), 
 		.pfn			= __phys_to_pfn(AST_XDMA_BASE),
 		.length 		= SZ_4K,

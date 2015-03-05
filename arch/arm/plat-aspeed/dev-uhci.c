@@ -33,7 +33,7 @@
 /* --------------------------------------------------------------------
  *  UHCI
  * -------------------------------------------------------------------- */
-#if defined(CONFIG_GUC_USB_UHCI_HCD) || defined(CONFIG_GUC_USB_UHCI_HCD_MODULE)
+#if defined(CONFIG_AST_USB_UHCI_HCD) || defined(CONFIG_AST_USB_UHCI_HCD_MODULE)
 static struct resource ast_uchi_resource[] = {
 	[0] = {
 		.start = AST_UHCI_BASE,
@@ -63,9 +63,9 @@ static struct platform_device ast_uhci_device = {
 void __init ast_add_device_uhci(void)
 {
 
-#if defined (CONFIG_GUC_USB_UHCI_MULTIPORT_2)
+#if defined (CONFIG_AST_USB_UHCI_MULTIPORT_2)
 	ast_scu_multi_func_usb11_host_port2(1);
-#elif defined (CONFIG_GUC_USB_UHCI_MULTIPORT_4)
+#elif defined (CONFIG_AST_USB_UHCI_MULTIPORT_4)
 	ast_scu_multi_func_usb11_host_port2(1);
 	ast_scu_multi_func_usb11_host_port4(1);
 #else

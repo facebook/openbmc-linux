@@ -1,30 +1,17 @@
-/*
- * Universal Host Controller Interface driver for USB.
- *
- * Maintainer: Alan Stern <stern@rowland.harvard.edu>
- *
- * (C) Copyright 1999 Linus Torvalds
- * (C) Copyright 1999-2002 Johannes Erdfelt, johannes@erdfelt.com
- * (C) Copyright 1999 Randy Dunlap
- * (C) Copyright 1999 Georg Acher, acher@in.tum.de
- * (C) Copyright 1999 Deti Fliegl, deti@fliegl.de
- * (C) Copyright 1999 Thomas Sailer, sailer@ife.ee.ethz.ch
- * (C) Copyright 1999 Roman Weissgaerber, weissg@vienna.at
- * (C) Copyright 2000 Yggdrasil Computing, Inc. (port of new PCI interface
- *               support from usb-ohci.c by Adam Richter, adam@yggdrasil.com).
- * (C) Copyright 1999 Gregory P. Smith (from usb-ohci.c)
- * (C) Copyright 2004-2007 Alan Stern, stern@rowland.harvard.edu
- */
-
-
-/*
- * Technically, updating td->status here is a race, but it's not really a
- * problem. The worst that can happen is that we set the IOC bit again
- * generating a spurious interrupt. We could fix this by creating another
- * QH and leaving the IOC bit always set, but then we would have to play
- * games with the FSBR code to make sure we get the correct order in all
- * the cases. I don't think it's worth the effort
- */
+/********************************************************************************
+* File Name     : uhci-q.c
+* 
+* port from uhci-q.c
+* This program is free software; you can redistribute it and/or modify 
+* it under the terms of the GNU General Public License as published by the Free Software Foundation; 
+* either version 2 of the License, or (at your option) any later version. 
+* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY; 
+* without even the implied warranty of MERCHANTABILITY or 
+* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
+* You should have received a copy of the GNU General Public License 
+* along with this program; if not, write to the Free Software 
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+********************************************************************************/
 static void uhci_set_next_interrupt(struct uhci_hcd *uhci)
 {
 	if (uhci->is_stopped)

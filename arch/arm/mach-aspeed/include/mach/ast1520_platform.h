@@ -19,24 +19,25 @@
 
 #define AST_SRAM_SIZE					(SZ_8K)
 
-#define AST_AHB_CONTROLLER_BASE            0x1E600000	/* AHB CONTROLLER */
+#define AST_AHB_CTRL_BASE            0x1E600000	/* AHB CONTROLLER */
 
 #define AST_SPI_BASE        				0x1E620000	/* SPI CONTROLLER */
 
 #define AST_MAC0_BASE                      0x1E660000	/* MAC1 */ 
 
-#define AST_USB20_BASE                     0x1E6A0000	/* USB 2.0 VIRTUAL HUB CONTROLLER */
-#define AST_EHCI_BASE                0x1E6A1000	/* USB 2.0 HOST CONTROLLER */
-#define AST_UHCI_BASE                0x1E6B0000	/* USB 1.1 HOST CONTROLLER */
-#define AST_VIC_BASE                       0x1E6C0000	/* VIC */
-#define AST_MMC_BASE                       0x1E6E0000	/* MMC SDRAM*/
-#define AST_SCU_BASE                       0x1E6E2000	/* SCU */
-#define AST_CRYPTO_BASE                    0x1E6E3000	/* Crypto */
+#define AST_USB20_BASE                    	0x1E6A0000	/* USB 2.0 VIRTUAL HUB CONTROLLER */
+#define AST_EHCI_BASE                		0x1E6A1000	/* USB 2.0 HOST CONTROLLER */
+#define AST_UHCI_BASE                		0x1E6B0000	/* USB 1.1 HOST CONTROLLER */
+#define AST_VIC_BASE                       	0x1E6C0000	/* VIC */
+#define AST_SDMC_BASE                       0x1E6E0000	/* MMC SDRAM*/
+#define AST_SCU_BASE                       	0x1E6E2000	/* SCU */
+#define AST_CRYPTO_BASE                    	0x1E6E3000	/* Crypto */
 
 #define AST_I2S_BASE	                   0x1E6E5000	/* I2S */
 #define AST_GRAPHIC_BASE                   0x1E6E6000	/* Graphics */
 #define AST_XDMA_BASE                      0x1E6E7000	/* XDMA */
 #define AST_MCTP_BASE                      0x1E6E8000	/* MCTP */
+#define AST_PCIE_BASE 						0x1E6ED000	/* PCIE */
 
 #define AST_VIDEO_BASE                     0x1E700000	/* VIDEO ENGINE */
 #define AST_SRAM_BASE                      0x1E720000	/* SRAM */
@@ -52,7 +53,9 @@
 #define AST_I2C_BASE                       0x1E78A000	/* I2C */
 #define AST_UART2_BASE                     0x1E78D000	/* UART2 */
 
-#define AST_SPI_MEM							0x20000000
-#define AST_PCIE_BRIDGE						0x70000000
+#define AST_SPI0_MEM							0x20000000
+
+#define AST_PCIE_WIN_BASE				0x70000000
+#define AST_PCIE_WIN_SIZE				0x01000000
 
 #endif

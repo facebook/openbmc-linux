@@ -27,12 +27,18 @@
 #include <linux/tty.h>
 #include <linux/serial_8250.h>
 
+#if defined(CONFIG_COLDFIRE)
+#include <asm/sizes.h>
+#include <asm/arch/devs.h>
+#include <asm/arch/platform.h>
+#include <asm/arch/irqs.h>
+#else
 #include <mach/irqs.h>
 #include <mach/platform.h>
 #include <mach/hardware.h>
-
 #include <plat/ast-scu.h>
 #include <plat/devs.h>
+#endif
 
 /* --------------------------------------------------------------------
  * UART
@@ -41,14 +47,58 @@
 static struct plat_serial8250_port ast_uart_data[] = {
 	{
 		.mapbase	= AST_UART0_BASE,
-		.membase	= (char*)(IO_ADDRESS(AST_UART0_BASE)),
 		.irq		= IRQ_UART0,
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
+#if defined(CONFIG_COLDFIRE)		
+		.iotype		= UPIO_MEM32,
+#else
 		.iotype		= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+#endif		
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},
-// UART1 is connected to host
+#if defined(CONFIG_ARCH_AST1010)	
+	{
+		.mapbase	= AST_UART1_BASE,
+		.irq		= IRQ_UART1,
+		.uartclk	= (24*1000000L),
+		.regshift	= 2,
+		.iotype		= UPIO_MEM32,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},	
+	{
+		.mapbase	= AST_UART2_BASE,
+		.irq		= IRQ_UART2,
+		.uartclk	= (24*1000000L),
+		.regshift	= 2,
+		.iotype 	= UPIO_MEM32,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},	
+#else
+//BMC UART 1 ,2 default to LPC
+#ifdef CONFIG_ARCH_AST1070
+#ifdef AST_UART1_BASE
+	{
+		.mapbase	= AST_UART1_BASE,
+		.irq		= IRQ_UART1,
+		.uartclk	= (24*1000000L),
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},	
+#endif
+#ifdef AST_UART2_BASE
+	{
+		.mapbase	= AST_UART2_BASE,
+		.irq		= IRQ_UART2,
+		.uartclk	= (24*1000000L),
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},	
+#endif
+#endif
+#ifdef AST_UART1_BASE
 	{
 		.mapbase	= AST_UART1_BASE,
 		.membase	= (char*)(IO_ADDRESS(AST_UART1_BASE)),
@@ -58,27 +108,27 @@ static struct plat_serial8250_port ast_uart_data[] = {
 		.iotype		= UPIO_MEM,
 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},
+#endif
 #ifdef AST_UART3_BASE
 	{
 		.mapbase	= AST_UART3_BASE,
-		.membase	= (char*)(IO_ADDRESS(AST_UART3_BASE)),
 		.irq		= IRQ_UART3,
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype		= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},	
 #endif
 #ifdef AST_UART4_BASE
 	{
 		.mapbase	= AST_UART4_BASE,
-		.membase	= (char*)(IO_ADDRESS(AST_UART4_BASE)),
 		.irq		= IRQ_UART4,
 		.uartclk	= (24*1000000L),
 		.regshift	= 2,
 		.iotype 	= UPIO_MEM,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},	
+#endif
 #endif	
 	{ },
 };
@@ -93,9 +143,12 @@ struct platform_device ast_uart_device = {
 
 void __init ast_add_device_uart(void)
 {
+#if defined(CONFIG_ARCH_AST1010)
+#else
 	ast_scu_multi_func_uart(1);		
 	ast_scu_multi_func_uart(3);		
 	ast_scu_multi_func_uart(4);	
+#endif	
 	platform_device_register(&ast_uart_device);
 }
 #else

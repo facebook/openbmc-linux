@@ -18,6 +18,9 @@
 *    1. 2013/05/15 Ryan Chen Create
 * 
 ********************************************************************************/
+#include <linux/platform_device.h>
+#include <linux/slab.h>
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -30,9 +33,15 @@
 
 #include <plat/regs-lpc.h>
 #include <plat/ast-snoop.h>
+#include <plat/ast-lpc.h>
+#ifdef CONFIG_ARCH_AST1070
+#include <plat/ast1070-scu.h>
+#include <plat/ast1070-devs.h>
+#include <plat/regs-ast1070-intc.h>
+#include <plat/ast1070-uart-dma.h>
+#endif
 
-
-#define AST_LPC_DEBUG
+//#define AST_LPC_DEBUG
 
 #ifdef AST_LPC_DEBUG
 #define LPCDBUG(fmt, args...) printk("%s() " fmt, __FUNCTION__, ## args)
@@ -40,10 +49,7 @@
 #define LPCDBUG(fmt, args...)
 #endif
 
-#define LPCMSG(fmt, args...) printk(fmt, ## args)
-
-static u32 ast_lpc_base;
-
+#if 0
 static inline u32 
 ast_lpc_read(u32 reg)
 {
@@ -303,14 +309,115 @@ extern void ast_snoop_dma_init(struct ast_snoop_dma_channel *ast_dma_ch)
 
 }
 EXPORT_SYMBOL(ast_snoop_dma_init);
+#endif
+static struct ast_lpc_driver_data *lpc_driver_data;
 
-static int __init ast_lpc_init_lpc(void)
+static int __devinit ast_lpc_probe(struct platform_device *pdev)
 {
-	LPCMSG("AST LPC INIT \n");
-	ast_lpc_base = ioremap(AST_LPC_BASE, SZ_256);	
+//	const struct platform_device_id *id = platform_get_device_id(pdev);
+	struct resource *res;
+	int ret = 0;
+	int i;
+
+	lpc_driver_data = kzalloc(sizeof(struct ast_lpc_driver_data), GFP_KERNEL);
+	if (lpc_driver_data == NULL) {
+		dev_err(&pdev->dev, "failed to allocate memory\n");
+		return -ENOMEM;
+	}
+
+	lpc_driver_data->pdev = pdev;
+
+	lpc_driver_data->bus_info = pdev->dev.platform_data;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (res == NULL) {
+		dev_err(&pdev->dev, "no memory resource defined\n");
+		ret = -ENODEV;
+		goto err_free;
+	}
+
+	res = request_mem_region(res->start, resource_size(res), pdev->name);
+	if (res == NULL) {
+		dev_err(&pdev->dev, "failed to request memory resource\n");
+		ret = -EBUSY;
+		goto err_free;
+	}
+
+	lpc_driver_data->reg_base = ioremap(res->start, resource_size(res));
+	if (lpc_driver_data->reg_base == NULL) {
+		dev_err(&pdev->dev, "failed to ioremap() registers\n");
+		ret = -ENODEV;
+		goto err_free_mem;
+	}
+
+#ifdef CONFIG_ARCH_AST1070
+	if(lpc_driver_data->bus_info->bus_scan) {
+		printk("LPC Scan Device... \n");		
+		for(i=0;i<lpc_driver_data->bus_info->scan_node;i++) {
+			ast1070_scu_init(i ,lpc_driver_data->bus_info->bridge_phy_addr + i*0x10000);
+			printk("C%d-[%x] ", i, ast1070_revision_id_info(i));
+			ast1070_vic_init(i, (lpc_driver_data->bus_info->bridge_phy_addr + i*0x10000), IRQ_C0_VIC_CHAIN + i, IRQ_C0_VIC_CHAIN_START + (i*AST_CVIC_NUM));
+			ast1070_scu_dma_init(i);
+			ast1070_uart_dma_init(i, lpc_driver_data->bus_info->bridge_phy_addr);
+			ast_add_device_cuart(i,lpc_driver_data->bus_info->bridge_phy_addr + i*0x10000);
+			ast_add_device_ci2c(i,lpc_driver_data->bus_info->bridge_phy_addr + i*0x10000);
+		}
+		printk("\n");
+
+	}
+	
+#endif
+
+	platform_set_drvdata(pdev, lpc_driver_data);
+	return 0;
+
+err_free_mem:
+	release_mem_region(res->start, resource_size(res));
+err_free:
+	kfree(lpc_driver_data);
+
+	return ret;
+}
+
+static int __devexit ast_lpc_remove(struct platform_device *pdev)
+{
+	struct ast_lpc_driver_data *lpc_driver_data;
+	struct resource *res;
+
+	lpc_driver_data = platform_get_drvdata(pdev);
+	if (lpc_driver_data == NULL)
+		return -ENODEV;
+
+	iounmap(lpc_driver_data->reg_base);
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	release_mem_region(res->start, resource_size(res));
+
+	kfree(lpc_driver_data);
+
 	return 0;
 }
 
-arch_initcall(ast_lpc_init_lpc);
+static struct platform_driver ast_lpc_driver = {
+	.driver		= {
+		.name	= "ast_lpc",
+		.owner	= THIS_MODULE,
+	},
+	.probe		= ast_lpc_probe,
+	.remove		= __devexit_p(ast_lpc_remove),
+//	.id_table	= pwm_id_table,
+};
 
+static int __init ast_lpc_init(void)
+{
+	return platform_driver_register(&ast_lpc_driver);
+}
+arch_initcall(ast_lpc_init);
 
+static void __exit ast_lpc_exit(void)
+{
+	platform_driver_unregister(&ast_lpc_driver);
+}
+module_exit(ast_lpc_exit);
+
+MODULE_LICENSE("GPL v2");

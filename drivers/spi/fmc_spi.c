@@ -178,7 +178,7 @@ static int fmc_spi_transfer(struct spi_device *spi, struct spi_message *msg)
 	int i=0,j=0;
 
 	dev_dbg(host->dev, "new message %p submitted for %s \n",
-					msg, spi->dev.bus_id);
+					msg, dev_name(&spi->dev));
 	
 	spin_lock_irqsave(&host->lock, flags);
 //	writel( (readl(host->spi_data->ctrl_reg) | SPI_CMD_USER_MODE) | SPI_CE_INACTIVE,host->spi_data->ctrl_reg);
@@ -272,7 +272,7 @@ static void fmc_spi_cleanup(struct spi_device *spi)
 
 static int fmc_spi_probe(struct platform_device *pdev)
 {
-	struct resource		*res0, *res1;
+	struct resource		*res0, *res1=0;
 	struct fmc_spi_host *host;
 	struct spi_master *master;
 	int err;

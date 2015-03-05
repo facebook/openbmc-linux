@@ -1,5 +1,5 @@
 /*
- *  linux/include/asm-arm/arch-ast2000/time.h
+ *  time.h
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

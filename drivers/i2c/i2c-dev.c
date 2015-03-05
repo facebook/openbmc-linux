@@ -449,7 +449,7 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
 	case I2C_SLAVE_RDWR:
 		return i2cdev_ioctl_slave_rdrw(client->adapter, (struct i2c_msg __user *)arg);
-#endif
+#endif		
 
 	case I2C_SMBUS:
 		return i2cdev_ioctl_smbus(client, arg);

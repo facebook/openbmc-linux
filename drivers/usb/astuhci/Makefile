@@ -7,4 +7,4 @@ ifeq ($(CONFIG_USB_DEBUG),y)
 endif
 
 
-obj-$(CONFIG_GUC_USB_UHCI_HCD)	+= uhci-hcd.o
+obj-$(CONFIG_AST_USB_UHCI_HCD)	+= uhci-hcd.o

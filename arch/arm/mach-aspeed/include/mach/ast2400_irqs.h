@@ -22,30 +22,13 @@
 #define _AST2400_IRQS_H_                 1
 
 #if defined(CONFIG_ARCH_AST1070)
+#include <mach/ast1070_irqs.h>
+#define MAX_AST1070_NR 2
 //----------VIC + CVIC + GPIO chain--------------------------------------------------
-#define NR_IRQS                         (AST_VIC_NUM + (AST_CVIC_NUM * CONFIG_AST1070_NR) + ARCH_NR_GPIOS)
-//---------------CVIC---------------------------------------------------------------
-#define IRQ_C0_VIC_CHAIN					IRQ_EXT0
-#define IRQ_C0_VIC_CHAIN_START			(AST_VIC_NUM)
-
-#if (CONFIG_AST1070_NR >= 2)
-#define IRQ_C1_VIC_CHAIN					IRQ_EXT1
-#define IRQ_C1_VIC_CHAIN_START			(IRQ_C0_VIC_CHAIN_START + AST_CVIC_NUM)
-#endif
-
-#if (CONFIG_AST1070_NR >= 3)
-#define IRQ_C2_VIC_CHAIN					IRQ_EXT2
-#define IRQ_C2_VIC_CHAIN_START			(IRQ_C1_VIC_CHAIN_START + AST_CVIC_NUM)
-#endif
-
-#if (CONFIG_AST1070_NR >= 4)
-#define IRQ_C3_VIC_CHAIN					IRQ_EXT3
-#define IRQ_C3_VIC_CHAIN_START			(IRQ_C2_VIC_CHAIN_START + AST_CVIC_NUM)
-#endif
-
+#define NR_IRQS                         (AST_VIC_NUM + (AST_CVIC_NUM * MAX_AST1070_NR) + ARCH_NR_GPIOS)
 //--------------GPIO ---------------------------------------------------------------
 #define ARCH_NR_GPIOS 					(GPIO_PORT_NUM*8)
-#define IRQ_GPIO_CHAIN_START			(AST_VIC_NUM + (AST_CVIC_NUM * CONFIG_AST1070_NR))
+#define IRQ_GPIO_CHAIN_START			(AST_VIC_NUM + (AST_CVIC_NUM * MAX_AST1070_NR))
 //------------------- ---------------------------------------------------------------
 #else
 //--------------GPIO ---------------------------------------------------------------

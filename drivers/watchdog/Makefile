@@ -41,7 +41,7 @@ obj-$(CONFIG_PNX4008_WATCHDOG) += pnx4008_wdt.o
 obj-$(CONFIG_IOP_WATCHDOG) += iop_wdt.o
 obj-$(CONFIG_DAVINCI_WATCHDOG) += davinci_wdt.o
 obj-$(CONFIG_ORION5X_WATCHDOG) += orion5x_wdt.o
-obj-$(CONFIG_AST_WATCHDOG) += ast_gucwdt.o
+obj-$(CONFIG_AST_WATCHDOG) += ast_wdt.o
 
 # ARM26 Architecture
 

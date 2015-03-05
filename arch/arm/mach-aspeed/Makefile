@@ -8,7 +8,7 @@
 obj-$(CONFIG_ARCH_AST1100) += ast1100.o
 obj-$(CONFIG_ARCH_AST2100) += ast2100.o
 obj-$(CONFIG_ARCH_AST2300) += ast2300.o gpio.o ast-lpc.o
-obj-$(CONFIG_ARCH_AST2400) += ast2400.o gpio.o ast-lpc.o
+obj-$(CONFIG_ARCH_AST2400) += ast2400.o gpio.o ast-lpc.o ast-lpc_plus.o
 obj-$(CONFIG_ARCH_AST2500) += ast2500.o ast-mctp.o
 #PC Ext
 obj-$(CONFIG_ARCH_AST1510) += ast1510.o gpio.o

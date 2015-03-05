@@ -42,7 +42,7 @@
 #define IRQ_UART1						10			/* UART 2 interrupt */
 //11 reserved 
 #define IRQ_I2C							12
-#define IRQ_USB11_HID					13
+#define IRQ_UDC11					13
 //14 reserved 
 #define IRQ_PECI						15
 #define IRQ_TIMER0						16			/* TIMER 1 interrupt */

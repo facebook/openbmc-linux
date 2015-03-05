@@ -203,7 +203,7 @@ config ARCH_ASPEED
 	bool "ASPEED AST Family"
 	select ARM_AMBA
 	select PLAT_ASPEED
-	select ARCH_REQUIRE_GPIOLIB
+        select ARCH_REQUIRE_GPIOLIB
 	select GENERIC_GPIO
 	select GENERIC_TIME
 	select GENERIC_CLOCKEVENTS

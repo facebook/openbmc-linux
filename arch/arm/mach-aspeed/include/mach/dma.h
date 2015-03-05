@@ -1,7 +1,5 @@
 /*
- *  linux/include/asm-arm/arch-mvp2000/dma.h
- *
- *  Copyright (C) 1997,1998 Russell King
+ *  dma.h
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

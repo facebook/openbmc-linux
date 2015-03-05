@@ -8,7 +8,7 @@ obj-$(CONFIG_USB)		+= core/
 
 obj-$(CONFIG_USB_MON)		+= mon/
 
-obj-$(CONFIG_GUC_USB_UHCI_HCD)	+= gucuhci/
+obj-$(CONFIG_AST_USB_UHCI_HCD)	+= astuhci/
 
 obj-$(CONFIG_PCI)		+= host/
 obj-$(CONFIG_USB_EHCI_HCD)	+= host/

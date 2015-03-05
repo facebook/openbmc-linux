@@ -18,8 +18,7 @@
 #define _AST2300_PLATFORM_H_                 1
 
 #define AST_DRAM_BASE					0x40000000
-
-#define AST_SRAM_SIZE					SZ_16K
+#define AST_SRAM_SIZE					(SZ_16K)
 
 #define AST_OLD_SMC_BASE						0x10000000		/*Legacy BMC Static Memory */
 #define AST_OLD_SMC_CTRL_BASE				0x16000000		/*Legacy BMC Static Memory Ctrl*/
@@ -61,6 +60,7 @@
 #define AST_VUART0_BASE                    0x1E787000	/* VUART1 */
 #define AST_PUART_BASE                     0x1E788000	/* PUART */
 #define AST_LPC_BASE                       0x1E789000	/* LPC */
+#define AST_MBX_BASE                       0x1E789200	/* MailBox */
 #define AST_I2C_BASE                       0x1E78A000	/* I2C */
 #define AST_PECI_BASE                      0x1E78B000	/* PECI */
 #define AST_UART2_BASE                     0x1E78D000	/* UART2 */

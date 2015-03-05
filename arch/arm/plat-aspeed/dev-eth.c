@@ -34,7 +34,7 @@
 /* --------------------------------------------------------------------
  *  Ethernet
  * -------------------------------------------------------------------- */
-#if defined(CONFIG_FARADAYMAC) || defined(CONFIG_FARADAYMAC_MODULE)
+#if defined(CONFIG_ASPEEDMAC) || defined(CONFIG_ASPEEDMAC_MODULE)
 #ifdef AST_MAC0_BASE
 static struct ftgmac100_eth_data ast_eth0_data = {
 	.dev_addr = { 0x00, 0x84, 0x14, 0xA0, 0xB0, 0x22},		

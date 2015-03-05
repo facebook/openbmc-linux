@@ -675,7 +675,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
 		I2C_BOARD_INFO("24c128", 0x51),
 	},
 };
-
+		
 //Under I2C Dev 7
 static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 	// Wedge devices
