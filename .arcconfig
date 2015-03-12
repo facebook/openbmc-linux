@@ -1,0 +1,14 @@
+{"project_id" : "linux-kernel",
+ "conduit_uri" : "https://phabricator.fb.com/api/",
+ "remote_hooks_installed" : true,
+ "lint_engine": "ArcanistSingleLintEngine",
+ "lint.engine.single.linter": "ArcanistScriptAndRegexLinter",
+ "linter.scriptandregex.script" : "scripts/checkpatch_arc.py",
+ "linter.scriptandregex.regex" :
+ "/^(?P<file>[^:]*):(?P<line>\\d+): (?P<severity>WARNING|ERROR):(?P<name>[^:]*): (?P<message>.*)$/m",
+ "unit_engine" : "FacebookKernelUnitTestEngine",
+ "git.default-relative-commit" : "origin/openbmc/helium/4.1",
+ "phutil_libraries" : {
+   "kernel-arcanist": "/mnt/vol/engshare/contbuild/fbcode/kernel/kernel/arcanist/"
+ }
+}

@@ -2076,6 +2076,7 @@ sub process {
 #make up the handle for any error we report on this line
 		$prefix = "$filename:$realline: " if ($emacs && $file);
 		$prefix = "$filename:$linenr: " if ($emacs && !$file);
+		$prefix = "$realfile:$realline: " if ($terse && !$file);
 
 		$here = "#$linenr: " if (!$file);
 		$here = "#$realline: " if ($file);
