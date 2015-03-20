@@ -132,6 +132,11 @@ void __init ast_add_device_gmac(void)
 
 	ast_eth0_data.DF_support = !isRevA0;
 	
+	// Wedge/6-Pack hardware attaches to MAC1;  there's nothing on
+	// MAC0.  Older drivers would drop interfaces without PHYs, but
+	// the latest open source drivers do not, so we drop the first
+	// MAC specs.
+#ifndef CONFIG_WEDGE
 	ast_scu_init_eth(0);
 	ast_scu_multi_func_eth(0);
 	
@@ -167,6 +172,7 @@ void __init ast_add_device_gmac(void)
 
 	
 	platform_device_register(&ast_eth0_device);
+#endif
 
 #ifdef AST_MAC1_BASE
 	ast_scu_init_eth(1);

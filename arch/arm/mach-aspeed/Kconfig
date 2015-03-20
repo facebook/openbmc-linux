@@ -203,6 +203,9 @@ endchoice
 config AST_SCU_LOCK
 	bool "AST SCU Protection Key"
 
+config WEDGE
+	bool "Facebook Wedge/6-Pack"
+
 # Support PCIE
 config PCIE
         bool "ASPEED PCIE support"

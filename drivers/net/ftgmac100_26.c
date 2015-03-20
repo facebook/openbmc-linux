@@ -255,6 +255,7 @@ static void getMacHwConfig( struct net_device* dev, struct AstMacHwConfig* out )
 
 //	out->macId   = dev->dev_id;
 //..	getMacAndPhy(dev, out);
+	out->phyAddr = PHY_DEFAULT_ADDR;
 	out->miiPhyId = 0;
 
 	// We assume the Clock Stop register does not disable the MAC1 or MAC2 clock
