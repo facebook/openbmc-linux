@@ -62,5 +62,16 @@
  * Watchdog
  */
 #define AST_WDT_VA_BASE		(IO_ADDRESS(AST_WDT_BASE))
- 
+
+/*
+ * Console UART
+ */
+#ifdef CONFIG_WEDGE
+#define AST_UART_BASE AST_UART3_BASE
+#elif CONFIG_YOSEMITE
+#define AST_UART_BASE AST_UART0_BASE
+#else
+#define AST_UART_BASE AST_UART0_BASE
+#endif
+
 #endif

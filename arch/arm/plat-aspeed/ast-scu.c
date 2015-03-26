@@ -1,20 +1,20 @@
 /********************************************************************************
-* File Name     : arch/arm/plat-aspeed/ast-scu.c 
+* File Name     : arch/arm/plat-aspeed/ast-scu.c
 * Author         : Ryan Chen
-* Description   : AST SCU 
-* 
+* Description   : AST SCU
+*
 * Copyright (C) 2012-2020  ASPEED Technology Inc.
-* This program is free software; you can redistribute it and/or modify 
-* it under the terms of the GNU General Public License as published by the Free Software Foundation; 
-* either version 2 of the License, or (at your option) any later version. 
-* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY; 
-* without even the implied warranty of MERCHANTABILITY or 
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
-* You should have received a copy of the GNU General Public License 
-* along with this program; if not, write to the Free Software 
-* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by the Free Software Foundation;
+* either version 2 of the License, or (at your option) any later version.
+* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
+* without even the implied warranty of MERCHANTABILITY or
+* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-CLK24M 
+CLK24M
  |
  |--> H-PLL -->HCLK
  |
@@ -27,9 +27,9 @@ CLK24M
  |--> USB2PHY -->UTMICLK
 
 
-*   History      : 
+*   History      :
 *    1. 2012/08/15 Ryan Chen Create
-* 
+*
 ********************************************************************************/
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -56,34 +56,34 @@ CLK24M
 
 static u32 ast_scu_base = IO_ADDRESS(AST_SCU_BASE);
 
-static inline u32 
+static inline u32
 ast_scu_read(u32 reg)
 {
 	u32 val;
-		
+
 	val = readl(ast_scu_base + reg);
-	
+
 	SCUDBUG("ast_scu_read : reg = 0x%08x, val = 0x%08x\n", reg, val);
-	
+
 	return val;
 }
 
 static inline void
-ast_scu_write(u32 val, u32 reg) 
+ast_scu_write(u32 val, u32 reg)
 {
 	SCUDBUG("ast_scu_write : reg = 0x%08x, val = 0x%08x\n", reg, val);
 #ifdef CONFIG_AST_SCU_LOCK
-	//unlock 
+	//unlock
 	writel(SCU_PROTECT_UNLOCK, ast_scu_base);
 	writel(val, ast_scu_base + reg);
 	//lock
-	writel(0xaa,ast_scu_base);	
+	writel(0xaa,ast_scu_base);
 #else
 	writel(val, ast_scu_base + reg);
 #endif
 }
 
-//SoC mapping Table 
+//SoC mapping Table
 struct soc_id {
 	const char	* name;
 	u32	rev_id;
@@ -180,9 +180,9 @@ ast_scu_init_video(u8 dynamic_en)
 		ast_scu_write((ast_scu_read(AST_SCU_CLK_SEL) & ~SCU_CLK_VIDEO_SLOW_MASK) | SCU_CLK_VIDEO_SLOW_EN | SCU_CLK_VIDEO_SLOW_SET(0), AST_SCU_CLK_SEL);
 	else
 		ast_scu_write((ast_scu_read(AST_SCU_CLK_SEL) & ~SCU_ECLK_SOURCE_MASK) | SCU_ECLK_SOURCE(2), AST_SCU_CLK_SEL);
-	
+
 	// Enable CLK
-	ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) & ~(SCU_ECLK_STOP_EN | SCU_VCLK_STOP_EN), AST_SCU_CLK_STOP);	
+	ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) & ~(SCU_ECLK_STOP_EN | SCU_VCLK_STOP_EN), AST_SCU_CLK_STOP);
 	mdelay(10);
 	ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_VIDEO, AST_SCU_RESET);
 	udelay(100);
@@ -201,32 +201,32 @@ ast_scu_init_eth(u8 num)
 		ast_scu_write((ast_scu_read(AST_SCU_CLK_SEL) & ~SCU_CLK_MAC_MASK) | SCU_CLK_MAC_DIV(4), AST_SCU_CLK_SEL);
 
 	//Set MAC delay Timing
-	ast_scu_write(0x2255, AST_SCU_MAC_CLK);	
+	ast_scu_write(0x2255, AST_SCU_MAC_CLK);
 
 	switch(num) {
 		case 0:
-			ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_MAC0, 
-							AST_SCU_RESET);		
+			ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_MAC0,
+							AST_SCU_RESET);
 			udelay(100);
-			ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) & ~SCU_MAC0CLK_STOP_EN, 
-							AST_SCU_CLK_STOP);		
+			ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) & ~SCU_MAC0CLK_STOP_EN,
+							AST_SCU_CLK_STOP);
 			udelay(1000);
-			ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_MAC0, 
-							AST_SCU_RESET);		
-			
+			ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_MAC0,
+							AST_SCU_RESET);
+
 			break;
 		case 1:
-			ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_MAC1, 
-							AST_SCU_RESET);			
+			ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_MAC1,
+							AST_SCU_RESET);
 			udelay(100);
-			ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) & ~SCU_MAC1CLK_STOP_EN, 
-							AST_SCU_CLK_STOP);		
+			ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) & ~SCU_MAC1CLK_STOP_EN,
+							AST_SCU_CLK_STOP);
 			udelay(1000);
-			ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_MAC1, 
-							AST_SCU_RESET);			
+			ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_MAC1,
+							AST_SCU_RESET);
 			break;
-			
-	}		
+
+	}
 }
 
 
@@ -292,7 +292,7 @@ ast_scu_init_sdhci(void)
 {
 	//SDHCI Host's Clock Enable and Reset
 	ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_SD, AST_SCU_RESET);
-	
+
 	ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) & ~SCU_SDCLK_STOP_EN, AST_SCU_CLK_STOP);
 	mdelay(10);
 
@@ -300,10 +300,10 @@ ast_scu_init_sdhci(void)
 	mdelay(10);
 
 	// SDCLK = H-PLL / 4
-	ast_scu_write((ast_scu_read(AST_SCU_CLK_SEL) & ~SCU_CLK_SD_MASK) | SCU_CLK_SD_DIV(1), 
+	ast_scu_write((ast_scu_read(AST_SCU_CLK_SEL) & ~SCU_CLK_SD_MASK) | SCU_CLK_SD_DIV(1),
 		AST_SCU_CLK_SEL);
 	mdelay(10);
-	
+
 	ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_SD, AST_SCU_RESET);
 }
 
@@ -358,13 +358,13 @@ EXPORT_SYMBOL(ast_scu_init_jtag);
 extern void
 ast_scu_init_lpc(void)
 {
-	//Note .. It have been enable in U-boot..... 
+	//Note .. It have been enable in U-boot.....
 //	ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_LPC, AST_SCU_RESET);
 
 	//enable LPC clock LHCLK = H-PLL/8
-	ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) | 
-					SCU_SET_LHCLK_DIV(3) | 
-					SCU_LHCLK_SOURCE_EN, 
+	ast_scu_write(ast_scu_read(AST_SCU_CLK_STOP) |
+					SCU_SET_LHCLK_DIV(3) |
+					SCU_LHCLK_SOURCE_EN,
 					AST_SCU_CLK_STOP);
 
 }
@@ -377,7 +377,7 @@ ast_scu_get_lpc_plus_enable(void)
 {
 	if(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & SCU_FUN_PIN_LPC_PLUS)
 		return 1;
-	else 
+	else
 		return 0;
 }
 
@@ -390,10 +390,10 @@ ast_scu_init_crt(void)
 #if defined(CONFIG_AST_DAC) || defined(CONFIG_AST_DVO)
 	ast_scu_write((ast_scu_read(AST_SCU_MISC1_CTRL) & ~(SCU_MISC_D2_PLL_DIS | SCU_MISC_DAC_MASK))
 				| SCU_MISC_DAC_SOURCE_CRT | SCU_MISC_DVO_SOURCE_CRT | SCU_MISC_2D_CRT_EN , AST_SCU_MISC1_CTRL);
-#elif defined(CONFIG_AST_DVO) 
+#elif defined(CONFIG_AST_DVO)
 	ast_scu_write((ast_scu_read(AST_SCU_MISC1_CTRL) & ~(SCU_MISC_D2_PLL_DIS)) |
 				SCU_MISC_DVO_SOURCE_CRT| SCU_MISC_2D_CRT_EN, AST_SCU_MISC1_CTRL);
-#else //default(CONFIG_AST_DAC) 
+#else //default(CONFIG_AST_DAC)
 	ast_scu_write((ast_scu_read(AST_SCU_MISC1_CTRL) & ~(SCU_MISC_D2_PLL_DIS | SCU_MISC_DAC_MASK))
 				| SCU_MISC_DAC_SOURCE_CRT | SCU_MISC_2D_CRT_EN, AST_SCU_MISC1_CTRL);
 #endif
@@ -401,7 +401,7 @@ ast_scu_init_crt(void)
 	ast_scu_write((ast_scu_read(AST_SCU_CLK_SEL) & ~SCU_CLK_VIDEO_DELAY_MASK) |
 						SCU_CLK_VIDEO_DELAY(5), AST_SCU_CLK_SEL);
 
-	/* Reset CRT */ 
+	/* Reset CRT */
 	ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_CRT, AST_SCU_RESET);
 
 	//enable D2 CLK
@@ -409,7 +409,7 @@ ast_scu_init_crt(void)
 
 	udelay(10);
 	ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_CRT, AST_SCU_RESET);
-	
+
 }
 
 EXPORT_SYMBOL(ast_scu_init_crt);
@@ -448,7 +448,7 @@ ast_get_h_pll_clk(void)
 
 	if(h_pll_set & SCU_H_PLL_OFF)
 		return 0;
-	
+
 	if(h_pll_set & SCU_H_PLL_PARAMETER) {
 		// Programming
 		clk = ast_get_clk_source();
@@ -470,21 +470,21 @@ ast_get_h_pll_clk(void)
 		speed = SCU_HW_STRAP_GET_H_PLL_CLK(ast_scu_read(AST_SCU_HW_STRAP1));
 		switch (speed) {
 			case 0:
-				clk = 384000000; 
+				clk = 384000000;
 				break;
 			case 1:
-				clk = 360000000; 
+				clk = 360000000;
 				break;
 			case 2:
-				clk = 336000000; 
+				clk = 336000000;
 				break;
 			case 3:
-				clk = 408000000; 
+				clk = 408000000;
 				break;
 			default:
-				BUG(); 
+				BUG();
 				break;
-		}		
+		}
 	}
 	SCUDBUG("h_pll = %d\n",clk);
 	return clk;
@@ -500,7 +500,7 @@ ast_get_m_pll_clk(void)
 
 	if(m_pll_set & SCU_M_PLL_OFF)
 		return 0;
-	
+
 	// Programming
 	clk = ast_get_clk_source();
 	if(m_pll_set & SCU_M_PLL_BYPASS_EN) {
@@ -542,10 +542,10 @@ ast_get_ahbclk(void)
 		case 3:
 			div = 4;
 		break;
-		
+
 	}
-	
-	SCUDBUG("HPLL=%d, Div=%d, AHB CLK=%d\n", hpll, div, hpll/div);	
+
+	SCUDBUG("HPLL=%d, Div=%d, AHB CLK=%d\n", hpll, div, hpll/div);
 	return (hpll/div);
 
 }
@@ -559,8 +559,8 @@ ast_get_pclk(void)
 	hpll = ast_get_h_pll_clk();
 	div = SCU_GET_PCLK_DIV(ast_scu_read(AST_SCU_CLK_SEL));
 	div = (div+1) << 1;
-	
-	SCUDBUG("HPLL=%d, Div=%d, PCLK=%d\n", hpll, div, hpll/div);	
+
+	SCUDBUG("HPLL=%d, Div=%d, PCLK=%d\n", hpll, div, hpll/div);
 	return (hpll/div);
 
 }
@@ -572,7 +572,7 @@ ast_get_lhclk(void)
 	unsigned int div, hpll;
 	u32 clk_sel = ast_scu_read(AST_SCU_CLK_SEL);
 //FPGA AST1070 is default 100/2 Mhz input
-//	return 50000000;	
+//	return 50000000;
 	hpll = ast_get_h_pll_clk();
 	if(SCU_LHCLK_SOURCE_EN & clk_sel) {
 		div = SCU_GET_LHCLK_DIV(clk_sel);
@@ -600,10 +600,10 @@ ast_get_lhclk(void)
 			break;
 			case 7:
 				div = 16;
-			break;			
+			break;
 		}
-		
-		SCUDBUG("HPLL=%d, Div=%d, LHCLK = %d\n", hpll, div, hpll/div);	
+
+		SCUDBUG("HPLL=%d, Div=%d, LHCLK = %d\n", hpll, div, hpll/div);
 		return (hpll/div);
 	} else {
 		SCUMSG("LPC CLK not enable \n");
@@ -704,7 +704,7 @@ ast_get_sd_clock_src(void)
 		sd_div = SCU_CLK_SD_GET_DIV(ast_scu_read(AST_SCU_CLK_SEL));
 		SCUDBUG("div %d, sdclk =%d \n",((sd_div + 1) * 2),clk/((sd_div + 1) * 2));
 		clk /= ((sd_div + 1) * 2);
-		
+
 #endif
 	return clk;
 }
@@ -717,7 +717,7 @@ ast_scu_show_system_info (void)
 	u32 h_pll, div;
 
 	h_pll = ast_get_h_pll_clk();
-	
+
 	div = SCU_HW_STRAP_GET_CPU_AHB_RATIO(ast_scu_read(AST_SCU_HW_STRAP1));
 	switch(div) {
 		case 0:
@@ -732,10 +732,10 @@ ast_scu_show_system_info (void)
 		case 3:
 			div = 4;
 		break;
-		
+
 	}
 
-	SCUMSG("CPU = %d MHz ,AHB = %d MHz (%d:1) \n", h_pll/1000000, h_pll/div/1000000,div); 
+	SCUMSG("CPU = %d MHz ,AHB = %d MHz (%d:1) \n", h_pll/1000000, h_pll/div/1000000,div);
 
 	return ;
 }
@@ -750,15 +750,19 @@ ast_scu_multi_func_uart(u8 uart)
 		case 1:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) |
 						SCU_FUN_PIN_UART1_RXD |
+#ifdef CONFIG_YOSEMITE
+						SCU_FUN_PIN_UART1_TXD,
+#else
 						SCU_FUN_PIN_UART1_TXD |
 						SCU_FUN_PIN_UART1_NRTS |
 						SCU_FUN_PIN_UART1_NDTR |
 						SCU_FUN_PIN_UART1_NRI |
 						SCU_FUN_PIN_UART1_NDSR |
 						SCU_FUN_PIN_UART1_NDCD |
-						SCU_FUN_PIN_UART1_NCTS, 
-				AST_SCU_FUN_PIN_CTRL2); 
-			break;		
+						SCU_FUN_PIN_UART1_NCTS,
+#endif
+				AST_SCU_FUN_PIN_CTRL2);
+			break;
 		case 2:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) |
 						SCU_FUN_PIN_UART2_RXD |
@@ -768,9 +772,9 @@ ast_scu_multi_func_uart(u8 uart)
 						SCU_FUN_PIN_UART2_NRI |
 						SCU_FUN_PIN_UART2_NDSR |
 						SCU_FUN_PIN_UART2_NDCD |
-						SCU_FUN_PIN_UART2_NCTS, 
-				AST_SCU_FUN_PIN_CTRL2); 
-			break;		
+						SCU_FUN_PIN_UART2_NCTS,
+				AST_SCU_FUN_PIN_CTRL2);
+			break;
 		case 3:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
 						SCU_FUN_PIN_UART3_RXD |
@@ -780,8 +784,8 @@ ast_scu_multi_func_uart(u8 uart)
 						SCU_FUN_PIN_UART3_NRI |
 						SCU_FUN_PIN_UART3_NDSR |
 						SCU_FUN_PIN_UART3_NDCD |
-						SCU_FUN_PIN_UART3_NCTS, 
-				AST_SCU_FUN_PIN_CTRL1); 
+						SCU_FUN_PIN_UART3_NCTS,
+				AST_SCU_FUN_PIN_CTRL1);
 			break;
 		case 4:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
@@ -792,8 +796,8 @@ ast_scu_multi_func_uart(u8 uart)
 						SCU_FUN_PIN_UART4_NRI |
 						SCU_FUN_PIN_UART4_NDSR |
 						SCU_FUN_PIN_UART4_NDCD |
-						SCU_FUN_PIN_UART4_NCTS, 
-				AST_SCU_FUN_PIN_CTRL1); 			
+						SCU_FUN_PIN_UART4_NCTS,
+				AST_SCU_FUN_PIN_CTRL1);
 			break;
 	}
 
@@ -806,13 +810,13 @@ ast_scu_multi_func_video()
 #if defined(CONFIG_ARCH_2100) || defined(CONFIG_ARCH_2200)
 	ast_scu_write(ast_scu_read(AST_SCU_MULTI_FUNC_2) |
 				MULTI_FUNC_VIDEO_RGB18 |
-				MULTI_FUNC_VIDEO_SINGLE_EDGE, 
-		AST_SCU_MULTI_FUNC_2); 
+				MULTI_FUNC_VIDEO_SINGLE_EDGE,
+		AST_SCU_MULTI_FUNC_2);
 #elif defined(CONFIG_ARCH_1100) || defined(CONFIG_ARCH_2050)
 	ast_scu_write(ast_scu_read(AST_SCU_MULTI_FUNC_2) |
 				MULTI_FUNC_VIDEO_RGB18 |
-				MULTI_FUNC_VIDEO_SINGLE_EDGE, 
-		AST_SCU_MULTI_FUNC_2); 
+				MULTI_FUNC_VIDEO_SINGLE_EDGE,
+		AST_SCU_MULTI_FUNC_2);
 #else
 
 #endif
@@ -825,38 +829,38 @@ ast_scu_multi_func_eth(u8 num)
 		case 0:
 			if(ast_scu_read(AST_SCU_HW_STRAP1) && SCU_HW_STRAP_MAC0_RGMII) {
 				SCUMSG("MAC0 : RGMII \n");
-				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) | 
-							SCU_FUN_PIN_MAC0_PHY_LINK, 
-					AST_SCU_FUN_PIN_CTRL1); 
+				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
+							SCU_FUN_PIN_MAC0_PHY_LINK,
+					AST_SCU_FUN_PIN_CTRL1);
 			} else {
-				SCUMSG("MAC0 : RMII/NCSI \n");			
+				SCUMSG("MAC0 : RMII/NCSI \n");
 				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) &
-							~SCU_FUN_PIN_MAC0_PHY_LINK, 
-					AST_SCU_FUN_PIN_CTRL1); 
+							~SCU_FUN_PIN_MAC0_PHY_LINK,
+					AST_SCU_FUN_PIN_CTRL1);
 			}
 
-			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL3) | 
+			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL3) |
 						SCU_FUN_PIN_MAC0_MDIO |
-						SCU_FUN_PIN_MAC0_MDC, 
-				AST_SCU_FUN_PIN_CTRL3); 
-			
+						SCU_FUN_PIN_MAC0_MDC,
+				AST_SCU_FUN_PIN_CTRL3);
+
 			break;
 		case 1:
 			if(ast_scu_read(AST_SCU_HW_STRAP1) && SCU_HW_STRAP_MAC1_RGMII) {
 				SCUMSG("MAC1 : RGMII \n");
-				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) | 
-							SCU_FUN_PIN_MAC1_PHY_LINK, 
-					AST_SCU_FUN_PIN_CTRL1); 
+				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
+							SCU_FUN_PIN_MAC1_PHY_LINK,
+					AST_SCU_FUN_PIN_CTRL1);
 			} else {
 				SCUMSG("MAC1 : RMII/NCSI \n");
-				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) & 
-						~SCU_FUN_PIN_MAC1_PHY_LINK, 
-					AST_SCU_FUN_PIN_CTRL1); 
+				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) &
+						~SCU_FUN_PIN_MAC1_PHY_LINK,
+					AST_SCU_FUN_PIN_CTRL1);
 			}
-			
-			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | 
+
+			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
 						SCU_FUC_PIN_MAC1_MDIO,
-				AST_SCU_FUN_PIN_CTRL5); 
+				AST_SCU_FUN_PIN_CTRL5);
 
 			break;
 	}
@@ -866,18 +870,18 @@ extern void
 ast_scu_multi_func_nand(void)
 {
 	//enable NAND flash multipin FLBUSY and FLWP
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) | 
-				SCU_FUN_PIN_NAND_FLBUSY | SCU_FUN_PIN_NAND_FLWP, 
-		AST_SCU_FUN_PIN_CTRL2); 
+	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) |
+				SCU_FUN_PIN_NAND_FLBUSY | SCU_FUN_PIN_NAND_FLWP,
+		AST_SCU_FUN_PIN_CTRL2);
 
 }
 
 extern void
 ast_scu_multi_func_nor(void)
 {
-	//Address 
+	//Address
 	//ROMA2~17
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL8) | 
+	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL8) |
 				SCU_FUN_PIN_ROMA2 | SCU_FUN_PIN_ROMA3 |
 				SCU_FUN_PIN_ROMA4 | SCU_FUN_PIN_ROMA5 |
 				SCU_FUN_PIN_ROMA6 | SCU_FUN_PIN_ROMA7 |
@@ -885,39 +889,39 @@ ast_scu_multi_func_nor(void)
 				SCU_FUN_PIN_ROMA10 | SCU_FUN_PIN_ROMA11 |
 				SCU_FUN_PIN_ROMA12 | SCU_FUN_PIN_ROMA13 |
 				SCU_FUN_PIN_ROMA14 | SCU_FUN_PIN_ROMA15 |
-				SCU_FUN_PIN_ROMA16 | SCU_FUN_PIN_ROMA17, 
+				SCU_FUN_PIN_ROMA16 | SCU_FUN_PIN_ROMA17,
 		AST_SCU_FUN_PIN_CTRL8);
 
 	//ROMA18~21
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL9) | 
+	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL9) |
 				SCU_FUN_PIN_ROMA18 | SCU_FUN_PIN_ROMA19 |
-				SCU_FUN_PIN_ROMA20 | SCU_FUN_PIN_ROMA21, 
-		AST_SCU_FUN_PIN_CTRL9);	
-	
+				SCU_FUN_PIN_ROMA20 | SCU_FUN_PIN_ROMA21,
+		AST_SCU_FUN_PIN_CTRL9);
+
 	//ROMA22,23
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL4) | SCU_FUN_PIN_ROMA22 | SCU_FUN_PIN_ROMA23, 
+	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL4) | SCU_FUN_PIN_ROMA22 | SCU_FUN_PIN_ROMA23,
 		AST_SCU_FUN_PIN_CTRL4);
-	
+
 	//ROMA24,25
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL3) | SCU_FUN_PIN_ROMA24 | SCU_FUN_PIN_ROMA25, 
+	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL3) | SCU_FUN_PIN_ROMA24 | SCU_FUN_PIN_ROMA25,
 		AST_SCU_FUN_PIN_CTRL3);
 
 	//SCU94 [1] = 0
- 	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL6) & SCU_VIDEO_OUT_MASK, 
+ 	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL6) & SCU_VIDEO_OUT_MASK,
 		AST_SCU_FUN_PIN_CTRL6);
 
-	
+
 	//data
 	//ROMD 4~7 //ROMWE#, OE#
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL4) | 
+	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL4) |
 			SCU_FUN_PIN_ROMOE | SCU_FUN_PIN_ROMWE |
 			SCU_FUN_PIN_ROMD4 | SCU_FUN_PIN_ROMD5 |
 			SCU_FUN_PIN_ROMD6 | SCU_FUN_PIN_ROMD7,
 			AST_SCU_FUN_PIN_CTRL4);
-	
+
 	//ROMD 8~15
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | 
-			SCU_FUC_PIN_ROM_16BIT, 
+	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
+			SCU_FUC_PIN_ROM_16BIT,
 		AST_SCU_FUN_PIN_CTRL5);
 
 }
@@ -925,44 +929,44 @@ ast_scu_multi_func_nor(void)
 extern void
 ast_scu_multi_func_romcs(u8 num)
 {
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL3) | 
-			SCU_FUN_PIN_ROMCS(num), 
+	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL3) |
+			SCU_FUN_PIN_ROMCS(num),
 		AST_SCU_FUN_PIN_CTRL3);
 }
 
 extern void
 ast_scu_multi_func_i2c(void)
 {
-	//TODO check ... //In AST2400 Due to share pin with SD , please not enable I2C 10 ~14 
+	//TODO check ... //In AST2400 Due to share pin with SD , please not enable I2C 10 ~14
 	// AST 2400 have 14 , AST 2300 9 ...
 #ifdef CONFIG_MMC_AST
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | 
-			SCU_FUC_PIN_I2C3 | 
-			SCU_FUC_PIN_I2C4 | 
-			SCU_FUC_PIN_I2C5 | 
-			SCU_FUC_PIN_I2C6 | 
-			SCU_FUC_PIN_I2C7 | 
-			SCU_FUC_PIN_I2C8 | 
-			SCU_FUC_PIN_I2C9, 
+	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
+			SCU_FUC_PIN_I2C3 |
+			SCU_FUC_PIN_I2C4 |
+			SCU_FUC_PIN_I2C5 |
+			SCU_FUC_PIN_I2C6 |
+			SCU_FUC_PIN_I2C7 |
+			SCU_FUC_PIN_I2C8 |
+			SCU_FUC_PIN_I2C9,
 		AST_SCU_FUN_PIN_CTRL5);
 #else
-	ast_scu_write((ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | 
-			SCU_FUC_PIN_I2C3 | 
-			SCU_FUC_PIN_I2C4 | 
-			SCU_FUC_PIN_I2C5 | 
-			SCU_FUC_PIN_I2C6 | 
-			SCU_FUC_PIN_I2C7 | 
-			SCU_FUC_PIN_I2C8 | 
-			SCU_FUC_PIN_I2C9 | 
-			SCU_FUC_PIN_I2C10 | 
-			SCU_FUC_PIN_I2C11 | 
-			SCU_FUC_PIN_I2C12 | 
-			SCU_FUC_PIN_I2C13 | 
+	ast_scu_write((ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
+			SCU_FUC_PIN_I2C3 |
+			SCU_FUC_PIN_I2C4 |
+			SCU_FUC_PIN_I2C5 |
+			SCU_FUC_PIN_I2C6 |
+			SCU_FUC_PIN_I2C7 |
+			SCU_FUC_PIN_I2C8 |
+			SCU_FUC_PIN_I2C9 |
+			SCU_FUC_PIN_I2C10 |
+			SCU_FUC_PIN_I2C11 |
+			SCU_FUC_PIN_I2C12 |
+			SCU_FUC_PIN_I2C13 |
 			SCU_FUC_PIN_I2C14) &
-			~(SCU_FUC_PIN_SD1 | SCU_FUC_PIN_SD2), 
+			~(SCU_FUC_PIN_SD1 | SCU_FUC_PIN_SD2),
 		AST_SCU_FUN_PIN_CTRL5);
 #endif
-}	
+}
 
 EXPORT_SYMBOL(ast_scu_multi_func_i2c);
 
@@ -972,7 +976,7 @@ ast_scu_multi_func_pwm_tacho(void)
 	//TODO check
 	u32 sts = ast_scu_read(AST_SCU_FUN_PIN_CTRL3) &~0xcfffff;
 	ast_scu_write(sts | 0xc000ff, AST_SCU_FUN_PIN_CTRL3);
-}	
+}
 
 EXPORT_SYMBOL(ast_scu_multi_func_pwm_tacho);
 
@@ -981,12 +985,12 @@ extern void
 ast_scu_multi_func_usb20_host_hub(u8 mode)
 {
 	if(mode)
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_USB20_HOST, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_USB20_HOST,
 					AST_SCU_FUN_PIN_CTRL5);
 	else
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_USB20_HOST, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_USB20_HOST,
 					AST_SCU_FUN_PIN_CTRL5);
-}	
+}
 
 EXPORT_SYMBOL(ast_scu_multi_func_usb20_host_hub);
 
@@ -995,12 +999,12 @@ extern void
 ast_scu_multi_func_usb11_host_port4(u8 mode)
 {
 	if(mode)
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_USB11_PORT4, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_USB11_PORT4,
 					AST_SCU_FUN_PIN_CTRL5);
 	else
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_USB11_PORT4, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_USB11_PORT4,
 					AST_SCU_FUN_PIN_CTRL5);
-}	
+}
 
 EXPORT_SYMBOL(ast_scu_multi_func_usb11_host_port4);
 
@@ -1009,26 +1013,26 @@ extern void
 ast_scu_multi_func_usb11_host_port2(u8 mode)
 {
 	if(mode)
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_USB11_PORT2, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_USB11_PORT2,
 					AST_SCU_FUN_PIN_CTRL5);
 	else
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_USB11_PORT2, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_USB11_PORT2,
 					AST_SCU_FUN_PIN_CTRL5);
-}	
+}
 
 EXPORT_SYMBOL(ast_scu_multi_func_usb11_host_port2);
 
-//0 : 1: SD1 function 
+//0 : 1: SD1 function
 extern void
 ast_scu_multi_func_sdhc_slot1(u8 mode)
 {
 	if(mode)
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_SD1, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_SD1,
 					AST_SCU_FUN_PIN_CTRL5);
 	else
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_SD1, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_SD1,
 					AST_SCU_FUN_PIN_CTRL5);
-}	
+}
 
 EXPORT_SYMBOL(ast_scu_multi_func_sdhc_slot1);
 
@@ -1036,13 +1040,13 @@ extern void
 ast_scu_multi_func_sdhc_slot2(u8 mode)
 {
 	if(mode)
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_SD2, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | SCU_FUC_PIN_SD2,
 					AST_SCU_FUN_PIN_CTRL5);
 	else
-		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_SD2, 
+		ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) & ~SCU_FUC_PIN_SD2,
 					AST_SCU_FUN_PIN_CTRL5);
 
-}	
+}
 
 EXPORT_SYMBOL(ast_scu_multi_func_sdhc_slot2);
 
@@ -1053,11 +1057,11 @@ ast_scu_multi_func_crt(void)
 
 	//Digital vodeo input function pins : 00 disable, 10 24bits mode 888,
 	ast_scu_write((ast_scu_read(AST_SCU_FUN_PIN_CTRL5) &
-			~SCU_FUC_PIN_DIGI_V_OUT_MASK) | 
+			~SCU_FUC_PIN_DIGI_V_OUT_MASK) |
 			SCU_FUC_PIN_DIGI_V_OUT(VIDEO_24BITS),AST_SCU_FUN_PIN_CTRL5);
 
 	//VPI input
-#if 0	
+#if 0
 	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) |
 			SCU_FUN_PIN_VPIB9 | SCU_FUN_PIN_VPIB8 |
 			SCU_FUN_PIN_VPIB7 | SCU_FUN_PIN_VPIB6 |
@@ -1070,11 +1074,11 @@ ast_scu_multi_func_crt(void)
 
 	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL3) |
 			SCU_FUN_PIN_VPIR9 | SCU_FUN_PIN_VPIR8 |
-			SCU_FUN_PIN_VPIR7 | SCU_FUN_PIN_VPIR6 |	
+			SCU_FUN_PIN_VPIR7 | SCU_FUN_PIN_VPIR6 |
 			SCU_FUN_PIN_VPIR5 | SCU_FUN_PIN_VPIR4 |
 			SCU_FUN_PIN_VPIR3 | SCU_FUN_PIN_VPIR2 |
 			SCU_FUN_PIN_VPIR1 | SCU_FUN_PIN_VPIR0 |
-			SCU_FUN_PIN_VPIG9 | SCU_FUN_PIN_VPIG8 |	
+			SCU_FUN_PIN_VPIG9 | SCU_FUN_PIN_VPIG8 |
 			SCU_FUN_PIN_VPIG7 | SCU_FUN_PIN_VPIG6 |
 			SCU_FUN_PIN_VPIG5 | SCU_FUN_PIN_VPIG4 |
 			SCU_FUN_PIN_VPIG3 | SCU_FUN_PIN_VPIG2 |
@@ -1097,9 +1101,9 @@ ast_scu_revision_id(void)
 		SCUMSG("UnKnow-SOC : %x \n",rev_id);
 	else
 		SCUMSG("SOC : %4s \n",soc_map_table[i].name);
-	
+
 	return rev_id;
-}	
+}
 
 EXPORT_SYMBOL(ast_scu_revision_id);
 

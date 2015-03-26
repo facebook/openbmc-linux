@@ -13,8 +13,8 @@
 	.macro	addruart, rx, tmp
 	mrc 	p15, 0, \rx, c1, c0
 	tst 	\rx, #1 								@ MMU enabled?
-	ldreq   \rx, =AST_UART3_BASE
-	ldrne	\rx, =IO_ADDRESS(AST_UART3_BASE)
+	ldreq   \rx, =AST_UART_BASE
+	ldrne	\rx, =IO_ADDRESS(AST_UART_BASE)
 	.endm
 	
 #define UART_SHIFT      2

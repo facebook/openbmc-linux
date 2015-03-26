@@ -25,5 +25,5 @@
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END       (PAGE_OFFSET + 0x20000000)
 #else
-#define VMALLOC_END                     0xf8000000UL
+#define VMALLOC_END       0xf8000000UL
 #endif
