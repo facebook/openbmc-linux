@@ -919,19 +919,13 @@ static void ftgmac100_phy_configure(struct net_device* dev)
 			}
 			break;
 		case PHYID_VENDOR_BROADCOM:
-			switch (priv->ids.miiPhyId) {
-				case PHYID_BCM54612E:
-				case PHYID_BCM54616S:
-					ftgmac100_write_phy_register(ioaddr, priv->ids.phyAddr, 0x1C, 0x8C00); // Disable GTXCLK Clock Delay Enable
-					ftgmac100_write_phy_register(ioaddr, priv->ids.phyAddr, 0x18, 0xF0E7); // Disable RGMII RXD to RXC Skew
-					break;			
-				case PHYID_BCM5221A4:
-				default:
-					tmp = ftgmac100_read_phy_register(ioaddr, priv->ids.phyAddr, 0x1b);
-					tmp |= 0x0004;
-					ftgmac100_write_phy_register(ioaddr, priv->ids.phyAddr, 0x1b, (u16) tmp);
-					break;
-				}
+			tmp = ftgmac100_read_phy_register(ioaddr, priv->ids.phyAddr, 0x1b);
+			tmp |= 0x0004;
+			ftgmac100_write_phy_register(ioaddr, priv->ids.phyAddr, 0x1b, (u16) tmp);
+			break;
+		case PHYID_VENDOR_BCM5461X:
+			ftgmac100_write_phy_register(ioaddr, priv->ids.phyAddr, 0x1C, 0x8C00); // Disable GTXCLK Clock Delay Enable
+			ftgmac100_write_phy_register(ioaddr, priv->ids.phyAddr, 0x18, 0xF0E7); // Disable RGMII RXD to RXC Skew
 			break;			
 		}
 }

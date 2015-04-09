@@ -464,6 +464,7 @@ typedef struct
 #define PHYID_REVISION_MASK             0x0000000f
 #define PHYID_VENDOR_MARVELL            0x01410c00
 #define PHYID_VENDOR_BROADCOM           0x00406000
+#define PHYID_VENDOR_BCM5461X           0x03625c00
 #define PHYID_VENDOR_REALTEK            0x001cc800
 
 #define PHYID_BCM5221A4                 0x004061e4
