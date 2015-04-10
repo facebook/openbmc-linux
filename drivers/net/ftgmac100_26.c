@@ -1710,8 +1710,7 @@ static int __init ast_gmac_probe(struct platform_device *pdev)
 	netdev->hard_start_xmit 	= ftgmac100_wait_to_send_packet;
 	netdev->tx_timeout 			= ftgmac100_timeout;
 	netdev->get_stats 			= ftgmac100_query_statistics;
-//#ifdef	HAVE_MULTICAST
-#if 0
+#ifdef	HAVE_MULTICAST
 	netdev->set_multicast_list 	= &ftgmac100_set_multicast_list;
 #endif
 
