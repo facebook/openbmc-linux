@@ -1064,7 +1064,7 @@ int i2c_transfer(struct i2c_adapter * adap, struct i2c_msg *msgs, int num)
 EXPORT_SYMBOL(i2c_transfer);
 
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
-int i2c_slave_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
+int i2c_slave_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	unsigned long orig_jiffies;
 	int ret, try;
@@ -1075,9 +1075,18 @@ int i2c_slave_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 			"len=%d\n", (msgs->flags & I2C_S_RD)
 			? 'R' : 'W', msgs->addr, msgs->len);
 #endif
-		i2c_lock_adapter(adap);
+    if (in_atomic() || irqs_disabled()) {
+      ret = mutex_trylock(&adap->bus_lock);
+      if (!ret)
+        /* I2C activity is ongoing. */
+        return -EAGAIN;
+    } else {
+      mutex_lock_nested(&adap->bus_lock, adap->level);
+    }
+
 		ret = adap->algo->slave_xfer(adap, msgs);
-		i2c_unlock_adapter(adap);
+
+    mutex_unlock(&adap->bus_lock);
 
 		return ret;
 	} else {

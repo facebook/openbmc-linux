@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
  * Copyright (C) 1998  Eddie C. Dost  (ecd@skynet.be)
- * Copyright (C) 2001,2002  Andi Kleen, SuSE Labs 
+ * Copyright (C) 2001,2002  Andi Kleen, SuSE Labs
  * Copyright (C) 2003       Pavel Machek (pavel@suse.cz)
  *
  * These routines maintain argument size conversion between 32bit and 64bit
@@ -125,7 +125,7 @@ static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 	mm_segment_t old_fs = get_fs();
 	int err;
 	unsigned long val;
-	
+
 	set_fs (KERNEL_DS);
 	err = sys_ioctl(fd, cmd, (unsigned long)&val);
 	set_fs (old_fs);
@@ -133,14 +133,14 @@ static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 		return -EFAULT;
 	return err;
 }
- 
+
 static int rw_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	mm_segment_t old_fs = get_fs();
 	u32 __user *argptr = compat_ptr(arg);
 	int err;
 	unsigned long val;
-	
+
 	if(get_user(val, argptr))
 		return -EFAULT;
 	set_fs (KERNEL_DS);
@@ -365,17 +365,17 @@ static int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
 			if (copy_in_user(ifr, ifr32, sizeof(struct ifreq32)))
 				return -EFAULT;
 			ifr++;
-			ifr32++; 
+			ifr32++;
 		}
 	}
 	if (copy_to_user(uifc, &ifc, sizeof(struct ifconf)))
 		return -EFAULT;
 
-	err = sys_ioctl (fd, SIOCGIFCONF, (unsigned long)uifc);	
+	err = sys_ioctl (fd, SIOCGIFCONF, (unsigned long)uifc);
 	if (err)
 		return err;
 
-	if (copy_from_user(&ifc, uifc, sizeof(struct ifconf))) 
+	if (copy_from_user(&ifc, uifc, sizeof(struct ifconf)))
 		return -EFAULT;
 
 	ifr = ifc.ifc_req;
@@ -411,7 +411,7 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	struct ifreq32 __user *ifr32;
 	u32 data;
 	void __user *datap;
-	
+
 	ifr = compat_alloc_user_space(sizeof(*ifr));
 	ifr32 = compat_ptr(arg);
 
@@ -507,7 +507,7 @@ static int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long arg)
 	struct ifmap32 __user *uifmap32;
 	mm_segment_t old_fs;
 	int err;
-	
+
 	uifr32 = compat_ptr(arg);
 	uifmap32 = &uifr32->ifr_ifru.ifru_map;
 	switch (cmd) {
@@ -610,7 +610,7 @@ static int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	char devname[16];
 	u32 rtdev;
 	mm_segment_t old_fs = get_fs();
-	
+
 	struct socket *mysock = sockfd_lookup(fd, &ret);
 
 	if (mysock && mysock->sk && mysock->sk->sk_family == AF_INET6) { /* ipv6 */
@@ -624,7 +624,7 @@ static int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		ret |= __get_user (r6.rtmsg_info, &(ur6->rtmsg_info));
 		ret |= __get_user (r6.rtmsg_flags, &(ur6->rtmsg_flags));
 		ret |= __get_user (r6.rtmsg_ifindex, &(ur6->rtmsg_ifindex));
-		
+
 		r = (void *) &r6;
 	} else { /* ipv4 */
 		struct rtentry32 __user *ur4 = compat_ptr(arg);
@@ -1046,14 +1046,14 @@ static int vt_check(struct file *file)
 	struct tty_struct *tty;
 	struct inode *inode = file->f_path.dentry->d_inode;
 	struct vc_data *vc;
-	
+
 	if (file->f_op->unlocked_ioctl != tty_ioctl)
 		return -EINVAL;
-	                
+
 	tty = (struct tty_struct *)file->private_data;
 	if (tty_paranoia_check(tty, inode, "tty_ioctl"))
 		return -EINVAL;
-	                                                
+
 	if (tty->ops->ioctl != vt_ioctl)
 		return -EINVAL;
 
@@ -1067,7 +1067,7 @@ static int vt_check(struct file *file)
 	 */
 	if (current->signal->tty == tty || capable(CAP_SYS_TTY_CONFIG))
 		return 1;
-	return 0;                                                    
+	return 0;
 }
 
 struct consolefontdesc32 {
@@ -1085,7 +1085,7 @@ static int do_fontx_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg, 
 
 	perm = vt_check(file);
 	if (perm < 0) return perm;
-	
+
 	switch (cmd) {
 	case PIO_FONTX:
 		if (!perm)
@@ -1130,16 +1130,16 @@ struct console_font_op32 {
 	compat_uint_t charcount;
 	compat_caddr_t data;    /* font data with height fixed to 32 */
 };
-                                        
+
 static int do_kdfontop_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file)
 {
 	struct console_font_op op;
 	struct console_font_op32 __user *fontop = compat_ptr(arg);
 	int perm = vt_check(file), i;
 	struct vc_data *vc;
-	
+
 	if (perm < 0) return perm;
-	
+
 	if (copy_from_user(&op, fontop, sizeof(struct console_font_op32)))
 		return -EFAULT;
 	if (!perm && op.op != KD_FONT_OP_GET)
@@ -1303,7 +1303,7 @@ static int do_atmif_sioc(unsigned int fd, unsigned int cmd, unsigned long arg)
 	u32 data;
 	void __user *datap;
 	int err;
-        
+
 	sioc = compat_alloc_user_space(sizeof(*sioc));
 	sioc32 = compat_ptr(arg);
 
@@ -1328,7 +1328,7 @@ static int do_atm_ioctl(unsigned int fd, unsigned int cmd32, unsigned long arg)
 {
         int i;
         unsigned int cmd = 0;
-        
+
 	switch (cmd32) {
 	case SONET_GETSTAT:
 	case SONET_GETSTATZ:
@@ -1349,11 +1349,11 @@ static int do_atm_ioctl(unsigned int fd, unsigned int cmd32, unsigned long arg)
 	}
 	if (i == NR_ATM_IOCTL)
 	        return -EINVAL;
-        
+
         switch (cmd) {
 	case ATM_GETNAMES:
 		return do_atm_iobuf(fd, cmd, arg);
-	    
+
 	case ATM_GETLINKRATE:
         case ATM_GETTYPE:
         case ATM_GETESI:
@@ -1444,7 +1444,7 @@ static int mtd_rw_oob(unsigned int fd, unsigned int cmd, unsigned long arg)
 	}
 
 	return err;
-}	
+}
 
 #ifdef CONFIG_BLOCK
 struct raw32_config_request
@@ -1798,7 +1798,7 @@ static int rtc_ioctl(unsigned fd, unsigned cmd, unsigned long arg)
 		val32 = kval;
 		return put_user(val32, (unsigned int __user *)arg);
 	case RTC_IRQP_SET32:
-		return sys_ioctl(fd, RTC_IRQP_SET, arg); 
+		return sys_ioctl(fd, RTC_IRQP_SET, arg);
 	case RTC_EPOCH_SET32:
 		return sys_ioctl(fd, RTC_EPOCH_SET, arg);
 	default:
@@ -2678,6 +2678,7 @@ COMPATIBLE_IOCTL(USBDEVFS_IOCTL32)
 /* i2c */
 HANDLE_IOCTL(I2C_FUNCS, w_long)
 HANDLE_IOCTL(I2C_RDWR, do_i2c_rdwr_ioctl)
+HANDLE_IOCTL(I2C_SLAVE_RDWR, do_i2c_rdwr_ioctl)
 HANDLE_IOCTL(I2C_SMBUS, do_i2c_smbus_ioctl)
 /* bridge */
 HANDLE_IOCTL(SIOCSIFBR, old_bridge_ioctl)
