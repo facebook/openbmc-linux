@@ -1412,6 +1412,8 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 		default:
 			if(sts)
 				printk("GR %x : No one care : %x, bus_id %d\n",i2c_dev->ast_i2c_data->reg_gr, sts, i2c_dev->bus_id);
+      //TODO: Clearing this interrupt for now, but needs to cleanup this ISR function
+			ast_i2c_write(i2c_dev, sts, I2C_INTR_STS_REG);
 			return IRQ_NONE;
 	}
 
