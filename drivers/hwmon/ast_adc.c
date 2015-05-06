@@ -13,10 +13,10 @@
  *    2012.11.26: Initial version [Ryan Chen]
  */
 
-/* attr ADC sysfs 0~max adc channel 
+/* attr ADC sysfs 0~max adc channel
 *	 0 - show/store enable
 *	 3 - show value
-*	 1 - show/store alarm_en set enable 
+*	 1 - show/store alarm_en set enable
 *	 2 - show alarm   get statuse
 *	 4 - show/store upper
 *	 5 - show/store lower  */
@@ -44,13 +44,33 @@
 
 #define REST_DESIGN		5
 
+
+#ifdef CONFIG_YOSEMITE
+enum {
+  ADC_P5V = 0,
+  ADC_P12V,
+  ADC_P3V3_STBY,
+  ADC_P12V_SLOT0,
+  ADC_P12V_SLOT1,
+  ADC_P12V_SLOT2,
+  ADC_P12V_SLOT3,
+  ADC_P3V3,
+};
+
+enum {
+  REST_DESIGN_P3V3 = 6,
+  REST_DESIGN_P5V = 7,
+  REST_DESIGN_P12V = 8,
+};
+#endif // CONFIG_YOSEMITE
+
 struct adc_vcc_ref_data {
 	int v2;
 	int r1;
-	int r2;	
+	int r2;
 };
 
-static struct adc_vcc_ref_data adc_vcc_ref[6] = {
+static struct adc_vcc_ref_data adc_vcc_ref[9] = {
 	[0] = {
 		.v2 = 0,
 		.r1 = 5600,
@@ -81,6 +101,24 @@ static struct adc_vcc_ref_data adc_vcc_ref[6] = {
 		.r1 = 1000,
 		.r2 = 1000,
 	},
+  // P3V3
+	[6] = {
+		.v2 = 0,
+		.r1 = 5110,
+		.r2 = 8250,
+	},
+  // P5V
+	[7] = {
+		.v2 = 0,
+		.r1 = 5110,
+		.r2 = 3480,
+	},
+  // P12V
+	[8] = {
+		.v2 = 0,
+		.r1 = 5110,
+		.r2 = 1020,
+	},
 };
 
 /* Divisors for voltage sense;  right now adc5 & adc6 divide by 2 */
@@ -93,7 +131,7 @@ static int adc_divisor[] = { 1, 1, 1, 1,
 struct ast_adc_data {
 	struct device			*hwmon_dev;
 	void __iomem			*reg_base;			/* virtual */
-	int 					irq;				//ADC IRQ number 
+	int 					irq;				//ADC IRQ number
 	int						compen_value;		//Compensating value
 };
 
@@ -123,14 +161,14 @@ static void ast_adc_ctrl_init(void)
 	ast_adc_write(ast_adc, AST_ADC_CTRL_COMPEN | AST_ADC_CTRL_NORMAL | AST_ADC_CTRL_EN, AST_ADC_CTRL);
 
 	//Set wait a sensing cycle t (s) = 1000 * 12 * (1/PCLK) * 2 * (ADC0c[31:17] + 1) * (ADC0c[9:0] +1)
-	//ex : pclk = 48Mhz , ADC0c[31:17] = 0,  ADC0c[9:0] = 0x40 : 64,  ADC0c[31:17] = 0x3e7 : 999 
+	//ex : pclk = 48Mhz , ADC0c[31:17] = 0,  ADC0c[9:0] = 0x40 : 64,  ADC0c[31:17] = 0x3e7 : 999
 	// --> 0.0325s	= 12 * 2 * (0x3e7 + 1) *(64+1) / 48000000
-	// --> 0.0005s	= 12 * 2 * (0x3e7 + 1) / 48000000	
-	
+	// --> 0.0005s	= 12 * 2 * (0x3e7 + 1) / 48000000
+
 	pclk = ast_get_pclk();
 
 #if defined(CONFIG_ARCH_AST2300)
-	ast_adc_write(ast_adc, 0x3e7, AST_ADC_CLK); 
+	ast_adc_write(ast_adc, 0x3e7, AST_ADC_CLK);
 
 	ast_adc_write(ast_adc, AST_ADC_CTRL_CH12_EN | AST_ADC_CTRL_COMPEN_CLR| ast_adc_read(ast_adc, AST_ADC_CTRL), AST_ADC_CTRL);
 
@@ -141,16 +179,16 @@ static void ast_adc_ctrl_init(void)
 		ast_adc->compen_value = 0x200 - (ast_adc_read(ast_adc, AST_ADC_CH12_13) & AST_ADC_L_CH_MASK);
 	else
 		ast_adc->compen_value = 0 - (ast_adc_read(ast_adc, AST_ADC_CH12_13) & AST_ADC_L_CH_MASK);
-	
+
 	printk("compensating value %d \n",ast_adc->compen_value);
-	
+
 #elif defined(CONFIG_ARCH_AST2400)
 
 	//For AST2400 A0 workaround  ... ADC0c = 1 ;
 //	ast_adc_write(ast_adc, 1, AST_ADC_CLK);
 //	ast_adc_write(ast_adc, (0x3e7<< 17) | 0x40, AST_ADC_CLK);
 	ast_adc_write(ast_adc, 0x40, AST_ADC_CLK);
-	
+
 	ast_adc_write(ast_adc, AST_ADC_CTRL_CH0_EN | AST_ADC_CTRL_COMPEN | AST_ADC_CTRL_NORMAL | AST_ADC_CTRL_EN, AST_ADC_CTRL);
 
 	ast_adc_read(ast_adc, AST_ADC_CTRL);
@@ -162,12 +200,12 @@ static void ast_adc_ctrl_init(void)
 	printk("compensating value %d \n",ast_adc->compen_value);
 
 #elif defined(CONFIG_ARCH_AST2500)
-//	TODO ... 
-//	scu read trim 
+//	TODO ...
+//	scu read trim
 //	write trim 0xc4 [3:0]
-	
+
 	ast_adc_write(ast_adc, 0x40, AST_ADC_CLK);
-	
+
 	ast_adc_write(ast_adc, AST_ADC_CTRL_NORMAL | AST_ADC_CTRL_EN, AST_ADC_CTRL);
 
     while(!ast_adc_read(ast_adc, AST_ADC_CTRL) & 0x100);
@@ -175,17 +213,17 @@ static void ast_adc_ctrl_init(void)
 	ast_adc_write(ast_adc, AST_ADC_CTRL_COMPEN  | AST_ADC_CTRL_NORMAL | AST_ADC_CTRL_EN, AST_ADC_CTRL);
 
 	while(ast_adc_read(ast_adc, AST_ADC_CTRL) & AST_ADC_CTRL_COMPEN);
-	
+
 	//compensating value = 0x200 - ADC10[9:0]
 	ast_adc->compen_value = 0x200 - ((ast_adc_read(ast_adc, AST_ADC_TRIM) >> 16) & 0x3ff);
 	printk("compensating value %d \n",ast_adc->compen_value);
-	
+
 #else
 #err "No define for ADC "
 #endif
 
 	ast_adc_write(ast_adc, AST_ADC_CTRL_NORMAL | AST_ADC_CTRL_EN, AST_ADC_CTRL);
-	
+
 }
 
 static u16
@@ -203,9 +241,9 @@ ast_get_adc_hyster_lower(struct ast_adc_data *ast_adc, u8 adc_ch)
 static void
 ast_set_adc_hyster_lower(struct ast_adc_data *ast_adc, u8 adc_ch, u16 value)
 {
-	ast_adc_write(ast_adc, 
+	ast_adc_write(ast_adc,
 			(ast_adc_read(ast_adc, AST_ADC_HYSTER0 + (adc_ch *4)) & ~AST_ADC_L_BOUND) |
-			value, 
+			value,
 			AST_ADC_HYSTER0 + (adc_ch *4));
 
 }
@@ -224,9 +262,9 @@ ast_get_adc_hyster_upper(struct ast_adc_data *ast_adc, u8 adc_ch)
 static void
 ast_set_adc_hyster_upper(struct ast_adc_data *ast_adc, u8 adc_ch, u32 value)
 {
-	ast_adc_write(ast_adc, 
+	ast_adc_write(ast_adc,
 			(ast_adc_read(ast_adc, AST_ADC_HYSTER0 + (adc_ch *4)) & ~AST_ADC_H_BOUND) |
-			(value << 16), 
+			(value << 16),
 			AST_ADC_HYSTER0 + (adc_ch *4));
 
 }
@@ -244,7 +282,7 @@ ast_get_adc_hyster_en(struct ast_adc_data *ast_adc, u8 adc_ch)
 static void
 ast_set_adc_hyster_en(struct ast_adc_data *ast_adc, u8 adc_ch, u8 enable)
 {
-	//tacho source 
+	//tacho source
 	if(enable == 1)
 		ast_adc_write(ast_adc,
 			ast_adc_read(ast_adc, AST_ADC_HYSTER0 + (adc_ch *4)) | AST_ADC_HYSTER_EN,
@@ -270,9 +308,9 @@ ast_get_adc_lower(struct ast_adc_data *ast_adc, u8 adc_ch)
 static void
 ast_set_adc_lower(struct ast_adc_data *ast_adc, u8 adc_ch, u16 value)
 {
-	ast_adc_write(ast_adc, 
+	ast_adc_write(ast_adc,
 			(ast_adc_read(ast_adc, AST_ADC_BOUND0 + (adc_ch *4)) & ~AST_ADC_L_BOUND) |
-			value, 
+			value,
 			AST_ADC_BOUND0 + (adc_ch *4));
 
 }
@@ -293,9 +331,9 @@ ast_get_adc_upper(struct ast_adc_data *ast_adc, u8 adc_ch)
 static void
 ast_set_adc_upper(struct ast_adc_data *ast_adc, u8 adc_ch, u32 value)
 {
-	ast_adc_write(ast_adc, 
+	ast_adc_write(ast_adc,
 			(ast_adc_read(ast_adc, AST_ADC_BOUND0 + (adc_ch *4)) & ~AST_ADC_H_BOUND) |
-			(value << 16), 
+			(value << 16),
 			AST_ADC_BOUND0 + (adc_ch *4));
 
 }
@@ -304,7 +342,7 @@ ast_set_adc_upper(struct ast_adc_data *ast_adc, u8 adc_ch, u32 value)
 static u8
 ast_get_adc_alarm(struct ast_adc_data *ast_adc, u8 adc_ch)
 {
-	//adc ch source 
+	//adc ch source
 	if(ast_adc_read(ast_adc, AST_ADC_IER) & (0x1 << adc_ch))
 		return 1;
 	else
@@ -322,61 +360,61 @@ ast_get_adc_value(struct ast_adc_data *ast_adc, u8 adc_ch)
 			break;
 		case 1:
 			tmp = (ast_adc_read(ast_adc, AST_ADC_CH0_1) & AST_ADC_H_CH_MASK) >> 16;
-			break;	
+			break;
 		case 2:
 			tmp = ast_adc_read(ast_adc, AST_ADC_CH2_3) & AST_ADC_L_CH_MASK;
 			break;
 		case 3:
 			tmp = (ast_adc_read(ast_adc, AST_ADC_CH2_3) & AST_ADC_H_CH_MASK) >> 16;
-			break;	
+			break;
 		case 4:
 			tmp = ast_adc_read(ast_adc, AST_ADC_CH4_5) & AST_ADC_L_CH_MASK;
 			break;
 		case 5:
 			tmp = (ast_adc_read(ast_adc, AST_ADC_CH4_5) & AST_ADC_H_CH_MASK) >> 16;
-			break;	
+			break;
 		case 6:
 			tmp = ast_adc_read(ast_adc, AST_ADC_CH6_7) & AST_ADC_L_CH_MASK;
 			break;
 		case 7:
 			tmp = (ast_adc_read(ast_adc, AST_ADC_CH6_7) & AST_ADC_H_CH_MASK) >> 16;
-			break;	
+			break;
 		case 8:
 			tmp = ast_adc_read(ast_adc, AST_ADC_CH8_9) & AST_ADC_L_CH_MASK;
 			break;
 		case 9:
 			tmp = (ast_adc_read(ast_adc, AST_ADC_CH8_9) & AST_ADC_H_CH_MASK) >> 16;
-			break;	
+			break;
 		case 10:
 			tmp = ast_adc_read(ast_adc, AST_ADC_CH10_11) & AST_ADC_L_CH_MASK;
 			break;
 		case 11:
 			tmp = (ast_adc_read(ast_adc, AST_ADC_CH10_11) & AST_ADC_H_CH_MASK) >> 16;
-			break;	
+			break;
 		case 12:
 			tmp = ast_adc_read(ast_adc, AST_ADC_CH12_13) & AST_ADC_L_CH_MASK;
 			break;
 		case 13:
 			tmp = (ast_adc_read(ast_adc, AST_ADC_CH12_13) & AST_ADC_H_CH_MASK) >> 16;
-			break;	
+			break;
 		case 14:
 			tmp = ast_adc_read(ast_adc, AST_ADC_CH14_15) & AST_ADC_L_CH_MASK;
 			break;
 		case 15:
 			tmp = (ast_adc_read(ast_adc, AST_ADC_CH14_15) & AST_ADC_H_CH_MASK) >> 16;
-			break;	
+			break;
 
 	}
 
 	tmp += ast_adc->compen_value;
 
 //	printk("voltage = %d \n",tmp);
-	
+
 	return tmp;
 
 }
 
-static u8 
+static u8
 ast_get_adc_en(struct ast_adc_data *ast_adc, u8 adc_ch)
 {
     u8 tmp=0;
@@ -390,7 +428,7 @@ ast_get_adc_en(struct ast_adc_data *ast_adc, u8 adc_ch)
 
 }
 
-static void 
+static void
 ast_set_adc_en(struct ast_adc_data *ast_adc, u8 adc_ch, u8 enable)
 {
 	if(enable)
@@ -401,7 +439,7 @@ ast_set_adc_en(struct ast_adc_data *ast_adc, u8 adc_ch, u8 enable)
 
 
 /* NAME sysfs */
-static ssize_t 
+static ssize_t
 show_name(struct device *dev, struct device_attribute *devattr,
                          char *buf)
 {
@@ -416,38 +454,63 @@ static const struct attribute_group name_attribute_groups = {
 	.attrs = name_attributes,
 };
 
-/* attr ADC sysfs 0~max adc channel 
+/* attr ADC sysfs 0~max adc channel
 *	 0 - show/store channel enable
-*	 1 - show value 
+*	 1 - show value
 *	 2 - show alarm   get statuse
 *	 3 - show/store upper
-*	 4 - show/store lower 
-*	 5 - show/store hystersis enable  
-*	 6 - show/store hystersis upper  
-*	 7 - show/store hystersis low  
+*	 4 - show/store lower
+*	 5 - show/store hystersis enable
+*	 6 - show/store hystersis upper
+*	 7 - show/store hystersis low
 */
 
-static u32 
+static u32
 ast_get_voltage(int idx) {
+  u8 rest_design = REST_DESIGN;
   u16 tmp;
   u32 voltage, tmp1, tmp2, tmp3;
   tmp = ast_get_adc_value(ast_adc, idx);
+
+#ifdef CONFIG_YOSEMITE
+  switch (idx) {
+  case ADC_P3V3:
+  case ADC_P3V3_STBY:
+    rest_design = REST_DESIGN_P3V3;
+    break;
+  case ADC_P5V:
+    rest_design = REST_DESIGN_P5V;
+    break;
+  case ADC_P12V:
+  case ADC_P12V_SLOT0:
+  case ADC_P12V_SLOT1:
+  case ADC_P12V_SLOT2:
+  case ADC_P12V_SLOT3:
+    rest_design = REST_DESIGN_P12V;
+    break;
+  default:
+    rest_design = REST_DESIGN;
+  }
+#endif // CONFIG_YOSEMITE
+
   // Voltage Sense Method
-  tmp1 = (adc_vcc_ref[REST_DESIGN].r1 + adc_vcc_ref[REST_DESIGN].r2) * tmp * 25 * 10;
-  tmp2 = adc_vcc_ref[REST_DESIGN].r2 * 1024 ;
-  tmp3 = (adc_vcc_ref[REST_DESIGN].r1 * adc_vcc_ref[REST_DESIGN].v2) / adc_vcc_ref[REST_DESIGN].r2;
+  tmp1 = (adc_vcc_ref[rest_design].r1 + adc_vcc_ref[rest_design].r2) * tmp * 25 * 10;
+  tmp2 = adc_vcc_ref[rest_design].r2 * 1024 ;
+  tmp3 = (adc_vcc_ref[rest_design].r1 * adc_vcc_ref[rest_design].v2) / adc_vcc_ref[rest_design].r2;
   // printk("tmp3 = %d \n",tmp3);
   voltage = (tmp1/tmp2) - tmp3;
 
+#ifndef CONFIG_YOSEMITE
   // Higher voltage inputs require a divisor
 
   if (adc_divisor[idx])
 	voltage /= adc_divisor[idx];
+#endif //CONFIG_YOSEMITE
 
   return voltage;
 }
 
-static ssize_t 
+static ssize_t
 ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 {
 	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
@@ -455,7 +518,7 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 
 	//sensor_attr->index : pwm_ch#
 	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
+	switch(sensor_attr->nr)
 	{
 		case 0: //channel enable, disable
 			return sprintf(sysfsbuf, "%d : %s\n", ast_get_adc_en(ast_adc,sensor_attr->index),ast_get_adc_en(ast_adc,sensor_attr->index) ? "Enable":"Disable");
@@ -466,23 +529,23 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 			break;
 		case 2: //alarm
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_alarm(ast_adc,sensor_attr->index));
-			break;			
+			break;
 		case 3: //upper
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_upper(ast_adc,sensor_attr->index));
-			break;			
+			break;
 		case 4: //lower
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_lower(ast_adc,sensor_attr->index));
-			break;			
-		case 5: //hystersis enable 
+			break;
+		case 5: //hystersis enable
 			return sprintf(sysfsbuf, "%d : %s\n", ast_get_adc_hyster_en(ast_adc,sensor_attr->index),ast_get_adc_hyster_en(ast_adc,sensor_attr->index) ? "Enable":"Disable");
-			break;			
+			break;
 		case 6: //hystersis upper
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_hyster_upper(ast_adc,sensor_attr->index));
-			break;			
+			break;
 		case 7: //hystersis lower
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_hyster_lower(ast_adc,sensor_attr->index));
-			break;			
-		case 8: 
+			break;
+		case 8:
 			voltage = ast_get_voltage(sensor_attr->index);
 			return sprintf(sysfsbuf, "%d\n",voltage * 10);
 
@@ -492,7 +555,7 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 	}
 }
 
-static ssize_t 
+static ssize_t
 ast_store_adc(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
 {
 	u32 input_val;
@@ -503,16 +566,16 @@ ast_store_adc(struct device *dev, struct device_attribute *attr, const char *sys
 
 	//sensor_attr->index : pwm_ch#
 	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
+	switch(sensor_attr->nr)
 	{
 		case 0: //enable, disable
 			ast_set_adc_en(ast_adc, sensor_attr->index, input_val);
 			break;
 		case 1: //value
-			
+
 			break;
 		case 2: //alarm
-			break;			
+			break;
 		case 3:
 			ast_set_adc_upper(ast_adc, sensor_attr->index, input_val);
 			break;
@@ -521,14 +584,14 @@ ast_store_adc(struct device *dev, struct device_attribute *attr, const char *sys
 			break;
 		case 5: //hystersis
 			ast_set_adc_hyster_en(ast_adc, sensor_attr->index, input_val);
-			break;			
+			break;
 		case 6:
 			ast_set_adc_hyster_upper(ast_adc, sensor_attr->index, input_val);
 			break;
 		case 7:
 			ast_set_adc_hyster_lower(ast_adc, sensor_attr->index, input_val);
 			break;
-			
+
 		default:
 			return -EINVAL;
 			break;
@@ -537,15 +600,15 @@ ast_store_adc(struct device *dev, struct device_attribute *attr, const char *sys
 	return count;
 }
 
-/* attr ADC sysfs 0~max adc channel 
+/* attr ADC sysfs 0~max adc channel
 *	 0 - show/store channel enable
-*	 1 - show value 
+*	 1 - show value
 *	 2 - show alarm   get statuse
 *	 3 - show/store upper
-*	 4 - show/store lower 
-*	 5 - show/store hystersis enable  
-*	 6 - show/store hystersis upper  
-*	 7 - show/store hystersis low  
+*	 4 - show/store lower
+*	 5 - show/store hystersis enable
+*	 6 - show/store hystersis upper
+*	 7 - show/store hystersis low
 *	 8 - show value as 1000s, expected by lm-sensors
 */
 
@@ -624,18 +687,18 @@ static const struct attribute_group adc_attribute_groups[] = {
 	{ .attrs = adc7_attributes },
 	{ .attrs = adc8_attributes },
 	{ .attrs = adc9_attributes },
-	{ .attrs = adc10_attributes },	
+	{ .attrs = adc10_attributes },
 	{ .attrs = adc11_attributes },
 #if defined(CONFIG_ARCH_AST2400) || defined(CONFIG_ARCH_AST2500)
 	{ .attrs = adc12_attributes },
 	{ .attrs = adc13_attributes },
 	{ .attrs = adc14_attributes },
 	{ .attrs = adc15_attributes },
-#endif	
+#endif
 };
 
 
-static int 
+static int
 ast_adc_probe(struct platform_device *pdev)
 {
 	struct resource *res;
@@ -695,7 +758,7 @@ ast_adc_probe(struct platform_device *pdev)
 	}
 
 	ast_adc_ctrl_init();
-	
+
 	printk(KERN_INFO "ast_adc: driver successfully loaded.\n");
 
 	return 0;
@@ -714,7 +777,7 @@ out:
 	return ret;
 }
 
-static int 
+static int
 ast_adc_remove(struct platform_device *pdev)
 {
 	int i=0;
@@ -739,14 +802,14 @@ ast_adc_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
-static int 
+static int
 ast_adc_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	printk("ast_adc_suspend : TODO \n");
 	return 0;
 }
 
-static int 
+static int
 ast_adc_resume(struct platform_device *pdev)
 {
 	ast_adc_ctrl_init();
@@ -769,13 +832,13 @@ static struct platform_driver ast_adc_driver = {
     },
 };
 
-static int __init 
+static int __init
 ast_adc_init(void)
 {
 	return platform_driver_register(&ast_adc_driver);
 }
 
-static void __exit 
+static void __exit
 ast_adc_exit(void)
 {
 	platform_driver_unregister(&ast_adc_driver);
