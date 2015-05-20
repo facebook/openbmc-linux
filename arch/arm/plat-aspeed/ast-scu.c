@@ -827,7 +827,7 @@ ast_scu_multi_func_eth(u8 num)
 {
 	switch(num) {
 		case 0:
-			if(ast_scu_read(AST_SCU_HW_STRAP1) && SCU_HW_STRAP_MAC0_RGMII) {
+			if(ast_scu_read(AST_SCU_HW_STRAP1) & SCU_HW_STRAP_MAC0_RGMII) {
 				SCUMSG("MAC0 : RGMII \n");
 				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
 							SCU_FUN_PIN_MAC0_PHY_LINK,
@@ -846,7 +846,7 @@ ast_scu_multi_func_eth(u8 num)
 
 			break;
 		case 1:
-			if(ast_scu_read(AST_SCU_HW_STRAP1) && SCU_HW_STRAP_MAC1_RGMII) {
+			if(ast_scu_read(AST_SCU_HW_STRAP1) & SCU_HW_STRAP_MAC1_RGMII) {
 				SCUMSG("MAC1 : RGMII \n");
 				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
 							SCU_FUN_PIN_MAC1_PHY_LINK,

@@ -7,11 +7,11 @@
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by the Free Software Foundation;
 * either version 2 of the License, or (at your option) any later version.
-* 
+*
 * This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
 * without even the implied warranty of MERCHANTABILITY or
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-* 
+*
 * You should have received a copy of the GNU General Public License
 * along with this program; if not, write to the Free Software
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
@@ -37,7 +37,7 @@
 #if defined(CONFIG_ASPEEDMAC) || defined(CONFIG_ASPEEDMAC_MODULE)
 #ifdef AST_MAC0_BASE
 static struct ftgmac100_eth_data ast_eth0_data = {
-	.dev_addr = { 0x00, 0x84, 0x14, 0xA0, 0xB0, 0x22},		
+	.dev_addr = { 0x00, 0x84, 0x14, 0xA0, 0xB0, 0x22},
 	.phy_id = 1,
 };
 
@@ -69,7 +69,7 @@ static struct platform_device ast_eth0_device = {
 #endif
 #ifdef AST_MAC1_BASE
 static struct ftgmac100_eth_data ast_eth1_data = {
-	.dev_addr = { 0x00, 0x84, 0x14, 0xA0, 0xB0, 0x23},		
+	.dev_addr = { 0x00, 0x84, 0x14, 0xA0, 0xB0, 0x23},
 	.phy_id = 1,
 };
 
@@ -131,7 +131,7 @@ void __init ast_add_device_gmac(void)
 	}
 
 	ast_eth0_data.DF_support = !isRevA0;
-	
+
 	// Wedge/6-Pack hardware attaches to MAC1;  there's nothing on
 	// MAC0.  Older drivers would drop interfaces without PHYs, but
 	// the latest open source drivers do not, so we drop the first
@@ -139,8 +139,8 @@ void __init ast_add_device_gmac(void)
 #ifndef CONFIG_WEDGE
 	ast_scu_init_eth(0);
 	ast_scu_multi_func_eth(0);
-	
-	
+
+
 	/*
 	* D[15:11] in 0x1E6E2040 is NCSI scratch from U-Boot. D[15:14] = MAC1, D[13:12] = MAC2
 	* The meanings of the 2 bits are:
@@ -149,7 +149,7 @@ void __init ast_add_device_gmac(void)
 	* 10(2): ASPEED's MAC is connected to NC-SI PHY chip directly
 	* 11: Reserved
 	*/
-	
+
 	phy_mode = ast_scu_get_phy_config(0);
 	switch(phy_mode) {
 		case 0:
@@ -157,12 +157,12 @@ void __init ast_add_device_gmac(void)
 			ast_eth0_data.NCSI_support = 0;
 			break;
 		case 1:
-			ast_eth0_data.NCSI_support = 1;
-			break;
-		case 2:
 			ast_eth0_data.INTEL_NCSI_EVA_support = 1;
 			break;
-			
+		case 2:
+			ast_eth0_data.NCSI_support = 1;
+			break;
+
 	}
 
 	phy_inter = ast_scu_get_phy_interface(0);
@@ -170,13 +170,13 @@ void __init ast_add_device_gmac(void)
 	// We assume the Clock Stop register does not disable the MAC1 or MAC2 clock
 	// unless Reset Control also holds the MAC in reset.
 
-	
+
 	platform_device_register(&ast_eth0_device);
 #endif
 
 #ifdef AST_MAC1_BASE
 	ast_scu_init_eth(1);
-	ast_scu_multi_func_eth(1);	
+	ast_scu_multi_func_eth(1);
 
 	ast_eth1_data.DF_support = !isRevA0;
 
@@ -192,7 +192,7 @@ void __init ast_add_device_gmac(void)
 		case 2:
 			ast_eth1_data.INTEL_NCSI_EVA_support = 1;
 			break;
-			
+
 	}
 	phy_inter = ast_scu_get_phy_interface(1);
 

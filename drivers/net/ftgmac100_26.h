@@ -1,16 +1,16 @@
 /********************************************************************************
 * File Name     : ftgmac100_26.h
-* 
+*
 * Copyright (C) 2012-2020  ASPEED Technology Inc.
-* This program is free software; you can redistribute it and/or modify 
-* it under the terms of the GNU General Public License as published by the Free Software Foundation; 
-* either version 2 of the License, or (at your option) any later version. 
-* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY; 
-* without even the implied warranty of MERCHANTABILITY or 
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
-* You should have received a copy of the GNU General Public License 
-* along with this program; if not, write to the Free Software 
-* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by the Free Software Foundation;
+* either version 2 of the License, or (at your option) any later version.
+* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
+* without even the implied warranty of MERCHANTABILITY or
+* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ********************************************************************************/
 // --------------------------------------------------------------------
 
@@ -78,7 +78,7 @@
 
 
 // --------------------------------------------------------------------
-//	APTC_REG 
+//	APTC_REG
 // --------------------------------------------------------------------
 
 
@@ -99,18 +99,18 @@ typedef struct
 #define PHY_READ_bit			(1UL<<26)
 #define PHY_WRITE_bit			(1UL<<27)
 // --------------------------------------------------------------------
-//		PHYCR_REG 
+//		PHYCR_REG
 // --------------------------------------------------------------------
 #define PHY_AUTO_OK_bit			(1UL<<5)
 // --------------------------------------------------------------------
-//		PHY INT_STAT_REG 
+//		PHY INT_STAT_REG
 // --------------------------------------------------------------------
 #define PHY_SPEED_CHG_bit		(1UL<<14)
 #define PHY_DUPLEX_CHG_bit		(1UL<<13)
 #define PHY_LINK_CHG_bit		(1UL<<10)
 #define PHY_AUTO_COMP_bit		(1UL<<11)
 // --------------------------------------------------------------------
-//		PHY SPE_STAT_REG 
+//		PHY SPE_STAT_REG
 // --------------------------------------------------------------------
 #define PHY_RESOLVED_bit		(1UL<<11)
 #define PHY_SPEED_mask			0xC000
@@ -269,7 +269,7 @@ typedef struct {
     unsigned short  Reserved_5;
     unsigned short  Response_Code;
     unsigned short  Reason_Code;
-    unsigned char   Payload_Data[64];
+    unsigned char   Payload_Data[128];
 }  NCSI_Response_Packet;
 
 //Standard Response Code
@@ -365,30 +365,30 @@ typedef struct
 	u32 FRS:1;
 	u32 EDORR:1;
 	u32 RXPKT_RDY:1;		// 1 ==> owned by FTMAC100, 0 ==> owned by software
-	
+
 	// RXDES1
 	u32 VLAN_TAGC:16;
 	u32 Reserved4:4;
 	u32 PROTL_TYPE:2;
 	u32 LLC_PKT:1;
 	u32 DF:1;
-	u32 VLAN_AVA:1;	
+	u32 VLAN_AVA:1;
 	u32 TCPCS_FAIL:1;
 	u32 UDPCS_FAIL:1;
 	u32 IPCS_FAIL:1;
 	u32 Reserved5:4;
-	
+
 	// RXDES2
 	u32 Reserved6:32;
-	
+
 	// RXDES3
 	u32 RXBUF_BADR;
-				
+
 	u32 VIR_RXBUF_BADR;			// not defined, the virtual address of receive buffer is placed here
-	
-	u32 RESERVED; 
-	u32 RESERVED1; 
-	u32 RESERVED2;	
+
+	u32 RESERVED;
+	u32 RESERVED1;
+	u32 RESERVED2;
 }RX_DESC;
 
 
@@ -405,7 +405,7 @@ typedef struct
 	u32 FTS:1;
 	u32 EDOTR:1;
 	u32 TXDMA_OWN:1;
-	
+
 	// TXDES1
 	u32 VLAN_TAGC:16;
 	u32 INS_VLAN:1;
@@ -416,8 +416,8 @@ typedef struct
 	u32 LLC_PKT:1;
 	u32 Reserved6:7;
 	u32 TX2FIC:1;
-	u32 TXIC:1;	
-	
+	u32 TXIC:1;
+
 	// TXDES2
 	u32 Reserved7:32;
 
@@ -427,8 +427,8 @@ typedef struct
 	u32 VIR_TXBUF_BADR;			// Reserve, the virtual address of transmit buffer is placed here
 
 	u32 RESERVED;
-	u32 RESERVED1; 
-	u32 RESERVED2; 
+	u32 RESERVED1;
+	u32 RESERVED2;
 
 }TX_DESC;
 
@@ -450,7 +450,7 @@ typedef struct
 // --------------------------------------------------------------------
 
 
-//#define RXDES_NUM			64//64 // we defined 32 descriptor for OTG issue 
+//#define RXDES_NUM			64//64 // we defined 32 descriptor for OTG issue
 #define RXDES_NUM			32
 
 #define RX_BUF_SIZE			1536
@@ -522,7 +522,7 @@ struct ftgmac100_priv {
 	int		tx_idx;
 	int		old_tx;
 	struct sk_buff *tx_skbuff[TXDES_NUM];
-	
+
 	int     maccr_val;
         struct timer_list    timer;
 	u32		GigaBit_MAHT0;
@@ -534,7 +534,7 @@ struct ftgmac100_priv {
 	NCSI_Capability NCSI_Cap;
 	unsigned int 	InstanceID;
 	unsigned int 	Retry;
-	unsigned char	Payload_Data[16];
+	unsigned char	Payload_Data[64];
 	unsigned char	Payload_Pad[4];
 	unsigned long	Payload_Checksum;
 	int		tx_free;
@@ -576,7 +576,7 @@ struct ftgmac100_priv {
 #define    STOP_DONE    (1 << 4)
 
 
- 
+
 #endif  /* _SMC_91111_H_ */
 
 
