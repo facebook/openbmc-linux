@@ -454,12 +454,15 @@ static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
 	int timeout = 32; //TODO number
 //	printk("ast_i2c_wait_bus_not_busy \n");
 	while (ast_i2c_read(i2c_dev,I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS) {
-		ast_i2c_bus_error_recover(i2c_dev);
 		if(timeout<=0)
 			break;
 		timeout--;
 		msleep(2);
 	}
+
+  if (timeout <=0) {
+    ast_i2c_bus_error_recover(i2c_dev);
+  }
 
 	return timeout <= 0 ? EAGAIN : 0;
 }
@@ -1414,11 +1417,22 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				printk("GR %x : No one care : %x, bus_id %d\n",i2c_dev->ast_i2c_data->reg_gr, sts, i2c_dev->bus_id);
       //TODO: Clearing this interrupt for now, but needs to cleanup this ISR function
 			ast_i2c_write(i2c_dev, sts, I2C_INTR_STS_REG);
-			return IRQ_NONE;
+
+      // Handle the write transaction ACK
+      if (sts & AST_I2CD_INTR_STS_TX_ACK) {
+        ast_i2c_master_xfer_done(i2c_dev);
+        complete(&i2c_dev->cmd_complete);
+      }
+
+      // Handle the Slave address match
+      if (sts & AST_I2CD_INTR_STS_SLAVE_MATCH) {
+        ast_i2c_slave_addr_match(i2c_dev);
+      }
+
+			return IRQ_HANDLED;
 	}
 
 	return IRQ_HANDLED;
-
 }
 
 static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msgs, int num)
