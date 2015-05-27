@@ -440,7 +440,7 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 		dev_dbg(i2c_dev->dev, "Don't know how to handle this case?!\n");
 		return -1;
 	}
-	dev_dbg(i2c_dev->dev, "Recovery successfully\n");
+  dev_dbg(i2c_dev->dev, "Recovery successfully\n");
 	return 0;
 }
 
@@ -451,20 +451,42 @@ static void ast_master_alert_recv(struct ast_i2c_dev *i2c_dev)
 
 static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
 {
-	int timeout = 32; //TODO number
+	int timeout = 10; //TODO number
+  volatile u8 mode = 0;
 //	printk("ast_i2c_wait_bus_not_busy \n");
+
+  // Wait for slave transfer to finish
+  mode = i2c_dev->slave_operation;
+  while (mode == 1) {
+    if (timeout <= 0) {
+      break;
+    }
+    mode = i2c_dev->slave_operation;
+    timeout--;
+    msleep(1);
+  }
+
+  if (timeout <= 0) {
+    return -EAGAIN;
+  }
+
+  // Wait for Bus to go IDLE
+  timeout = 10;
 	while (ast_i2c_read(i2c_dev,I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS) {
-		if(timeout<=0)
+		if(timeout<=0) {
 			break;
+    }
+
 		timeout--;
-		msleep(2);
+		msleep(1);
 	}
 
   if (timeout <=0) {
     ast_i2c_bus_error_recover(i2c_dev);
+    return 0;
   }
 
-	return timeout <= 0 ? EAGAIN : 0;
+  return 0;
 }
 
 static void ast_i2c_do_dma_xfer(struct ast_i2c_dev *i2c_dev)
@@ -1262,6 +1284,8 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			I2C_INTR_CTRL_REG);
 		complete(&i2c_dev->cmd_complete);
 		sts &= ~AST_I2CD_INTR_STS_ABNORMAL;
+    // Need to clear the interrupt
+    ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ABNORMAL, I2C_INTR_STS_REG);
 	}
 
 	switch(sts) {
@@ -1417,6 +1441,12 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				printk("GR %x : No one care : %x, bus_id %d\n",i2c_dev->ast_i2c_data->reg_gr, sts, i2c_dev->bus_id);
       //TODO: Clearing this interrupt for now, but needs to cleanup this ISR function
 			ast_i2c_write(i2c_dev, sts, I2C_INTR_STS_REG);
+
+      // Handle Arbitration Loss
+      if (sts & AST_I2CD_INTR_STS_ARBIT_LOSS) {
+        i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
+        complete(&i2c_dev->cmd_complete);
+      }
 
       // Handle the write transaction ACK
       if (sts & AST_I2CD_INTR_STS_TX_ACK) {
