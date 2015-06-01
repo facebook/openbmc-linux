@@ -180,7 +180,7 @@ static void ast_adc_ctrl_init(void)
 	else
 		ast_adc->compen_value = 0 - (ast_adc_read(ast_adc, AST_ADC_CH12_13) & AST_ADC_L_CH_MASK);
 
-	printk("compensating value %d \n",ast_adc->compen_value);
+	// printk("compensating value %d \n",ast_adc->compen_value);
 
 #elif defined(CONFIG_ARCH_AST2400)
 
@@ -197,7 +197,7 @@ static void ast_adc_ctrl_init(void)
 
 	//compensating value = 0x200 - ADC10[9:0]
 	ast_adc->compen_value = 0x200 - (ast_adc_read(ast_adc, AST_ADC_CH0_1) & AST_ADC_L_CH_MASK);
-	printk("compensating value %d \n",ast_adc->compen_value);
+	// printk("compensating value %d \n",ast_adc->compen_value);
 
 #elif defined(CONFIG_ARCH_AST2500)
 //	TODO ...
@@ -216,7 +216,7 @@ static void ast_adc_ctrl_init(void)
 
 	//compensating value = 0x200 - ADC10[9:0]
 	ast_adc->compen_value = 0x200 - ((ast_adc_read(ast_adc, AST_ADC_TRIM) >> 16) & 0x3ff);
-	printk("compensating value %d \n",ast_adc->compen_value);
+	// printk("compensating value %d \n",ast_adc->compen_value);
 
 #else
 #err "No define for ADC "
