@@ -206,6 +206,9 @@ config AST_SCU_LOCK
 config WEDGE
 	bool "Facebook Wedge/6-Pack"
 
+config WEDGE100
+	bool "Facebook Wedge100"
+
 config YOSEMITE
 	bool "Facebook Yosemite"
 

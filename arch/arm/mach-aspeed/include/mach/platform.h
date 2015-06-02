@@ -68,6 +68,8 @@
  */
 #ifdef CONFIG_WEDGE
 #define AST_UART_BASE AST_UART3_BASE
+#elif defined(CONFIG_WEDGE100)
+#define AST_UART_BASE AST_UART3_BASE
 #elif defined(CONFIG_YOSEMITE)
 #define AST_UART_BASE AST_UART0_BASE
 #else
