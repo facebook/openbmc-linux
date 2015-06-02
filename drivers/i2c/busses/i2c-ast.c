@@ -1437,8 +1437,6 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			complete(&i2c_dev->cmd_complete);
 			break;
 		default:
-			if(sts)
-				printk("GR %x : No one care : %x, bus_id %d\n",i2c_dev->ast_i2c_data->reg_gr, sts, i2c_dev->bus_id);
       //TODO: Clearing this interrupt for now, but needs to cleanup this ISR function
 			ast_i2c_write(i2c_dev, sts, I2C_INTR_STS_REG);
 
@@ -1446,17 +1444,25 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
       if (sts & AST_I2CD_INTR_STS_ARBIT_LOSS) {
         i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
         complete(&i2c_dev->cmd_complete);
+        sts &= (~AST_I2CD_INTR_STS_ARBIT_LOSS);
       }
 
       // Handle the write transaction ACK
       if (sts & AST_I2CD_INTR_STS_TX_ACK) {
         ast_i2c_master_xfer_done(i2c_dev);
         complete(&i2c_dev->cmd_complete);
+        sts &= (~AST_I2CD_INTR_STS_TX_ACK);
       }
 
       // Handle the Slave address match
       if (sts & AST_I2CD_INTR_STS_SLAVE_MATCH) {
         ast_i2c_slave_addr_match(i2c_dev);
+        sts &= (~AST_I2CD_INTR_STS_SLAVE_MATCH);
+      }
+
+      // TODO: Debug print for any unhandled condition
+			if(sts) {
+				printk("GR %x : Status : %x, bus_id %d\n",i2c_dev->ast_i2c_data->reg_gr, sts, i2c_dev->bus_id);
       }
 
 			return IRQ_HANDLED;
