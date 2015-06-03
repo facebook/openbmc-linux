@@ -597,7 +597,89 @@ struct platform_device ast_i2c_dev14_device = {
 //ASPEED AST2300 EVB I2C Device
 #if defined(CONFIG_ARCH_AST2300) || defined(CONFIG_ARCH_AST2400)
 
-#if defined(CONFIG_YOSEMITE)
+#if defined(CONFIG_WEDGE100)
+
+static struct i2c_board_info __initdata wedge100_i2c_bus1[] = {
+  /* shared NIC, no kernel driver */
+};
+
+static struct i2c_board_info __initdata wedge100_i2c_bus2[] = {
+  /* TODO: one IR3581 and two IR3584 */
+};
+
+static struct i2c_board_info __initdata wedge100_i2c_bus3[] = {
+  /* TODO: one PWR1014A */
+};
+
+static struct i2c_board_info __initdata wedge100_i2c_bus4[] = {
+  {
+    I2C_BOARD_INFO("tmp75", 0x48),
+  },
+  {
+    I2C_BOARD_INFO("tmp75", 0x49),
+  },
+  {
+    I2C_BOARD_INFO("tmp75", 0x4a),
+  },
+  {
+    I2C_BOARD_INFO("tmp75", 0x4b),
+  },
+  {
+    I2C_BOARD_INFO("tmp75", 0x4c),
+  },
+};
+
+static struct i2c_board_info __initdata wedge100_i2c_bus5[] = {
+  /* Panther+ microserver */
+  {
+    I2C_BOARD_INFO("fb_panther_plus", 0x40),
+  },
+};
+
+static struct i2c_board_info __initdata wedge100_i2c_bus6[] = {
+  /* TODO: USB hub */
+};
+
+static struct i2c_board_info __initdata wedge100_i2c_bus7[] = {
+  {
+    I2C_BOARD_INFO("pcf8574", 0x2f),
+  },
+  {
+    I2C_BOARD_INFO("24c64", 0x51),
+  }
+};
+
+static struct i2c_board_info __initdata wedge100_i2c_bus8[] = {
+  // EEPROM on the pfe1100 power supplies
+  {
+    I2C_BOARD_INFO("24c64", 0x51),
+  },
+  {
+    I2C_BOARD_INFO("24c64", 0x52),
+  },
+  {
+    I2C_BOARD_INFO("pfe1100", 0x59),
+  },
+  {
+    I2C_BOARD_INFO("pfe1100", 0x5a),
+  },
+};
+
+static struct i2c_board_info __initdata wedge100_i2c_bus9[] = {
+  /* TODO: to FANCPLD */
+};
+
+/* i2c bus 10-12 on wedge100 are not connected as i2c bus */
+
+static struct i2c_board_info __initdata wedge100_i2c_bus13[] = {
+  /* TODO: to SYSCPLD */
+};
+
+/* i2c bus 14 on wedge100 are not connected as i2c bus */
+
+/* end of defined(CONFIG_WEDGE100) */
+
+#elif defined(CONFIG_YOSEMITE)
 
 //Under I2C Dev 1
 static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
@@ -677,7 +759,12 @@ static struct i2c_board_info __initdata ast_i2c_board_info_13[] = {
   // Mezz Card Mezz_SMB bus (FRUID, GPIO expander, QSFP+)
 };
 
+/* end of CONFIG_YOSEMITE */
+
 #else
+
+/* wedge */
+
 //Under I2C Dev 1
 static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
 	{
@@ -828,7 +915,11 @@ static struct i2c_board_info __initdata ast_i2c_board_info_13[] = {
 		I2C_BOARD_INFO("adm1278", 0x10),
 	},
 };
-#endif // CONFIG_YOSEMITE
+
+/* end of WEDGE case */
+#endif
+
+/* end of defined(CONFIG_ARCH_AST2300) || defined(CONFIG_ARCH_AST2400) */
 #endif
 
 /*-------------------------------------*/
@@ -859,8 +950,48 @@ void __init ast_add_device_i2c(void)
 		return;
 	}
 #endif
-	//TODO
+
 	pool_buff_page_init(ast_i2c_data.buf_pool);
+
+#if defined(CONFIG_WEDGE100)
+
+  platform_device_register(&ast_i2c_dev1_device);
+  i2c_register_board_info(0, wedge100_i2c_bus1, ARRAY_SIZE(wedge100_i2c_bus1));
+
+  platform_device_register(&ast_i2c_dev2_device);
+  i2c_register_board_info(1, wedge100_i2c_bus2, ARRAY_SIZE(wedge100_i2c_bus2));
+
+  platform_device_register(&ast_i2c_dev3_device);
+  i2c_register_board_info(2, wedge100_i2c_bus3, ARRAY_SIZE(wedge100_i2c_bus3));
+
+  platform_device_register(&ast_i2c_dev4_device);
+  i2c_register_board_info(3, wedge100_i2c_bus4, ARRAY_SIZE(wedge100_i2c_bus4));
+
+  platform_device_register(&ast_i2c_dev5_device);
+  i2c_register_board_info(4, wedge100_i2c_bus5, ARRAY_SIZE(wedge100_i2c_bus5));
+
+  platform_device_register(&ast_i2c_dev6_device);
+  i2c_register_board_info(5, wedge100_i2c_bus6, ARRAY_SIZE(wedge100_i2c_bus6));
+
+  platform_device_register(&ast_i2c_dev7_device);
+  i2c_register_board_info(6, wedge100_i2c_bus7, ARRAY_SIZE(wedge100_i2c_bus7));
+
+  platform_device_register(&ast_i2c_dev8_device);
+  i2c_register_board_info(7, wedge100_i2c_bus8, ARRAY_SIZE(wedge100_i2c_bus8));
+
+  platform_device_register(&ast_i2c_dev9_device);
+  i2c_register_board_info(8, wedge100_i2c_bus9, ARRAY_SIZE(wedge100_i2c_bus9));
+
+  /* i2c bus 10 - 12 are not used as i2c on wedge100 */
+
+  platform_device_register(&ast_i2c_dev13_device);
+  i2c_register_board_info(12, wedge100_i2c_bus13, ARRAY_SIZE(wedge100_i2c_bus13));
+
+  /* i2c bug 14 is not used as i2c on wedge100 */
+
+  /* end of defined(CONFIG_WEDGE100) */
+#else
+
 	platform_device_register(&ast_i2c_dev1_device);
 	i2c_register_board_info(0, ast_i2c_board_info_1, ARRAY_SIZE(ast_i2c_board_info_1));
 	platform_device_register(&ast_i2c_dev2_device);
@@ -884,11 +1015,13 @@ void __init ast_add_device_i2c(void)
 
 #if defined(CONFIG_ARCH_AST2400)
 	platform_device_register(&ast_i2c_dev10_device);
+
 #if defined(CONFIG_YOSEMITE)
 	i2c_register_board_info(9, ast_i2c_board_info_10, ARRAY_SIZE(ast_i2c_board_info_10));
 	platform_device_register(&ast_i2c_dev11_device);
 	i2c_register_board_info(10, ast_i2c_board_info_11, ARRAY_SIZE(ast_i2c_board_info_11));
 #endif
+
 #if defined(CONFIG_MMC_AST)
 	//Due to share pin with SD
 #else
@@ -903,6 +1036,11 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev13_device);
 	i2c_register_board_info(12, ast_i2c_board_info_13, ARRAY_SIZE(ast_i2c_board_info_13));
 #endif
+
+  /* end of defined(CONFIG_ARCH_AST2400) */
+#endif
+
+  /* end of else of defined(CONFIG_WEDGE100) */
 #endif
 }
 #else
