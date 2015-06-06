@@ -766,6 +766,9 @@ ast_scu_multi_func_uart(u8 uart)
 		case 2:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) |
 						SCU_FUN_PIN_UART2_RXD |
+#ifdef CONFIG_YOSEMITE
+						SCU_FUN_PIN_UART2_TXD,
+#else
 						SCU_FUN_PIN_UART2_TXD |
 						SCU_FUN_PIN_UART2_NRTS |
 						SCU_FUN_PIN_UART2_NDTR |
@@ -773,11 +776,15 @@ ast_scu_multi_func_uart(u8 uart)
 						SCU_FUN_PIN_UART2_NDSR |
 						SCU_FUN_PIN_UART2_NDCD |
 						SCU_FUN_PIN_UART2_NCTS,
+#endif
 				AST_SCU_FUN_PIN_CTRL2);
 			break;
 		case 3:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
 						SCU_FUN_PIN_UART3_RXD |
+#ifdef CONFIG_YOSEMITE
+						SCU_FUN_PIN_UART3_TXD,
+#else
 						SCU_FUN_PIN_UART3_TXD |
 						SCU_FUN_PIN_UART3_NRTS |
 						SCU_FUN_PIN_UART3_NDTR |
@@ -785,11 +792,15 @@ ast_scu_multi_func_uart(u8 uart)
 						SCU_FUN_PIN_UART3_NDSR |
 						SCU_FUN_PIN_UART3_NDCD |
 						SCU_FUN_PIN_UART3_NCTS,
+#endif
 				AST_SCU_FUN_PIN_CTRL1);
 			break;
 		case 4:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
 						SCU_FUN_PIN_UART4_RXD |
+#ifdef CONFIG_YOSEMITE
+						SCU_FUN_PIN_UART4_TXD,
+#else
 						SCU_FUN_PIN_UART4_TXD |
 						SCU_FUN_PIN_UART4_NRTS |
 						SCU_FUN_PIN_UART4_NDTR |
@@ -797,11 +808,10 @@ ast_scu_multi_func_uart(u8 uart)
 						SCU_FUN_PIN_UART4_NDSR |
 						SCU_FUN_PIN_UART4_NDCD |
 						SCU_FUN_PIN_UART4_NCTS,
+#endif
 				AST_SCU_FUN_PIN_CTRL1);
 			break;
 	}
-
-
 }
 
 extern void

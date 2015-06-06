@@ -109,6 +109,19 @@ static struct plat_serial8250_port ast_uart_data[] = {
 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},
 #endif
+#if defined(CONFIG_YOSEMITE) //Without this, tty offset might change for others
+#ifdef AST_UART2_BASE
+	{
+		.mapbase	= AST_UART2_BASE,
+		.membase	= (char*)(IO_ADDRESS(AST_UART2_BASE)),
+		.irq		= IRQ_UART2,
+		.uartclk	= (24*1000000L),
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+#endif
+#endif
 #ifdef AST_UART3_BASE
 	{
 		.mapbase	= AST_UART3_BASE,
@@ -146,6 +159,9 @@ void __init ast_add_device_uart(void)
 #if defined(CONFIG_ARCH_AST1010)
 #elif defined(CONFIG_YOSEMITE)
 	ast_scu_multi_func_uart(1);
+	ast_scu_multi_func_uart(2);
+	ast_scu_multi_func_uart(3);
+	ast_scu_multi_func_uart(4);
 #else
 	ast_scu_multi_func_uart(1);
 	ast_scu_multi_func_uart(3);

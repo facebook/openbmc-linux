@@ -48,13 +48,14 @@ static void ast_mask_irq(unsigned int irq)
 	if((irq >= IRQ_TIMER0) && (irq <= IRQ_TIMER2))
 		timer = 1;
 #endif
-	
-	if (irq > 32) {
+
+  // for irq0-irq31 use LOW register; for irq32-irq63 use HIGH register set.
+	if (irq >= 32) {
 		i=1;
 		irq = irq - 32;
 	} else
 		i=0;
-	
+
 	regVal = readl(AST_INTR_DIS(i));
 	regVal |= (1 << irq);
 	writel(regVal, AST_INTR_DIS(i));
@@ -63,8 +64,8 @@ static void ast_mask_irq(unsigned int irq)
 	 * clear the interrupt
 	 */
 	if(timer)
-		IRQ_EDGE_CLEAR(i,irq);	
-	
+		IRQ_EDGE_CLEAR(i,irq);
+
 }
 
 static void ast_unmask_irq(unsigned int irq)
@@ -72,12 +73,13 @@ static void ast_unmask_irq(unsigned int irq)
 	int i;
 	u32 regVal;
 
-	if (irq > 32) {
+  // for irq0-irq31 use LOW register; for irq32-irq63 use HIGH register set.
+	if (irq >= 32) {
 		i=1;
 		irq = irq - 32;
 	} else
 		i=0;
-	
+
 	regVal = readl(AST_INTR_EN(i));
 	regVal |= (1 << irq);
 	writel(regVal, AST_INTR_EN(i));
@@ -88,8 +90,8 @@ static struct irq_chip ast_irq_chip = {
 	.ack	= ast_mask_irq,
 	.mask	= ast_mask_irq,
 	.unmask = ast_unmask_irq,
-}; 
- 
+};
+
 void __init ast_init_irq(void)
 {
 	unsigned int i;
@@ -107,8 +109,8 @@ void __init ast_init_irq(void)
 	writel(0xFFFFFFFF, AST_INTR_EDGE_CLR(1));
 #endif
 
-	//TOTAL IRQ NUM = 
-	for (i = 0; i < AST_VIC_NUM; i++) 
+	//TOTAL IRQ NUM =
+	for (i = 0; i < AST_VIC_NUM; i++)
 	{
 		if(i<32) {
 			if((i >= IRQ_TIMER0) && (i <= IRQ_TIMER2)) //Timer0/1/2
@@ -125,9 +127,9 @@ void __init ast_init_irq(void)
 				IRQ_SET_HIGH_LEVEL(1,i-32);
 				IRQ_SET_LEVEL_TRIGGER(1,i-32);
 			}
-#endif			
+#endif
 		}
-			
+
 		set_irq_chip(i, &ast_irq_chip);
 		set_irq_handler(i, handle_level_irq);
 		set_irq_flags(i, IRQF_VALID);
