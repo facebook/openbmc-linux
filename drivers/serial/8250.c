@@ -38,6 +38,7 @@
 #include <linux/serial_8250.h>
 #include <linux/nmi.h>
 #include <linux/mutex.h>
+#include <linux/gpio.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -2526,6 +2527,26 @@ serial8250_type(struct uart_port *port)
 	return uart_config[type].name;
 }
 
+static int serial8250_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg) {
+	struct uart_8250_port *up = (struct uart_8250_port *)port;
+  unsigned long flags;
+  int ret = -ENOIOCTLCMD;
+  if (cmd == TIOCSERWAITTEMT) {
+	  spin_lock_irqsave(&up->port.lock, flags);
+	  wait_for_xmitr(up, BOTH_EMPTY);
+    if (arg != 0) {
+      gpio_set_value(arg, 0);
+    }
+    // grab any phantom char
+		(void) serial_inp(up, UART_RX);
+    // enable read
+		up->port.ignore_status_mask &= ~UART_LSR_DR;
+	  spin_unlock_irqrestore(&up->port.lock, flags);
+    return 0;
+  }
+  return ret;
+}
+
 static struct uart_ops serial8250_pops = {
 	.tx_empty	= serial8250_tx_empty,
 	.set_mctrl	= serial8250_set_mctrl,
@@ -2544,6 +2565,7 @@ static struct uart_ops serial8250_pops = {
 	.request_port	= serial8250_request_port,
 	.config_port	= serial8250_config_port,
 	.verify_port	= serial8250_verify_port,
+  .ioctl = serial8250_ioctl,
 #ifdef CONFIG_CONSOLE_POLL
 	.poll_get_char = serial8250_get_poll_char,
 	.poll_put_char = serial8250_put_poll_char,
