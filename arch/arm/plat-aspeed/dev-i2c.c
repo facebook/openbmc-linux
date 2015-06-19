@@ -857,15 +857,23 @@ static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 	},
 	{
 		I2C_BOARD_INFO("24c64", 0x50),
-	}
+	},
 };
 
 
 //Under I2C Dev 8
 static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
 	{
+		// 6pack power supply
+		I2C_BOARD_INFO("pfe3000", 0x10),
+	},
+	{
 		// Eval board:
 		I2C_BOARD_INFO("lm75b", 0x4a),
+	},
+	{
+		// 6pack power supply EEPROM
+		I2C_BOARD_INFO("24c64", 0x50),
 	},
 	// EEPROMS on the pfe1100 power supplies
 	{
@@ -905,6 +913,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
 //Under I2C Dev 12
 static struct i2c_board_info __initdata ast_i2c_board_info_12[] = {
 	{
+		// Early version of 6pack
 		I2C_BOARD_INFO("pfe3000", 0x10),
 	},
 };
