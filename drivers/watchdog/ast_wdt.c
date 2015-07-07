@@ -68,6 +68,7 @@ typedef unsigned char bool_T;
 
 #else
 #define WDT_BASE_VA		(IO_ADDRESS(AST_WDT_BASE))
+#define WDT2_BASE_VA		(IO_ADDRESS(AST_WDT_BASE + 20))
 #endif
 
 #define WDT_CntSts              (WDT_BASE_VA+0x00)
@@ -77,6 +78,14 @@ typedef unsigned char bool_T;
 #define WDT_TimeOut             (WDT_BASE_VA+0x10)
 #define WDT_Clr                 (WDT_BASE_VA+0x14)
 #define WDT_RstWd               (WDT_BASE_VA+0x18)
+
+#define WDT2_CntSts             (WDT2_BASE_VA+0x00)
+#define WDT2_Reload             (WDT2_BASE_VA+0x04)
+#define WDT2_Restart            (WDT2_BASE_VA+0x08)
+#define WDT2_Ctrl               (WDT2_BASE_VA+0x0C)
+#define WDT2_TimeOut            (WDT2_BASE_VA+0x10)
+#define WDT2_Clr                (WDT2_BASE_VA+0x14)
+#define WDT2_RstWd              (WDT2_BASE_VA+0x18)
 
 #define WDT_CTRL_B_SECOND_BOOT  (0x1 << 7)
 #define WDT_CTRL_B_RESET_SOC (0x00 << 5) /* yes, 0x00 */
@@ -101,6 +110,11 @@ typedef unsigned char bool_T;
 #define WDT_TIMO 30			/* Default heartbeat = 30 seconds */
 
 #define WDT_INITIAL_TIMO (8*60) /* Initial timeout, 8m */
+/*
+ * Dual boot watchdog is 5s shorter so that dual boot watchdog
+ * will kick in first.
+ */
+#define WDT_DUAL_BOOT_TIMO (WDT_INITIAL_TIMO - 5)
 #define WDT_TIMO2TICKS(t) (TICKS_PER_uSEC * 1000000 * (t))
 
 static int heartbeat = WDT_TIMO;
@@ -233,6 +247,14 @@ bool_T wdt_is_enabled(void)
 	return reg & WDT_CTRL_B_ENABLE;
 }
 
+#ifdef CONFIG_AST_WATCHDOG_REARM_DUAL_BOOT
+void wdt_dual_boot_restart(unsigned int timeo)
+{
+	AST_WRITE_REG(WDT2_Reload, WDT_TIMO2TICKS(timeo));
+	AST_WRITE_REG(WDT2_Restart, 0x4755);	/* reload! */
+	printk(KERN_INFO "Re-arm the dual boot watchdog for %u seconds\n", timeo);
+}
+#endif
 
 void wdt_restart_new(unsigned int nPeriod, int sourceClk, bool_T bResetOut,
 		     bool_T bIntrSys, bool_T bClrAfter, bool_T bResetARMOnly)
@@ -541,6 +563,11 @@ static int ast_wdt_probe(struct platform_device *pdev)
       unregister_reboot_notifier(&ast_wdt_notifier);   
       return ret;
    }
+
+#ifdef CONFIG_AST_WATCHDOG_REARM_DUAL_BOOT
+   /* re-arm dual boot watchdog */
+   wdt_dual_boot_restart(WDT_DUAL_BOOT_TIMO);
+#endif
 
    /* interrupt the system while WDT timeout */
    wdt_restart_new(WDT_TIMO2TICKS(WDT_INITIAL_TIMO), WDT_CLK_SRC_EXT,

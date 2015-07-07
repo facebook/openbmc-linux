@@ -235,9 +235,16 @@ config ORION5X_WATCHDOG
 
 config AST_WATCHDOG
 	tristate "ASPEED GUC watchdog"
-	depends on WATCHDOG 
+	depends on WATCHDOG
 	help
 	  Watchdog timer for ASPEED chips.
+
+config AST_WATCHDOG_REARM_DUAL_BOOT
+  bool "Rearm dual boot watchdog"
+  default n
+	depends on AST_WATCHDOG
+	help
+	  Rearm dual boot watchdog or not during boot
 
 # ARM26 Architecture
 
