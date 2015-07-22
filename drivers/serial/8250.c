@@ -60,6 +60,8 @@ static unsigned int nr_uarts = CONFIG_SERIAL_8250_RUNTIME_UARTS;
 
 static struct uart_driver serial8250_reg;
 
+DECLARE_WAIT_QUEUE_HEAD(thre_wait);
+
 static int serial_index(struct uart_port *port)
 {
 	return (serial8250_reg.minor - 64) + port->line;
@@ -1226,7 +1228,10 @@ static void autoconfig_irq(struct uart_8250_port *up)
 
 static inline void __stop_tx(struct uart_8250_port *p)
 {
-	if (p->ier & UART_IER_THRI) {
+  int status = serial_in(p, UART_LSR);
+  // only turn off THRE interrupt if THRE is *currently* asserted
+  // (we still want to catch it a final time after the FIFO empties)
+	if ((p->ier & UART_IER_THRI) && (status & UART_LSR_THRE)) {
 		p->ier &= ~UART_IER_THRI;
 		serial_out(p, UART_IER, p->ier);
 	}
@@ -1528,6 +1533,7 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id)
 
 	DEBUG_INTR("end.\n");
 
+  wake_up(&thre_wait);
 	return IRQ_RETVAL(handled);
 }
 
@@ -2531,13 +2537,22 @@ static int serial8250_ioctl(struct uart_port *port, unsigned int cmd, unsigned l
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
   unsigned long flags;
   int ret = -ENOIOCTLCMD;
+  // kernel-space RS485 drain-and-switch hack
   if (cmd == TIOCSERWAITTEMT) {
+    // wait for kernel buffers and UART FIFO to both empty
+	  struct circ_buf *xmit = &up->port.info->xmit;
+    wait_event_interruptible(
+       thre_wait,
+       uart_circ_empty(xmit) &&
+       (serial_in(up, UART_LSR) & UART_LSR_THRE));
+    // spin until TEMT (transmit shift register empty)
 	  spin_lock_irqsave(&up->port.lock, flags);
 	  wait_for_xmitr(up, BOTH_EMPTY);
     if (arg != 0) {
+      // turn off RS485 DE pin
       gpio_set_value(arg, 0);
     }
-    // grab any phantom char
+    // grab any phantom char seen on RX when transceiver switches
 		(void) serial_inp(up, UART_RX);
     // enable read
 		up->port.ignore_status_mask &= ~UART_LSR_DR;
