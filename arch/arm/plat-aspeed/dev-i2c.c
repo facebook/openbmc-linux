@@ -650,6 +650,10 @@ static struct i2c_board_info __initdata wedge100_i2c_bus7[] = {
 };
 
 static struct i2c_board_info __initdata wedge100_i2c_bus8[] = {
+  /* BMC PHY EEPROM */
+  {
+    I2C_BOARD_INFO("24c02", 0x50),
+  },
   // EEPROM on the pfe1100 power supplies
   {
     I2C_BOARD_INFO("24c64", 0x51),
@@ -657,6 +661,7 @@ static struct i2c_board_info __initdata wedge100_i2c_bus8[] = {
   {
     I2C_BOARD_INFO("24c64", 0x52),
   },
+  /* PSU driver */
   {
     I2C_BOARD_INFO("pfe1100", 0x59),
   },
@@ -666,13 +671,23 @@ static struct i2c_board_info __initdata wedge100_i2c_bus8[] = {
 };
 
 static struct i2c_board_info __initdata wedge100_i2c_bus9[] = {
-  /* TODO: to FANCPLD */
+  {
+    I2C_BOARD_INFO("fancpld", 0x33),
+  },
+  {
+    I2C_BOARD_INFO("tmp75", 0x48),
+  },
+  {
+    I2C_BOARD_INFO("tmp75", 0x49),
+  },
 };
 
 /* i2c bus 10-12 on wedge100 are not connected as i2c bus */
 
 static struct i2c_board_info __initdata wedge100_i2c_bus13[] = {
-  /* TODO: to SYSCPLD */
+  {
+    I2C_BOARD_INFO("syscpld", 0x31),
+  },
 };
 
 /* i2c bus 14 on wedge100 are not connected as i2c bus */
