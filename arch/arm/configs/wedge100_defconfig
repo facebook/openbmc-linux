@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.28.9
-# Thu Jul 30 18:33:41 2015
+# Wed Aug  5 18:43:53 2015
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -780,7 +780,7 @@ CONFIG_SPI_BITBANG=y
 # SPI Protocol Masters
 #
 CONFIG_SPI_AT25=m
-# CONFIG_SPI_SPIDEV is not set
+CONFIG_SPI_SPIDEV=m
 # CONFIG_SPI_TLE62X0 is not set
 CONFIG_ARCH_REQUIRE_GPIOLIB=y
 CONFIG_GPIOLIB=y

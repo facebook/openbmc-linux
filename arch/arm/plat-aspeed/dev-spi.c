@@ -344,8 +344,8 @@ static struct flash_platform_data wedge_spi_flash_data = {
 
 
 /* Device info for the flash on ast-spi */
-#ifdef CONFIG_ARCH_AST2400
-static struct mtd_partition ast_spi5_flash_partitions[] = {
+#ifdef CONFIG_WEDGE
+static struct mtd_partition wedge_spi5_flash_partitions[] = {
   {
     .name = "led-fpga",
     .offset = 0, /* From 0 */
@@ -355,8 +355,8 @@ static struct mtd_partition ast_spi5_flash_partitions[] = {
 
 static struct flash_platform_data wedge_spi5_flash_data = {
   .type = "at45db011d",
-  .nr_parts = ARRAY_SIZE(ast_spi5_flash_partitions),
-  .parts = ast_spi5_flash_partitions,
+  .nr_parts = ARRAY_SIZE(wedge_spi5_flash_partitions),
+  .parts = wedge_spi5_flash_partitions,
 };
 #endif
 
@@ -372,6 +372,7 @@ static struct spi_board_info ast_spi_devices[] = {
     }, 
 #endif
 #ifdef CONFIG_ARCH_AST2400
+#ifdef CONFIG_WEDGE
     {
         .modalias    = "mtd_dataflash",
         .platform_data  = &wedge_spi5_flash_data,
@@ -380,6 +381,15 @@ static struct spi_board_info ast_spi_devices[] = {
         .bus_num    = 5,
         .mode = SPI_MODE_0,
     },
+#elif defined CONFIG_WEDGE100
+    {
+        .modalias    = "spidev",
+        .chip_select    = 0,
+        .max_speed_hz    = 33 * 1000 * 1000,
+        .bus_num    = 5,
+        .mode = SPI_MODE_0,
+    },
+#endif
     {
         .modalias    = "m25p80",
         .platform_data  = &wedge_spi_flash_data,
@@ -389,13 +399,6 @@ static struct spi_board_info ast_spi_devices[] = {
         .mode = SPI_MODE_0,
     },
 #endif
-    {
-        .modalias    = "spidev",
-        .chip_select    = 0,
-        .max_speed_hz    = 30 * 1000 * 1000,
-        .bus_num    = 1,
-		.mode = SPI_MODE_0,
-    },
 };
 
 #if defined(AST_SPI1_BASE)
@@ -490,5 +493,3 @@ void __init ast_add_device_spi(void)
 #else
 void __init ast_add_device_spi(void) {}
 #endif
-
-
