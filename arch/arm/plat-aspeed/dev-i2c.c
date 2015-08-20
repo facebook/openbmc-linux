@@ -796,15 +796,6 @@ static struct i2c_board_info __initdata ast_i2c_board_info_2[] = {
 	{
 		I2C_BOARD_INFO("ncp4200", 0x60),
 	},
-	{
-		I2C_BOARD_INFO("ncp4200", 0x61),
-	},
-	{
-		I2C_BOARD_INFO("ncp4200", 0x62),
-	},
-	{
-		I2C_BOARD_INFO("ncp4200", 0x63),
-	},
 };
 
 
@@ -815,15 +806,6 @@ static struct i2c_board_info __initdata ast_i2c_board_info_3[] = {
 	// Hope the address will not change after probing.
 	{
 		I2C_BOARD_INFO("ncp4200", 0x60),
-	},
-	{
-		I2C_BOARD_INFO("ncp4200", 0x61),
-	},
-	{
-		I2C_BOARD_INFO("ncp4200", 0x62),
-	},
-	{
-		I2C_BOARD_INFO("ncp4200", 0x63),
 	},
 };
 
@@ -913,15 +895,6 @@ static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
 	// Hope the address will not change after probing.
 	{
 		I2C_BOARD_INFO("ncp4200", 0x60),
-	},
-	{
-		I2C_BOARD_INFO("ncp4200", 0x61),
-	},
-	{
-		I2C_BOARD_INFO("ncp4200", 0x62),
-	},
-	{
-		I2C_BOARD_INFO("ncp4200", 0x63),
 	},
 };
 
