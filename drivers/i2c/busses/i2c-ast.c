@@ -55,6 +55,8 @@
 #define BUFF_ONGOING	1
 #endif
 
+#define AST_LOCKUP_DETECTED (0x1 << 15)
+
 struct ast_i2c_dev {
 	struct ast_i2c_driver_data *ast_i2c_data;
 	struct device		*dev;
@@ -1314,7 +1316,15 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 					ast_i2c_master_xfer_done(i2c_dev);
 
 				} else {
-					printk("TODO ...\n");
+					printk("ast_i2c:  TX_ACK | NORMAL_STOP;  xfer_last %d\n", i2c_dev->xfer_last);
+					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_ACK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
+					uint32_t new_val = ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
+						        	AST_I2CD_NORMAL_STOP_INTR_EN | 
+								AST_I2CD_TX_ACK_INTR_EN;
+					ast_i2c_write(i2c_dev, new_val, I2C_INTR_CTRL_REG);
+					//take care
+					i2c_dev->cmd_err |= AST_LOCKUP_DETECTED;
+					complete(&i2c_dev->cmd_complete);
 				}
 			break;
 
@@ -1534,6 +1544,11 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 
 		if(i2c_dev->cmd_err != 0 &&
 		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
+			if (i2c_dev->cmd_err & AST_LOCKUP_DETECTED) {
+				printk("ast-i2c:  error got unexpected STOP\n");
+				// reset the bus
+				ast_i2c_bus_error_recover(i2c_dev);
+			}
 			ret = -EAGAIN;
 			spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
 			goto stop;
