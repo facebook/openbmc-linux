@@ -694,7 +694,7 @@ static struct i2c_board_info __initdata wedge100_i2c_bus13[] = {
 
 /* end of defined(CONFIG_WEDGE100) */
 
-#elif defined(CONFIG_YOSEMITE)
+#elif defined(CONFIG_YOSEMITE) || defined(CONFIG_FBPLATFORM1)
 
 //Under I2C Dev 1
 static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
