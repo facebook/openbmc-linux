@@ -772,6 +772,9 @@ static struct i2c_board_info __initdata ast_i2c_board_info_12[] = {
 //Under I2C Dev 13
 static struct i2c_board_info __initdata ast_i2c_board_info_13[] = {
   // Mezz Card Mezz_SMB bus (FRUID, GPIO expander, QSFP+)
+  {
+    I2C_BOARD_INFO("24c64", 0x52),
+  },
 };
 
 /* end of CONFIG_YOSEMITE */
