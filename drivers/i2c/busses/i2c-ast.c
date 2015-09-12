@@ -49,8 +49,8 @@
 /***************************************************************************/
 
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
-#define I2C_S_BUF_SIZE 		64
-#define I2C_S_RX_BUF_NUM 		4
+#define I2C_S_BUF_SIZE 		256
+#define I2C_S_RX_BUF_NUM 		20
 #define BUFF_FULL		0xff00
 #define BUFF_ONGOING	1
 #endif
@@ -266,7 +266,6 @@ static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 			}
 			if(i == I2C_S_RX_BUF_NUM) {
 				printk("RX buffer full ........use tmp msgs buff \n");
-				//TODO...
 			}
 			//printk("I2C_SLAVE_EVENT_START_WRITE ... %d \n", i);
 
@@ -1319,7 +1318,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 					printk("ast_i2c:  TX_ACK | NORMAL_STOP;  xfer_last %d\n", i2c_dev->xfer_last);
 					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_ACK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
 					uint32_t new_val = ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
-						        	AST_I2CD_NORMAL_STOP_INTR_EN | 
+						        	AST_I2CD_NORMAL_STOP_INTR_EN |
 								AST_I2CD_TX_ACK_INTR_EN;
 					ast_i2c_write(i2c_dev, new_val, I2C_INTR_CTRL_REG);
 					//take care
@@ -1471,6 +1470,11 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
       if (sts & AST_I2CD_INTR_STS_SLAVE_MATCH) {
         ast_i2c_slave_addr_match(i2c_dev);
         sts &= (~AST_I2CD_INTR_STS_SLAVE_MATCH);
+      }
+
+      // Handle Normal Stop conditon
+      if (sts & AST_I2CD_INTR_STS_NORMAL_STOP) {
+        sts &= (~AST_I2CD_INTR_STS_NORMAL_STOP);
       }
 
       // TODO: Debug print for any unhandled condition
