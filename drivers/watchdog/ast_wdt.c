@@ -450,7 +450,7 @@ static int ast_wdt_open(struct inode *inode, struct file *file)
           
 static int ast_wdt_release(struct inode *inode, struct file *file)
 {
-  if (expect_close != 42 || !nowayout) 
+  if (expect_close != 42 && !nowayout) 
   {
      /* handles the case where the device is closed without the "magic
       * close" character (anything that is not 'V' qualifies -- see the
