@@ -768,7 +768,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_11[] = {
 static struct i2c_board_info __initdata ast_i2c_board_info_12[] = {
   // Mezz Card LAN_SMB bus (PHY, Temp. Sensor)
   {
-    I2C_BOARD_INFO("tmp75", 0x1f),
+    //I2C_BOARD_INFO("tmp75", 0x1f),
   },
 };
 
