@@ -56,6 +56,7 @@
 #endif
 
 #define AST_LOCKUP_DETECTED (0x1 << 15)
+#define AST_I2C_LOW_TIMEOUT 0x03
 
 struct ast_i2c_dev {
 	struct ast_i2c_driver_data *ast_i2c_data;
@@ -192,12 +193,12 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 							, I2C_FUN_CTRL_REG);
 
 		/* Set AC Timing */
-		ast_i2c_write(i2c_dev, 0x3, I2C_AC_TIMING_REG2);
+		ast_i2c_write(i2c_dev, AST_I2C_LOW_TIMEOUT, I2C_AC_TIMING_REG2);
 		ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
 	}else {
 		/* target apeed is xxKhz*/
 		ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
-		ast_i2c_write(i2c_dev, AST_NO_TIMEOUT_CTRL, I2C_AC_TIMING_REG2);
+		ast_i2c_write(i2c_dev, AST_I2C_LOW_TIMEOUT, I2C_AC_TIMING_REG2);
 	}
 #else
 	/* target apeed is xxKhz*/
@@ -1424,6 +1425,8 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			complete(&i2c_dev->cmd_complete);
 			break;
 		case AST_I2CD_INTR_STS_SCL_TO:
+		case AST_I2CD_INTR_STS_SLAVE_MATCH | AST_I2CD_INTR_STS_SCL_TO:
+			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SCL_TO, I2C_INTR_STS_REG);
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_SCL_TO;
 			complete(&i2c_dev->cmd_complete);
 
@@ -1442,6 +1445,9 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 		case AST_I2CD_INTR_STS_SMBUS_ARP_ADDR:
 			break;
 		case AST_I2CD_INTR_STS_SDA_DL_TO:
+			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SDA_DL_TO, I2C_INTR_STS_REG);
+			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_SDA_DL_TO;
+			complete(&i2c_dev->cmd_complete);
 			break;
 		case AST_I2CD_INTR_STS_BUS_RECOVER:
 			dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_BUS_RECOVER= %x\n",sts);
@@ -1609,7 +1615,7 @@ static int ast_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 		ret = ast_i2c_do_msgs_xfer(i2c_dev, msgs, num);
 		if (ret != -EAGAIN)
 			goto out;
-		dev_dbg(&adap->dev, "Retrying transmission [%d]\n",i);
+		dev_dbg(&i2c_dev->adap.dev, "Retrying transmission [%d]\n",i);
 		udelay(100);
 	}
 
