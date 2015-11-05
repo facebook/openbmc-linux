@@ -1270,6 +1270,7 @@ static inline void __stop_tx(struct uart_8250_port *p)
 		p->ier &= ~UART_IER_THRI;
 		serial_out(p, UART_IER, p->ier);
 	}
+	uart_write_wakeup(&p->port);
 }
 
 static void serial8250_stop_tx(struct uart_port *port)
