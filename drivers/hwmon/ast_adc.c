@@ -525,7 +525,7 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 			break;
 		case 1: //value
 			voltage = ast_get_voltage(sensor_attr->index);
-			return sprintf(sysfsbuf, "%d.%d (V)\n",voltage/100, voltage%100);
+			return sprintf(sysfsbuf, "%d.%02d (V)\n",voltage/100, voltage%100);
 			break;
 		case 2: //alarm
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_alarm(ast_adc,sensor_attr->index));
