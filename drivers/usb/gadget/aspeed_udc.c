@@ -580,10 +580,10 @@ static void ep_dequeue_locked(struct ast_ep* ep, struct ast_usb_request *req) {
 
 static void ep_dequeue_all(struct ast_ep* ep, int status) {
   struct ast_usb_request *req;
-  struct ast_usb_request *n;
   unsigned long flags;
   spin_lock_irqsave(&ep->lock, flags);
-  list_for_each_entry_safe(req, n, &ep->queue, queue) {
+  while (!list_empty(&ep->queue)) {
+    req = list_entry(ep->queue.next, struct ast_usb_request, queue);
     ep_dequeue_locked(ep, req);
     req->req.status = status;
     if(req->req.complete) {
@@ -654,8 +654,14 @@ static void ep_txrx_check_done(struct ast_ep* ep) {
   spin_lock_irqsave(&ep->lock, flags);
   status = ep_hreadl(ep, DESC_STATUS);
   // if txrx complete;
-  if(!(status & 0xff) &&
-     !list_empty(&ep->queue)) {
+  if (!(status & 0xff)) {
+    /* DMA is done */
+    ep->dma_busy = 0;
+    /* if the list is empty, nothing to do */
+    if (list_empty(&ep->queue)) {
+      spin_unlock_irqrestore(&ep->lock, flags);
+      return;
+    }
     req = list_entry(ep->queue.next, struct ast_usb_request, queue);
     if(!req->in_transit) {
       spin_unlock_irqrestore(&ep->lock, flags);
@@ -663,7 +669,6 @@ static void ep_txrx_check_done(struct ast_ep* ep) {
     }
     //head rq completed
     req->in_transit = 0;
-    ep->dma_busy = 0;
     if(!ep->to_host) {
       req->lastpacket = (status >> 16) & 0x3ff;
       __cpuc_flush_kern_all();
