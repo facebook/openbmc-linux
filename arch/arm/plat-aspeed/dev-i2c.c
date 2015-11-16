@@ -634,6 +634,9 @@ static struct i2c_board_info __initdata wedge100_i2c_bus5[] = {
   {
     I2C_BOARD_INFO("fb_panther_plus", 0x40),
   },
+  {
+     I2C_BOARD_INFO("com_e_driver", 0x33),
+  }
 };
 
 static struct i2c_board_info __initdata wedge100_i2c_bus6[] = {
