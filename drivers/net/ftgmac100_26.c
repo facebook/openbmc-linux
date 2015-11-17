@@ -901,6 +901,41 @@ void Enable_Broadcast_Filter (struct net_device * dev)
     lp->Retry = 0;
 }
 
+void Disable_Multicast_Filter (struct net_device * dev)
+{
+  struct ftgmac100_priv *lp = (struct ftgmac100_priv *)dev->priv;
+  unsigned long Combined_Channel_ID;
+  struct sk_buff * skb;
+
+    do {
+  skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+  memset(skb->data, 0, TX_BUF_SIZE + 16);
+//TX
+  lp->InstanceID++;
+  lp->NCSI_Request.IID = lp->InstanceID;
+  lp->NCSI_Request.Command = DISABLE_GLOBAL_MULTICAST_FILTERING;
+  Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+  lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+  lp->NCSI_Request.Payload_Length = 0;
+  memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+  copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+  skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+  ftgmac100_wait_to_send_packet (skb, dev);
+//RX
+  NCSI_Rx(dev);
+  if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (DISABLE_GLOBAL_MULTICAST_FILTERING | 0x80)) || (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) && (lp->Retry != RETRY_COUNT)) {
+    printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+    printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+    lp->Retry++;
+    lp->InstanceID--;
+  }
+  else {
+    lp->Retry = 0;
+  }
+    } while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+    lp->Retry = 0;
+}
+
 void Disable_VLAN (struct net_device * dev)
 {
   struct ftgmac100_priv *lp = (struct ftgmac100_priv *)dev->priv;
@@ -1416,6 +1451,8 @@ static void ftgmac100_enable( struct net_device *dev )
 					Enable_Set_MAC_Address(dev);
 //Enable Broadcast Filter
 					Enable_Broadcast_Filter(dev);
+//Disable Multicast Filter
+          Disable_Multicast_Filter(dev);
 //Disable VLAN
 					Disable_VLAN(dev);
 //Enable AEN
