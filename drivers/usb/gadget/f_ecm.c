@@ -245,7 +245,11 @@ static struct usb_endpoint_descriptor hs_ecm_in_desc __initdata = {
 
 	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+#ifdef CONFIG_WEDGE
+	.wMaxPacketSize =	__constant_cpu_to_le16(64),
+#else
 	.wMaxPacketSize =	__constant_cpu_to_le16(512),
+#endif
 };
 
 static struct usb_endpoint_descriptor hs_ecm_out_desc __initdata = {
@@ -254,7 +258,11 @@ static struct usb_endpoint_descriptor hs_ecm_out_desc __initdata = {
 
 	.bEndpointAddress =	USB_DIR_OUT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+#ifdef CONFIG_WEDGE
+	.wMaxPacketSize =	__constant_cpu_to_le16(64),
+#else
 	.wMaxPacketSize =	__constant_cpu_to_le16(512),
+#endif
 };
 
 static struct usb_descriptor_header *ecm_hs_function[] __initdata = {

@@ -19,7 +19,7 @@
  */
 
 //#define DEBUG
-//#define VERBOSE_DEBUG
+//#define VERBOSE
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -49,6 +49,23 @@
 
 #define NUM_ENDPOINTS 14
 #define AST_UDC_EP0_MAXPACKET 64
+
+#if CONFIG_WEDGE
+/*
+ * The HW should be able to support up to 512 on EP pool. However, we notice
+ * some issues on some wedges that the IN DMA was stuck. Changing the maxpacket
+ * to 64 seems to fix this issue.
+ */
+#define AST_UDC_EP_MAXPACKET 64
+#else
+#define AST_UDC_EP_MAXPACKET 512
+#endif
+
+#ifdef VERBOSE
+#define ep_vdebug pr_debug
+#else
+#define ep_vdebug
+#endif
 
 struct ast_ep *eps;
 static const struct usb_ep_ops ast_ep_ops;
@@ -211,7 +228,7 @@ static void ep0_stall(void) {
 }
 
 static void ep0_next_stage(int has_data_phase, u8 data_dir) {
-#ifdef DEBUG
+#ifdef VERBOSE
   int prev_stage = udc.ep0_stage;
   int prev_dir = udc.ep0_dir;
 #endif
@@ -239,10 +256,10 @@ static void ep0_next_stage(int has_data_phase, u8 data_dir) {
     break;
   }
 
-#ifdef DEBUG
-  pr_debug("EP0 stage is changed from %d (%s) to %d (%s)\n",
-           prev_stage, ast_udc_dir2str(prev_dir),
-           udc.ep0_stage, ast_udc_dir2str(udc.ep0_dir));
+#if VERBOSE
+  ep_vdebug("EP0 stage is changed from %d (%s) to %d (%s)\n",
+            prev_stage, ast_udc_dir2str(prev_dir),
+            udc.ep0_stage, ast_udc_dir2str(udc.ep0_dir));
 #endif
 }
 
@@ -287,8 +304,8 @@ static int ep0_enqueue(struct usb_ep* _ep, struct usb_request *_rq,
   _rq->status = -EINPROGRESS;
   req->req.actual = 0;
 
-  pr_debug("EP0 enqueue %d bytes at stage %d, %s\n",
-           req->req.length, udc.ep0_stage, ast_udc_dir2str(udc.ep0_dir));
+  ep_vdebug("EP0 enqueue %d bytes at stage %d, %s\n",
+            req->req.length, udc.ep0_stage, ast_udc_dir2str(udc.ep0_dir));
 
   spin_lock_irqsave(&ep->lock, flags);
 
@@ -348,9 +365,9 @@ static int ep0_handle_setup(void) {
   idx = le16_to_cpu(crq.wIndex);
   len = le16_to_cpu(crq.wLength);
 
-  pr_debug("request=%d, reqType=0x%x val=0x%x idx=%d len=%d %s\n",
-           crq.bRequest, crq.bRequestType, val, idx, len,
-           ast_udc_dir2str(crq.bRequestType));
+  ep_vdebug("request=%d, reqType=0x%x val=0x%x idx=%d len=%d %s\n",
+            crq.bRequest, crq.bRequestType, val, idx, len,
+            ast_udc_dir2str(crq.bRequestType));
 
   spin_lock_irqsave(&ep->lock, flags);
   ep0_next_stage(
@@ -417,8 +434,8 @@ static void ep0_handle_ack(void) {
 
   status = ast_hreadl(&udc, EP0_STATUS);
 
-  pr_debug("Check done with status 0x%lx: stage=%d %s\n", status,
-           udc.ep0_stage, ast_udc_dir2str((udc.ep0_dir)));
+  ep_vdebug("Check done with status 0x%lx: stage=%d %s\n", status,
+            udc.ep0_stage, ast_udc_dir2str((udc.ep0_dir)));
 
   if (list_empty(&ep->queue)) {
     /* we requested DMA but no request */
@@ -442,8 +459,8 @@ static void ep0_handle_ack(void) {
       }
     }
     req->req.actual += req->lastpacket;
-    pr_debug("EP0 req actual=%d length=%d lastpacket=%d\n",
-             req->req.actual, req->req.length, req->lastpacket);
+    ep_vdebug("EP0 req actual=%d length=%d lastpacket=%d\n",
+              req->req.actual, req->req.length, req->lastpacket);
     if (req->req.actual >= req->req.length
         || req->lastpacket < AST_UDC_EP0_MAXPACKET) {
       list_del_init(&req->queue);
@@ -640,7 +657,7 @@ static void disable_all_endpoints(void) {
 }
 
 static void ep_txrx(struct ast_ep* ep, void* buf, size_t len) {
-  if(ep->to_host) {
+  if (ep->to_host && len) {
     memcpy(ep->txbuf, buf, len);
   }
   ep_hwritel(ep, DESC_STATUS, len << 16);
@@ -651,6 +668,8 @@ static void ep_txrx_check_done(struct ast_ep* ep) {
   struct ast_usb_request *req;
   unsigned long flags;
   u32 status;
+  int req_done;
+
   spin_lock_irqsave(&ep->lock, flags);
   status = ep_hreadl(ep, DESC_STATUS);
   // if txrx complete;
@@ -669,31 +688,64 @@ static void ep_txrx_check_done(struct ast_ep* ep) {
     }
     //head rq completed
     req->in_transit = 0;
-    if(!ep->to_host) {
+    ep->dma_busy = 0;
+    if (!ep->to_host) {
       req->lastpacket = (status >> 16) & 0x3ff;
       __cpuc_flush_kern_all();
       memcpy(req->req.buf + req->req.actual, ep->txbuf, req->lastpacket);
       //print_hex_dump(KERN_DEBUG, "epXrx: ", DUMP_PREFIX_OFFSET, 16, 1, ep->txbuf, req->lastpacket, 0);
     }
     req->req.actual += req->lastpacket;
-    if(req->req.actual == req->req.length ||
-        req->lastpacket < ep->ep.maxpacket) {
+
+    req_done = 1;
+    if (req->lastpacket < ep->ep.maxpacket) {
+      /* the last packet was smaller than maximum size. we are done */
+
+    } else {
+      if (req->req.actual < req->req.length) {
+        /* the transferred is smaller than requested, need more data xfer */
+        req_done = 0;
+      } else if (req->req.actual == req->req.length) {
+        /*
+         * The exact requested has been xferred. which means the xfer is done.
+         * Unless, req->req.zero is set (to_host direction only).
+         * If req->req.zero is set, we need to make sure a 'short'
+         * pkt is sent (zero pkt if needed)
+         */
+        if (ep->to_host && req->req.zero) {
+          /*
+           * to_host direction; and req->req.zero is set;
+           * and the last pkt was full pkt (not short).
+           * Need to send a zero length pkt (short)
+           */
+          req_done = 0;
+        }
+      }
+    }
+
+    if (req_done) {
       list_del_init(&req->queue);
       spin_unlock_irqrestore(&ep->lock, flags);
       //printk("rq done ep%d\n", ep->addr);
       req->req.status = 0;
-      if(req->req.complete) {
+      if (req->req.complete) {
         req->req.complete(&ep->ep, &req->req);
       }
     } else {
       //printk("rq partial ep%d %d/%d\n", ep->addr, req->req.actual, req->req.length);
       spin_unlock_irqrestore(&ep->lock, flags);
     }
+
+    ep_vdebug("%s:%d %s lastpacket=%d maxpacket=%d zero=%d to_host=%d "
+              "actual=%d length=%d done=%d\n",
+              __FUNCTION__, __LINE__, ep->ep.name ? ep->ep.name : "Unknown",
+              req->lastpacket, ep->ep.maxpacket, req->req.zero, ep->to_host,
+              req->req.actual, req->req.length, req_done);
   }
 }
 
 static int ast_ep_queue_run(struct ast_ep* ep) {
-  struct ast_usb_request *req;
+  struct ast_usb_request *req = NULL;
   unsigned long flags;
   spin_lock_irqsave(&ep->lock, flags);
   if(ep->active && !ep->dma_busy) {
@@ -702,22 +754,26 @@ static int ast_ep_queue_run(struct ast_ep* ep) {
       // nothing
     } else {
       req = list_entry(ep->queue.next, struct ast_usb_request, queue);
-      req->lastpacket = req->req.length - req->req.actual;
+      if (req->req.length < req->req.actual) {
+        req->lastpacket = 0;
+      } else {
+        req->lastpacket = req->req.length - req->req.actual;
+      }
       if (req->lastpacket > ep->ep.maxpacket) {
         req->lastpacket = ep->ep.maxpacket;
       }
-      //printk("ep%d%sx:%d-%d/%d\n",
-      //    ep->addr,
-      //    ep->to_host ? "t" : "r",
-      //    req->req.actual,
-      //    req->req.actual + req->lastpacket,
-      //    req->req.length);
       ep_txrx(ep, req->req.buf + req->req.actual, req->lastpacket);
       req->in_transit = 1;
       ep->dma_busy = 1;
+      ep_vdebug("%s:%d %s lastpacket=%d maxpacket=%d zero=%d to_host=%d "
+                "actual=%d length=%d \n",
+                __FUNCTION__, __LINE__, ep->ep.name ? ep->ep.name : "Unknown",
+                req->lastpacket, ep->ep.maxpacket, req->req.zero, ep->to_host,
+                req->req.actual, req->req.length);
     }
   }
   spin_unlock_irqrestore(&ep->lock, flags);
+
   return 0;
 }
 
@@ -742,6 +798,13 @@ static int ast_ep_queue(struct usb_ep* _ep, struct usb_request *_rq, gfp_t gfp_f
   struct ast_usb_request *req = to_ast_req(_rq);
   struct ast_ep *ep = to_ast_ep(_ep);
   unsigned long flags;
+
+  ep_vdebug("%s: req l/%u d/%08x %c%c%c\n",
+            ep->ep.name ? ep->ep.name : "Unknown",
+            req->req.length, req->req.dma,
+            req->req.zero ? 'Z' : 'z',
+            req->req.short_not_ok ? 'S' : 's',
+            req->req.no_interrupt ? 'I' : 'i');
 
   if (ep == &ep0_ep) {
     return ep0_enqueue(_ep, _rq, gfp_flags);
@@ -970,6 +1033,7 @@ static int __init ast_vhub_udc_probe(struct platform_device *pdev) {
 
   INIT_LIST_HEAD(&ep0_ep.ep.ep_list);
   udc.gadget.ep0 = &ep0_ep.ep;
+  udc.gadget.speed = USB_SPEED_HIGH;
 
   eps = kzalloc(sizeof(struct ast_ep) * 14, GFP_KERNEL);
   if(!eps) {
@@ -987,7 +1051,7 @@ static int __init ast_vhub_udc_probe(struct platform_device *pdev) {
     ep->addr = i+2;
     snprintf(ep->epname, 7, "ep%d", ep->addr);
     ep->ep.name = ep->epname;
-    ep->ep.maxpacket = 1024;
+    ep->ep.maxpacket = AST_UDC_EP_MAXPACKET;
     spin_lock_init(&ep->lock);
     list_add_tail(&ep->ep.ep_list, &udc.gadget.ep_list);
   }

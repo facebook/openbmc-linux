@@ -205,14 +205,22 @@ static struct usb_endpoint_descriptor acm_hs_in_desc __initdata = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+#ifdef CONFIG_WEDGE
+	.wMaxPacketSize =	__constant_cpu_to_le16(64),
+#else
 	.wMaxPacketSize =	__constant_cpu_to_le16(512),
+#endif
 };
 
 static struct usb_endpoint_descriptor acm_hs_out_desc __initdata = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+#ifdef CONFIG_WEDGE
+	.wMaxPacketSize =	__constant_cpu_to_le16(64),
+#else
 	.wMaxPacketSize =	__constant_cpu_to_le16(512),
+#endif
 };
 
 static struct usb_descriptor_header *acm_hs_function[] __initdata = {
