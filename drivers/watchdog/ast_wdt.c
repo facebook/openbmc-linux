@@ -439,7 +439,7 @@ static int ast_wdt_probe(struct platform_device *pdev)
    wdt_set_timeout_action(FALSE, FALSE, FALSE);
 	
    /* register ISR */
-   if (request_irq(IRQ_WDT, (void *)wdt_isr, IRQF_DISABLED, "WDT", NULL))
+   if (request_irq(IRQ_WDT, (void *)wdt_isr, 0 /* IRQF_DISABLED */, "WDT", NULL))
    {
      printk("unable to register interrupt INT_WDT = %d\n", IRQ_WDT);
      return (-1);

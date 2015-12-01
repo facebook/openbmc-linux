@@ -160,7 +160,7 @@ ast_timer_interrupt(int irq, void *dev_id)
 
 static struct irqaction ast_timer_irq = {
 	.name		= "ast timer",
-	.flags		= IRQF_DISABLED |  IRQF_TIMER,
+	.flags		= IRQF_TIMER,
 	.handler		= ast_timer_interrupt,
 	.dev_id		= &ast_clockevent,	
 };
