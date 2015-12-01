@@ -340,6 +340,31 @@ config MTD_UCLINUX
 	help
 	  Map driver to support image based filesystems for uClinux.
 
+config MTD_UCLINUX_EBSS
+	bool "uClinux RAM/ROM filesystem is located at ebss"
+	depends on MTD_UCLINUX
+	default y
+	help
+	  The filesystem is located directly after the kernel in memory.
+
+config MTD_UCLINUX_ADDRESS
+	hex "uClinux RAM/ROM filesystem address"
+	default 0x1400000
+	depends on MTD_UCLINUX && !MTD_UCLINUX_EBSS
+	help
+	  The filesystem is located at the given address.
+
+choice
+	prompt "uClinux RAM/ROM is located in ROM/RAM"
+	default MTD_UCLINUX_RAM
+	depends on MTD_UCLINUX && !MTD_UCLINUX_EBSS
+
+config MTD_UCLINUX_RAM
+	bool "RAM"
+config MTD_UCLINUX_ROM
+	bool "ROM"
+endchoice
+
 config MTD_INTEL_VR_NOR
 	tristate "NOR flash on Intel Vermilion Range Expansion Bus CS0"
 	depends on PCI

@@ -126,6 +126,20 @@ config GPIO_BCM_KONA
 	help
 	  Turn on GPIO support for Broadcom "Kona" chips.
 
+config GPIO_AST
+	tristate "ASPEED GPIO support"
+	depends on PLAT_ASPEED
+	select GPIO_GENERIC
+        help
+          Say yes here to support GPIO functionality of AST SOC chip.
+
+config SGPIO_AST
+        tristate "ASPEED SGPIO support"
+	depends on PLAT_ASPEED
+	select GPIO_GENERIC
+        help
+          Say yes here to support SGPIO functionality of AST SOC chip.
+
 config GPIO_CLPS711X
 	tristate "CLPS711X GPIO support"
 	depends on ARCH_CLPS711X || COMPILE_TEST

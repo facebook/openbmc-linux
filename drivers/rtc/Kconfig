@@ -1233,6 +1233,11 @@ config RTC_DRV_PL031
 	  To compile this driver as a module, choose M here: the
 	  module will be called rtc-pl031.
 
+config RTC_DRV_AST
+	bool "ASPEED RTC"
+	depends on ARM
+	help
+
 config RTC_DRV_AT32AP700X
 	tristate "AT32AP700X series RTC"
 	depends on PLATFORM_AT32AP

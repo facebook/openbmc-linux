@@ -156,6 +156,41 @@ config SERIAL_8250_RUNTIME_UARTS
 	  with the module parameter "nr_uarts", or boot-time parameter
 	  8250.nr_uarts
 
+config SERIAL_AST_VUART
+        tristate "AST VUART driver"
+        depends on ARCH_ASPEED
+        select SERIAL_CORE
+        help
+          The ASPEED VUART driver supporting. The device node is /dev/ttyS
+	
+config SERIAL_AST_DMA_UART
+        tristate "AST UART driver with DMA"
+        depends on ARCH_ASPEED
+        select SERIAL_CORE
+        help
+          The ASPEED UART driver with DMA supporting. The device node is /dev/ttyDMA
+
+config AST_NR_DMA_UARTS
+        int "Maximum number of uart dma serial ports"
+        depends on SERIAL_AST_DMA_UART
+        default "4"
+        help
+          Set this to the number of serial ports you want the driver
+          to support.  This includes any ports discovered via ACPI or
+          PCI enumeration and any ports that may be added at run-time
+          via hot-plug, or any ISA multi-port serial cards.
+
+config AST_RUNTIME_DMA_UARTS
+        int "Number of uart dma serial ports to register at runtime"
+        depends on SERIAL_AST_DMA_UART
+        range 0 AST_NR_DMA_UARTS
+        default "4"
+        help
+          Set this to the maximum number of serial ports you want
+          the kernel to register at boot time.  This can be overridden
+          with the module parameter "nr_uarts", or boot-time parameter
+          8250.nr_uarts
+
 config SERIAL_8250_EXTENDED
 	bool "Extended 8250/16550 serial driver options"
 	depends on SERIAL_8250
@@ -276,6 +311,39 @@ config SERIAL_8250_FSL
 	bool
 	depends on SERIAL_8250_CONSOLE && PPC_UDBG_16550
 	default PPC
+
+config SERIAL_AST
+	tristate "ASPEED serial port support"
+	depends on ARCH_ASPEED
+	select SERIAL_CORE
+	help
+	  Support for the on-chip UARTs on the ASPEED chips,
+	  providing /dev/ttySAC0, 1 and 2 (note, some machines may not
+	  provide all of these ports, depending on how the serial port
+	  pins are configured.
+
+config SERIAL_ASPEED_CONSOLE
+	bool "Support for console on ASPEED serial port"
+	depends on SERIAL_AST=y
+	select SERIAL_CORE_CONSOLE
+	help
+	  Allow selection of the ASPEED on-board serial ports for use as
+	  an virtual console.
+
+	  Even if you say Y here, the currently visible virtual console
+	  (/dev/ttyS0) will still be used as the system console by default, but
+	  you can alter that using a kernel command line option such as
+	  "console=ttySx". (Try "man bootparam" or see the documentation of
+	  your boot loader about how to pass options to the kernel at
+	  boot time.)
+
+config SERIAL_ASPEED_CONSOLE_BAUD
+	int "ASPEED serial port baud"
+	depends on SERIAL_ASPEED_CONSOLE=y
+	default "115200"
+	help
+	  Select the ASPEED console baud rate.
+	  This value is only used if the bootloader doesn't pass in the
 
 config SERIAL_8250_DW
 	tristate "Support for Synopsys DesignWare 8250 quirks"

@@ -1,0 +1,203 @@
+if ARCH_ASPEED
+
+choice
+        prompt "ASPEED Processor Family"
+        default CONFIG_IRMP
+
+config IRMP
+        bool "IRMP Serials"
+
+config PCEXT
+	bool "PC Extender Serials"
+
+config REMOTEFX
+	bool "RemoteFX Zero-Client Serials"
+
+endchoice
+
+if IRMP
+
+choice
+        prompt "IRMP Serials"
+        default CONFIG_ARCH_AST2300
+
+config ARCH_AST1100
+	select CPU_ARM926T
+        bool "AST1100"
+
+config ARCH_AST2100
+	select CPU_ARM926T
+        bool "AST2100"
+
+config ARCH_AST2200
+	select CPU_ARM926T
+        bool "AST2200"
+
+config ARCH_AST2300
+	select CPU_ARM926T
+        bool "AST2300"
+
+config ARCH_AST2400
+	select CPU_ARM926T
+	select USB_ARCH_HAS_EHCI
+        bool "AST2400"
+
+config ARCH_AST2500
+#        select CPU_V6
+	select USB_ARCH_HAS_EHCI
+	select AST_UART_SDMA
+	select EGFX_IRQ
+        bool "AST2500"
+
+endchoice
+
+endif
+
+if PCEXT
+
+choice
+        prompt "PC Extender Serials"
+        default CONFIG_ARCH_AST1510
+
+config ARCH_AST1500
+	select CPU_ARM926T
+        bool "AST1500"
+
+config ARCH_AST1510
+	select CPU_ARM926T
+        bool "AST1510"
+
+config ARCH_AST1520
+	select CPU_V6
+	select USB_ARCH_HAS_EHCI
+	bool "AST1520"
+
+endchoice
+
+endif
+
+if REMOTEFX
+
+choice
+        prompt "RemoteFX Zero-Client Serials"
+        default CONFIG_ARCH_AST3100
+
+config ARCH_AST3100
+	select CPU_ARM926T
+	select USB_ARCH_HAS_EHCI
+        bool "AST3100"
+
+config ARCH_AST3200
+        select CPU_V6
+	select USB_ARCH_HAS_EHCI
+	select EGFX_IRQ
+        bool "AST3200"
+
+endchoice
+
+endif
+
+menu "FLASH Chip Select"
+
+choice
+        prompt "CS0 Config"
+        default CONFIG_AST_CS0_SPI
+
+config AST_CS0_NOR
+        bool "NOR"
+
+config AST_CS0_NAND
+        bool "NAND"
+
+config AST_CS0_SPI
+        bool "SPI_NOR"
+
+config AST_CS0_NONE
+	bool "NONE"
+
+endchoice
+
+choice
+        prompt "CS1 Config"
+        default CONFIG_AST_CS1_SPI
+
+config AST_CS1_NOR
+        bool "NOR"
+
+config AST_CS1_NAND
+        bool "NAND"
+
+config AST_CS1_SPI
+        bool "SPI_NOR"
+
+config AST_CS1_NONE
+        bool "NONE"
+
+endchoice
+
+choice
+        prompt "CS2 Config"
+        default CONFIG_AST_CS2_SPI
+
+config AST_CS2_NOR
+        bool "NOR"
+
+config AST_CS2_NAND
+        bool "NAND"
+
+config AST_CS2_SPI
+        bool "SPI_NOR"
+
+config AST_CS2_NONE
+        bool "NONE"
+
+endchoice
+
+choice
+        prompt "CS3 Config"
+        default CONFIG_AST_CS3_SPI
+
+config AST_CS3_NOR
+        bool "NOR"
+
+config AST_CS3_NAND
+        bool "NAND"
+
+config AST_CS3_SPI
+        bool "SPI_NOR"
+
+config AST_CS3_NONE
+        bool "NONE"
+
+endchoice
+
+choice
+        prompt "CS4 Config"
+        default CONFIG_AST_CS4_SPI
+
+config AST_CS4_NOR
+        bool "NOR"
+
+config AST_CS4_NAND
+        bool "NAND"
+
+config AST_CS4_SPI
+        bool "SPI_NOR"
+
+config AST_CS4_NONE
+        bool "NONE"
+
+endchoice
+
+endmenu
+
+config AST_SCU_LOCK
+	bool "AST SCU Protection Key"
+
+config AST1070_UART_DMA
+	bool
+
+config AST_UART_SDMA
+	bool
+
+endif

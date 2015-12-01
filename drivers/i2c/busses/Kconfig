@@ -339,6 +339,51 @@ config I2C_AT91
 	  the latency to fill the transmission register is too long. If you
 	  are facing this situation, use the i2c-gpio driver.
 
+config I2C_AST
+        tristate "ASPEED AST I2C adapter "
+#        depends on ARCH_ASPEED
+        help
+          If you have devices in the AST I2C bus, say yes to this option.
+          This driver can also be built as a module.  If so, the module
+          will be called i2c-ast.
+
+config I2C_AST1070
+        tristate "ASPEED AST1070 I2C adapter "
+        depends on ARCH_AST1070
+        help
+          If you have devices in the AST1070 I2C bus, say yes to this option.
+          This driver can also be built as a module.  If so, the module
+          will be called i2c-ast.
+
+config AST_I2C_SLAVE_MODE
+        bool "AST I2C Slave mode"
+	depends on I2C_AST
+
+if AST_I2C_SLAVE_MODE
+
+choice 
+	prompt "I2C slave config"
+        default AST_I2C_SLAVE_EEPROM
+
+config AST_I2C_SLAVE_EEPROM
+        bool "10 byte EEPROM Device"
+        help
+          Support I2C slave mode communications on the AST I2C bus.  This
+          is necessary for systems where the AST may be a target on the
+          I2C bus.
+	  
+config AST_I2C_SLAVE_RDWR
+        bool "I2C Slave RD/WR via ioctl"
+
+        help
+          Support I2C slave mode communications on the AST I2C bus.  This
+          is necessary for systems where the AST may be a target on the
+          I2C bus.
+
+endchoice
+
+endif
+
 config I2C_AU1550
 	tristate "Au1550/Au1200/Au1300 SMBus interface"
 	depends on MIPS_ALCHEMY

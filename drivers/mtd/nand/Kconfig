@@ -126,6 +126,12 @@ config MTD_NAND_RICOH
 	  expermental, readwrite
 	  'SmartMedia/xD new translation layer'
 
+config MTD_NAND_AST
+	tristate "AST NAND flash"
+	depends on MTD_NAND && ARCH_ASPEED && MTD_PARTITIONS
+	help
+	  This enables the driver for the ASPEED NAND flash.
+
 config MTD_NAND_AU1550
 	tristate "Au1550/1200 NAND support"
 	depends on MIPS_ALCHEMY

@@ -35,6 +35,10 @@
 #include <linux/jiffies.h>
 #include <linux/uaccess.h>
 
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR
+#include <plat/ast_i2c.h>
+#endif
+
 /*
  * An i2c_dev represents an i2c_adapter ... an I2C or SMBus master, not a
  * slave (i2c_client) with which messages will be exchanged.  It's coupled
@@ -457,6 +461,11 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case I2C_RDWR:
 		return i2cdev_ioctl_rdrw(client, arg);
+
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR
+	case I2C_SLAVE_RDWR:
+		return i2cdev_ioctl_slave_rdrw(client->adapter, (struct i2c_msg __user *)arg);
+#endif		
 
 	case I2C_SMBUS:
 		return i2cdev_ioctl_smbus(client, arg);

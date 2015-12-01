@@ -76,6 +76,10 @@ struct i2c_msg {
 #define I2C_M_IGNORE_NAK	0x1000	/* if I2C_FUNC_PROTOCOL_MANGLING */
 #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
 #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR
+#define I2C_S_EN			0x2000	/* Slave mode enable */
+#define I2C_S_ALT			0x2001	/* Slave issue slt */
+#endif
 	__u16 len;		/* msg length				*/
 	__u8 *buf;		/* pointer to msg data			*/
 };

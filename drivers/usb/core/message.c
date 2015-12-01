@@ -725,11 +725,19 @@ static int usb_string_sub(struct usb_device *dev, unsigned int langid,
 	if (dev->quirks & USB_QUIRK_STRING_FETCH_255)
 		rc = -EIO;
 	else
+#ifdef CONFIG_ARCH_ASPEED
+		rc = usb_get_string(dev, langid, index, buf, 256);
+#else
 		rc = usb_get_string(dev, langid, index, buf, 255);
+#endif
 
 	/* If that failed try to read the descriptor length, then
 	 * ask for just that many bytes */
+#ifdef CONFIG_ARCH_ASPEED
+	if ((rc < 2) || (rc == 256)) {
+#else
 	if (rc < 2) {
+#endif		
 		rc = usb_get_string(dev, langid, index, buf, 2);
 		if (rc == 2)
 			rc = usb_get_string(dev, langid, index, buf, buf[0]);

@@ -48,6 +48,27 @@ config MMC_SDHCI
 
 	  If unsure, say N.
 
+config MMC_AST
+	tristate "ASPEED Secure Digital Host Controller Interface support"
+	depends on HAS_DMA
+	help
+	  This selects the ASPEED Secure Digital Host Controller Interface.
+
+	  If you have a controller with this interface, say Y or M here. You
+	  also need to enable an appropriate bus interface.
+
+	  If unsure, say N.
+
+config WO_CD
+	bool "SDHCi Without Card Detect pin"
+	depends on MMC_AST
+	help
+	  This selects the ASPEED SDHCI support for with out Card detect pin 	
+
+config 8BIT_MODE
+	bool "8 bit Mode"
+	depends on MMC_AST
+
 config MMC_SDHCI_IO_ACCESSORS
 	bool
 	depends on MMC_SDHCI

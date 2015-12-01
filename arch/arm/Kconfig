@@ -329,6 +329,15 @@ config ARCH_MULTIPLATFORM
 	select SPARSE_IRQ
 	select USE_OF
 
+config ARCH_ASPEED
+	bool "ASPEED AST Family"
+	select ARM_AMBA
+	select PLAT_ASPEED
+	select ARCH_WANT_OPTIONAL_GPIOLIB
+#	select ARCH_USES_GETTIMEOFFSET
+	select MIGHT_HAVE_PCI
+	select GENERIC_CLOCKEVENTS
+
 config ARCH_REALVIEW
 	bool "ARM Ltd. RealView family"
 	select ARCH_WANT_OPTIONAL_GPIOLIB
@@ -824,6 +833,8 @@ config ARCH_VIRT
 # Kconfigs may be included either alphabetically (according to the
 # plat- suffix) or along side the corresponding mach-* source.
 #
+source "arch/arm/mach-aspeed/Kconfig"
+
 source "arch/arm/mach-mvebu/Kconfig"
 
 source "arch/arm/mach-alpine/Kconfig"
@@ -954,6 +965,10 @@ source "arch/arm/mach-zynq/Kconfig"
 # Definitions to make life easier
 config ARCH_ACORN
 	bool
+
+config PLAT_ASPEED
+	bool
+	select FIQ
 
 config PLAT_IOP
 	bool

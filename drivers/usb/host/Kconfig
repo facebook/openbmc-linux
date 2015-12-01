@@ -144,6 +144,13 @@ config USB_EHCI_FSL
 	---help---
 	  Variation of ARC USB block used in some Freescale chips.
 
+config USB_EHCI_AST
+        bool "Support for ASPEED SoC EHCI USB controller"
+        depends on USB_EHCI_HCD && ARCH_ASPEED
+#        select USB_EHCI_ROOT_HUB_TT
+        ---help---
+          Variation of ARC USB block used in some ASPEED SoC chips.
+	  
 config USB_EHCI_MXC
 	tristate "Support for Freescale i.MX on-chip EHCI USB controller"
 	depends on ARCH_MXC
@@ -583,7 +590,7 @@ endif # USB_OHCI_HCD
 
 config USB_UHCI_HCD
 	tristate "UHCI HCD (most Intel and VIA) support"
-	depends on PCI || USB_UHCI_SUPPORT_NON_PCI_HC
+	depends on PCI || USB_UHCI_SUPPORT_NON_PCI_HC || PLAT_ASPEED
 	---help---
 	  The Universal Host Controller Interface is a standard by Intel for
 	  accessing the USB hardware in the PC (which is also called the USB
@@ -598,9 +605,32 @@ config USB_UHCI_HCD
 	  To compile this driver as a module, choose M here: the
 	  module will be called uhci-hcd.
 
+config USB_UHCI_AST
+	bool "AST UHCI (USB 1.1) support"
+	depends on USB_UHCI_HCD
+
+choice
+        prompt "Config AST USB UHCI Number of Ports"
+        depends on USB_UHCI_AST
+        default AST_USB_UHCI_MULTIPORT_4
+
+config AST_USB_UHCI_MULTIPORT_1
+        bool "AST UHCI support 1 ports"
+        depends on USB_UHCI_AST
+
+config AST_USB_UHCI_MULTIPORT_2
+        bool "AST UHCI support 2 ports"
+        depends on USB_UHCI_AST
+
+config AST_USB_UHCI_MULTIPORT_4
+        bool "AST UHCI support 4 ports"
+        depends on USB_UHCI_AST
+
+endchoice
+
 config USB_UHCI_SUPPORT_NON_PCI_HC
 	bool
-	default y if (SPARC_LEON || USB_UHCI_PLATFORM)
+	default y if (SPARC_LEON || USB_UHCI_PLATFORM || PLAT_ASPEED)
 
 config USB_UHCI_PLATFORM
 	bool

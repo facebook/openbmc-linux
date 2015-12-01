@@ -1,0 +1,33 @@
+#
+# USB Host Controller Drivers
+#
+comment "AST USB Drivers"
+	depends on USB
+
+
+config AST_USB_UHCI_HCD
+	tristate "AST UHCI (USB 1.1) support"
+	depends on USB
+	---help---
+	  The AST Universal Host Controller Interface (UHCI) is standard for 
+	  USB 1.1 host controller hardware. It is an embedded HC based on AMBA bus.
+	  You may want to read <file:Documentation/usb/uhci.txt>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called uhci-hcd.
+
+choice
+	prompt "Config AST USB UHCI Number of Ports"
+	depends on AST_USB_UHCI_HCD
+
+	config AST_USB_UHCI_1_PORT
+		bool "AST UHCI support 1 ports"
+
+	config AST_USB_UHCI_2_PORT
+		bool "AST UHCI support 2 ports"
+
+	config AST_USB_UHCI_4_PORT
+		bool "AST UHCI support 4 ports"
+
+endchoice
+

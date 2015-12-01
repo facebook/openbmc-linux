@@ -53,6 +53,18 @@ if SPI_MASTER
 
 comment "SPI Master Controller Drivers"
 
+config SPI_AST
+	tristate "Aspeed SPI Controller"
+        depends on ARCH_ASPEED 
+        help
+          This selects a driver for the AST SPI Controller
+
+config SPI_FMC
+        tristate "Aspeed FMC SPI Controller"
+        depends on ARCH_ASPEED
+        help
+          This selects a driver for the AST FMC SPI Controller
+
 config SPI_ALTERA
 	tristate "Altera SPI Controller"
 	select SPI_BITBANG

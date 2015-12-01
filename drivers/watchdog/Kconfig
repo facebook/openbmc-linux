@@ -368,6 +368,13 @@ config COH901327_WATCHDOG
 	  This watchdog is used to reset the system and thus cannot be
 	  compiled as a module.
 
+config AST_WATCHDOG
+	tristate "ASPEED watchdog"
+	depends on PLAT_ASPEED
+	select WATCHDOG_CORE 
+	help
+	  Watchdog timer for ASPEED chips.
+
 config TWL4030_WATCHDOG
 	tristate "TWL4030 Watchdog"
 	depends on TWL4030_CORE

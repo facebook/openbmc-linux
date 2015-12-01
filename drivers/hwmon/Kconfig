@@ -1715,6 +1715,30 @@ config SENSORS_ULTRA45
 	  This driver provides support for the Ultra45 workstation environmental
 	  sensors.
 
+config SENSORS_AST_ADC
+	tristate "ASPEED ADC Controller Driver"
+	depends on ARCH_ASPEED
+	default n
+	help
+          This driver provides support for the ASPEED ADC
+          Controller, which provides an Voltage Sensor.
+
+config SENSORS_AST1010_ADC
+        tristate "AST1010 ADC Controller Driver"
+        depends on ARCH_ASPEED
+        default n
+        help
+          This driver provides support for the ASPEED ADC
+          Controller, which provides an Voltage Sensor.
+
+config SENSORS_AST_PWM_FAN
+        tristate "ASPEED PWM & FAN Tacho Controller Driver"
+        depends on ARCH_ASPEED
+        default n
+        help
+          This driver provides support for the ASPEED PWM & FAN Tacho
+          Controller, which provides an Sensor, fan control.
+
 if ACPI
 
 comment "ACPI drivers"

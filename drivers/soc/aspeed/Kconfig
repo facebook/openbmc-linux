@@ -1,0 +1,120 @@
+#
+# MISC configuration for ASPEED SOCs
+#
+
+if PLAT_ASPEED
+menuconfig AST_MISC
+	tristate 'ASPEED SOCs MISC drivers'
+	help
+	  We can select misc drivers for ASPEED SOC in this sub-function.
+
+if AST_MISC
+config AST_VIDEO
+	tristate "ASPEED Video Engine driver"
+	default n
+	help
+	  Driver for AST Video Engine 
+
+# Support LPC
+menuconfig AST_LPC
+	bool "AST LPC Driver"
+
+if AST_LPC
+
+choice
+	prompt "AST LPC Mode"
+
+	config AST_LPC_SLAVE
+		bool "Slave"
+
+	config AST_LPC_MASTER
+		bool "Master"
+
+endchoice
+
+config ARCH_AST1070
+	depends on AST_LPC_MASTER
+	select AST1070_UART_DMA
+	bool "AST1070 Comapnion Chip Combination"
+
+config AST_LPC_SNOOP
+	depends on AST_LPC_SLAVE
+	bool "AST LPC SNOOP"
+
+config AST_IPMI_KCS
+	depends on AST_LPC_SLAVE
+	bool "AST IPMI KCS"
+
+config AST_IPMI_BT
+	depends on AST_LPC_SLAVE
+	bool "AST IPMI BT"
+
+endif 
+
+config AST_ESPI
+	bool "AST eSPI"
+
+if AST_ESPI
+
+config COLDFIRE_ESPI
+	bool "Coldfire ESPI"
+
+endif
+	
+config ADC_CAT9883
+	tristate "CAT 9883 ADC driver"
+	default n
+	help
+	  Driver for CAT 9883
+
+config AST_PECI
+	tristate "ASPEED PECI Controller"
+	default n
+	help
+	  Driver for PECI Controller
+
+config AST_MBX
+	tristate 'ASPEED MailBox support'
+	help
+	  Support for the Mailbox on the ASPEED chips.
+
+config AST_GPIO
+	tristate "ASPEED GPIO Controller"
+	default n
+	help
+	  Driver for GPIO Controller included in ASPEED SOCs.
+
+config AST_JTAG
+	tristate "ASPEED JTAG Controller"
+	default n
+	help
+	  Driver for JTAG Controller
+
+config AST_MCTP
+	tristate "ASPEED MCTP Driver"
+	default n
+	help
+	  Driver for MCTP
+
+config AST_XDMA
+	tristate "ASPEED XDMA Driver"
+	default n
+	help
+	  Driver for XDMA
+
+config AST_RFX
+	tristate "ASPEED RFX Driver"
+	default n
+	help
+	  Driver for RFX
+
+config AST_VHUB
+	tristate "ASPEED VHUB Driver"
+	depends on !(USB)
+	default n
+	help 
+	  Driver for VHUB
+
+endif	# CONFIG_AST_MISC
+endif	# CONFIG_AST
+

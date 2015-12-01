@@ -67,6 +67,21 @@ static int ast_detect_chip(struct drm_device *dev, bool *need_post)
 {
 	struct ast_private *ast = dev->dev_private;
 	uint32_t data, jreg;
+
+	/*
+	 * If VGA isn't enabled, we need to enable now or subsequent
+	 * access to the scratch registers will fail. We also inform
+	 * our caller that it needs to POST the chip
+	 * (Assumption: VGA not enabled -> need to POST)
+	 */
+	if (!ast_is_vga_enabled(dev)) {
+		ast_enable_vga(dev);
+		ast_enable_mmio(dev);
+		DRM_INFO("VGA not enabled on entry, requesting chip POST\n");
+		*need_post = true;
+	} else
+		*need_post = false;
+	
 	ast_open_key(ast);
 
 	if (dev->pdev->device == PCI_CHIP_AST1180) {
@@ -110,19 +125,6 @@ static int ast_detect_chip(struct drm_device *dev, bool *need_post)
 		}
 	}
 
-	/*
-	 * If VGA isn't enabled, we need to enable now or subsequent
-	 * access to the scratch registers will fail. We also inform
-	 * our caller that it needs to POST the chip
-	 * (Assumption: VGA not enabled -> need to POST)
-	 */
-	if (!ast_is_vga_enabled(dev)) {
-		ast_enable_vga(dev);
-		ast_enable_mmio(dev);
-		DRM_INFO("VGA not enabled on entry, requesting chip POST\n");
-		*need_post = true;
-	} else
-		*need_post = false;
 
 	/* Check if we support wide screen */
 	switch (ast->chip) {
@@ -412,12 +414,13 @@ int ast_driver_load(struct drm_device *dev, unsigned long flags)
 	 * assume the chip has MMIO enabled by default (rev 0x20
 	 * and higher).
 	 */
-	if (!(pci_resource_flags(dev->pdev, 2) & IORESOURCE_IO)) {
+//	if (!(pci_resource_flags(dev->pdev, 2) & IORESOURCE_IO)) {
 		DRM_INFO("platform has no IO space, trying MMIO\n");
 		ast->ioregs = ast->regs + AST_IO_MM_OFFSET;
-	}
+//	}
 
 	/* "map" IO regs if the above hasn't done so already */
+#if 0	
 	if (!ast->ioregs) {
 		ast->ioregs = pci_iomap(dev->pdev, 2, 0);
 		if (!ast->ioregs) {
@@ -425,6 +428,7 @@ int ast_driver_load(struct drm_device *dev, unsigned long flags)
 			goto out_free;
 		}
 	}
+#endif	
 
 	ast_detect_chip(dev, &need_post);
 

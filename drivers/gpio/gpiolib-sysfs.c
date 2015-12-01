@@ -112,9 +112,13 @@ static ssize_t gpio_value_store(struct device *dev,
 
 	if (!test_bit(FLAG_EXPORT, &desc->flags))
 		status = -EIO;
+#if 0	//Ryan Modify for AST GPIO Feature
 	else if (!test_bit(FLAG_IS_OUT, &desc->flags))
 		status = -EPERM;
 	else {
+#else
+	else {
+#endif	
 		long		value;
 
 		status = kstrtol(buf, 0, &value);

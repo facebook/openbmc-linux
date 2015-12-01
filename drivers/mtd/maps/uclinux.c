@@ -15,6 +15,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/major.h>
+#include <linux/root_dev.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
@@ -23,11 +24,18 @@
 
 /****************************************************************************/
 
-#ifdef CONFIG_MTD_ROM
-#define MAP_NAME "rom"
+#if defined(CONFIG_MTD_UCLINUX_EBSS)
+#define MAP_NAME	"ram"
+#define CONFIG_MTD_UCLINUX_ADDRESS __bss_stop
+#elif defined(CONFIG_MTD_UCLINUX_RAM)
+#define MAP_NAME	"ram"
+#elif defined(CONFIG_MTD_UCLINUX_ROM)
+#define MAP_NAME	"rom"
 #else
-#define MAP_NAME "ram"
+#error "Unknown uClinux map type"
 #endif
+
+/****************************************************************************/
 
 /*
  * Blackfin uses uclinux_ram_map during startup, so it must not be static.
@@ -76,7 +84,7 @@ static int __init uclinux_mtd_init(void)
 	mapp = &uclinux_ram_map;
 
 	if (physaddr == -1)
-		mapp->phys = (resource_size_t)__bss_stop;
+		mapp->phys = (resource_size_t) CONFIG_MTD_UCLINUX_ADDRESS;
 	else
 		mapp->phys = physaddr;
 
@@ -111,6 +119,10 @@ static int __init uclinux_mtd_init(void)
 	mtd->owner = THIS_MODULE;
 	mtd->_point = uclinux_point;
 	mtd->priv = mapp;
+
+	printk("uclinux[mtd]: set %s to be root filesystem\n",
+	     	uclinux_romfs[0].name);
+	ROOT_DEV = MKDEV(MTD_BLOCK_MAJOR, 0);
 
 	uclinux_ram_mtdinfo = mtd;
 	mtd_device_register(mtd, uclinux_romfs, NUM_PARTITIONS);

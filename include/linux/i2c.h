@@ -397,6 +397,9 @@ struct i2c_algorithm {
 	   processed, or a negative value on error */
 	int (*master_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs,
 			   int num);
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR	
+	int (*slave_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs);
+#endif	
 	int (*smbus_xfer) (struct i2c_adapter *adap, u16 addr,
 			   unsigned short flags, char read_write,
 			   u8 command, int size, union i2c_smbus_data *data);
@@ -604,6 +607,14 @@ static inline u32 i2c_get_functionality(struct i2c_adapter *adap)
 {
 	return adap->algo->functionality(adap);
 }
+
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR
+static inline int i2cdev_ioctl_slave_rdrw(struct i2c_adapter *adap,
+		struct i2c_msg *msgs)
+{
+	return adap->algo->slave_xfer(adap, msgs);
+}
+#endif
 
 /* Return 1 if adapter supports everything we need, 0 if not. */
 static inline int i2c_check_functionality(struct i2c_adapter *adap, u32 func)

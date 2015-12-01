@@ -62,6 +62,14 @@ config HW_RANDOM_AMD
 
 	  If unsure, say Y.
 
+config HW_RANDOM_AST
+	tristate "AST HW Random Number Generator support"
+	depends on PLAT_ASPEED 
+	default HW_RANDOM
+	---help---
+	  This driver provides kernel-side support for the Random Number
+	  Generator hardware found on aspeed SOC.
+
 config HW_RANDOM_ATMEL
 	tristate "Atmel Random Number Generator support"
 	depends on ARCH_AT91 && HAVE_CLK && OF
