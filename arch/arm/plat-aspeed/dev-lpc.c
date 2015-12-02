@@ -24,11 +24,14 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/platform_device.h>
+#include <asm/io.h>
+#include <mach/hardware.h>
 #include <mach/irqs.h>
 #include <mach/platform.h>
 #include <plat/devs.h>
 #include <plat/ast-scu.h>
 #include <plat/ast-lpc.h>
+#include <plat/regs-lpc.h>
 #include <mach/gpio.h>
 
 /* --------------------------------------------------------------------
@@ -157,5 +160,15 @@ void __init ast_add_device_lpc(void)
 #endif
 }
 #else
-void __init ast_add_device_lpc(void) {}
+void __init ast_add_device_lpc(void) {
+    // Since we disable LPC, bring the UART1 and UART2 out from LPC control
+
+    void __iomem *reg_base;
+
+    reg_base = ioremap(AST_LPC_BASE, SZ_256);
+    writel(readl(reg_base + AST_LPC_HICR9)
+           & ~(LPC_HICR9_SOURCE_UART1|LPC_HICR9_SOURCE_UART2
+               |LPC_HICR9_SOURCE_UART3|LPC_HICR9_SOURCE_UART4),
+           reg_base + AST_LPC_HICR9);
+}
 #endif

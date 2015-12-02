@@ -181,6 +181,24 @@ static struct plat_serial8250_port ast_uart_data[] = {
 		.iotype 	= UPIO_MEM,
 		.flags	= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},
+	{
+		.mapbase	= AST_UART1_BASE,
+		.irq		= IRQ_UART1,
+		.uartclk	= (24*1000000L),
+		.regshift	= 2,
+		.iotype 	= UPIO_MEM,
+		.flags	= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+#if defined(CONFIG_YOSEMITE) //Without this, tty offset might change for others
+	{
+		.mapbase	= AST_UART2_BASE,
+		.irq		= IRQ_UART2,
+		.uartclk	= (24*1000000L),
+		.regshift	= 2,
+		.iotype 	= UPIO_MEM,
+		.flags	= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+#endif
 #ifdef CONFIG_SERIAL_AST_DMA_UART
 #else
 #ifdef AST_UART3_BASE
@@ -348,9 +366,15 @@ struct platform_device ast_uart_device = {
 void __init ast_add_device_uart(void)
 {
 #if defined(CONFIG_ARCH_AST1010)
+#elif defined(CONFIG_YOSEMITE)
+	ast_scu_multi_func_uart(1);
+	ast_scu_multi_func_uart(2);
+	ast_scu_multi_func_uart(3);
+	ast_scu_multi_func_uart(4);
 #else
-	ast_scu_multi_func_uart(3);		
-	ast_scu_multi_func_uart(4);	
+	ast_scu_multi_func_uart(1);
+	ast_scu_multi_func_uart(3);
+	ast_scu_multi_func_uart(4);
 #endif	
 	platform_device_register(&ast_uart_device);
 

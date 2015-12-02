@@ -188,6 +188,12 @@
 #define SET_LPC_SEL6IO(x,value)		((x & ~(0x7 << 8)) |(value << 8))
 #define GET_LPC_SEL6IO(x)			((x >> 8) & 0x7)
 
+/* AST_LPC_HICR9				0x098	- LPC Host Interface Control Register 9 */
+#define LPC_HICR9_SOURCE_UART1			(1 << 4)
+#define LPC_HICR9_SOURCE_UART2			(1 << 5)
+#define LPC_HICR9_SOURCE_UART3			(1 << 6)
+#define LPC_HICR9_SOURCE_UART4			(1 << 7)
+
 /* AST_LPC_HICRA				0x09C	Host Interface Control Register A */
 #define SET_LPC_SEL5DW(x,value)		((x & ~(0x7 << 28)) |(value << 28))
 #define GET_LPC_SEL5DW(x)			((x >> 28) & 0x7)
