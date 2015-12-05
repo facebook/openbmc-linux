@@ -697,7 +697,7 @@ static struct i2c_board_info __initdata wedge100_i2c_bus13[] = {
 
 /* end of defined(CONFIG_WEDGE100) */
 
-#elif defined(CONFIG_YOSEMITE) || defined(CONFIG_FBPLATFORM1)
+#elif defined(CONFIG_YOSEMITE)
 
 //Under I2C Dev 1
 static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
@@ -784,6 +784,115 @@ static struct i2c_board_info __initdata ast_i2c_board_info_13[] = {
 };
 
 /* end of CONFIG_YOSEMITE */
+
+#elif defined(CONFIG_LIGHTNING)
+
+//Under I2C Dev 1
+static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
+};
+
+//Under I2C Dev 2
+static struct i2c_board_info __initdata ast_i2c_board_info_2[] = {
+};
+
+//Under I2C Dev 3
+static struct i2c_board_info __initdata ast_i2c_board_info_3[] = {
+  {
+    I2C_BOARD_INFO("tmp75", 0x4a),
+  },
+  {
+    I2C_BOARD_INFO("tmp75", 0x4c),
+  },
+};
+
+//Under I2C Dev 4
+static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
+};
+
+//Under I2C Dev 5
+static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
+  // PEB Hot Swap Controller (0x22)
+  {
+    I2C_BOARD_INFO("adm1278", 0x11),
+  },
+  // PEB FRUID (0xA0)
+  {
+    I2C_BOARD_INFO("24c64", 0x50),
+  },
+
+};
+
+//Under I2C Dev 6
+static struct i2c_board_info __initdata ast_i2c_board_info_6[] = {
+  // FCB FRUID (0xA2)
+  {
+    I2C_BOARD_INFO("24c64", 0x51),
+  },
+  // FCB Fan Controller (0x5A)
+  // TODO: Need to port the driver from kernel 4.1
+  {
+    //I2C_BOARD_INFO("nct7904", 0x2d),
+  },
+  // FCB Hot Swap Controller (0x44)
+  {
+    I2C_BOARD_INFO("adm1276", 0x22),
+  },
+  // FCB LED Driver (0xC0)
+  {
+   I2C_BOARD_INFO("pca9551", 0x60),
+  },
+};
+
+//Under I2C Dev 7
+static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
+  // PDPB (FRUID)
+  {
+    I2C_BOARD_INFO("24c64", 0x51),
+  },
+  // PDPB Voltage (0x90)
+  // Need to port the driver from kernel 3.18
+  {
+    // I2C_BOARD_INFO("ads1015", 0x48),
+  },
+  // PDPB Sensor1 (0x92)
+  {
+    I2C_BOARD_INFO("tmp75", 0x49),
+  },
+  // PDPB Sensor2 (0x94)
+  {
+    I2C_BOARD_INFO("tmp75", 0x4a),
+  },
+  // PDPB Sensor3 (0x96)
+  {
+    I2C_BOARD_INFO("tmp75", 0x4b),
+  },
+};
+
+//Under I2C Dev 8
+static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
+};
+
+//Under I2C Dev 9
+static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
+};
+
+//Under I2C Dev 10
+static struct i2c_board_info __initdata ast_i2c_board_info_10[] = {
+};
+
+//Under I2C Dev 11
+static struct i2c_board_info __initdata ast_i2c_board_info_11[] = {
+};
+
+//Under I2C Dev 12
+static struct i2c_board_info __initdata ast_i2c_board_info_12[] = {
+};
+
+//Under I2C Dev 13
+static struct i2c_board_info __initdata ast_i2c_board_info_13[] = {
+};
+
+/* end of defined(CONFIG_LIGHTNING) */
 
 #else
 
@@ -1009,7 +1118,7 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev5_device);
 	i2c_register_board_info(4, ast_i2c_board_info_5, ARRAY_SIZE(ast_i2c_board_info_5));
 	platform_device_register(&ast_i2c_dev6_device);
-#if defined(CONFIG_YOSEMITE)
+#if defined(CONFIG_YOSEMITE) || defined(CONFIG_LIGHTNING)
 	i2c_register_board_info(5, ast_i2c_board_info_6, ARRAY_SIZE(ast_i2c_board_info_6));
 #endif
 	platform_device_register(&ast_i2c_dev7_device);
@@ -1022,7 +1131,7 @@ void __init ast_add_device_i2c(void)
 #if defined(CONFIG_ARCH_AST2400)
 	platform_device_register(&ast_i2c_dev10_device);
 
-#if defined(CONFIG_YOSEMITE)
+#if defined(CONFIG_YOSEMITE) || defined(CONFIG_LIGHTNING)
 	i2c_register_board_info(9, ast_i2c_board_info_10, ARRAY_SIZE(ast_i2c_board_info_10));
 	platform_device_register(&ast_i2c_dev11_device);
 	i2c_register_board_info(10, ast_i2c_board_info_11, ARRAY_SIZE(ast_i2c_board_info_11));

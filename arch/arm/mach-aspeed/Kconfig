@@ -212,7 +212,7 @@ config WEDGE100
 config YOSEMITE
 	bool "Facebook Yosemite"
 
-config FBPLATFORM1
+config LIGHTNING
 	bool "Facebook Platform1"
 
 # Support PCIE
