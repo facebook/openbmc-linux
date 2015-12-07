@@ -200,4 +200,16 @@ config AST1070_UART_DMA
 config AST_UART_SDMA
 	bool
 
+config WEDGE
+        bool "Facebook Wedge/6-Pack"
+
+config WEDGE100
+        bool "Facebook Wedge100"
+
+config YOSEMITE
+        bool "Facebook Yosemite"
+
+config FBPLATFORM1
+        bool "Facebook Platform1"
+
 endif

@@ -363,6 +363,68 @@ static int bcm54xx_config_intr(struct phy_device *phydev)
 	return err;
 }
 
+static int bcm54616s_config_aneg(struct phy_device *phydev)
+{
+	int ret;
+
+	/* Aneg firsly. */
+	ret = genphy_config_aneg(phydev);
+
+#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100)
+	/* disable GTXCLK Clock Delay */
+	phy_write(phydev, 0x1C, 0x8C00);
+	/* Disable RGMII RXD to RXC skew */
+	phy_write(phydev, 0x18, 0xF0E7);
+#endif
+
+	return ret;
+}
+
+static int bcm54616s_read_status(struct phy_device *phydev)
+{
+	int ret;
+
+	ret = genphy_read_status(phydev);
+	if (ret < 0) {
+		return ret;
+	}
+
+	/* read LED status to find out duplex and speed */
+	ret = bcm54xx_shadow_read(phydev, 0x8);
+	if (ret < 0) {
+		return ret;
+	}
+
+	if (ret & (0x1 << 7)) {
+		phydev->duplex = DUPLEX_HALF;
+	} else {
+		phydev->duplex = DUPLEX_FULL;
+	}
+
+	phydev->link = 1;
+	switch (ret & (0x3 << 3)) {
+	case 0x3:
+		/* no link */
+		phydev->link = 0;
+		break;
+	case 0x2:
+		/* 10BASE-T */
+		phydev->speed = SPEED_10;
+		break;
+	case 0x1:
+		/* 100BASE-TX */
+		phydev->speed = SPEED_100;
+		break;
+	case 0x0:
+		/* 1000BASE-T */
+		phydev->speed = SPEED_1000;
+		break;
+	}
+
+	return 0;
+}
+
+
 static int bcm5481_config_aneg(struct phy_device *phydev)
 {
 	int ret;
@@ -556,8 +618,8 @@ static struct phy_driver broadcom_drivers[] = {
 			  SUPPORTED_Pause | SUPPORTED_Asym_Pause,
 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
 	.config_init	= bcm54xx_config_init,
-	.config_aneg	= genphy_config_aneg,
-	.read_status	= genphy_read_status,
+	.config_aneg	= bcm54616s_config_aneg,
+	.read_status	= bcm54616s_read_status,
 	.ack_interrupt	= bcm54xx_ack_interrupt,
 	.config_intr	= bcm54xx_config_intr,
 	.driver		= { .owner = THIS_MODULE },

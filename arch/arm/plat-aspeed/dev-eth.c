@@ -40,10 +40,16 @@
 #undef AST_MAC1_BASE
 #endif
 
+#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100)
+#define DRVNAME "ftgmac100"
+#else
+#define DRVNAME "ast_gmac"
+#endif
+
 /* --------------------------------------------------------------------
  *  Ethernet
  * -------------------------------------------------------------------- */
-#if defined(CONFIG_AST_MAC) || defined(CONFIG_AST_MAC_MODULE)
+#if defined(CONFIG_AST_MAC) || defined(CONFIG_AST_MAC_MODULE) || defined(CONFIG_FTGMAC100)
 #ifdef AST_MAC0_BASE
 static struct ftgmac100_eth_data ast_eth0_data = {
 	.dev_addr = { 0x00, 0x84, 0x14, 0xA0, 0xB0, 0x22},		
@@ -65,7 +71,7 @@ static struct resource ast_mac0_resources[] = {
 };
 
 static struct platform_device ast_eth0_device = {
-	.name		= "ast_gmac",
+	.name		= DRVNAME,
 	.id		= 0,
 	.dev		= {
 				.dma_mask		= &ast_eth_dmamask,
@@ -96,7 +102,7 @@ static struct resource ast_mac1_resources[] = {
 };
 
 static struct platform_device ast_eth1_device = {
-	.name		= "ast_gmac",
+	.name		= DRVNAME,
 	.id		= 1,
 	.dev		= {
 				.dma_mask		= &ast_eth_dmamask,
@@ -141,6 +147,12 @@ void __init ast_add_device_gmac(void)
 //		out->isRevA2 = 1; //((regVal & 0x00ff) == 0x02);
 	}
 
+	// Wedge/6-Pack hardware attaches to MAC1;  there's nothing on
+	// MAC0.  Older drivers would drop interfaces without PHYs, but
+	// the latest open source drivers do not, so we drop the first
+	// MAC specs.
+#if !defined(CONFIG_WEDGE) && !defined(CONFIG_WEDGE100)
+
 	ast_eth0_data.DF_support = !isRevA0;
 	
 	ast_scu_init_eth(0);
@@ -175,9 +187,10 @@ void __init ast_add_device_gmac(void)
 
 	// We assume the Clock Stop register does not disable the MAC1 or MAC2 clock
 	// unless Reset Control also holds the MAC in reset.
-#endif
 	
 	platform_device_register(&ast_eth0_device);
+#endif
+#endif
 
 #ifdef AST_MAC1_BASE
 	ast_scu_init_eth(1);

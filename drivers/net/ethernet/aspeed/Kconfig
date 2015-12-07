@@ -25,12 +25,4 @@ config AST_MAC
         help
           This driver supports the ASPEED Gigabit Ethernet controller.
 
-config FTGMAC100
-	tristate "Faraday FTGMAC100 Gigabit Ethernet support"
-	select PHYLIB
-	help
-	  This driver supports the FTGMAC100 Gigabit Ethernet controller
-	  from Faraday. It is used on Faraday A369, Andes AG102 and some
-	  other ARM/NDS32 SoC's.
-
 endif # NET_VENDOR_AST

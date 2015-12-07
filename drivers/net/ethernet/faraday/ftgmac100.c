@@ -21,6 +21,7 @@
 
 #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
 
+#include <linux/crc32.h>
 #include <linux/dma-mapping.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
@@ -1095,7 +1096,12 @@ static int ftgmac100_open(struct net_device *netdev)
 		goto err_hw;
 
 	ftgmac100_init_hw(priv);
+
+#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100)
+	ftgmac100_start_hw(priv, 1000);
+#else
 	ftgmac100_start_hw(priv, 10);
+#endif
 
 	phy_start(priv->phydev);
 
@@ -1169,10 +1175,60 @@ static int ftgmac100_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int 
 	return phy_mii_ioctl(priv->phydev, ifr, cmd);
 }
 
+/*
+ * This routine will, depending on the values passed to it,
+ * either make it accept multicast packets, go into
+ * promiscuous mode ( for TCPDUMP and cousins ) or accept
+ * a select set of multicast packets
+ */
+static void ftgmac100_set_multicast(struct net_device *dev)
+{
+	struct ftgmac100 *priv = netdev_priv(dev);
+	u32 maccr;
+
+	maccr = ioread32(priv->base + FTGMAC100_OFFSET_MACCR);
+
+	if (dev->flags & IFF_PROMISC) {
+		maccr |= FTGMAC100_MACCR_RX_ALL;
+	} else {
+		maccr &= ~FTGMAC100_MACCR_RX_ALL;
+	}
+
+	if (dev->flags & IFF_ALLMULTI) {
+		maccr |= FTGMAC100_MACCR_RX_MULTIPKT;
+	} else {
+		maccr &= ~FTGMAC100_MACCR_RX_MULTIPKT;
+	}
+
+	if (!netdev_mc_empty(dev)) {
+		/* the following algorithm is copied from Aspeed ftgmac100 driver */
+		struct netdev_hw_addr *ha;
+		u32 maht0 = 0;
+		u32 maht1 = 0;
+		netdev_for_each_mc_addr(ha, dev) {
+			u32 crc_val = ether_crc_le(ETH_ALEN, ha->addr);
+			int bit = (~(crc_val >> 2)) & 0x3f;
+			if (bit >= 32) {
+				maht1 |= 1 << (bit - 32);
+			} else {
+				maht0 |= 1 << bit;
+			}
+		}
+		iowrite32(maht0, priv->base + FTGMAC100_OFFSET_MAHT0);
+		iowrite32(maht1, priv->base + FTGMAC100_OFFSET_MAHT1);
+		maccr |= FTGMAC100_MACCR_HT_MULTI_EN;
+	} else {
+		maccr &= ~FTGMAC100_MACCR_HT_MULTI_EN;
+	}
+
+	iowrite32(maccr, priv->base + FTGMAC100_OFFSET_MACCR);
+}
+
 static const struct net_device_ops ftgmac100_netdev_ops = {
 	.ndo_open		= ftgmac100_open,
 	.ndo_stop		= ftgmac100_stop,
 	.ndo_start_xmit		= ftgmac100_hard_start_xmit,
+	.ndo_set_rx_mode	= ftgmac100_set_multicast,
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_do_ioctl		= ftgmac100_do_ioctl,
