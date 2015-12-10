@@ -131,6 +131,12 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
 	unsigned int clk, inc = 0, div, divider_ratio;
 	u32 SCL_Low, SCL_High, data;
 
+  // hack: The calculated value for 1MHz does not match with measured value, so override
+  if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
+    data = 0x77744302;
+    return data;
+  }
+
 	clk = i2c_dev->ast_i2c_data->get_i2c_clock();
 //	printk("pclk = %d \n",clk);
 	divider_ratio = clk / i2c_dev->ast_i2c_data->bus_clk;
@@ -191,22 +197,8 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 
 	/* Set AC Timing */
 #if defined(CONFIG_ARCH_AST2400)
-	if(i2c_dev->ast_i2c_data->bus_clk/1000 > 400) {
-		printk("high speed mode enable clk [%dkhz]\n",i2c_dev->ast_i2c_data->bus_clk/1000);
-		ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG) |
-							AST_I2CD_M_HIGH_SPEED_EN |
-							AST_I2CD_M_SDA_DRIVE_1T_EN |
-							AST_I2CD_SDA_DRIVE_1T_EN
-							, I2C_FUN_CTRL_REG);
-
-		/* Set AC Timing */
-		ast_i2c_write(i2c_dev, AST_I2C_LOW_TIMEOUT, I2C_AC_TIMING_REG2);
-		ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
-	}else {
-		/* target apeed is xxKhz*/
-		ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
-		ast_i2c_write(i2c_dev, AST_I2C_LOW_TIMEOUT, I2C_AC_TIMING_REG2);
-	}
+  ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
+  ast_i2c_write(i2c_dev, AST_I2C_LOW_TIMEOUT, I2C_AC_TIMING_REG2);
 #else
 	/* target apeed is xxKhz*/
 	ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
@@ -393,6 +385,19 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 #endif
 
 static u8
+ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
+{
+  u32 temp;
+
+  // Reset i2c controller
+  temp = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
+
+  ast_i2c_write(i2c_dev, temp & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN), I2C_FUN_CTRL_REG);
+
+  ast_i2c_write(i2c_dev, temp, I2C_FUN_CTRL_REG);
+}
+
+static u8
 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 {
 	u32 sts;
@@ -514,7 +519,8 @@ static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
 	}
 
   if (timeout <=0) {
-    ast_i2c_bus_error_recover(i2c_dev);
+    //ast_i2c_bus_error_recover(i2c_dev);
+    ast_i2c_bus_reset(i2c_dev);
     return 0;
   }
 
@@ -1396,6 +1402,39 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				}
 			break;
 
+		case AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH :
+				if((i2c_dev->xfer_last == 1) && (i2c_dev->slave_operation == 0)) {
+					dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_TX_ACK | AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH= %x\n",sts);
+					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
+					//take care
+					ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
+										AST_I2CD_TX_ACK_INTR_EN, I2C_INTR_CTRL_REG);
+					ast_i2c_master_xfer_done(i2c_dev);
+
+          // Handle the new slave match interrupt
+    			ast_i2c_slave_addr_match(i2c_dev);
+					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
+				} else {
+					dev_err(i2c_dev->dev, "Slave  TX_NAK | NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH;  xfer_last %d\n", i2c_dev->xfer_last);
+					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
+					uint32_t new_val = ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
+						        	AST_I2CD_NORMAL_STOP_INTR_EN |
+								AST_I2CD_TX_ACK_INTR_EN;
+					ast_i2c_write(i2c_dev, new_val, I2C_INTR_CTRL_REG);
+					//take care
+					i2c_dev->cmd_err |= AST_LOCKUP_DETECTED;
+					complete(&i2c_dev->cmd_complete);
+
+          // stop previous slave transaction
+          i2c_dev->slave_event = I2C_SLAVE_EVENT_STOP;
+          ast_i2c_slave_xfer_done(i2c_dev);
+
+          // Handle the new slave match interrupt
+    			ast_i2c_slave_addr_match(i2c_dev);
+					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
+				}
+			break;
+
 		case AST_I2CD_INTR_STS_TX_NAK:
 			if(i2c_dev->slave_operation == 1) {
 				i2c_dev->slave_event = I2C_SLAVE_EVENT_NACK;
@@ -1684,7 +1723,8 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 			if (i2c_dev->cmd_err & AST_LOCKUP_DETECTED) {
 				printk("ast-i2c:  error got unexpected STOP\n");
 				// reset the bus
-				ast_i2c_bus_error_recover(i2c_dev);
+				//ast_i2c_bus_error_recover(i2c_dev);
+        ast_i2c_bus_reset(i2c_dev);
 			}
 			ret = -EAGAIN;
 			spin_unlock_irqrestore(&i2c_dev->master_lock, flags);

@@ -240,6 +240,19 @@ static struct ast_i2c_driver_data ast_i2c_data = {
 	.get_i2c_clock = ast_get_pclk,
 };
 
+static struct ast_i2c_driver_data ast_i2c_data_1M = {
+	.bus_clk = 1000000,		//bus clock 1MHz
+	.master_dma = BUFF_MODE,
+	.slave_dma = BYTE_MODE,
+	.request_pool_buff_page = request_pool_buff_page,
+	.free_pool_buff_page = free_pool_buff_page,
+#ifdef CONFIG_AST_I2C_SLAVE_MODE
+	.slave_xfer = i2c_slave_xfer,
+	.slave_init = i2c_slave_init,
+#endif
+	.get_i2c_clock = ast_get_pclk,
+};
+
 static u64 ast_i2c_dma_mask = 0xffffffffUL;
 static struct resource ast_i2c_dev1_resources[] = {
 	[0] = {
@@ -286,6 +299,18 @@ struct platform_device ast_i2c_dev2_device = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
 		.platform_data = &ast_i2c_data,
+	},
+	.resource = ast_i2c_dev2_resources,
+	.num_resources = ARRAY_SIZE(ast_i2c_dev2_resources),
+};
+
+struct platform_device ast_i2c_dev2_device_1M = {
+	.name = "ast-i2c",
+	.id = 1,
+	.dev = {
+		.dma_mask = &ast_i2c_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+		.platform_data = &ast_i2c_data_1M,
 	},
 	.resource = ast_i2c_dev2_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev2_resources),
@@ -341,6 +366,18 @@ struct platform_device ast_i2c_dev4_device = {
 	.num_resources = ARRAY_SIZE(ast_i2c_dev4_resources),
 };
 
+struct platform_device ast_i2c_dev4_device_1M = {
+	.name = "ast-i2c",
+	.id = 3,
+	.dev = {
+		.dma_mask = &ast_i2c_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+		.platform_data = &ast_i2c_data_1M,
+	},
+	.resource = ast_i2c_dev4_resources,
+	.num_resources = ARRAY_SIZE(ast_i2c_dev4_resources),
+};
+
 static struct resource ast_i2c_dev5_resources[] = {
 	[0] = {
 		.start = AST_I2C_BASE + AST_I2C_DEVICE5,
@@ -391,6 +428,18 @@ struct platform_device ast_i2c_dev6_device = {
 	.num_resources = ARRAY_SIZE(ast_i2c_dev6_resources),
 };
 
+struct platform_device ast_i2c_dev6_device_1M = {
+	.name = "ast-i2c",
+	.id = 5,
+	.dev = {
+		.dma_mask = &ast_i2c_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+		.platform_data = &ast_i2c_data_1M,
+	},
+	.resource = ast_i2c_dev6_resources,
+	.num_resources = ARRAY_SIZE(ast_i2c_dev6_resources),
+};
+
 static struct resource ast_i2c_dev7_resources[] = {
 	[0] = {
 		.start = AST_I2C_BASE + AST_I2C_DEVICE7,
@@ -436,6 +485,18 @@ struct platform_device ast_i2c_dev8_device = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
 		.platform_data = &ast_i2c_data,
+	},
+	.resource = ast_i2c_dev8_resources,
+	.num_resources = ARRAY_SIZE(ast_i2c_dev8_resources),
+};
+
+struct platform_device ast_i2c_dev8_device_1M = {
+	.name = "ast-i2c",
+	.id = 7,
+	.dev = {
+		.dma_mask = &ast_i2c_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+		.platform_data = &ast_i2c_data_1M,
 	},
 	.resource = ast_i2c_dev8_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev8_resources),
@@ -1051,6 +1112,7 @@ void __init ast_add_device_i2c(void)
 		printk("ast_add_device_i2c ERROR \n");
 		return;
 	}
+  ast_i2c_data_1M.reg_gr = ast_i2c_data.reg_gr;
 
 #if defined (CONFIG_ARCH_AST2400)
 	ast_i2c_data.buf_pool= ioremap(AST_I2C_BASE+0x800, 2048);
@@ -1105,20 +1167,63 @@ void __init ast_add_device_i2c(void)
   /* i2c bug 14 is not used as i2c on wedge100 */
 
   /* end of defined(CONFIG_WEDGE100) */
-#else
-
+#elif defined(CONFIG_YOSEMITE)
 	platform_device_register(&ast_i2c_dev1_device);
 	i2c_register_board_info(0, ast_i2c_board_info_1, ARRAY_SIZE(ast_i2c_board_info_1));
-	platform_device_register(&ast_i2c_dev2_device);
+
+	platform_device_register(&ast_i2c_dev2_device_1M);// 1MHz
 	i2c_register_board_info(1, ast_i2c_board_info_2, ARRAY_SIZE(ast_i2c_board_info_2));
+
 	platform_device_register(&ast_i2c_dev3_device);
 	i2c_register_board_info(2, ast_i2c_board_info_3, ARRAY_SIZE(ast_i2c_board_info_3));
-	platform_device_register(&ast_i2c_dev4_device);
+
+	platform_device_register(&ast_i2c_dev4_device_1M); // 1MHz
 	i2c_register_board_info(3, ast_i2c_board_info_4, ARRAY_SIZE(ast_i2c_board_info_4));
+
 	platform_device_register(&ast_i2c_dev5_device);
 	i2c_register_board_info(4, ast_i2c_board_info_5, ARRAY_SIZE(ast_i2c_board_info_5));
+
+	platform_device_register(&ast_i2c_dev6_device_1M); // 1MHz
+	i2c_register_board_info(5, ast_i2c_board_info_6, ARRAY_SIZE(ast_i2c_board_info_6));
+
+	platform_device_register(&ast_i2c_dev7_device);
+	i2c_register_board_info(6, ast_i2c_board_info_7, ARRAY_SIZE(ast_i2c_board_info_7));
+
+	platform_device_register(&ast_i2c_dev8_device_1M); // 1MHz
+	i2c_register_board_info(7, ast_i2c_board_info_8, ARRAY_SIZE(ast_i2c_board_info_8));
+
+	platform_device_register(&ast_i2c_dev9_device);
+	i2c_register_board_info(8, ast_i2c_board_info_9, ARRAY_SIZE(ast_i2c_board_info_9));
+
+	platform_device_register(&ast_i2c_dev10_device);
+	i2c_register_board_info(9, ast_i2c_board_info_10, ARRAY_SIZE(ast_i2c_board_info_10));
+
+	platform_device_register(&ast_i2c_dev11_device);
+	i2c_register_board_info(10, ast_i2c_board_info_11, ARRAY_SIZE(ast_i2c_board_info_11));
+
+	platform_device_register(&ast_i2c_dev12_device);
+	i2c_register_board_info(11, ast_i2c_board_info_12, ARRAY_SIZE(ast_i2c_board_info_12));
+
+	platform_device_register(&ast_i2c_dev13_device);
+	i2c_register_board_info(12, ast_i2c_board_info_13, ARRAY_SIZE(ast_i2c_board_info_13));
+#else
+	platform_device_register(&ast_i2c_dev1_device);
+	i2c_register_board_info(0, ast_i2c_board_info_1, ARRAY_SIZE(ast_i2c_board_info_1));
+
+	platform_device_register(&ast_i2c_dev2_device);
+	i2c_register_board_info(1, ast_i2c_board_info_2, ARRAY_SIZE(ast_i2c_board_info_2));
+
+	platform_device_register(&ast_i2c_dev3_device);
+	i2c_register_board_info(2, ast_i2c_board_info_3, ARRAY_SIZE(ast_i2c_board_info_3));
+
+	platform_device_register(&ast_i2c_dev4_device);
+	i2c_register_board_info(3, ast_i2c_board_info_4, ARRAY_SIZE(ast_i2c_board_info_4));
+
+	platform_device_register(&ast_i2c_dev5_device);
+	i2c_register_board_info(4, ast_i2c_board_info_5, ARRAY_SIZE(ast_i2c_board_info_5));
+
 	platform_device_register(&ast_i2c_dev6_device);
-#if defined(CONFIG_YOSEMITE) || defined(CONFIG_LIGHTNING)
+#if defined(CONFIG_LIGHTNING)
 	i2c_register_board_info(5, ast_i2c_board_info_6, ARRAY_SIZE(ast_i2c_board_info_6));
 #endif
 	platform_device_register(&ast_i2c_dev7_device);
@@ -1131,7 +1236,7 @@ void __init ast_add_device_i2c(void)
 #if defined(CONFIG_ARCH_AST2400)
 	platform_device_register(&ast_i2c_dev10_device);
 
-#if defined(CONFIG_YOSEMITE) || defined(CONFIG_LIGHTNING)
+#if defined(CONFIG_LIGHTNING)
 	i2c_register_board_info(9, ast_i2c_board_info_10, ARRAY_SIZE(ast_i2c_board_info_10));
 	platform_device_register(&ast_i2c_dev11_device);
 	i2c_register_board_info(10, ast_i2c_board_info_11, ARRAY_SIZE(ast_i2c_board_info_11));
@@ -1148,6 +1253,7 @@ void __init ast_add_device_i2c(void)
 	 */
 	platform_device_register(&ast_i2c_dev12_device);
 	i2c_register_board_info(11, ast_i2c_board_info_12, ARRAY_SIZE(ast_i2c_board_info_12));
+
 	platform_device_register(&ast_i2c_dev13_device);
 	i2c_register_board_info(12, ast_i2c_board_info_13, ARRAY_SIZE(ast_i2c_board_info_13));
 #endif
@@ -1155,9 +1261,10 @@ void __init ast_add_device_i2c(void)
   /* end of defined(CONFIG_ARCH_AST2400) */
 #endif
 
-  /* end of else of defined(CONFIG_WEDGE100) */
+  /* end of else of defined(CONFIG_WEDGE100) or defined(CONFIG_YOSEMITE) */
 #endif
 }
+
 #else
 void __init ast_add_device_i2c(void) {}
 #endif
