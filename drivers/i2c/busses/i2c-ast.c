@@ -1335,6 +1335,18 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
     return IRQ_HANDLED;
 	}
 
+	if(AST_I2CD_INTR_STS_SCL_TO & sts) {
+    dev_err(i2c_dev->dev, "SCL LOW detected with sts = %x, slave mode: %x\n",sts, i2c_dev->slave_operation);
+    ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SCL_TO, I2C_INTR_STS_REG);
+    i2c_dev->cmd_err |= AST_I2CD_INTR_STS_SCL_TO;
+    complete(&i2c_dev->cmd_complete);
+
+    // Reset i2c controller
+    ast_i2c_bus_reset(i2c_dev);
+
+    return IRQ_HANDLED;
+	}
+
 	switch(sts) {
 		case AST_I2CD_INTR_STS_TX_ACK:
 			if(i2c_dev->slave_operation == 1) {
@@ -1549,37 +1561,35 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				ast_i2c_master_xfer_done(i2c_dev);
       }
 			break;
+		case AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH:
+			if(i2c_dev->slave_operation == 0) {
+				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP = %x\n",sts);
+				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
+				//take care
+				ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
+									AST_I2CD_RX_DOWN_INTR_EN, I2C_INTR_CTRL_REG);
+				ast_i2c_master_xfer_done(i2c_dev);
+
+				// Handle the new slave match interrupt
+				ast_i2c_slave_addr_match(i2c_dev);
+				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
+			} else {
+				dev_err(i2c_dev->dev, "S clear isr: AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP |"
+                              "AST_I2CD_INTR_STS_SLAVE_MATCH = %x\n",sts);
+				i2c_dev->slave_event = I2C_SLAVE_EVENT_STOP;
+				ast_i2c_slave_xfer_done(i2c_dev);
+
+				// Handle the new slave match interrupt
+				ast_i2c_slave_addr_match(i2c_dev);
+				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP |
+                                AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
+      }
+			break;
 		case AST_I2CD_INTR_STS_ARBIT_LOSS:
 			dev_err(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_ARBIT_LOSS = %x\n",sts);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
 			complete(&i2c_dev->cmd_complete);
-			break;
-		case AST_I2CD_INTR_STS_SCL_TO:
-      dev_err(i2c_dev->dev, "SCL LOW detected with sts = %x, slave mode: %x\n",sts, i2c_dev->slave_operation);
-			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SCL_TO, I2C_INTR_STS_REG);
-			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_SCL_TO;
-			complete(&i2c_dev->cmd_complete);
-
-      // Reset i2c controller
-      temp = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
-
-      ast_i2c_write(i2c_dev, temp & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN), I2C_FUN_CTRL_REG);
-
-      ast_i2c_write(i2c_dev, temp, I2C_FUN_CTRL_REG);
-      break;
-		case AST_I2CD_INTR_STS_SLAVE_MATCH | AST_I2CD_INTR_STS_SCL_TO:
-      dev_err(i2c_dev->dev, "SCL LOW detected with sts = %x, slave mode: %x\n",sts, i2c_dev->slave_operation);
-			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SCL_TO | AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
-			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_SCL_TO;
-			complete(&i2c_dev->cmd_complete);
-
-      // Reset i2c controller
-      temp = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
-
-      ast_i2c_write(i2c_dev, temp & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN), I2C_FUN_CTRL_REG);
-
-      ast_i2c_write(i2c_dev, temp, I2C_FUN_CTRL_REG);
 			break;
  		case AST_I2CD_INTR_STS_GCALL_ADDR:
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_GCALL_ADDR;
@@ -1713,6 +1723,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 			dev_err(i2c_dev->dev, "controller timed out\n");
 			i2c_dev->state = (ast_i2c_read(i2c_dev,I2C_CMD_REG) >> 19) & 0xf;
 //			printk("sts [%x], isr sts [%x] \n",i2c_dev->state, ast_i2c_read(i2c_dev,I2C_INTR_STS_REG));
+			ast_i2c_bus_reset(i2c_dev);
 			ret = -ETIMEDOUT;
 			spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
 			goto stop;
