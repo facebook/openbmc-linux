@@ -230,6 +230,8 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 				AST_I2CD_TX_ACK_INTR_EN,
 				I2C_INTR_CTRL_REG);
 
+				// Initialize completion structure
+				init_completion(&i2c_dev->cmd_complete);
 }
 
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
