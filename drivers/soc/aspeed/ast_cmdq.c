@@ -289,7 +289,7 @@ static int ast_cmdq_probe(struct platform_device *pdev)
 		goto out_region;
 	}
 
-	ret = request_irq(irq, ast_cmdq_done_irq, IRQF_DISABLED,
+	ret = request_irq(irq, ast_cmdq_done_irq, 0,
 			  "ast-cmdq-done", NULL);
 
 	if (ret) {

@@ -708,7 +708,7 @@ static int ast_hid_probe(struct platform_device *pdev)
 	}
 
 
-    ret = request_irq(ast_hid->irq, ast_hid_interrupt, IRQF_DISABLED, "ast-jtag", ast_hid);
+    ret = request_irq(ast_hid->irq, ast_hid_interrupt, 0, "ast-jtag", ast_hid);
     if (ret) {
         printk("JTAG Unable to get IRQ");
 		goto out_region;

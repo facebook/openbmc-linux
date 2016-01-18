@@ -553,7 +553,7 @@ static int ast_mctp_probe(struct platform_device *pdev)
 		goto out_region;
 	}
 
-	ret = request_irq(ast_mctp->irq, ast_mctp_isr, IRQF_DISABLED, "ast-mctp", ast_mctp);
+	ret = request_irq(ast_mctp->irq, ast_mctp_isr, 0, "ast-mctp", ast_mctp);
 	if (ret) {
 		printk("MCTP Unable to get IRQ");
 		goto out_region;

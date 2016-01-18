@@ -746,7 +746,7 @@ static int ast_jtag_probe(struct platform_device *pdev)
 	ast_jtag_write(ast_jtag, JTAG_SW_MODE_EN | JTAG_SW_MODE_TDIO, AST_JTAG_SW);
 
 
-	ret = request_irq(ast_jtag->irq, ast_jtag_interrupt, IRQF_DISABLED, "ast-jtag", ast_jtag);
+	ret = request_irq(ast_jtag->irq, ast_jtag_interrupt, 0, "ast-jtag", ast_jtag);
 	if (ret) {
 		printk("JTAG Unable to get IRQ");
 		goto out_region;

@@ -509,7 +509,7 @@ ast_uart_sdma_init(void)
 	ast_uart_sdma_write(sdma, 0, UART_RX_SDMA_IER);
 
 	ret = request_irq(IRQ_UART_SDMA, 
-							ast_uart_sdma_irq, IRQF_DISABLED, 
+							ast_uart_sdma_irq, 0, 
 							"ast_sdma_uart", sdma);
 	if (ret) {
 		printk ("Unable to get UART SDMA IRQ !!!!!!!!!!!!!!!!!!!!\n");

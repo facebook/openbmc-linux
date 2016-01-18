@@ -1671,7 +1671,7 @@ static int ftgmac100_open(struct net_device *netdev)
 
     /* Grab the IRQ next.  Beyond this, we will free the IRQ. */
     err = request_irq(netdev->irq, (void *)&ftgmac100_interrupt,
-                        IRQF_DISABLED, netdev->name, netdev);
+                        0, netdev->name, netdev);
     if (err)
     {
         DO_PRINT("%s: unable to get IRQ %d (retval=%d).\n",

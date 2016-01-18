@@ -451,7 +451,7 @@ static int ast_xdma_probe(struct platform_device *pdev)
 		goto out_region;
 	}
 
-	ret = request_irq(ast_xdma->irq, ast_xdma_isr, IRQF_DISABLED, "ast-xdma", ast_xdma);
+	ret = request_irq(ast_xdma->irq, ast_xdma_isr, 0, "ast-xdma", ast_xdma);
 	if (ret) {
 		printk("MCTP Unable to get IRQ");
 		goto out_region;

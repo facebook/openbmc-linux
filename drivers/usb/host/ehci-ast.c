@@ -167,7 +167,7 @@ static int ehci_ast_drv_probe(struct platform_device *pdev)
 		hcd->rsrc_len = res->end - res->start + 1;
 		hcd->regs = regs;
 
-		err = usb_add_hcd(hcd, irq, IRQF_DISABLED);
+		err = usb_add_hcd(hcd, irq, 0);
 		if (err)
 			goto err4;
 		
