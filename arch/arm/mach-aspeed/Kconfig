@@ -212,4 +212,19 @@ config YOSEMITE
 config FBPLATFORM1
         bool "Facebook Platform1"
 
+config CMM
+	select USB_ARCH_HAS_EHCI
+	select AST_UART_SDMA
+	select EGFX_IRQ
+    bool "Facebook CMM"
+
+config AST_CONSOLE_UART_BASE
+    hex "Console UART base address"
+    default 0x1e783000 if CMM
+    default 0x1e78e000 if WEDGE || WEDGE100
+    default 0x1e784000
+	help
+	  Please provide the physical address corresponding to the
+	  location of main memory in your system.
+
 endif
