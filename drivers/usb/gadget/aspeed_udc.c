@@ -50,7 +50,7 @@
 #define NUM_ENDPOINTS 14
 #define AST_UDC_EP0_MAXPACKET 64
 
-#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100)
+#if CONFIG_WEDGE
 /*
  * The HW should be able to support up to 512 on EP pool. However, we notice
  * some issues on some wedges that the IN DMA was stuck. Changing the maxpacket

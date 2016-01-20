@@ -183,7 +183,7 @@ ep_matches (
 		if (size > 64)
 			size = 64;
 		if (gadget->is_dualspeed)
-#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100)
+#ifdef CONFIG_WEDGE
 			size = 64;
 #else
 			size = 512;
