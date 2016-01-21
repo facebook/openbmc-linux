@@ -495,6 +495,32 @@ static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 };
 
 /*-------------------------------------*/
+#ifdef CONFIG_CMM
+void __init ast_add_device_i2c(void)
+{
+  //I2C Multi-Pin
+  ast_scu_multi_func_i2c();
+
+  platform_device_register(&ast_i2c_dev0_device);
+  platform_device_register(&ast_i2c_dev1_device);
+  platform_device_register(&ast_i2c_dev2_device);
+  platform_device_register(&ast_i2c_dev3_device);
+  platform_device_register(&ast_i2c_dev4_device);
+  platform_device_register(&ast_i2c_dev5_device);
+  platform_device_register(&ast_i2c_dev6_device);
+  platform_device_register(&ast_i2c_dev7_device);
+  platform_device_register(&ast_i2c_dev8_device);
+
+  /*
+   * i2c buses 9, 10, 11, 12 share pins with eMMC.
+   * not used in this board.
+   */
+
+  platform_device_register(&ast_i2c_dev13_device);
+}
+
+#else
+
 void __init ast_add_device_i2c(void)
 {
 	//I2C Multi-Pin
@@ -537,8 +563,12 @@ void __init ast_add_device_i2c(void)
 	i2c_register_board_info(2, ast_i2c_board_info_2, ARRAY_SIZE(ast_i2c_board_info_2));		
 	i2c_register_board_info(3, ast_i2c_board_info_3, ARRAY_SIZE(ast_i2c_board_info_3));
 	i2c_register_board_info(7, ast_i2c_board_info_7, ARRAY_SIZE(ast_i2c_board_info_7));
-	
 }
+
+#endif
+
 #else
+
 void __init ast_add_device_i2c(void) {}
+
 #endif
