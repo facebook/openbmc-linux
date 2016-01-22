@@ -59,6 +59,7 @@ struct ftgmac100 {
 
 	struct ftgmac100_descs *descs;
 	dma_addr_t descs_dma_addr;
+	struct page *rxdes_pages[RX_QUEUE_ENTRIES];
 
 	unsigned int rx_pointer;
 	unsigned int tx_clean_pointer;
@@ -78,7 +79,7 @@ struct ftgmac100 {
 };
 
 static int ftgmac100_alloc_rx_page(struct ftgmac100 *priv,
-				   struct ftgmac100_rxdes *rxdes, gfp_t gfp);
+                                   int rxdes_idx,  gfp_t gfp);
 
 /******************************************************************************
  * internal functions (hardware register access)
@@ -298,18 +299,16 @@ static bool ftgmac100_rxdes_ipcs_err(struct ftgmac100_rxdes *rxdes)
 	return rxdes->rxdes1 & cpu_to_le32(FTGMAC100_RXDES1_IP_CHKSUM_ERR);
 }
 
-/*
- * rxdes2 is not used by hardware. We use it to keep track of page.
- * Since hardware does not touch it, we can skip cpu_to_le32()/le32_to_cpu().
- */
-static void ftgmac100_rxdes_set_page(struct ftgmac100_rxdes *rxdes, struct page *page)
+static void ftgmac100_rxdes_set_page(struct ftgmac100 *priv,
+                                     int idx,
+                                     struct page *page)
 {
-	rxdes->rxdes2 = (unsigned int)page;
+	priv->rxdes_pages[idx] = page;
 }
 
-static struct page *ftgmac100_rxdes_get_page(struct ftgmac100_rxdes *rxdes)
+static struct page *ftgmac100_rxdes_get_page(struct ftgmac100 *priv, int idx)
 {
-	return (struct page *)rxdes->rxdes2;
+	return priv->rxdes_pages[idx];
 }
 
 /******************************************************************************
@@ -345,6 +344,11 @@ ftgmac100_rx_locate_first_segment(struct ftgmac100 *priv)
 	}
 
 	return NULL;
+}
+
+static int ftgmac100_current_rxdes_idx(const struct ftgmac100 *priv)
+{
+    return priv->rx_pointer;
 }
 
 static bool ftgmac100_rx_packet_error(struct ftgmac100 *priv,
@@ -423,6 +427,7 @@ static bool ftgmac100_rx_packet(struct ftgmac100 *priv, int *processed)
 	struct net_device *netdev = priv->netdev;
 	struct ftgmac100_rxdes *rxdes;
 	struct sk_buff *skb;
+	int rxdes_idx;
 	bool done = false;
 
 	rxdes = ftgmac100_rx_locate_first_segment(priv);
@@ -456,9 +461,10 @@ static bool ftgmac100_rx_packet(struct ftgmac100 *priv, int *processed)
 	    (ftgmac100_rxdes_is_udp(rxdes) && !ftgmac100_rxdes_udpcs_err(rxdes)))
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 
+	rxdes_idx = ftgmac100_current_rxdes_idx(priv);
 	do {
 		dma_addr_t map = ftgmac100_rxdes_get_dma_addr(rxdes);
-		struct page *page = ftgmac100_rxdes_get_page(rxdes);
+		struct page *page = ftgmac100_rxdes_get_page(priv, rxdes_idx);
 		unsigned int size;
 
 		dma_unmap_page(priv->dev, map, RX_BUF_SIZE, DMA_FROM_DEVICE);
@@ -473,10 +479,11 @@ static bool ftgmac100_rx_packet(struct ftgmac100 *priv, int *processed)
 		if (ftgmac100_rxdes_last_segment(rxdes))
 			done = true;
 
-		ftgmac100_alloc_rx_page(priv, rxdes, GFP_ATOMIC);
+		ftgmac100_alloc_rx_page(priv, rxdes_idx, GFP_ATOMIC);
 
 		ftgmac100_rx_pointer_advance(priv);
 		rxdes = ftgmac100_current_rxdes(priv);
+		rxdes_idx = ftgmac100_current_rxdes_idx(priv);
 	} while (!done);
 
 	/* Small frames are copied into linear part of skb to free one page */
@@ -715,9 +722,11 @@ static int ftgmac100_xmit(struct ftgmac100 *priv, struct sk_buff *skb,
  * internal functions (buffer)
  *****************************************************************************/
 static int ftgmac100_alloc_rx_page(struct ftgmac100 *priv,
-				   struct ftgmac100_rxdes *rxdes, gfp_t gfp)
+                                   int rxdes_idx,
+                                   gfp_t gfp)
 {
 	struct net_device *netdev = priv->netdev;
+	struct ftgmac100_rxdes *rxdes = &priv->descs->rxdes[rxdes_idx];
 	struct page *page;
 	dma_addr_t map;
 
@@ -736,7 +745,7 @@ static int ftgmac100_alloc_rx_page(struct ftgmac100 *priv,
 		return -ENOMEM;
 	}
 
-	ftgmac100_rxdes_set_page(rxdes, page);
+	ftgmac100_rxdes_set_page(priv, rxdes_idx, page);
 	ftgmac100_rxdes_set_dma_addr(rxdes, map);
 	ftgmac100_rxdes_set_dma_own(rxdes);
 	return 0;
@@ -748,7 +757,7 @@ static void ftgmac100_free_buffers(struct ftgmac100 *priv)
 
 	for (i = 0; i < RX_QUEUE_ENTRIES; i++) {
 		struct ftgmac100_rxdes *rxdes = &priv->descs->rxdes[i];
-		struct page *page = ftgmac100_rxdes_get_page(rxdes);
+		struct page *page = ftgmac100_rxdes_get_page(priv, i);
 		dma_addr_t map = ftgmac100_rxdes_get_dma_addr(rxdes);
 
 		if (!page)
@@ -788,9 +797,7 @@ static int ftgmac100_alloc_buffers(struct ftgmac100 *priv)
 	ftgmac100_rxdes_set_end_of_ring(&priv->descs->rxdes[RX_QUEUE_ENTRIES - 1]);
 
 	for (i = 0; i < RX_QUEUE_ENTRIES; i++) {
-		struct ftgmac100_rxdes *rxdes = &priv->descs->rxdes[i];
-
-		if (ftgmac100_alloc_rx_page(priv, rxdes, GFP_KERNEL))
+		if (ftgmac100_alloc_rx_page(priv, i, GFP_KERNEL))
 			goto err;
 	}
 
