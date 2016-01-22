@@ -1578,8 +1578,7 @@ ast_scu_multi_func_i2c(void)
 					SCU_FUN_PIN_SDA12,
 			AST_SCU_FUN_PIN_CTRL1);
 #else
-	//TODO check ... //In AST2400 Due to share pin with SD , please not enable I2C 10 ~14 
-	// AST 2400 have 14 , AST 2300 9 ...
+	// In AST2400 and AST2500, i2c 10 - 13 pins are shared w/ SD/MMC.
 #ifdef CONFIG_MMC_AST
 	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | 
 			SCU_FUC_PIN_I2C3 | 
@@ -1588,7 +1587,8 @@ ast_scu_multi_func_i2c(void)
 			SCU_FUC_PIN_I2C6 | 
 			SCU_FUC_PIN_I2C7 | 
 			SCU_FUC_PIN_I2C8 | 
-			SCU_FUC_PIN_I2C9, 
+			SCU_FUC_PIN_I2C9 | 
+			SCU_FUC_PIN_I2C14, 
 		AST_SCU_FUN_PIN_CTRL5);
 #else
 	ast_scu_write((ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | 
