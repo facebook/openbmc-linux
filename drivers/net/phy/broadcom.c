@@ -370,7 +370,7 @@ static int bcm54616s_config_aneg(struct phy_device *phydev)
 	/* Aneg firsly. */
 	ret = genphy_config_aneg(phydev);
 
-#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100)
+#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || defined(CONFIG_CMM)
 	/* disable GTXCLK Clock Delay */
 	phy_write(phydev, 0x1C, 0x8C00);
 	/* Disable RGMII RXD to RXC skew */
