@@ -189,10 +189,10 @@ struct ftgmac100_txdes {
 } __attribute__ ((aligned(16)));
 
 #define FTGMAC100_TXDES0_TXBUF_SIZE(x)	((x) & 0x3fff)
-#define FTGMAC100_TXDES0_EDOTR		(1 << 15)
 #define FTGMAC100_TXDES0_CRC_ERR	(1 << 19)
 #define FTGMAC100_TXDES0_LTS		(1 << 28)
 #define FTGMAC100_TXDES0_FTS		(1 << 29)
+#define FTGMAC100_TXDES0_EDOTR		(1 << 30)
 #define FTGMAC100_TXDES0_TXDMA_OWN	(1 << 31)
 
 #define FTGMAC100_TXDES1_VLANTAG_CI(x)	((x) & 0xffff)
@@ -200,7 +200,6 @@ struct ftgmac100_txdes {
 #define FTGMAC100_TXDES1_TCP_CHKSUM	(1 << 17)
 #define FTGMAC100_TXDES1_UDP_CHKSUM	(1 << 18)
 #define FTGMAC100_TXDES1_IP_CHKSUM	(1 << 19)
-#define FTGMAC100_TXDES1_LLC		(1 << 22)
 #define FTGMAC100_TXDES1_TX2FIC		(1 << 30)
 #define FTGMAC100_TXDES1_TXIC		(1 << 31)
 
@@ -215,7 +214,6 @@ struct ftgmac100_rxdes {
 } __attribute__ ((aligned(16)));
 
 #define FTGMAC100_RXDES0_VDBC		0x3fff
-#define FTGMAC100_RXDES0_EDORR		(1 << 15)
 #define FTGMAC100_RXDES0_MULTICAST	(1 << 16)
 #define FTGMAC100_RXDES0_BROADCAST	(1 << 17)
 #define FTGMAC100_RXDES0_RX_ERR		(1 << 18)
@@ -228,6 +226,7 @@ struct ftgmac100_rxdes {
 #define FTGMAC100_RXDES0_PAUSE_FRAME	(1 << 25)
 #define FTGMAC100_RXDES0_LRS		(1 << 28)
 #define FTGMAC100_RXDES0_FRS		(1 << 29)
+#define FTGMAC100_RXDES0_EDORR		(1 << 30)
 #define FTGMAC100_RXDES0_RXPKT_RDY	(1 << 31)
 
 #define FTGMAC100_RXDES1_VLANTAG_CI	0xffff
