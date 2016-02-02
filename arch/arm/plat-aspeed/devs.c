@@ -57,7 +57,7 @@ init_fnc_t __initdata *init_all_device[] = {
 	ast_add_device_watchdog,
 	ast_add_device_rtc,	
 	ast_add_device_spi,
-	//ast_add_device_ehci,
+	ast_add_device_ehci,
 	//ast_add_device_nand,
 	ast_add_device_flash,
 	ast_add_device_pwm_fan,
@@ -83,7 +83,6 @@ init_fnc_t __initdata *init_all_device[] = {
 	//ast_add_device_formatter,	
 	ast_add_device_vhub,
 	//ast_add_device_crypto,
-//	ast_add_device_nand,
 	NULL,
 };
 #endif
