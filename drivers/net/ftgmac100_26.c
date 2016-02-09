@@ -374,6 +374,7 @@ void NCSI_Rx (struct net_device * dev)
   struct ftgmac100_priv *lp = (struct ftgmac100_priv *)dev->priv;
   unsigned long status, length, i = 0;
   volatile RX_DESC *cur_desc;
+  int count = 0;
 
 ncsi_rx:
   i = 0;
@@ -393,7 +394,10 @@ ncsi_rx:
           printk("NCSI_RX: Skip len: %d, proto: %x:%x\n", length, tbuf[12], tbuf[13]);
           lp->rx_descs[lp->rx_idx].RXPKT_RDY = RX_OWNBY_FTGMAC100;
           lp->rx_idx = (lp->rx_idx+1)%RXDES_NUM;
-          goto ncsi_rx;
+          // Check next descriptor for response packet
+          if (count++ <= RXDES_NUM) {
+            goto ncsi_rx;
+          }
       }
 
     }
