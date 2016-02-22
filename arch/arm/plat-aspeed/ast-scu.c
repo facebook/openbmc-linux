@@ -749,10 +749,10 @@ ast_scu_multi_func_uart(u8 uart)
 	switch(uart) {
 		case 1:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) |
-						SCU_FUN_PIN_UART1_RXD |
 #ifdef CONFIG_YOSEMITE
-						SCU_FUN_PIN_UART1_TXD,
+						SCU_FUN_PIN_UART1_RXD,
 #else
+						SCU_FUN_PIN_UART1_RXD |
 						SCU_FUN_PIN_UART1_TXD |
 						SCU_FUN_PIN_UART1_NRTS |
 						SCU_FUN_PIN_UART1_NDTR |
@@ -765,10 +765,10 @@ ast_scu_multi_func_uart(u8 uart)
 			break;
 		case 2:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL2) |
-						SCU_FUN_PIN_UART2_RXD |
 #ifdef CONFIG_YOSEMITE
-						SCU_FUN_PIN_UART2_TXD,
+						SCU_FUN_PIN_UART2_RXD,
 #else
+						SCU_FUN_PIN_UART2_RXD |
 						SCU_FUN_PIN_UART2_TXD |
 						SCU_FUN_PIN_UART2_NRTS |
 						SCU_FUN_PIN_UART2_NDTR |
@@ -781,10 +781,10 @@ ast_scu_multi_func_uart(u8 uart)
 			break;
 		case 3:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
-						SCU_FUN_PIN_UART3_RXD |
 #ifdef CONFIG_YOSEMITE
-						SCU_FUN_PIN_UART3_TXD,
+						SCU_FUN_PIN_UART3_RXD,
 #else
+						SCU_FUN_PIN_UART3_RXD |
 						SCU_FUN_PIN_UART3_TXD |
 						SCU_FUN_PIN_UART3_NRTS |
 						SCU_FUN_PIN_UART3_NDTR |
@@ -797,10 +797,10 @@ ast_scu_multi_func_uart(u8 uart)
 			break;
 		case 4:
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
-						SCU_FUN_PIN_UART4_RXD |
 #ifdef CONFIG_YOSEMITE
-						SCU_FUN_PIN_UART4_TXD,
+						SCU_FUN_PIN_UART4_RXD,
 #else
+						SCU_FUN_PIN_UART4_RXD |
 						SCU_FUN_PIN_UART4_TXD |
 						SCU_FUN_PIN_UART4_NRTS |
 						SCU_FUN_PIN_UART4_NDTR |
