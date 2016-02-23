@@ -62,7 +62,26 @@ enum {
   REST_DESIGN_P5V = 7,
   REST_DESIGN_P12V = 8,
 };
-#endif // CONFIG_YOSEMITE
+
+#elif CONFIG_LIGHTNING
+enum {
+  ADC_P12V = 0,
+  ADC_P5V,
+  ADC_P3V3_STBY,
+  ADC_P1V8_STBY,
+  ADC_P1V53,
+  ADC_P0V9,
+  ADC_P0V9_E,
+  ADC_P1V26,
+};
+
+enum {
+  REST_DESIGN_P3V3 = 6,
+  REST_DESIGN_P5V = 7,
+  REST_DESIGN_P12V = 8,
+  REST_DESIGN_NOPOP = 9,
+};
+#endif // CONFIG_YOSEMITE & CONFIG_LIGHTNING
 
 struct adc_vcc_ref_data {
 	int v2;
@@ -70,7 +89,7 @@ struct adc_vcc_ref_data {
 	int r2;
 };
 
-static struct adc_vcc_ref_data adc_vcc_ref[9] = {
+static struct adc_vcc_ref_data adc_vcc_ref[] = {
 	[0] = {
 		.v2 = 0,
 		.r1 = 5600,
@@ -101,6 +120,8 @@ static struct adc_vcc_ref_data adc_vcc_ref[9] = {
 		.r1 = 1000,
 		.r2 = 1000,
 	},
+
+#ifdef CONFIG_YOSEMITE
   // P3V3
 	[6] = {
 		.v2 = 0,
@@ -119,6 +140,35 @@ static struct adc_vcc_ref_data adc_vcc_ref[9] = {
 		.r1 = 5110,
 		.r2 = 1020,
 	},
+
+#elif CONFIG_LIGHTNING
+  // P3V3
+	[6] = {
+		.v2 = 0,
+		.r1 = 1000,
+		.r2 = 1000,
+	},
+  // P5V
+	[7] = {
+		.v2 = 0,
+		.r1 = 3300,
+		.r2 = 1000,
+	},
+  // P12V
+	[8] = {
+		.v2 = 0,
+		.r1 = 5600,
+		.r2 = 1000,
+	},
+  // NOPOP
+	[9] = {
+		.v2 = 0,
+		.r1 = 0,
+		.r2 = 1000,
+	},
+
+#endif // CONFIG_YOSEMITE & CONFIG_LIGHTNING
+
 };
 
 /* Divisors for voltage sense;  right now adc5 & adc6 divide by 2 */
@@ -488,24 +538,40 @@ ast_get_voltage(int idx) {
   case ADC_P12V_SLOT3:
     rest_design = REST_DESIGN_P12V;
     break;
-  default:
-    rest_design = REST_DESIGN;
   }
-#endif // CONFIG_YOSEMITE
+#elif CONFIG_LIGHTNING
+  switch (idx) {
+  case ADC_P12V:
+    rest_design = REST_DESIGN_P12V;
+    break;
+  case ADC_P5V:
+    rest_design = REST_DESIGN_P5V;
+    break;
+  case ADC_P3V3_STBY:
+    rest_design = REST_DESIGN_P3V3;
+    break;
+  case ADC_P1V8_STBY:
+  case ADC_P1V53:
+  case ADC_P0V9:
+  case ADC_P0V9_E:
+  case ADC_P1V26:
+    rest_design = REST_DESIGN_NOPOP;
+    break;
+  }
+#endif // CONFIG_YOSEMITE & CONFIG_LIGHTNING
 
   // Voltage Sense Method
   tmp1 = (adc_vcc_ref[rest_design].r1 + adc_vcc_ref[rest_design].r2) * tmp * 25 * 10;
   tmp2 = adc_vcc_ref[rest_design].r2 * 1024 ;
   tmp3 = (adc_vcc_ref[rest_design].r1 * adc_vcc_ref[rest_design].v2) / adc_vcc_ref[rest_design].r2;
-  // printk("tmp3 = %d \n",tmp3);
   voltage = (tmp1/tmp2) - tmp3;
 
-#ifndef CONFIG_YOSEMITE
+#if !defined(CONFIG_YOSEMITE) && !defined(CONFIG_LIGHTNING)
   // Higher voltage inputs require a divisor
 
   if (adc_divisor[idx])
 	voltage /= adc_divisor[idx];
-#endif //CONFIG_YOSEMITE
+#endif //CONFIG_YOSEMITE & CONFIG_LIGHTNING
 
   return voltage;
 }
