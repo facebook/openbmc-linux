@@ -1267,12 +1267,13 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev5_device);
 	i2c_register_board_info(4, ast_i2c_board_info_5, ARRAY_SIZE(ast_i2c_board_info_5));
 
+#if !defined(CONFIG_WEDGE)
 	platform_device_register(&ast_i2c_dev6_device);
 	i2c_register_board_info(5, ast_i2c_board_info_6, ARRAY_SIZE(ast_i2c_board_info_6));
+#endif /* CONFIG_WEDGE */
 
 	platform_device_register(&ast_i2c_dev7_device);
 	i2c_register_board_info(6, ast_i2c_board_info_7, ARRAY_SIZE(ast_i2c_board_info_7));
-
 	platform_device_register(&ast_i2c_dev8_device);
 	i2c_register_board_info(7, ast_i2c_board_info_8, ARRAY_SIZE(ast_i2c_board_info_8));
 
@@ -1280,11 +1281,14 @@ void __init ast_add_device_i2c(void)
 	i2c_register_board_info(8, ast_i2c_board_info_9, ARRAY_SIZE(ast_i2c_board_info_9));
 
 #if defined(CONFIG_ARCH_AST2400)
+
+#if !defined(CONFIG_WEDGE)
 	platform_device_register(&ast_i2c_dev10_device);
 	i2c_register_board_info(9, ast_i2c_board_info_10, ARRAY_SIZE(ast_i2c_board_info_10));
 
 	platform_device_register(&ast_i2c_dev11_device);
 	i2c_register_board_info(10, ast_i2c_board_info_11, ARRAY_SIZE(ast_i2c_board_info_11));
+#endif /* CONFIG_WEDGE */
 
 #if defined(CONFIG_MMC_AST)
 	//Due to share pin with SD
