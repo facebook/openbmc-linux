@@ -32,7 +32,7 @@
 #include <linux/delay.h>
 #include "pmbus.h"
 
-enum chips { SPDFCBK_15G, SPAFCBK_14G };
+enum chips { SPDFCBK_15G, SPAFCBK_14G, SPDFCBK_16G };
 
 struct pfe1100_data {
 	int id;
@@ -51,6 +51,7 @@ MODULE_PARM_DESC(delay, "Delay between chip accesses in uS");
 static const struct i2c_device_id pfe1100_id[] = {
 	{"pfe1100dc", SPDFCBK_15G},
 	{"pfe1100ac", SPAFCBK_14G},
+	{"pfe1100dc1", SPDFCBK_16G},
 	{"pfe1100", 0},
 	{ }
 };
@@ -182,10 +183,14 @@ static int pfe1100_probe(struct i2c_client *client,
 		kind = SPDFCBK_15G;
 	} else {
 		device_id[ret] = 0;
-		if (strncmp(device_id, "SPAFCBK-14G", ret))
-			kind = SPDFCBK_15G;
-		else
+
+		if (strncmp(device_id, "SPAFCBK-14G", ret) == 0 )
 			kind = SPAFCBK_14G;
+		else if (strncmp(device_id, "SPDFCBK_16G", ret) == 0 )
+			kind = SPDFCBK_16G;
+		else
+		  kind = SPDFCBK_15G;
+
 		dev_notice(&client->dev, "MFR_ID is [%s]\n", device_id);
 	}
 
@@ -199,9 +204,9 @@ static int pfe1100_probe(struct i2c_client *client,
 	info = &data->info;
 	info->delay = delay;
 	if (kind == SPAFCBK_14G)
-		info->pages = 2;
+		info->pages = 2; //for ac
 	else
-		info->pages = 1;
+		info->pages = 1; //for all dc
 
 	/*
 	 * It seems reasonable to just scan the device for supported
