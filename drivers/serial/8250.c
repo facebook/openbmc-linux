@@ -2570,7 +2570,7 @@ serial8250_type(struct uart_port *port)
 
 static int serial8250_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg) {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
-  unsigned long flags;
+  unsigned long flags, timeout;
   int ret = -ENOIOCTLCMD;
   // kernel-space RS485 drain-and-switch hack
   if (cmd == TIOCSERWAITTEMT) {
@@ -2578,15 +2578,19 @@ static int serial8250_ioctl(struct uart_port *port, unsigned int cmd, unsigned l
 	  spin_lock_irqsave(&up->port.lock, flags);
     up->rs485_wait_state.gpio = arg;
     up->rs485_wait_state.waiting = 1;
+    // this is set by uart_update_timeout in serial_core.c to amt of jiffies to
+    // transmit a full FIFO + 0.02 seconds
+    timeout = up->port.timeout;
+    // though, at HZ=100, that might still only work out to the added 0.02s.
 	  spin_unlock_irqrestore(&up->port.lock, flags);
-
     // wait for kernel buffers and UART FIFO to both empty
-    wait_event_interruptible(
+    wait_event_interruptible_timeout(
        thre_wait,
        uart_circ_empty(xmit) &&
-       (serial_in(up, UART_LSR) & UART_LSR_THRE));
-    // spin until TEMT (transmit shift register empty)
+       (serial_in(up, UART_LSR) & UART_LSR_THRE),
+       timeout);
 	  spin_lock_irqsave(&up->port.lock, flags);
+    // spin until TEMT (transmit shift register empty)
 	  wait_for_xmitr(up, BOTH_EMPTY);
 	  spin_unlock_irqrestore(&up->port.lock, flags);
     return 0;
