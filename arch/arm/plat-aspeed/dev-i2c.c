@@ -729,6 +729,9 @@ static struct i2c_board_info __initdata wedge100_i2c_bus8[] = {
   {
     I2C_BOARD_INFO("pfe1100", 0x5a),
   },
+  {
+    I2C_BOARD_INFO("ltc4151", 0x6f),
+  }
 };
 
 static struct i2c_board_info __initdata wedge100_i2c_bus9[] = {
