@@ -67,7 +67,7 @@ init_fnc_t __initdata *init_all_device[] = {
 	//ast_add_device_sgpio,			
 	//ast_add_device_peci,	
 	ast_add_device_jtag,	
-	//ast_add_device_sdhci,
+	ast_add_device_sdhci,
 	ast_add_device_gmac,
 	//ast_add_device_uhci,
 	//ast_add_device_udc11,
