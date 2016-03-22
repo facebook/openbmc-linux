@@ -400,104 +400,163 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 	}
 	return ret;
 }
-
-
 #endif
 
-static u8
-ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
-{
-  u32 temp;
+static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev) {
+  u32 sts;
+  int r;
+  u32 i = 0;
 
-  // Reset i2c controller
-  temp = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
+  // Check 0x14's SDA and SCL status
+  sts = ast_i2c_read(i2c_dev, I2C_CMD_REG);
 
-  ast_i2c_write(i2c_dev, temp & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN), I2C_FUN_CTRL_REG);
+  if ((sts & AST_I2CD_SDA_LINE_STS) && (sts & AST_I2CD_SCL_LINE_STS)) {
+    // Means bus is idle.
+    dev_err(i2c_dev->dev, "I2C bus (%d) is idle. I2C slave doesn't exist?!\n",
+            i2c_dev->bus_id);
+    return -1;
+  }
 
-  ast_i2c_write(i2c_dev, temp, I2C_FUN_CTRL_REG);
+  if ((sts & AST_I2CD_SDA_LINE_STS) && !(sts & AST_I2CD_SCL_LINE_STS)) {
+    // if SDA == 1 and SCL == 0, it means the master is locking the bus.
+    // Send a stop command to unlock the bus.
+
+    dev_err(i2c_dev->dev, "I2C(%d) bus hang! Master Lock (ctrl=%x,cmd=%x)\n",
+            i2c_dev->bus_id, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+            ast_i2c_read(i2c_dev, I2C_CMD_REG));
+
+    init_completion(&i2c_dev->cmd_complete);
+    i2c_dev->cmd_err = 0;
+
+    ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
+
+    r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
+                                                  i2c_dev->adap.timeout * HZ);
+    if (i2c_dev->cmd_err && i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
+      dev_err(
+          i2c_dev->dev,
+          "I2C(%d) bus hang! Master Lock: Recovery Error (ctrl=%x,cmd=%x)\n",
+          i2c_dev->bus_id, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+          ast_i2c_read(i2c_dev, I2C_CMD_REG));
+      return -1;
+    }
+
+    if (r == 0) {
+      dev_err(
+          i2c_dev->dev,
+          "I2C(%d) bus hang! Master Lock: Recovery Timedout (ctrl=%x,cmd=%x)\n",
+          i2c_dev->bus_id, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+          ast_i2c_read(i2c_dev, I2C_CMD_REG));
+      return -1;
+    } else {
+      dev_err(
+          i2c_dev->dev,
+          "I2C(%d) bus hang! Master Lock: Recovery Success (ctrl=%x,cmd=%x)\n",
+          i2c_dev->bus_id, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+          ast_i2c_read(i2c_dev, I2C_CMD_REG));
+      return 0;
+    }
+  } else if (!(sts & AST_I2CD_SDA_LINE_STS)) {
+    // else if SDA == 0, the device is dead. We need to reset the bus
+    // And do the recovery command.
+    dev_err(i2c_dev->dev, "I2C(%d) bus hang! Slave dead: (ctrl=%x,cmd=%x)\n",
+            i2c_dev->bus_id, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+            ast_i2c_read(i2c_dev, I2C_CMD_REG));
+    // Let's retry 10 times
+    for (i = 0; i < 10; i++) {
+      ast_i2c_dev_init(i2c_dev);
+      // Do the recovery command BIT11
+      /*init_completion(&i2c_dev->cmd_complete);  ast_i2c_dev_init() sends a
+       * completion */
+      i2c_dev->cmd_err = 0;
+      ast_i2c_write(i2c_dev, AST_I2CD_BUS_RECOVER_CMD_EN, I2C_CMD_REG);
+
+      r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
+                                                    i2c_dev->adap.timeout * HZ);
+      if (i2c_dev->cmd_err != 0 &&
+          i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
+        dev_err(i2c_dev->dev, "I2C(%d) bus hang! Slave dead: Recovery failed "
+                              "(ctrl=%x,cmd=%x) error=(0x%08x)\n",
+                i2c_dev->bus_id, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+                ast_i2c_read(i2c_dev, I2C_CMD_REG), i2c_dev->cmd_err);
+        return -1;
+      }
+      // Check 0x14's SDA and SCL status
+      sts = ast_i2c_read(i2c_dev, I2C_CMD_REG);
+      if (sts & AST_I2CD_SDA_LINE_STS) { // Recover OK
+        dev_err(
+            i2c_dev->dev,
+            "I2C(%d) bus hang! Slave dead: Recovery Success (ctrl=%x,cmd=%x)\n",
+            i2c_dev->bus_id, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+            ast_i2c_read(i2c_dev, I2C_CMD_REG));
+        break;
+      }
+    }
+    if (i == 10) {
+      dev_err(i2c_dev->dev, "I2C(%d) bus hang! Slave dead: Recovery Failed "
+                            "after %d tries (ctrl=%x,cmd=%x)\n",
+              i2c_dev->bus_id, i, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+              ast_i2c_read(i2c_dev, I2C_CMD_REG));
+      return -1;
+    }
+  } else {
+    dev_err(i2c_dev->dev, "I2C(%d) Don't know how to handle this case?!\n",
+            i2c_dev->bus_id);
+    return -1;
+  }
+  return 0;
 }
 
-static u8
-ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
-{
-	u32 sts;
-	int r;
-	u32 i = 0;
+static u8 ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev) {
+  u32 temp;
+  u32 ctrl_reg1, cmd_reg1;
+  temp = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
 
-	//Check 0x14's SDA and SCL status
-	sts = ast_i2c_read(i2c_dev,I2C_CMD_REG);
+  // MASTER mode only - bus recover + reset
+  // MASTER & SLAVE mode - only reset
 
-	if ((sts & AST_I2CD_SDA_LINE_STS) && (sts & AST_I2CD_SCL_LINE_STS)) {
-		//Means bus is idle.
-		dev_err(i2c_dev->dev, "I2C bus (%d) is idle. I2C slave doesn't exist?!\n", i2c_dev->bus_id);
-		return -1;
-	}
+  // Bus recover
+  if ((temp & AST_I2CD_MASTER_EN) && !(temp & AST_I2CD_SLAVE_EN)) {
+    // Seen occurances on pfe1100 that some times the recovery fails,
+    // but a subsequent 'controller timed out' recovers it.
+    // So not handling the return code here.
+    ctrl_reg1 = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
+    cmd_reg1 = ast_i2c_read(i2c_dev, I2C_CMD_REG);
 
-	dev_err(i2c_dev->dev, "ERROR!! I2C(%d) bus hanged, try to recovery it!\n", i2c_dev->bus_id);
+    ast_i2c_bus_error_recover(i2c_dev);
 
+    dev_warn(
+        i2c_dev->dev,
+        "I2C(%d) recover completed (ctrl,cmd): before(%x,%x) after(%x,%x)\n",
+        i2c_dev->bus_id, ctrl_reg1, cmd_reg1,
+        ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+        ast_i2c_read(i2c_dev, I2C_CMD_REG));
+  }
+  // Bus Reset
+  // Clean up the state
+  ctrl_reg1 = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
+  cmd_reg1 = ast_i2c_read(i2c_dev, I2C_CMD_REG);
 
-	if ((sts & AST_I2CD_SDA_LINE_STS) && !(sts & AST_I2CD_SCL_LINE_STS)) {
-		//if SDA == 1 and SCL == 0, it means the master is locking the bus.
-		//Send a stop command to unlock the bus.
-		dev_err(i2c_dev->dev, "I2C's master is locking the bus, try to stop it.\n");
-//
-		init_completion(&i2c_dev->cmd_complete);
-		i2c_dev->cmd_err = 0;
+  ast_i2c_write(i2c_dev, temp & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN),
+                I2C_FUN_CTRL_REG);
 
-		ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
+  dev_warn(
+      i2c_dev->dev,
+      "I2C(%d) M|&S disable completed (ctrl,cmd): before(%x,%x) after(%x,%x)\n",
+      i2c_dev->bus_id, ctrl_reg1, cmd_reg1,
+      ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+      ast_i2c_read(i2c_dev, I2C_CMD_REG));
 
-		r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
-													   i2c_dev->adap.timeout*HZ);
+  ctrl_reg1 = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
+  cmd_reg1 = ast_i2c_read(i2c_dev, I2C_CMD_REG);
 
-		if(i2c_dev->cmd_err &&
-		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
-			dev_err(i2c_dev->dev, "recovery error \n");
-			return -1;
-		}
+  ast_i2c_write(i2c_dev, temp, I2C_FUN_CTRL_REG);
 
-		if (r == 0) {
-			 dev_err(i2c_dev->dev, "recovery timed out\n");
-			 return -1;
-		} else {
-			dev_err(i2c_dev->dev, "Recovery successfully\n");
-			return 0;
-		}
-
-
-	} else if (!(sts & AST_I2CD_SDA_LINE_STS)) {
-		//else if SDA == 0, the device is dead. We need to reset the bus
-		//And do the recovery command.
-		dev_err(i2c_dev->dev, "I2C's slave is dead, try to recover it\n");
-		//Let's retry 10 times
-		for (i = 0; i < 10; i++) {
-			ast_i2c_dev_init(i2c_dev);
-			//Do the recovery command BIT11
-			init_completion(&i2c_dev->cmd_complete);
-      i2c_dev->cmd_err = 0;
-			ast_i2c_write(i2c_dev, AST_I2CD_BUS_RECOVER_CMD_EN, I2C_CMD_REG);
-
-			r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
-														   i2c_dev->adap.timeout*HZ);
-			if (i2c_dev->cmd_err != 0 &&
-			   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
-				dev_err(i2c_dev->dev, "ERROR!! Failed to do recovery command(0x%08x)\n", i2c_dev->cmd_err);
-				return -1;
-			}
-			//Check 0x14's SDA and SCL status
-			sts = ast_i2c_read(i2c_dev,I2C_CMD_REG);
-			if (sts & AST_I2CD_SDA_LINE_STS) //Recover OK
-				break;
-		}
-		if (i == 10) {
-			dev_err(i2c_dev->dev, "ERROR!! recover failed\n");
-			return -1;
-		}
-	} else {
-		dev_err(i2c_dev->dev, "Don't know how to handle this case?!\n");
-		return -1;
-	}
-  dev_err(i2c_dev->dev, "Recovery successfully\n");
-	return 0;
+  dev_warn(i2c_dev->dev,
+           "I2C(%d) reset completed (ctrl,cmd): before(%x,%x) after(%x,%x)\n",
+           i2c_dev->bus_id, ctrl_reg1, cmd_reg1,
+           ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+           ast_i2c_read(i2c_dev, I2C_CMD_REG));
 }
 
 static void ast_master_alert_recv(struct ast_i2c_dev *i2c_dev)
@@ -540,6 +599,12 @@ static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
 
   if (timeout <=0) {
     //ast_i2c_bus_error_recover(i2c_dev);
+    dev_err(i2c_dev->dev,
+            "I2C(%d) ast_i2c_wait_bus_not_busy slave_op=%d (ctrl=%x,cmd=%x)\n",
+            i2c_dev->bus_id, i2c_dev->slave_operation,
+            ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+            ast_i2c_read(i2c_dev, I2C_CMD_REG));
+
     ast_i2c_bus_reset(i2c_dev);
     return 0;
   }
@@ -1345,7 +1410,10 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 
 	if(AST_I2CD_INTR_STS_ABNORMAL & sts) {
     // TODO: observed abnormal interrupt happening when the bus is stressed with traffic
-    dev_err(i2c_dev->dev, "abnormal interrupt happens with status: %x, slave mode: %d\n", sts, i2c_dev->slave_operation);
+    /* When "controller timed out" error occues this is bound to happen because we
+       send STOP signal to master. Until the behaviour is clearer changing the
+       to dev_dbg.*/
+    dev_dbg(i2c_dev->dev, "Abnormal interrupt happens with status: %x, slave mode: %d\n", sts, i2c_dev->slave_operation);
     // Need to clear the interrupt
     ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ABNORMAL, I2C_INTR_STS_REG);
 
@@ -1356,14 +1424,13 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 	}
 
 	if(AST_I2CD_INTR_STS_SCL_TO & sts) {
-    dev_err(i2c_dev->dev, "SCL LOW detected with sts = %x, slave mode: %x\n",sts, i2c_dev->slave_operation);
+    dev_err(i2c_dev->dev, "I2C(%d) SCL LOW detected with sts = %x, slave mode: %x\n", i2c_dev->bus_id, sts, i2c_dev->slave_operation);
     ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SCL_TO, I2C_INTR_STS_REG);
     i2c_dev->cmd_err |= AST_I2CD_INTR_STS_SCL_TO;
     complete(&i2c_dev->cmd_complete);
-
     // Reset i2c controller
-    ast_i2c_bus_reset(i2c_dev);
 
+    ast_i2c_bus_reset(i2c_dev);
     return IRQ_HANDLED;
 	}
 
@@ -1740,7 +1807,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 		i2c_dev->master_msgs = NULL;
 
 		if (ret == 0) {
-			dev_err(i2c_dev->dev, "controller timed out\n");
+			dev_err(i2c_dev->dev, "I2C(%d) controller timed out\n", i2c_dev->bus_id);
 			i2c_dev->state = (ast_i2c_read(i2c_dev,I2C_CMD_REG) >> 19) & 0xf;
 //			printk("sts [%x], isr sts [%x] \n",i2c_dev->state, ast_i2c_read(i2c_dev,I2C_INTR_STS_REG));
 			ast_i2c_bus_reset(i2c_dev);
@@ -1752,7 +1819,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 		if(i2c_dev->cmd_err != 0 &&
 		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
 			if (i2c_dev->cmd_err & AST_LOCKUP_DETECTED) {
-				printk("ast-i2c:  error got unexpected STOP\n");
+				dev_err(i2c_dev->dev, "I2C(%d) Lockup detected\n", i2c_dev->bus_id);
 				// reset the bus
 				//ast_i2c_bus_error_recover(i2c_dev);
         ast_i2c_bus_reset(i2c_dev);
