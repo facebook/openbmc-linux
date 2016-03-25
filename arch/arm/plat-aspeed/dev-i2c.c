@@ -746,7 +746,11 @@ static struct i2c_board_info __initdata wedge100_i2c_bus9[] = {
   },
 };
 
-/* i2c bus 10-12 on wedge100 are not connected as i2c bus */
+static struct i2c_board_info __initdata wedge100_i2c_bus10[] = {
+	// TPM on i2c 10
+};
+
+/* i2c bus 11,12 on wedge100 are not connected as i2c bus */
 
 static struct i2c_board_info __initdata wedge100_i2c_bus13[] = {
   {
@@ -1166,7 +1170,10 @@ void __init ast_add_device_i2c(void)
   platform_device_register(&ast_i2c_dev9_device);
   i2c_register_board_info(8, wedge100_i2c_bus9, ARRAY_SIZE(wedge100_i2c_bus9));
 
-  /* i2c bus 10 - 12 are not used as i2c on wedge100 */
+	platform_device_register(&ast_i2c_dev10_device);
+	i2c_register_board_info(9, wedge100_i2c_bus10, ARRAY_SIZE(wedge100_i2c_bus10));
+
+  /* i2c bus 11, 12 are not used as i2c on wedge100 */
 
   platform_device_register(&ast_i2c_dev13_device);
   i2c_register_board_info(12, wedge100_i2c_bus13, ARRAY_SIZE(wedge100_i2c_bus13));
