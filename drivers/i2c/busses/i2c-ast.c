@@ -22,6 +22,8 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/completion.h>
+#include <asm/siginfo.h>
+#include <linux/pid.h>
 
 #include <linux/platform_device.h>
 #include <linux/err.h>
@@ -101,6 +103,9 @@ struct ast_i2c_dev {
   struct i2c_msg		slave_rx_msg[I2C_S_RX_BUF_NUM + 1];
   struct i2c_msg		slave_tx_msg;
   spinlock_t	slave_rx_lock;
+  int         owner;
+  struct siginfo     info;
+  struct task_struct *current_task;
 #endif
 };
 
@@ -313,6 +318,11 @@ static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 				if(i2c_dev->slave_rx_msg[i].addr == BUFF_ONGOING) {
 					i2c_dev->slave_rx_msg[i].flags = BUFF_FULL;
 					i2c_dev->slave_rx_msg[i].addr = 0;
+          if(i2c_dev->owner > 0) {
+             if(send_sig_info(SIGUSR1, &i2c_dev->info, i2c_dev->current_task)) {
+                 dev_err(i2c_dev->dev, "Error sending signal on bus %d\n", i2c_dev->bus_id);
+             }
+          }
 					break;
 				}
 			}
@@ -335,7 +345,15 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 //			printk("slave read \n");
 			//cur_msg = get_free_msg;
 			spin_lock_irqsave(&i2c_dev->slave_rx_lock, flags);
+      if((i2c_dev->owner != *((int *)msgs->buf)) || (i2c_dev->owner < 0)) {
+           i2c_dev->owner = *((int *)msgs->buf);
+           i2c_dev->current_task = pid_task(find_vpid(i2c_dev->owner), PIDTYPE_PID);
+           if(i2c_dev->current_task == NULL) {
+               dev_err(i2c_dev->dev, "Task pointer is empty for pid %d\n", i2c_dev->owner);
+               i2c_dev->owner = -1;
 
+          }
+      }
 			for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
 				if((i2c_dev->slave_rx_msg[i].addr == 0) && (i2c_dev->slave_rx_msg[i].flags == BUFF_FULL)) {
 					memcpy(msgs->buf, i2c_dev->slave_rx_msg[i].buf, i2c_dev->slave_rx_msg[i].len);
@@ -1942,6 +1960,11 @@ static int ast_i2c_probe(struct platform_device *pdev)
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
 	ast_i2c_slave_buff_init(i2c_dev);
   spin_lock_init(&i2c_dev->slave_rx_lock);
+  i2c_dev->owner = -1;
+  memset(&i2c_dev->info, 0, sizeof(struct siginfo));
+  i2c_dev->info.si_signo = SIGUSR1;
+  i2c_dev->info.si_code = 0;
+  i2c_dev->info.si_int = 1234;
 #endif
 
 	i2c_dev->adap.algo_data = i2c_dev;
