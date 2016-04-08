@@ -345,13 +345,20 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 //			printk("slave read \n");
 			//cur_msg = get_free_msg;
 			spin_lock_irqsave(&i2c_dev->slave_rx_lock, flags);
+      //check if it is shutdown signal
+      if(*((int *)msgs->buf) == -0xdeca){
+           i2c_dev->owner = -1;
+           spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
+           msgs->len = 0;
+           ret = -1;
+           return ret;
+      }
       if((i2c_dev->owner != *((int *)msgs->buf)) || (i2c_dev->owner < 0)) {
            i2c_dev->owner = *((int *)msgs->buf);
            i2c_dev->current_task = pid_task(find_vpid(i2c_dev->owner), PIDTYPE_PID);
            if(i2c_dev->current_task == NULL) {
                dev_err(i2c_dev->dev, "Task pointer is empty for pid %d\n", i2c_dev->owner);
                i2c_dev->owner = -1;
-
           }
       }
 			for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
