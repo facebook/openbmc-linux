@@ -964,6 +964,10 @@ static struct i2c_board_info __initdata ast_i2c_board_info_12[] = {
 static struct i2c_board_info __initdata ast_i2c_board_info_13[] = {
 };
 
+//Under I2C Dev 14
+static struct i2c_board_info __initdata ast_i2c_board_info_14[] = {
+};
+
 /* end of defined(CONFIG_LIGHTNING) */
 
 #else
@@ -1261,6 +1265,9 @@ void __init ast_add_device_i2c(void)
 
 	platform_device_register(&ast_i2c_dev13_device);
 	i2c_register_board_info(12, ast_i2c_board_info_13, ARRAY_SIZE(ast_i2c_board_info_13));
+
+	platform_device_register(&ast_i2c_dev14_device);
+	i2c_register_board_info(13, ast_i2c_board_info_14, ARRAY_SIZE(ast_i2c_board_info_14));
 #else
 	platform_device_register(&ast_i2c_dev1_device);
 	i2c_register_board_info(0, ast_i2c_board_info_1, ARRAY_SIZE(ast_i2c_board_info_1));
