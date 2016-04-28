@@ -318,11 +318,14 @@ static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 				if(i2c_dev->slave_rx_msg[i].addr == BUFF_ONGOING) {
 					i2c_dev->slave_rx_msg[i].flags = BUFF_FULL;
 					i2c_dev->slave_rx_msg[i].addr = 0;
+// TODO: Under stress conditons, reboot process, this signal mechansim causing kernel to panic
+#ifdef SIG_USR1
           if(i2c_dev->owner > 0) {
              if(send_sig_info(SIGUSR1, &i2c_dev->info, i2c_dev->current_task)) {
                  dev_err(i2c_dev->dev, "Error sending signal on bus %d\n", i2c_dev->bus_id);
              }
           }
+#endif
 					break;
 				}
 			}
@@ -345,6 +348,9 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 //			printk("slave read \n");
 			//cur_msg = get_free_msg;
 			spin_lock_irqsave(&i2c_dev->slave_rx_lock, flags);
+
+// TODO: Under stress conditons, reboot process, this signal mechansim causing kernel to panic
+#ifdef SIG_USR1
       //check if it is shutdown signal
       if(*((int *)msgs->buf) == -0xdeca){
            i2c_dev->owner = -1;
@@ -361,6 +367,7 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
                i2c_dev->owner = -1;
           }
       }
+#endif
 			for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
 				if((i2c_dev->slave_rx_msg[i].addr == 0) && (i2c_dev->slave_rx_msg[i].flags == BUFF_FULL)) {
 					memcpy(msgs->buf, i2c_dev->slave_rx_msg[i].buf, i2c_dev->slave_rx_msg[i].len);
