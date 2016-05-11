@@ -36,6 +36,8 @@
 #include <linux/i2c-dev.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
+#include <linux/poll.h>
+#include <linux/sched.h>
 
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
 #include <plat/ast_i2c.h>
@@ -612,6 +614,8 @@ static int i2cdev_open(struct inode *inode, struct file *file)
 		ret = -ENOMEM;
 		goto out;
 	}
+	init_waitqueue_head(&adap->wq);
+	adap->data_ready = 0;
 	snprintf(client->name, I2C_NAME_SIZE, "i2c-dev %d", adap->nr);
 	client->driver = &i2cdev_driver;
 
@@ -633,6 +637,23 @@ static int i2cdev_release(struct inode *inode, struct file *file)
 
 	return 0;
 }
+static int i2cdev_poll(struct file *file, poll_table *wait)
+{
+  struct i2c_client *client = file->private_data;
+  struct i2c_adapter *adap = client->adapter;
+  int events = 0;
+
+  if(adap->data_ready) {
+     adap->data_ready = 0;
+     return (POLLIN | POLLRDNORM);
+  }
+  poll_wait(file, &adap->wq, wait);
+  if(adap->data_ready) {
+     events = POLLIN | POLLRDNORM;
+     adap->data_ready = 0;
+  }
+  return events;
+}
 
 static const struct file_operations i2cdev_fops = {
 	.owner		= THIS_MODULE,
@@ -642,6 +663,7 @@ static const struct file_operations i2cdev_fops = {
 	.unlocked_ioctl	= i2cdev_ioctl,
 	.open		= i2cdev_open,
 	.release	= i2cdev_release,
+	.poll     = i2cdev_poll
 };
 
 /* ------------------------------------------------------------------------- */

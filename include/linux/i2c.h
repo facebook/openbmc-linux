@@ -373,6 +373,8 @@ struct i2c_adapter {
 	struct list_head clients;	/* DEPRECATED */
 	char name[48];
 	struct completion dev_released;
+	uint8_t data_ready;
+	wait_queue_head_t wq;
 };
 #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
 
