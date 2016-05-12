@@ -896,6 +896,10 @@ static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
   {
     I2C_BOARD_INFO("24c64", 0x50),
   },
+  // PEB RTC PCF8563 (0xA2)
+  {
+    I2C_BOARD_INFO("pcf8563", 0x51),
+  },
 };
 
 //Under I2C Dev 6
