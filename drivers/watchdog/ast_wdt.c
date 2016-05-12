@@ -1,16 +1,16 @@
 /********************************************************************************
 * File Name     : ast_wdt
-* 
+*
 * Copyright (C) 2012-2020  ASPEED Technology Inc.
-* This program is free software; you can redistribute it and/or modify 
-* it under the terms of the GNU General Public License as published by the Free Software Foundation; 
-* either version 2 of the License, or (at your option) any later version. 
-* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY; 
-* without even the implied warranty of MERCHANTABILITY or 
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
-* You should have received a copy of the GNU General Public License 
-* along with this program; if not, write to the Free Software 
-* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by the Free Software Foundation;
+* either version 2 of the License, or (at your option) any later version.
+* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
+* without even the implied warranty of MERCHANTABILITY or
+* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ********************************************************************************/
 
 #include <linux/module.h>
@@ -47,7 +47,7 @@
 #include <mach/platform.h>
 #endif
 
-#define TICKS_PER_uSEC                  1 
+#define TICKS_PER_uSEC                  1
 
 
 typedef unsigned char bool_T;
@@ -146,7 +146,7 @@ static irqreturn_t wdt_isr(int irq, void *devid, struct pt_regs *regs)
 void wdt_disable(void)
 {
     register unsigned int regVal;
-                                                                                     
+
     /* reset WDT_Ctrl[0] as 0 */
     regVal = AST_READ_REG(WDT_Ctrl);
     regVal &= ~(WDT_CTRL_B_ENABLE);
@@ -156,7 +156,7 @@ void wdt_disable(void)
 void wdt_sel_clk_src(unsigned char sourceClk)
 {
     register unsigned int regVal;
-                                                                                     
+
     regVal = AST_READ_REG(WDT_Ctrl);
     if (sourceClk == WDT_CLK_SRC_PCLK)
     {
@@ -219,11 +219,15 @@ void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys,
 	}
 	else
 	{
+		/* reset WDT_CTrl[6..5] = 00, SoC reset */
 		/* reset WDT_CTrl[6..5] = 01, full chip */
 		regVal &= ~WDT_CTRL_B_RESET_MASK;
+    /* For Yosemite, need to do SoC level reset only */
+#ifndef CONFIG_YOSEMITE
 		regVal |= WDT_CTRL_B_RESET_FULL;
+#endif
 	}
-	
+
 
 	AST_WRITE_REG(WDT_Ctrl, regVal);
 }
@@ -232,7 +236,7 @@ void wdt_enable(void)
 {
 	if (!force_disable) {
 		register unsigned int regVal;
-	
+
 		/* set WDT_Ctrl[0] as 1 */
 		regVal = AST_READ_REG(WDT_Ctrl);
 		regVal |= WDT_CTRL_B_ENABLE;
@@ -300,9 +304,9 @@ static int wdt_set_heartbeat(int t)
 {
   if ((t < 1) || (t > 1000))
       return -EINVAL;
-      
+
   heartbeat=t;
-      
+
   wdt_restart_new(WDT_TIMO2TICKS(t), WDT_CLK_SRC_EXT,
                   /* No Ext, No intr, Self clear, Full chip reset */
                   FALSE, FALSE, TRUE, FALSE);
@@ -314,7 +318,7 @@ static int wdt_set_heartbeat(int t)
 */
 
 /**
- *	ast_wdt_write: 
+ *	ast_wdt_write:
  *	@file: file handle to the watchdog
  *	@buf: buffer to write (unused as data does not matter here
  *	@count: count of bytes
@@ -326,19 +330,19 @@ static int wdt_set_heartbeat(int t)
  *	settings and disable it), or the letter 'x' (to turn off override
  *	and restore its old settings).
  */
-         
+
  static ssize_t ast_wdt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
  {
-   if(count) 
+   if(count)
    {
      if (!nowayout)
      {
         size_t i;
-             
+
         /* In case it was set long ago */
         expect_close = 0;
-                         
-        for (i = 0; i != count; i++) 
+
+        for (i = 0; i != count; i++)
         {
           char c;
           if (get_user(c, buf + i))
@@ -361,9 +365,9 @@ static int wdt_set_heartbeat(int t)
       }
       wdt_restart();
    }
-   return count; 
+   return count;
  }
- 
+
 /**
  *	ast_wdt_ioctl:
  *	@inode: inode of the device
@@ -374,14 +378,14 @@ static int wdt_set_heartbeat(int t)
  *	according to their available features. We only actually usefully support
  *	querying capabilities and current status.
  */
-          
+
 static int ast_wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
   void __user *argp = (void __user *)arg;
   int __user *p = argp;
   int new_heartbeat;
-      
-  static struct watchdog_info ident = 
+
+  static struct watchdog_info ident =
   {
     .options 		= WDIOF_SETTIMEOUT|
                           WDIOF_MAGICCLOSE|
@@ -389,13 +393,13 @@ static int ast_wdt_ioctl(struct inode *inode, struct file *file, unsigned int cm
     .firmware_version 	= 1,
     .identity 		= "AST WDT",
   };
-  
+
   switch(cmd)
   {
     default:
       return -ENOIOCTLCMD;
     case WDIOC_GETSUPPORT:
-      return copy_to_user(argp, &ident, sizeof(ident))?-EFAULT:0;                      
+      return copy_to_user(argp, &ident, sizeof(ident))?-EFAULT:0;
     case WDIOC_GETSTATUS:
     case WDIOC_GETBOOTSTATUS:
       return put_user(0, p);
@@ -411,7 +415,7 @@ static int ast_wdt_ioctl(struct inode *inode, struct file *file, unsigned int cm
 
       /* Fall */
     case WDIOC_GETTIMEOUT:
-      return put_user(heartbeat, p);      
+      return put_user(heartbeat, p);
   }
 }
 /**
@@ -425,16 +429,16 @@ static int ast_wdt_ioctl(struct inode *inode, struct file *file, unsigned int cm
 *	triggers counter 2 downcounts the length of the reset pulse which
 *	set set to be as long as possible.
 */
-          
+
 static int ast_wdt_open(struct inode *inode, struct file *file)
 {
   /*
    *	Activate
    */
- // wdt_init(); 
+ // wdt_init();
   wdt_restart();
   return nonseekable_open(inode, file);
-} 
+}
 
 /**
 *	ast_wdt_release:
@@ -447,10 +451,10 @@ static int ast_wdt_open(struct inode *inode, struct file *file)
 *	reboots. In the former case we disable the counters, in the latter
 *	case you have to open it again very soon.
 */
-          
+
 static int ast_wdt_release(struct inode *inode, struct file *file)
 {
-  if (expect_close != 42 && !nowayout) 
+  if (expect_close != 42 && !nowayout)
   {
      /* handles the case where the device is closed without the "magic
       * close" character (anything that is not 'V' qualifies -- see the
@@ -460,8 +464,8 @@ static int ast_wdt_release(struct inode *inode, struct file *file)
       */
 
       wdt_disable();
-  } 
-  else 
+  }
+  else
   {
       /* handles the case where the kernel is compiled with nowayout, or
        * if the user specifies that the watchdog should continue ticking
@@ -484,10 +488,10 @@ static int ast_wdt_release(struct inode *inode, struct file *file)
 *	test or worse yet during the following fsck. This would suck, in fact
 *	trust me - if it happens it does suck.
 */
-          
+
 static int ast_wdt_notify_sys(struct notifier_block *this, unsigned long code, void *unused)
 {
-   if(code==SYS_DOWN || code==SYS_HALT) 
+   if(code==SYS_DOWN || code==SYS_HALT)
    {
      /* Turn the WDT off */
      wdt_disable();
@@ -513,7 +517,7 @@ extern void ast_wdt_reset_full(void)
 }
 EXPORT_SYMBOL(ast_wdt_reset_full);
 
-static struct file_operations ast_wdt_fops = 
+static struct file_operations ast_wdt_fops =
 {
   .owner	= THIS_MODULE,
   .llseek	= no_llseek,
@@ -523,22 +527,22 @@ static struct file_operations ast_wdt_fops =
   .release	= ast_wdt_release,
 };
 
-static struct miscdevice ast_wdt_miscdev = 
+static struct miscdevice ast_wdt_miscdev =
 {
    .minor	= WATCHDOG_MINOR,
    .name	= "watchdog",
    .fops	= &ast_wdt_fops,
 };
-     
-static struct notifier_block ast_wdt_notifier = 
+
+static struct notifier_block ast_wdt_notifier =
 {
    .notifier_call=ast_wdt_notify_sys,
 };
 
 static int ast_wdt_probe(struct platform_device *pdev)
 {
-   int ret;  
-    
+   int ret;
+
    /* register ISR */
    if (request_irq(IRQ_WDT, (void *)wdt_isr, IRQF_DISABLED, "WDT", NULL))
    {
@@ -549,7 +553,7 @@ static int ast_wdt_probe(struct platform_device *pdev)
      printk("success to register interrupt for INT_WDT (%d)\n", IRQ_WDT);
 
    ret = register_reboot_notifier(&ast_wdt_notifier);
-   if(ret) 
+   if(ret)
    {
      printk(KERN_ERR "wdt: cannot register reboot notifier (err=%d)\n", ret);
      free_irq(IRQ_WDT, NULL);
@@ -557,10 +561,10 @@ static int ast_wdt_probe(struct platform_device *pdev)
    }
 
    ret = misc_register(&ast_wdt_miscdev);
-   if (ret) 
+   if (ret)
    {
       printk(KERN_ERR "wdt: cannot register miscdev on minor=%d (err=%d)\n",WATCHDOG_MINOR, ret);
-      unregister_reboot_notifier(&ast_wdt_notifier);   
+      unregister_reboot_notifier(&ast_wdt_notifier);
       return ret;
    }
 
@@ -573,7 +577,7 @@ static int ast_wdt_probe(struct platform_device *pdev)
    wdt_restart_new(WDT_TIMO2TICKS(WDT_INITIAL_TIMO), WDT_CLK_SRC_EXT,
 		   /* No Ext, No intr, Self clear, Full chip reset */
 		   FALSE, FALSE, TRUE, FALSE);
-   
+
    /* enable it by default */
    if (!force_disable) {
      wdt_enable();
@@ -594,7 +598,7 @@ static int ast_wdt_remove(struct platform_device *dev)
 {
 	misc_deregister(&ast_wdt_miscdev);
 	disable_irq(IRQ_WDT);
-	free_irq(IRQ_WDT, NULL);		
+	free_irq(IRQ_WDT, NULL);
 	return 0;
 }
 
@@ -607,10 +611,10 @@ static struct platform_driver ast_wdt_driver = {
         .probe          = ast_wdt_probe,
         .remove         = ast_wdt_remove,
         .shutdown       = ast_wdt_shutdown,
-#if 0        
+#if 0
         .suspend                = ast_wdt_suspend,
         .resume         = ast_wdt_resume,
-#endif        
+#endif
         .driver         = {
                 .owner  = THIS_MODULE,
                 .name   = "ast-wdt",
