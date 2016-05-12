@@ -870,28 +870,14 @@ static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
 
 //Under I2C Dev 5
 static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
-  // PEB Hot Swap Controller (0x22)
-  //{
-    //I2C_BOARD_INFO("adm1278", 0x11),
-  //},
-  /*
-  // PEB TEMP SENSOR 4 (0x30)
-  {
-    I2C_BOARD_INFO("tmp75", 0x18),
-  },
-  // PEB TEMP SENSOR 2 (0x94)
-  {
-    I2C_BOARD_INFO("tmp75", 0x4a),
-  },
-  // PEB TEMP SENSOR 1 (0x98)
-  {
-    I2C_BOARD_INFO("tmp75", 0x4c),
-  },
-  // PEB TEMP SENSOR 3 (0x9A)
+  // PEB TEMP SENSOR (0x9A)
   {
     I2C_BOARD_INFO("tmp75", 0x4d),
   },
-  */
+  // PEB TEMP SENSOR (0x94)
+  {
+    I2C_BOARD_INFO("tmp75", 0x4a),
+  },
   // PEB FRUID (0xA0)
   {
     I2C_BOARD_INFO("24c64", 0x50),
@@ -904,11 +890,6 @@ static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
 
 //Under I2C Dev 6
 static struct i2c_board_info __initdata ast_i2c_board_info_6[] = {
-  // FCB Hot Swap Controller (0x44)
-  //{
-    //I2C_BOARD_INFO("adm1276", 0x22),
- // },
-  // FCB FRUID (0xA2)
   {
     I2C_BOARD_INFO("24c64", 0x51),
   },
@@ -920,24 +901,22 @@ static struct i2c_board_info __initdata ast_i2c_board_info_6[] = {
 
 //Under I2C Dev 7
 static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
-  /*
-  // PDPB Temp Sensor2 (0x92)
+  // PDPB Temp Sensor (0x92)
   {
     I2C_BOARD_INFO("tmp75", 0x49),
   },
-  // PDPB Temp Sensor3 (0x94)
+  // PDPB Temp Sensor (0x94)
   {
     I2C_BOARD_INFO("tmp75", 0x4a),
   },
-  // PDPB Temp Sensor4 (0x96)
+  // PDPB Temp Sensor (0x96)
   {
     I2C_BOARD_INFO("tmp75", 0x4b),
   },
-  // PDPB Temp Sensor1 (0x98)
+  // PDPB Temp Sensor (0x98)
   {
     I2C_BOARD_INFO("tmp75", 0x4c),
   },
-  */
   // PDPB FRUID (0xA2)
   {
     I2C_BOARD_INFO("24c64", 0x51),
