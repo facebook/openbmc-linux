@@ -57,12 +57,9 @@
 
 #define AST_LOCKUP_DETECTED (0x1 << 15)
 
-// Enable SCL/SDA pull LOW detection for Yosemite platform
-#ifdef CONFIG_YOSEMITE
-#define AST_I2C_LOW_TIMEOUT 0x07
-#else
+// TODO: Disable SCL/SDA pull LOW detection for now based on stress testing
+// Will revisit this if needed to be enabled for some reason later
 #define AST_I2C_LOW_TIMEOUT 0x00
-#endif //CONFIG_YOSEMITE
 
 struct ast_i2c_dev {
 	struct ast_i2c_driver_data *ast_i2c_data;
@@ -391,6 +388,7 @@ static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev) {
   int r;
   u32 i = 0;
 
+
   // Check 0x14's SDA and SCL status
   sts = ast_i2c_read(i2c_dev, I2C_CMD_REG);
 
@@ -446,6 +444,7 @@ static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev) {
     dev_err(i2c_dev->dev, "I2C(%d) bus hang! Slave dead: (ctrl=%x,cmd=%x)\n",
             i2c_dev->bus_id, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
             ast_i2c_read(i2c_dev, I2C_CMD_REG));
+
     // Let's retry 10 times
     for (i = 0; i < 10; i++) {
       ast_i2c_dev_init(i2c_dev);
@@ -500,7 +499,6 @@ static u8 ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev) {
   // MASTER & SLAVE mode - only reset
   // Note: On Yosemite, this function is also called when i2c clock is detected low in
   // interrupt context. Since the bus_error_recover() sleeps, the logic can not be used.
-#ifndef CONFIG_YOSEMITE
   // Bus recover
   if ((temp & AST_I2CD_MASTER_EN) && !(temp & AST_I2CD_SLAVE_EN)) {
     // Seen occurances on pfe1100 that some times the recovery fails,
@@ -518,7 +516,6 @@ static u8 ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev) {
         ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
         ast_i2c_read(i2c_dev, I2C_CMD_REG));
   }
-#endif
   // Bus Reset
   // Clean up the state
   ctrl_reg1 = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
@@ -526,7 +523,6 @@ static u8 ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev) {
 
   ast_i2c_write(i2c_dev, temp & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN),
                 I2C_FUN_CTRL_REG);
-
 
 #ifndef CONFIG_YOSEMITE
   dev_warn(
