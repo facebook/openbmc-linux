@@ -45,6 +45,10 @@
 #include <linux/pm.h>
 #include <linux/slab.h>
 
+static bool ignore_probe;
+module_param(ignore_probe, bool, 0);
+MODULE_PARM_DESC(ignore_probe, "Ignore probe result. Always assume there is one.");
+
 #define PCA954X_MAX_NCHANS 8
 
 enum pca_type {
@@ -214,7 +218,11 @@ static int pca954x_probe(struct i2c_client *client,
 	 */
 	if (i2c_smbus_write_byte(client, 0) < 0) {
 		dev_warn(&client->dev, "probe failed\n");
-		return -ENODEV;
+		if (ignore_probe) {
+		  dev_warn(&client->dev, "ignore probe result\n");
+		} else {
+		  return -ENODEV;
+		}
 	}
 
 	data->type = id->driver_data;
