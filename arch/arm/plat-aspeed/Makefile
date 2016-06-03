@@ -29,7 +29,11 @@ obj-y                   += dev-i2c.o dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o 
 ifdef CONFIG_CMM
 obj-y += dev-spi-cmm.o
 else
+ifdef CONFIG_WEDGE
+obj-y += dev-spi-wedge.o
+else
 obj-y += dev-spi.o
+endif
 endif
 
 #dev
