@@ -24,15 +24,15 @@ obj-y			+= dev-uart.o dev-vuart.o dev-wdt.o dev-rtc.o dev-gpio.o dev-sgpio.o dev
 obj-y 	                += dev-nor.o dev-nand.o dev-sdhci.o
 
 #bus
-obj-y                   += dev-i2c.o dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o dev-peci.o dev-kcs.o dev-mbx.o dev-pcie.o dev-jtag.o dev-mctp.o dev-xdma.o
+obj-y                   += dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o dev-peci.o dev-kcs.o dev-mbx.o dev-pcie.o dev-jtag.o dev-mctp.o dev-xdma.o
 
 ifdef CONFIG_CMM
-obj-y += dev-spi-cmm.o
+obj-y += dev-spi-cmm.o dev-i2c-cmm.o dev-i2c-common.o
 else
 ifdef CONFIG_WEDGE
-obj-y += dev-spi-wedge.o
+obj-y += dev-spi-wedge.o dev-i2c.o
 else
-obj-y += dev-spi.o
+obj-y += dev-spi.o dev-i2c.o
 endif
 endif
 

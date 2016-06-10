@@ -35,6 +35,7 @@ extern void __init ast_add_device_espi(void);
 extern void __init ast_add_device_kcs(void);
 extern void __init ast_add_device_mailbox(void);
 extern void __init ast_add_device_i2c(void);
+extern void __init ast_add_device_i2c_common(void);
 extern void __init ast_add_device_spi(void);
 extern void __init ast_add_device_ehci(void);
 extern void __init ast_add_device_uhci(void);
