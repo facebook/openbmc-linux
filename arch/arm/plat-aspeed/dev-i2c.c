@@ -762,6 +762,104 @@ static struct i2c_board_info __initdata wedge100_i2c_bus13[] = {
 
 /* end of defined(CONFIG_WEDGE100) */
 
+#elif defined(CONFIG_GALAXY100)
+static struct i2c_board_info __initdata galaxy100_i2c_bus1[] = {
+  {
+    I2C_BOARD_INFO("adm1278", 0x10),
+  },
+  {
+    I2C_BOARD_INFO("ds110df111", 0x18),
+  },
+  {
+    I2C_BOARD_INFO("pca9534", 0x21),
+  },
+  /* Panther+ microserver */
+  {
+    I2C_BOARD_INFO("galaxy100_ec", 0x33),
+  },
+  {
+    I2C_BOARD_INFO("scmcpld", 0x3e),
+  },
+  {
+    I2C_BOARD_INFO("24c02", 0x54),
+  },
+  {
+    I2C_BOARD_INFO("24c02", 0x52),
+  },
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus2[] = {
+  /* TODO: one IR3581 and two IR3584 */
+  {
+    I2C_BOARD_INFO("IR3584", 0x72),
+  },
+  {
+    I2C_BOARD_INFO("IR3581", 0x70),
+  },
+  {
+    I2C_BOARD_INFO("ds110df111", 0x18),
+  },
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus3[] = {
+  /* TODO: one PWR1014A */
+  {
+    I2C_BOARD_INFO("pwr1014a", 0x40),
+  },
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus4[] = {
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus5[] = {
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus6[] = {
+  /* tpm */
+  {
+    I2C_BOARD_INFO("slb9645tt", 0x20),
+  },
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus7[] = {
+  {
+    I2C_BOARD_INFO("pcf8574", 0x27),
+  },
+  {
+    I2C_BOARD_INFO("24c64", 0x51),
+  }
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus8[] = {
+  /* as a slave, from CMM*/
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus9[] = {
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus10[] = {
+  {
+    I2C_BOARD_INFO("24c02", 0x50),
+  },
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus12[] = {
+  {
+    I2C_BOARD_INFO("adm1278", 0x10),
+  },
+};
+
+static struct i2c_board_info __initdata galaxy100_i2c_bus13[] = {
+  {
+    I2C_BOARD_INFO("syscpld", 0x31),
+  },
+  {
+    I2C_BOARD_INFO("qsfp_cpld", 0x39),
+  },
+};
+
+/* end of defined(CONFIG_GALAXY100) */
+
 #elif defined(CONFIG_YOSEMITE)
 
 //Under I2C Dev 1
@@ -1168,6 +1266,43 @@ void __init ast_add_device_i2c(void)
   /* i2c bug 14 is not used as i2c on wedge100 */
 
   /* end of defined(CONFIG_WEDGE100) */
+
+#elif defined(CONFIG_GALAXY100)
+  platform_device_register(&ast_i2c_dev1_device);
+  i2c_register_board_info(0, galaxy100_i2c_bus1, ARRAY_SIZE(galaxy100_i2c_bus1));
+
+  platform_device_register(&ast_i2c_dev2_device);
+  i2c_register_board_info(1, galaxy100_i2c_bus2, ARRAY_SIZE(galaxy100_i2c_bus2));
+
+  platform_device_register(&ast_i2c_dev3_device);
+  i2c_register_board_info(2, galaxy100_i2c_bus3, ARRAY_SIZE(galaxy100_i2c_bus3));
+
+  platform_device_register(&ast_i2c_dev4_device);
+  i2c_register_board_info(3, galaxy100_i2c_bus4, ARRAY_SIZE(galaxy100_i2c_bus4));
+
+  platform_device_register(&ast_i2c_dev5_device);
+  i2c_register_board_info(4, galaxy100_i2c_bus5, ARRAY_SIZE(galaxy100_i2c_bus5));
+
+  platform_device_register(&ast_i2c_dev6_device);
+  i2c_register_board_info(5, galaxy100_i2c_bus6, ARRAY_SIZE(galaxy100_i2c_bus6));
+
+  platform_device_register(&ast_i2c_dev7_device);
+  i2c_register_board_info(6, galaxy100_i2c_bus7, ARRAY_SIZE(galaxy100_i2c_bus7));
+
+  platform_device_register(&ast_i2c_dev8_device);
+  i2c_register_board_info(7, galaxy100_i2c_bus8, ARRAY_SIZE(galaxy100_i2c_bus8));
+
+  platform_device_register(&ast_i2c_dev9_device);
+  i2c_register_board_info(8, galaxy100_i2c_bus9, ARRAY_SIZE(galaxy100_i2c_bus9));
+
+  platform_device_register(&ast_i2c_dev10_device);
+  i2c_register_board_info(9, galaxy100_i2c_bus10, ARRAY_SIZE(galaxy100_i2c_bus10));
+
+  platform_device_register(&ast_i2c_dev12_device);
+  i2c_register_board_info(11, galaxy100_i2c_bus12, ARRAY_SIZE(galaxy100_i2c_bus12));
+
+  platform_device_register(&ast_i2c_dev13_device);
+  i2c_register_board_info(12, galaxy100_i2c_bus13, ARRAY_SIZE(galaxy100_i2c_bus13));
 
 #elif defined(CONFIG_YOSEMITE)
 	platform_device_register(&ast_i2c_dev1_device);

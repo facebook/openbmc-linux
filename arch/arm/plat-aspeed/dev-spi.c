@@ -381,7 +381,7 @@ static struct spi_board_info ast_spi_devices[] = {
         .bus_num    = 5,
         .mode = SPI_MODE_0,
     },
-#elif defined CONFIG_WEDGE100
+#elif defined(CONFIG_WEDGE100) || defined(CONFIG_GALAXY100)
     {
         .modalias    = "spidev",
         .chip_select    = 0,

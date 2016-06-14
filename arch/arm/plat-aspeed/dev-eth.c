@@ -136,7 +136,7 @@ void __init ast_add_device_gmac(void)
 	// MAC0.  Older drivers would drop interfaces without PHYs, but
 	// the latest open source drivers do not, so we drop the first
 	// MAC specs.
-#if !defined(CONFIG_WEDGE) && !defined(CONFIG_WEDGE100)
+#if !defined(CONFIG_WEDGE) && !defined(CONFIG_WEDGE100) && !defined(CONFIG_GALAXY100)
 	ast_scu_init_eth(0);
 	ast_scu_multi_func_eth(0);
 

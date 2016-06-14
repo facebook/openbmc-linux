@@ -120,7 +120,7 @@
 #err "Not define include for GMAC"
 #endif
 
-#ifdef CONFIG_WEDGE100
+#if defined(CONFIG_WEDGE100) || defined(CONFIG_GALAXY100)
 #define PHY_DEFAULT_ADDR 0x18
 #else
 /* wedge */
