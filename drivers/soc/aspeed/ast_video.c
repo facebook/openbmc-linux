@@ -1319,7 +1319,7 @@ static void ast_video_mode_detect(struct ast_video_data *ast_video)
 
 //	ast_video->plat_data->ctrl_reset();
 	//set input signal  and Check polarity (video engine prefers negative signal)		
-	if(ast_video->input_source == VIDEO_SOURCE_INTERNAL) {
+	if(ast_video->input_source <= VIDEO_SOURCE_INT_CRT) {
 		ast_get_vga_scratch_info(ast_video);
 		ast_video_write(ast_video, (ast_video_read(ast_video, AST_VIDEO_PASS_CTRL) &
 						~VIDEO_FROM_EXT_SOURCE) |
@@ -1377,7 +1377,7 @@ static void ast_video_mode_detect(struct ast_video_data *ast_video)
 	//2nd mode detect and get detect info
 	ast_video_mode_detect_trigger(ast_video);
 
-	if(ast_video->input_source == VIDEO_SOURCE_INTERNAL) {
+	if(ast_video->input_source == VIDEO_SOURCE_INT_VGA) {
 		color_mode = ast_get_vga_signal(ast_video);
 		if(color_mode) {
 			if(color_mode >= VGA_15BPP_MODE) {
@@ -1562,6 +1562,17 @@ static void ast_video_ctrl_init(struct ast_video_data *ast_video)
 	ast_init_jpeg_table(ast_video);
 	ast_video_write(ast_video,  VM_STREAM_PKT_SIZE(STREAM_3MB), AST_VM_STREAM_SIZE);
 	ast_video_write(ast_video,  0x00080000 | VIDEO_DCT_LUM(4) | VIDEO_DCT_CHROM(4 + 16) | VIDEO_DCT_ONLY_ENCODE, AST_VM_COMPRESS_CTRL);
+
+	//WriteMMIOLong(0x1e700238, 0x00000000);
+	//WriteMMIOLong(0x1e70023c, 0x00000000);
+
+	ast_video_write(ast_video, 0x00001E00, AST_VM_SOURCE_SCAN_LINE); //buffer pitch
+	ast_video_write(ast_video, 0x00000000, 0x268);
+	ast_video_write(ast_video, 0x00001234, 0x280);
+
+	ast_video_write(ast_video, 0x00000000, AST_VM_PASS_CTRL);
+	ast_video_write(ast_video, 0x00000000, AST_VM_BCD_CTRL);
+
 	// ===============================================================================
 
 
@@ -1592,38 +1603,6 @@ static void ast_video_ctrl_init(struct ast_video_data *ast_video)
 									VIDEO_MODE_VER_STABLE(2) |
 									VIDEO_MODE_EDG_THROD(0x65)
 									, AST_VIDEO_MODE_DETECT);	
-
-#if 0
-	//init .......
-	if(ast_video->plat_data->mode == VIDEO_SINGLE_MODE) {
-		ast_video_write(ast_video, ast_video_read(ast_video, AST_VIDEO_SEQ_CTRL) & ~(VIDEO_CAPTURE_MULTI_FRAME | VIDEO_AUTO_COMPRESS), AST_VIDEO_SEQ_CTRL);
-	} else if(ast_video->plat_data->mode == VIDEO_FRAME_MODE) {
-		ast_video_write(ast_video, (ast_video_read(ast_video, AST_VIDEO_SEQ_CTRL) | VIDEO_AUTO_COMPRESS) & ~(VIDEO_CAPTURE_MULTI_FRAME) , AST_VIDEO_SEQ_CTRL);
-	} else if(ast_video->plat_data->mode == VIDEO_STREAM_MODE) {
-		ast_video_write(ast_video, ast_video_read(ast_video, AST_VIDEO_SEQ_CTRL) | VIDEO_CAPTURE_MULTI_FRAME | VIDEO_AUTO_COMPRESS ,AST_VIDEO_SEQ_CTRL);	
-	} else
-		printk("ERROR Mode \n");
-
-//	ast_video_write(ast_video, VIDEO_MODE_DETECT_RDY | VIDEO_CAPTURE_COMPLETE 
-//					|VIDEO_COMPRESS_COMPLETE | VIDEO_MODE_DETECT_WDT ,AST_VIDEO_INT_EN);
-	ast_video_write(ast_video, VIDEO_CAPTURE_COMPLETE 
-					|VIDEO_COMPRESS_COMPLETE | VIDEO_MODE_DETECT_WDT ,AST_VIDEO_INT_EN);
-
-
-	//420/444 Setting
-	ast_video_set_compress_format(ast_video, ast_video->plat_data->compress);	
-
-	if(ast_video->plat_data->mode == VIDEO_SINGLE_MODE)
-		ast_video_write(ast_video, VIDEO_COMPRESS_COMPLETE | VIDEO_MODE_DETECT_WDT ,AST_VIDEO_INT_EN);
-	else
-		ast_video_write(ast_video, VIDEO_CAPTURE_COMPLETE |VIDEO_COMPRESS_COMPLETE | VIDEO_MODE_DETECT_WDT ,AST_VIDEO_INT_EN);
-
-
-	if(ast_video->plat_data->rc4_enable)
-		ast_video_rc4_encryption(ast_video, 1);
-	else
-		ast_video_rc4_encryption(ast_video, 0);
-#endif	
 }
 
 static long ast_video_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
@@ -2438,7 +2417,7 @@ static int ast_video_probe(struct platform_device *pdev)
 	ast_video->plat_data = pdev->dev.platform_data;	
 
 	// default config 
-	ast_video->input_source = VIDEO_SOURCE_INTERNAL;
+	ast_video->input_source = VIDEO_SOURCE_INT_VGA;
 	ast_video->rc4_enable = 0;
 	strcpy(ast_video->EncodeKeys, "fedcba9876543210");
 	ast_video->scaling = 0;
@@ -2478,6 +2457,8 @@ static int ast_video_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, ast_video);
 	dev_set_drvdata(ast_video_misc.this_device, ast_video);
 
+	ast_video_ctrl_init(ast_video);
+
 	ret = request_irq(ast_video->irq, video_interrupt, 0, "ast-video", ast_video);
 	if (ret) {
 		printk(KERN_INFO "VIDEO: Failed request irq %d\n", ast_video->irq);
@@ -2495,7 +2476,7 @@ static int ast_video_probe(struct platform_device *pdev)
 	VIDEO_DBG("kthread pid: %d\n", ast_video->thread_task->pid);
 #endif			
 
-	ast_video_ctrl_init(ast_video);
+
 		
 	printk(KERN_INFO "ast_video: driver successfully loaded.\n");
 

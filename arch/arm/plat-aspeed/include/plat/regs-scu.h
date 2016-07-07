@@ -168,6 +168,7 @@
 #define SCU_RESET_2D				(0x1 << 7)
 #define SCU_RESET_VIDEO				(0x1 << 6)
 #define SCU_RESET_LPC				(0x1 << 5)
+#define SCU_RESET_ESPI				(0x1 << 5)
 #define SCU_RESET_HACE				(0x1 << 4)
 #define SCU_RESET_USB_P1			(0x1 << 3)
 #define SCU_RESET_I2C				(0x1 << 2)
@@ -325,6 +326,7 @@
 #define SCU_FREQ_MEASU_FINISH			(0x1 << 6)
 #define SCU_FREQ_SOURCE_FOR_MEASU(x)	(x << 2)
 #define SCU_FREQ_SOURCE_FOR_MEASU_MASK	(0xf << 2)
+#define SCU_FREQ_SOURCE_FOR_MEASU_12MHZ 0xC //0b1100
 
 #if defined(AST_SOC_G5)
 #define SCU_SOURCE_PCLK					0xf

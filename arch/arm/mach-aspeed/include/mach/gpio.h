@@ -544,5 +544,7 @@ static inline void gpio_set_value(unsigned gpio, int value)
 
 #endif	/* __ASSEMBLY__ */
 
+void ast_set_gpio_debounce(int gpio_port, int timer);
+void ast_set_gpio_debounce_timer(int timer, int val);
 
 #endif

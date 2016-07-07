@@ -32,6 +32,8 @@
 #include <mach/platform.h>
 #include <mach/hardware.h>
 #include <plat/regs-espi.h>
+#include <plat/ast-scu.h>
+#include <mach/gpio.h>
 
 /*************************************************************************************/
 struct ast_espi_xfer {
@@ -56,7 +58,7 @@ struct ast_espi_xfer {
 //#define AST_ESPI_DEBUG
 
 #ifdef AST_ESPI_DEBUG
-#define ESPI_DBUG(fmt, args...) printk("%s() " fmt, __FUNCTION__, ## args)
+#define ESPI_DBUG(fmt, args...) printk(KERN_DEBUG "%s() " fmt,__FUNCTION__, ## args)
 #else
 #define ESPI_DBUG(fmt, args...)
 #endif
@@ -76,7 +78,6 @@ struct espi_ch_data {
 struct ast_espi_data {
 	struct platform_device 	*pdev;
 	void __iomem			*reg_base;			/* virtual */	
-	int 					version;
 	int 					irq;					//LPC IRQ number 
 	u32 					irq_sts;					
 	u32 					vw_gpio;	
@@ -255,6 +256,7 @@ ast_sys_event(struct ast_espi_data *ast_espi)
 {
 	u32 sts = ast_espi_read(ast_espi, AST_ESPI_SYS_EVENT_ISR);
 	u32 sys_event = ast_espi_read(ast_espi, AST_ESPI_SYS_EVENT);
+	ESPI_DBUG("sts %x, sys_event %x\n", sts, sys_event);
 
 	if(sts & ESPI_HOST_RST_WARN) {
 		if(sys_event & ESPI_HOST_RST_WARN)
@@ -271,6 +273,11 @@ ast_sys_event(struct ast_espi_data *ast_espi)
 			ast_espi_write(ast_espi, sys_event & ~ESPI_OOB_REST_ACK, AST_ESPI_SYS_EVENT);
 		ast_espi_write(ast_espi, ESPI_OOB_RST_WARN, AST_ESPI_SYS_EVENT_ISR);
 	}
+
+	if(sts & ~(ESPI_OOB_RST_WARN | ESPI_HOST_RST_WARN)) {
+		printk("new sts %x \n",sts);
+		ast_espi_write(ast_espi, sts, AST_ESPI_SYS_EVENT_ISR);
+	}
 	
 }
 
@@ -278,15 +285,68 @@ static void
 ast_sys1_event(struct ast_espi_data *ast_espi)
 {
 	u32 sts = ast_espi_read(ast_espi, AST_ESPI_SYS1_INT_STS);
-	if(sts & 0x1) {
-		ast_espi_write(ast_espi, ast_espi_read(ast_espi, AST_ESPI_SYS1_EVENT) | 0x100000, AST_ESPI_SYS1_EVENT);
+	if(sts & ESPI_SYS_SUS_WARN) {
+		ast_espi_write(ast_espi, ast_espi_read(ast_espi, AST_ESPI_SYS1_EVENT) | ESPI_SYS_SUS_ACK, AST_ESPI_SYS1_EVENT);
 		//TODO  polling bit 20 is 1		
-		ast_espi_write(ast_espi, 0x1, AST_ESPI_SYS1_INT_STS);
+		ast_espi_write(ast_espi, ESPI_SYS_SUS_WARN, AST_ESPI_SYS1_INT_STS);
+	}
 
+	if(sts & ~(ESPI_SYS_SUS_WARN)) {
+		printk("new sys1 sts %x \n",sts);
+		ast_espi_write(ast_espi, sts, AST_ESPI_SYS1_INT_STS);
 	}
 }
 
-static irqreturn_t ast_espi_isr (int this_irq, void *dev_id)
+static void ast_espi_init(struct ast_espi_data *ast_espi) {
+
+	//a1 espi intiial
+	ast_espi_write(ast_espi, ast_espi_read(ast_espi, AST_ESPI_CTRL) | 0xff, AST_ESPI_CTRL);
+
+	//TODO for function interrpt type
+	ast_espi_write(ast_espi, 0, AST_ESPI_SYS_INT_T0);
+	ast_espi_write(ast_espi, 0, AST_ESPI_SYS_INT_T1);
+	ast_espi_write(ast_espi, ESPI_HOST_RST_WARN| ESPI_OOB_RST_WARN, AST_ESPI_SYS_INT_T2);
+
+	ast_espi_write(ast_espi, 0xffffffff, AST_ESPI_IER);
+	ast_espi_write(ast_espi, 0xffffffff, AST_ESPI_SYS_IER);
+
+	//A1
+	ast_espi_write(ast_espi, 0x1, AST_ESPI_SYS1_IER);
+	ast_espi_write(ast_espi, 0x1, AST_ESPI_SYS1_INT_T0);
+
+
+#ifdef AST_ESPI_DMA_MODE
+	ast_espi_write(ast_espi, ast_espi->p_rx_channel.dma_addr, AST_ESPI_PCP_RX_DMA);
+	ast_espi_write(ast_espi, ast_espi->p_tx_channel.dma_addr, AST_ESPI_PCP_TX_DMA);
+
+	ast_espi_write(ast_espi, ast_espi->np_tx_channel.dma_addr, AST_ESPI_PCNP_TX_DMA);
+
+	ast_espi_write(ast_espi, ast_espi->oob_rx_channel.dma_addr, AST_ESPI_OOB_RX_DMA);
+	ast_espi_write(ast_espi, ast_espi->oob_tx_channel.dma_addr, AST_ESPI_OOB_TX_DMA);
+
+	ast_espi_write(ast_espi, ast_espi->flash_rx_channel.dma_addr, AST_ESPI_FLASH_RX_DMA);
+	ast_espi_write(ast_espi, ast_espi->flash_tx_channel.dma_addr, AST_ESPI_FLASH_TX_DMA);
+
+	ast_espi_write(ast_espi, ast_espi_read(ast_espi, AST_ESPI_CTRL) |
+					ESPI_CTRL_FLASH_RX_DMA | ESPI_CTRL_FLASH_TX_DMA |
+					ESPI_CTRL_OOB_RX_DMA |ESPI_CTRL_OOB_TX_DMA |
+					ESPI_CTRL_PCNP_TX_DMA | ESPI_CTRL_PCP_RX_DMA | ESPI_CTRL_PCP_TX_DMA,  AST_ESPI_CTRL);
+#endif
+}
+
+static irqreturn_t ast_espi_reset_isr(int this_irq, void *dev_id)
+{
+	struct ast_espi_data *ast_espi = dev_id;
+
+	ESPI_DBUG("ast_espi_reset_isr\n");
+
+	ast_scu_reset_espi();
+	ast_espi_init(ast_espi);
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t ast_espi_isr(int this_irq, void *dev_id)
 {
 	struct ast_espi_data *ast_espi = dev_id;
 	u32 sts = ast_espi_read(ast_espi, AST_ESPI_ISR);
@@ -296,9 +356,6 @@ static irqreturn_t ast_espi_isr (int this_irq, void *dev_id)
 #else
 	if(sts & ESPI_ISR_HW_RESET) {
 		printk("ESPI_ISR_HW_RESET \n");
-		ast_espi_write(ast_espi, ast_espi_read(ast_espi, AST_ESPI_CTRL) & ~0xff000000, AST_ESPI_CTRL);
-		ast_espi_write(ast_espi, ast_espi_read(ast_espi, AST_ESPI_CTRL) |0xff000000, AST_ESPI_CTRL);
-
 		ast_espi_write(ast_espi, ast_espi_read(ast_espi, AST_ESPI_SYS_EVENT) |ESPI_BOOT_STS | ESPI_BOOT_DWN, AST_ESPI_SYS_EVENT);
 		
 		//6:flash ready ,4: oob ready , 0: perp ready
@@ -987,28 +1044,16 @@ static int __init ast_espi_probe(struct platform_device *pdev)
 		goto err_free_mem;
 	}
 
-	//a1 espi intiial 
-	ast_espi_write(ast_espi, ast_espi_read(ast_espi, AST_ESPI_CTRL) | 0xff, AST_ESPI_CTRL);
-
-	// check espi version; 
-	if((ast_espi_read(ast_espi, AST_ESPI_CTRL) & 0xff) == 0)
-		ast_espi->version = 0;
-	else
-		ast_espi->version = 1;
-
-	//TODO for function interrpt type 
-	ast_espi_write(ast_espi, 0, AST_ESPI_SYS_INT_T0);
-	ast_espi_write(ast_espi, 0, AST_ESPI_SYS_INT_T1);
-	ast_espi_write(ast_espi, ESPI_HOST_RST_WARN| ESPI_OOB_RST_WARN, AST_ESPI_SYS_INT_T2);
-		
- 	ast_espi_write(ast_espi, 0xffffffff, AST_ESPI_IER);
-	ast_espi_write(ast_espi, 0xffffffff, AST_ESPI_SYS_IER);
-
-	//A1 
-	if(ast_espi->version) {
-		ast_espi_write(ast_espi, 0x1, AST_ESPI_SYS1_IER);
-		ast_espi_write(ast_espi, 0x1, AST_ESPI_SYS1_INT_T0);
+	ast_set_gpio_debounce(PIN_GPIOAC7, 0x1);
+	ast_set_gpio_debounce_timer(1, 0x100);
+	irq_set_irq_type(IRQ_GPIOAC7, IRQ_TYPE_EDGE_FALLING);
+	ret = request_irq(IRQ_GPIOAC7, ast_espi_reset_isr, IRQF_SHARED, "gpioAC7", ast_espi);
+	if (ret) {
+		printk("AST ESPI Unable to get IRQ");
+		goto err_free_mem;
 	}
+
+	ast_espi_init(ast_espi);
 	
 	ret = misc_register(&ast_espi_misc);
 	if (ret){		

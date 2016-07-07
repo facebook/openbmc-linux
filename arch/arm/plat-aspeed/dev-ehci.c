@@ -89,7 +89,7 @@ static struct platform_device ast_ehci_1_device = {
 
 void __init ast_add_device_ehci(void)
 {
-#if !defined(CONFIG_GUC_USB_UHCI_HCD)	
+#if !defined(CONFIG_USB_UHCI_AST)
 	ast_scu_multi_func_usb_port1_mode(1);
 	ast_scu_init_usb_port1();
 #endif 
@@ -97,7 +97,7 @@ void __init ast_add_device_ehci(void)
 	platform_device_register(&ast_ehci_0_device);
 	
 #ifdef AST_EHCI1_BASE
-#if !defined(CONFIG_GUC_USB_UHCI_HCD)	
+#if !defined(CONFIG_USB_UHCI_AST)
 	ast_scu_multi_func_usb_port2_mode(2);	//SOC_G5
 	ast_scu_init_usb_port2();	
 #endif 

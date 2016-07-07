@@ -67,8 +67,8 @@ static struct resource ast_video_resources[] = {
 		.flags = IORESOURCE_IRQ,
 	},
 	[2] = {
-		.start = ASR_VIDEO_MEM,
-		.end = ASR_VIDEO_MEM + ASR_VIDEO_MEM_SIZE - 1,
+		.start = AST_VIDEO_MEM,
+		.end = AST_VIDEO_MEM + AST_VIDEO_MEM_SIZE - 1,
 		.flags = IORESOURCE_DMA,
 	},	
 };

@@ -307,15 +307,17 @@ EXPORT_SYMBOL(ast_get_gpio_value);
 //Debounce time = PCLK * (val+1)
 void ast_set_gpio_debounce_timer(int timer, int val)
 {
+	struct ast_gpio_bank *ast_gpio = &ast_gpio_gp[0];
+
 	switch(timer) {
-		case 0:
-			writel(val, (void *)(IO_ADDRESS(AST_GPIO_BASE) + 0x50));
-			break;
 		case 1:
-			writel(val, (void *)(IO_ADDRESS(AST_GPIO_BASE) + 0x54));
+			ast_gpio_write(ast_gpio, val, 0x50);
 			break;
 		case 2:
-			writel(val, (void *)(IO_ADDRESS(AST_GPIO_BASE) + 0x58));
+			ast_gpio_write(ast_gpio, val, 0x54);
+			break;
+		case 3:
+			ast_gpio_write(ast_gpio, val, 0x58);
 			break;
 	}
 }
@@ -323,30 +325,34 @@ void ast_set_gpio_debounce_timer(int timer, int val)
 EXPORT_SYMBOL(ast_set_gpio_debounce_timer);
 
 //TODO ......
-//mode 0 : no debounce , 1: set  0x50, 2: 0x54, 3: 0x58
-void ast_set_gpio_debounce(int gpio_port, int mode)
+//mode 0 : no debounce , 1: set  0x50, 2: 0x54, 3: 0x58 as debonce timer
+void ast_set_gpio_debounce(int gpio_port, int timer)
 {
-#if 0 
 	u32 set0, set1;
-	u16 gp, port;
-	gp = gpio_port / 4;
-	port = gpio_port % 4;
-	set0 = ast_gpio_read(&ast_gpio_gp[gp], ast_gpio_gp[gp].debounce_offset);
-	set1 = ast_gpio_read(&ast_gpio_gp[gp], ast_gpio_gp[gp].debounce_offset + 0x04);
+	u32 gp, port;
+	struct ast_gpio_bank *ast_gpio;
+	gp = gpio_port / GPIO_PORT_NUM;
+	ast_gpio = &ast_gpio_gp[gp];
+	set0 = ast_gpio_read(ast_gpio, ast_gpio->debounce_offset);
+	set1 = ast_gpio_read(ast_gpio, ast_gpio->debounce_offset + 0x04);
 
-	switch(port) {
-		case 0:		//A , H , ......
-			set0 = port 
-			ast_gpio_write(ast_gpio, val, 0x50);
+	port = gpio_port % 8;
+	switch(timer) {
+		case 0:	//no debonce
+			set0 &= ~(1 << port);
+			set1 &= ~(1 << port);
 			break;
-		case 1:
-			ast_gpio_write(ast_gpio, val, 0x54);
+		case 1:	//GPIO 0x50 as debonce timer
+			set0 &= ~(1 << port);
+			set1 |= (1 << port);
 			break;
-		case 2:
-			ast_gpio_write(ast_gpio, val, 0x58);
+		case 2: //GPIO 0x54 as debonce timer
+			set0 |= (1 << port);
+			set1 &= ~(1 << port);
 			break;
-		case 3:
-			ast_gpio_write(ast_gpio, val, 0x58);
+		case 3:	//GPIO 0x58 as debonce timer
+			set0 |= (1 << port);
+			set1 |= (1 << port);
 		break;
 		default:
 			GPIODBUG("not support \n");
@@ -355,9 +361,9 @@ void ast_set_gpio_debounce(int gpio_port, int mode)
 
 	}
 
-	ast_gpio_write(&ast_gpio_gp[gp], set0, ast_gpio_gp[gp].debounce_offset);
-	ast_gpio_write(&ast_gpio_gp[gp], set1, ast_gpio_gp[gp].debounce_offset + 0x04);
-#endif
+	ast_gpio_write(ast_gpio, set0, ast_gpio->debounce_offset);
+	ast_gpio_write(ast_gpio, set1, ast_gpio->debounce_offset + 0x04);
+
 }
 
 EXPORT_SYMBOL(ast_set_gpio_debounce);
@@ -430,15 +436,15 @@ ast_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 	for (i = 0; i < GPIO_PORT_NUM; i++) {
 		ast_gpio = &ast_gpio_gp[i];
 		isr = ast_gpio_read(ast_gpio, ast_gpio->int_sts_offset);
-		GPIODBUG("isr %x \n", isr);
+//		GPIODBUG("isr %x \n", isr);
 		isr = (isr >> (8 * ast_gpio->index)) & 0xff;
-		GPIODBUG("[%s] isr %x \n", ast_gpio->chip.label, isr);
+//		GPIODBUG("[%s] isr %x \n", ast_gpio->chip.label, isr);
 		if(isr != 0) {
 			//get gpio isr and --> to IRQ number ....
 			for (j=0; j<8;j++) {
 				if((1<<j) & isr) {
 					// dispach interrupt
-//					GPIODBUG("[%s] pin %d -> irq [%d]\n",ast_gpio->chip.label, j, j + IRQ_GPIO_CHAIN_START + (8 * i));
+					GPIODBUG("[%s] pin %d -> irq [%d]\n",ast_gpio->chip.label, j, j + IRQ_GPIO_CHAIN_START + (8 * i));
 					generic_handle_irq(j + IRQ_GPIO_CHAIN_START + (8 * i));
 				}
 			}
@@ -483,7 +489,7 @@ static void ast_gpio_unmask_irq(struct irq_data *d)
 	struct ast_gpio_bank *ast_gpio = irq_get_chip_data(d->irq);
 	unsigned int gpio_irq = (d->irq - IRQ_GPIO_CHAIN_START) % 8;
 
-	GPIODBUG("irq[%d], [%s] pin %d\n",d->irq, ast_gpio->chip.label, gpio_irq);
+	GPIODBUG("irq[%d], [%s] pin %d : unmask \n",d->irq, ast_gpio->chip.label, gpio_irq);
 
 	//Enable IRQ ..
 	ast_gpio_write(ast_gpio, 1<< (gpio_irq + (ast_gpio->index * 8)), ast_gpio->int_sts_offset);

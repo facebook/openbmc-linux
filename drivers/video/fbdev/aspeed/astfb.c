@@ -438,6 +438,8 @@ static int astfb_hw_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
 	int x, y;
 	struct astfb_info *sfb = info->par;
+	if(sfb->cursor_phy == NULL)
+		return 1;
 
 //	printk("Enable [%d], set = %x \n ",cursor->enable, cursor->set);
 
@@ -607,28 +609,28 @@ static int astfb_set_par(struct fb_info *info)
 	ASTFB_DBG("var->pixclock = %d \n",var->pixclock);
 
 #ifdef AST_SOC_G5
-	if(sfb->fb_plat_data->clock_src == 24000000) {
-		for(i=0; i<sizeof(pll_table)/sizeof(struct pixel_freq_pll_data); i++) {
-			if(pll_table[i].pixel_freq == var->pixclock) {
-				astfb_write(sfb, pll_table[i].pll_set, AST_CRT_PLL);
-				ASTFB_DBG("find pixclk in table set 0x%x \n",pll_table[i].pll_set);
-				break;
+	if(sfb->fb_plat_data->set_pll) {
+		if(sfb->fb_plat_data->clock_src == 24000000) {
+			for(i=0; i<sizeof(pll_table)/sizeof(struct pixel_freq_pll_data); i++) {
+				if(pll_table[i].pixel_freq == var->pixclock) {
+					sfb->fb_plat_data->set_pll(pll_table[i].pll_set);
+					ASTFB_DBG("find pixclk in table set 0x%x \n",pll_table[i].pll_set);
+					break;
+				}
 			}
+			if(i == sizeof(pll_table)/sizeof(struct pixel_freq_pll_data))
+				printk("ERROR pixclk in table ... FIXME \n");
+		} else {
+			for(i=0; i<sizeof(pll25M_table)/sizeof(struct pixel_freq_pll_data); i++) {
+				if(pll25M_table[i].pixel_freq == var->pixclock) {
+					sfb->fb_plat_data->set_pll(pll_table[i].pll_set);
+					ASTFB_DBG("find pixclk in table set 0x%x \n",pll25M_table[i].pll_set);
+					break;
+				}
+			}
+			if(i == sizeof(pll25M_table)/sizeof(struct pixel_freq_pll_data))
+				printk("ERROR pixclk in table ... FIXME \n");
 		}
-		if(i == sizeof(pll_table)/sizeof(struct pixel_freq_pll_data))
-			printk("ERROR pixclk in table ... FIXME \n");
-		
-	} else {
-		for(i=0; i<sizeof(pll25M_table)/sizeof(struct pixel_freq_pll_data); i++) {
-			if(pll25M_table[i].pixel_freq == var->pixclock) {
-				astfb_write(sfb, pll25M_table[i].pll_set, AST_CRT_PLL);
-				ASTFB_DBG("find pixclk in table set 0x%x \n",pll25M_table[i].pll_set);
-				break;
-			}
-		}	
-		if(i == sizeof(pll25M_table)/sizeof(struct pixel_freq_pll_data))
-			printk("ERROR pixclk in table ... FIXME \n");
-		
 	}
 #else
 	for(i=0; i<sizeof(pll_table)/sizeof(struct pixel_freq_pll_data); i++) {
@@ -1195,67 +1197,68 @@ static int astfb_probe(struct platform_device *pdev)
 						 &info->modelist);
 			m = fb_find_best_display(specs, &info->modelist);
 			if (m) {
+				disp_dev->ops->config_video(disp_dev, &info->var);
 				fb_videomode_to_var(&info->var, m);
 				/* fill all other info->var's fields */
 				if (astfb_check_var(&info->var, info) < 0) {
-					printk("TODO ........... var ]]] \n");
-					//info->var = tdfx_var;
+					//no found , false
 				} else
 					found = true;
 			}
 		}
+	}else {
+			printk("No Display device !! \n");
 	}
 #endif
-	printk("specs->modedb = %x, specs->modedb_len = %d \n",specs->modedb, specs->modedb_len);
+
 	if(!specs->modedb) {
 		specs->modedb = ast_modedb;
 		specs->modedb_len = 4;
 	}
+
 	if (!mode_option && !found) {
 		//use default modes list 
-//		mode_option = "640x480-32@60";
-//		mode_option = "800x600-32@60";
-//		mode_option = "1024x768-32@60";
-//		mode_option = "1920x1080-32@60";
 #ifdef AST_SOC_G5
-		if(sfb->fb_plat_data->set_pclk) {
+		if(sfb->fb_plat_data->set_pll) {
 			mode_option = "1920x1080-32@60";
 			if (sfb->fb_plat_data->clock_src == 24000000) {
 			} else {
 			}
-		} else
+		} else {
 			mode_option = "800x600-32@60";
+		}
 #else
+		//AST2500 always use 800x600-32@60
 		mode_option = "800x600-32@60";
 #endif
-
+		printk("use default mode : %s \n", mode_option);
 
 #if 0			
-/////
-			const struct fb_videomode *m;
-			printk("mode list \n");
-			fb_videomode_to_modelist(&modedb,
-						 3,
-						 &info->modelist);
+		const struct fb_videomode *m;
+		printk("mode list \n");
+		fb_videomode_to_modelist(&modedb,
+					 3,
+					 &info->modelist);
 
-			printk("find best disp \n");		
-			m = fb_find_best_display(specs, &info->modelist);
-			if (m) {
-				fb_videomode_to_var(&info->var, m);
-				/* fill all other info->var's fields */
-				if (astfb_check_var(&info->var, info) < 0) {
-					printk("TODO ........... var ]]] \n");
-					//info->var = tdfx_var;
-				} else
-					found = true;
-			}
+		printk("find best disp \n");
+		m = fb_find_best_display(specs, &info->modelist);
+		if (m) {
+			fb_videomode_to_var(&info->var, m);
+			/* fill all other info->var's fields */
+			if (astfb_check_var(&info->var, info) < 0) {
+				printk("TODO ........... var ]]] \n");
+				//info->var = tdfx_var;
+			} else
+				found = true;
+		}
 #endif
-/////
+
 		sfb->fb_res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
 		info->fix.smem_start = sfb->fb_res->start;
-		info->fix.smem_len = sfb->fb_res->end - sfb->fb_res->start;
+		info->fix.smem_len = sfb->fb_res->end - sfb->fb_res->start + 1;
+
 	}
-	
+
 	if (mode_option) {
 		if(fb_find_mode(&info->var, info, mode_option, 
 						specs->modedb, specs->modedb_len, 
@@ -1271,37 +1274,37 @@ static int astfb_probe(struct platform_device *pdev)
 		specs->modedb = NULL;
 	}
 
-
 	/* resource allocation */
 //	info->fix.smem_len = SZ_2M * ((info->var.bits_per_pixel)/8 * NUMBER_OF_BUFFERS); //assign 16M for 1920*1080*32it double-buffering
 
-	printk("info->fix.smem_start = %x , len = %d , bpp = %d\n",info->fix.smem_start, info->fix.smem_len, info->var.bits_per_pixel);
-	
+	printk("info->fix.smem_start = %x, len = %x , bpp = %d\n",info->fix.smem_start, info->fix.smem_len, info->var.bits_per_pixel);
+
 	if (!request_mem_region(info->fix.smem_start, info->fix.smem_len, pdev->name)) {
-		dev_err(dev, "cannot request CRT mem\n");
+		dev_err(dev, "cannot request CRT mem %s\n", pdev->name);
 		ret = -EBUSY;
 		goto free_io;
 	}
 
 	info->screen_base = ioremap(info->fix.smem_start, info->fix.smem_len);
 	if (!info->screen_base) {
-		dev_err(dev, "cannot map CRT mem\n");
+		dev_err(dev, "cannot map CRT mem %s\n", pdev->name);
 		ret = -ENOMEM;
 		goto free_addr;
 	}
 
 	printk(KERN_INFO "FB Phys:%x, Virtual:%x \n", info->fix.smem_start, info->screen_base);
 
-//
 	res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
-	sfb->cursor_phy = res->start; 
-	sfb->cursor_virt = ioremap(res->start, res->end - res->start);
-	if (!sfb->cursor_virt) {
-		dev_err(dev, "cannot map CURSOR mem\n");
-		ret = -ENOMEM;
-		goto free_addr;
+	if(res) {
+		//no cursor frame buffer
+		sfb->cursor_phy = res->start;
+		sfb->cursor_virt = ioremap(res->start, res->end - res->start);
+		if (!sfb->cursor_virt) {
+			dev_err(dev, "cannot map CURSOR mem\n");
+			ret = -ENOMEM;
+			goto free_addr;
+		}
 	}
-	
 //
 
     info->fix.type          = FB_TYPE_PACKED_PIXELS;

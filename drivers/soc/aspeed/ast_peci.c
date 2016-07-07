@@ -112,6 +112,7 @@ static long ast_peci_ioctl(struct file *fp,
 	struct timing_negotiation tim_ng;
 	u32	peci_head;
 	int i = 0;
+	int timeout = 5;
 	u32 *tx_buf0 = (u32 *) (ast_peci.reg_base + AST_PECI_W_DATA0);
 	u32 *tx_buf1 = (u32 *) (ast_peci.reg_base + AST_PECI_W_DATA4);
 	u32 *rx_buf0 = (u32 *) (ast_peci.reg_base + AST_PECI_R_DATA0);
@@ -138,14 +139,18 @@ static long ast_peci_ioctl(struct file *fp,
 			break;
 			
 		case AST_PECI_IOCXFER:
-			//Check cmd operation sts 
-			while(ast_peci_read(AST_PECI_CMD) & PECI_CMD_FIRE) {
-				printk("wait for free \n");
+			//Check ctrl idle sts & bus state
+			while(ast_peci_read(AST_PECI_CMD) & (PECI_CMD_STS | PECI_CMD_PIN_MON)) {
+				if (timeout-- < 0) {
+					PECI_DBG("PECI: Timeout to wait idle!\n");
+					goto out;
+				}
+				msleep(10);
 			};
 
 			if (copy_from_user(&msg, argp, sizeof(struct xfer_msg))) {
 				ret = -EFAULT;
-				break;
+				goto out;
 			}
 
 #ifdef CONFIG_AST_PECI_DEBUG
@@ -267,6 +272,7 @@ static long ast_peci_ioctl(struct file *fp,
 			break;			
 	}
 
+out:
 	return ret;
 }
 

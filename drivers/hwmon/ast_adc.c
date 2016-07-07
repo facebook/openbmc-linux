@@ -42,19 +42,29 @@
 #include <plat/regs-adc.h>
 #include <plat/ast-scu.h>
 
-struct adc_vcc_ref_data {
-	int v2;			/* in mV */
+struct adc_ch_vcc_data {
+	int v2;
 	int r1;
 	int r2;	
 };
 
-#if defined(CONFIG_ARCH_AST2400) || defined(CONFIG_ARCH_AST2500)
+#if defined(AST_SOC_G4) || defined(AST_SOC_G5)
 #define TOTAL_CHANNELS 16
 #else
 #define TOTAL_CHANNELS 12
 #endif
 
-static struct adc_vcc_ref_data adc_vcc_ref[TOTAL_CHANNELS];
+static struct adc_ch_vcc_data vcc_ref[TOTAL_CHANNELS];
+
+static void adc_vcc_ref_init(void)
+{
+        int i;
+        for (i = 0; i < TOTAL_CHANNELS; i++) {
+                vcc_ref[i].v2 = 0;
+                vcc_ref[i].r1 = 0;
+                vcc_ref[i].r2 = 1;
+        }
+}
 
 struct ast_adc_data {
 	struct device			*dev;
@@ -62,16 +72,6 @@ struct ast_adc_data {
 	int 	irq;				//ADC IRQ number 
 	int	compen_value;		//Compensating value
 };
-
-static void adc_vcc_ref_init(void)
-{
-	int i;
-	for (i = 0; i < TOTAL_CHANNELS; i++) {
-		adc_vcc_ref[i].v2 = 0;
-		adc_vcc_ref[i].r1 = 0;
-		adc_vcc_ref[i].r2 = 1;
-	}
-}
 
 static inline void
 ast_adc_write(struct ast_adc_data *ast_adc, u32 val, u32 reg)
@@ -91,7 +91,7 @@ ast_adc_read(struct ast_adc_data *ast_adc, u32 reg)
 static void ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
 {
 	u32 pclk;
-#ifdef CONFIG_ARCH_AST2500
+#ifdef AST_SOC_G5
 	u8 trim;
 #endif
 	//Set wait a sensing cycle t (s) = 1000 * 12 * (1/PCLK) * 2 * (ADC0c[31:17] + 1) * (ADC0c[9:0] +1)
@@ -101,7 +101,7 @@ static void ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
 	
 	pclk = ast_get_pclk();
 
-#if defined(CONFIG_ARCH_AST2300)
+#if defined(AST_SOC_G3)
 	ast_adc_write(ast_adc, 0x3e7, AST_ADC_CLK); 
 
 	ast_adc_write(ast_adc, AST_ADC_CTRL_CH12_EN | AST_ADC_CTRL_COMPEN_CLR | 
@@ -119,7 +119,7 @@ static void ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
 	dev_dbg(ast_adc->dev, "compensating value %d \n",ast_adc->compen_value);
 
 	ast_adc_write(ast_adc, ~AST_ADC_CTRL_COMPEN & ast_adc_read(ast_adc, AST_ADC_CTRL), AST_ADC_CTRL);
-#elif defined(CONFIG_ARCH_AST2400)
+#elif defined(AST_SOC_G4)
 
 	//For AST2400 A0 workaround  ... ADC0c = 1 ;
 //	ast_adc_write(ast_adc, 1, AST_ADC_CLK);
@@ -140,7 +140,7 @@ static void ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
 
 	ast_adc_write(ast_adc, ~AST_ADC_CTRL_COMPEN & ast_adc_read(ast_adc, AST_ADC_CTRL), AST_ADC_CTRL);
 
-#elif defined(CONFIG_ARCH_AST2500)
+#elif defined(AST_SOC_G5)
 //	TODO ... 
 //	scu read trim 
 //	write trim 0x154 [3:0]
@@ -402,7 +402,7 @@ static const struct attribute_group name_attribute_groups = {
 	.attrs = name_attributes,
 };
 
-#ifdef CONFIG_ARCH_AST2400
+#ifdef defined(AST_SOC_G4)
 
 static u32
 ast_get_voltage(struct ast_adc_data *ast_adc, int idx) {
@@ -411,17 +411,17 @@ ast_get_voltage(struct ast_adc_data *ast_adc, int idx) {
 	u32 voltage, tmp1, tmp2, tmp3;
 	tmp = ast_get_adc_value(ast_adc, idx);
 	// Voltage Sense Method
-	tmp1 = (adc_vcc_ref[idx].r1 + adc_vcc_ref[idx].r2)
+	tmp1 = (vcc_ref[idx].r1 + vcc_ref[idx].r2)
 	  * tmp * 25;
-	tmp2 = adc_vcc_ref[idx].r2 * 1024 / 100;
-	tmp3 = (adc_vcc_ref[idx].r1 * adc_vcc_ref[idx].v2)
-	  / adc_vcc_ref[idx].r2;
+	tmp2 = vcc_ref[idx].r2 * 1024 / 100;
+	tmp3 = (vcc_ref[idx].r1 * vcc_ref[idx].v2)
+	  / vcc_ref[idx].r2;
 	voltage = (tmp1/tmp2) - tmp3;
 
 	return voltage;
 }
 
-#elif CONFIG_ARCH_AST2500
+#elif defined(AST_SOC_G5)
 
 static u32
 ast_get_voltage(struct ast_adc_data *ast_adc, int idx) {
@@ -430,11 +430,11 @@ ast_get_voltage(struct ast_adc_data *ast_adc, int idx) {
 	u32 voltage, tmp1, tmp2, tmp3;
 	tmp = ast_get_adc_value(ast_adc, idx);
 	// Voltage Sense Method
-	tmp1 = (adc_vcc_ref[idx].r1 + adc_vcc_ref[idx].r2)
+	tmp1 = (vcc_ref[idx].r1 + vcc_ref[idx].r2)
 	  * (tmp + 1) * 18;
-	tmp2 = adc_vcc_ref[idx].r2 * 1024 / 100;
-	tmp3 = (adc_vcc_ref[idx].r1 * adc_vcc_ref[idx].v2)
-	  / adc_vcc_ref[idx].r2;
+	tmp2 = vcc_ref[idx].r2 * 1024 / 100;
+	tmp3 = (vcc_ref[idx].r1 * vcc_ref[idx].v2)
+	  / vcc_ref[idx].r2;
 	voltage = (tmp1/tmp2) - tmp3;
 
 	return voltage;
@@ -464,7 +464,8 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 
 	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
 	int index;
-	u32 voltage;
+	u16 tmp;
+	u32 voltage, tmp1, tmp2, tmp3;
 
 	index = sensor_attr->index;
 	if (index >= TOTAL_CHANNELS || index < 0) {
@@ -501,14 +502,26 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 		case 7: //hystersis lower
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_hyster_lower(ast_adc, index));
 			break;			
-		case 8:
-			return sprintf(sysfsbuf, "%d\n", ast_get_voltage(ast_adc, index));
-		case 9:
-			return sprintf(sysfsbuf, "%d\n", adc_vcc_ref[index].r1);
-		case 10:
-			return sprintf(sysfsbuf, "%d\n", adc_vcc_ref[index].r2);
-		case 11:
-			return sprintf(sysfsbuf, "%d\n", adc_vcc_ref[index].v2);
+		case 8: //voltage
+			tmp = ast_get_adc_value(ast_adc, index);
+			//Voltage Sense Method
+			tmp1 = (vcc_ref[index].r1 + vcc_ref[index].r2) * tmp * 25 * 10;
+			tmp2 = vcc_ref[index].r2 * 1023 ;
+
+			tmp3 = (vcc_ref[index].r1 * vcc_ref[index].v2) / vcc_ref[index].r2;
+		//	printk("tmp3 = %d \n",tmp3);
+			voltage = (tmp1/tmp2) - tmp3;
+			return sprintf(sysfsbuf, "%d.%d (V)\n",voltage/100, voltage%100);
+			break;
+		case 9: //r1
+			return sprintf(sysfsbuf, "%d\n", vcc_ref[index].r1);
+			break;
+		case 10: //r2
+			return sprintf(sysfsbuf, "%d\n", vcc_ref[index].r2);
+			break;
+		case 11: //v2
+			return sprintf(sysfsbuf, "%d\n", vcc_ref[index].v2);
+			break;
 		default:
 			return -EINVAL;
 			break;
@@ -558,23 +571,25 @@ ast_store_adc(struct device *dev, struct device_attribute *attr, const char *sys
 		case 7:
 			ast_set_adc_hyster_lower(ast_adc, index, input_val);
 			break;
+		case 8:	//voltage
+			break;
 		case 9:		/* r1 */
 			if (input_val < 0) {
 				return -EINVAL;
 			}
-			adc_vcc_ref[index].r1 = input_val;
+			vcc_ref[index].r1 = input_val;
 			break;
 		case 10:	/* r2 */
 			if (input_val <= 0) {
 				return -EINVAL;
 			}
-			adc_vcc_ref[index].r2 = input_val;
+			vcc_ref[index].r2 = input_val;
 			break;
 		case 11:	/* v2 */
 			if (input_val < 0) {
 				return -EINVAL;
 			}
-			adc_vcc_ref[index].v2 = input_val;
+			vcc_ref[index].v2 = input_val;
 			break;
 		default:
 			return -EINVAL;
@@ -584,7 +599,7 @@ ast_store_adc(struct device *dev, struct device_attribute *attr, const char *sys
 	return count;
 }
 
-#if defined(CONFIG_ARCH_AST2500)
+#if defined(AST_SOC_G5)
 static u16
 ast_get_temper_value(struct ast_adc_data *ast_adc, u8 temper_ch)
 {
@@ -698,7 +713,7 @@ static SENSOR_DEVICE_ATTR_2(adc##index##_hyster_upper, S_IRUGO | S_IWUSR, \
 static SENSOR_DEVICE_ATTR_2(adc##index##_hyster_lower, S_IRUGO | S_IWUSR, \
 	ast_show_adc, ast_store_adc, 7, index); \
 \
-static SENSOR_DEVICE_ATTR_2(in##index##_input, S_IRUGO, \
+static SENSOR_DEVICE_ATTR_2(adc##index##_voltage, S_IRUGO | S_IWUSR, \
 	ast_show_adc, NULL, 8, index); \
 \
 static SENSOR_DEVICE_ATTR_2(adc##index##_r1, S_IRUGO | S_IWUSR, \
@@ -719,7 +734,7 @@ static struct attribute *adc##index##_attributes[] = { \
 	&sensor_dev_attr_adc##index##_hyster_en.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_hyster_upper.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_hyster_lower.dev_attr.attr, \
-	&sensor_dev_attr_in##index##_input.dev_attr.attr, \
+	&sensor_dev_attr_adc##index##_voltage.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_r1.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_r2.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_v2.dev_attr.attr, \
@@ -742,7 +757,7 @@ sysfs_adc_ch(8);
 sysfs_adc_ch(9);
 sysfs_adc_ch(10);
 sysfs_adc_ch(11);
-#if defined(CONFIG_ARCH_AST2400) || defined(CONFIG_ARCH_AST2500)
+#if defined(AST_SOC_G4) || defined(AST_SOC_G5)
 sysfs_adc_ch(12);
 sysfs_adc_ch(13);
 sysfs_adc_ch(14);
@@ -763,7 +778,7 @@ static const struct attribute_group adc_attribute_groups[] = {
 	{ .attrs = adc9_attributes },
 	{ .attrs = adc10_attributes },	
 	{ .attrs = adc11_attributes },
-#if defined(CONFIG_ARCH_AST2400) || defined(CONFIG_ARCH_AST2500)
+#if defined(AST_SOC_G4) || defined(AST_SOC_G5)
 	{ .attrs = adc12_attributes },
 	{ .attrs = adc13_attributes },
 	{ .attrs = adc14_attributes },
@@ -839,7 +854,7 @@ ast_adc_probe(struct platform_device *pdev)
 			goto out_sysfs00;
 	}
 
-#if defined(CONFIG_ARCH_AST2500)
+#if defined(AST_SOC_G5)
 	for(i=0; i<TEMPER_CH_NO; i++) {
 		err = sysfs_create_group(&pdev->dev.kobj, &temper_attribute_groups[i]);
 		if (err)
@@ -880,7 +895,7 @@ ast_adc_remove(struct platform_device *pdev)
 	for(i=0; i<MAX_CH_NO; i++)
 		sysfs_remove_group(&pdev->dev.kobj, &adc_attribute_groups[i]);
 
-#if defined(CONFIG_ARCH_AST2500)
+#if defined(AST_SOC_G5)
 	for(i=0; i<TEMPER_CH_NO; i++)
 		sysfs_remove_group(&pdev->dev.kobj, &temper_attribute_groups[i]);
 #endif

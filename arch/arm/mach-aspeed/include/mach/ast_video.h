@@ -23,9 +23,10 @@
 ********************************************************************************/
 //VR08[2]
 typedef enum ast_video_source {
-	VIDEO_SOURCE_UNKNOW = 0,	//maybe memory .. TODO ...
-	VIDEO_SOURCE_INTERNAL,
-	VIDEO_SOURCE_EXTERNAL,
+	VIDEO_SOURCE_INT_VGA = 0,
+	VIDEO_SOURCE_INT_CRT,
+	VIDEO_SOURCE_EXT_ADC,
+	VIDEO_SOURCE_EXT_DIGITAL,
 } video_source;
 
 //VR08[5]

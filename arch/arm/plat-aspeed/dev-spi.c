@@ -268,8 +268,8 @@ static struct mtd_partition ast_spi_flash0_partitions[] = {
 		.size   	= 0x280000,     
 	}, {
 		.name   	= "rootfs",
-		.offset 	= 0x300000,
-		.size   	= 0x300000,
+		.offset 	= 0x400000,
+		.size		= 0x400000,
 	}, {
 		.name	= "pd_rootfs",
 		.offset 	= MTDPART_OFS_APPEND,
@@ -317,6 +317,8 @@ static struct mtd_partition ast_spi_flash1_partitions[] = {
 static struct flash_platform_data ast_spi_flash0_data = {
 #if defined(CONFIG_ARCH_AST2400) || defined(CONFIG_ARCH_AST2500)
 	.type 		  = "mx25l25635e",	//AST2400 A1
+#elif defined(CONFIG_ARCH_AST3200)
+	.type 		  = "w25q256",
 #else		
 	.type 		  = "mx25l12805d",	//old AST2300 
 #endif		
@@ -416,22 +418,6 @@ static struct spi_board_info ast_spi1_devices[] = {
 void __init ast_add_device_spi(void)
 {
 #if defined(CONFIG_SPI_FMC) || defined(CONFIG_SPI_FMC_MODULE)
-
-#if defined(CONFIG_AST_CS1_SPI)
-	ast_scu_multi_func_romcs(1);
-#endif
-
-#if defined(CONFIG_AST_CS2_SPI)
-	ast_scu_multi_func_romcs(2);
-#endif
-
-#if defined(CONFIG_AST_CS3_SPI)
-	ast_scu_multi_func_romcs(3);
-#endif
-
-#if defined(CONFIG_AST_CS4_SPI)
-	ast_scu_multi_func_romcs(4);
-#endif
 	platform_device_register(&ast_fmc0_spi_device);
 	spi_register_board_info(ast_spi_devices, ARRAY_SIZE(ast_spi_devices));
 #endif

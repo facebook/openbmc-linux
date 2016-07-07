@@ -22,6 +22,27 @@
 #define AST_MACH_NAME 		"AST-G5"
 #define AST_SOC_G5
 #define NEW_VIC
+
+#undef AST_CRT1_BASE
+#undef AST_CRT2_BASE
+#undef AST_CRT3_BASE
+
+#elif defined(CONFIG_ARCH_AST3200)
+#define AST_MACH_NAME 		"AST-G5"
+#define AST_SOC_G5
+#define NEW_VIC
+#undef AST_I2C_DEV3_BASE
+#undef AST_I2C_DEV4_BASE
+#undef AST_I2C_DEV5_BASE
+#undef AST_I2C_DEV6_BASE
+#undef AST_I2C_DEV7_BASE
+#undef AST_I2C_DEV8_BASE
+#undef AST_I2C_DEV9_BASE
+#undef AST_I2C_DEV10_BASE
+#undef AST_I2C_DEV11_BASE
+#undef AST_I2C_DEV12_BASE
+#undef AST_I2C_DEV13_BASE
+
 #elif defined(CONFIG_ARCH_AST1400) || defined(CONFIG_ARCH_AST2400) || defined(CONFIG_ARCH_AST3100)
 #define AST_MACH_NAME 		"AST-G4"
 #define AST_SOC_G4

@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-obj-y 			+= fiq.o irq.o timer.o devs.o ast-scu.o ast-sdmc.o ast-ahbc.o i2c-irq.o sdhci-irq.o
+obj-y 			+= fiq.o irq.o timer.o devs.o ast-scu.o ast-sdmc.o ast-ahbc.o i2c-irq.o ast-pciarbiter.o sdhci-irq.o
 
 obj-$(CONFIG_AST_RFX)	+= egfx-irq.o
 

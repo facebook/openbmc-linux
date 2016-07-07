@@ -310,14 +310,14 @@ static int uhci_show_status(struct uhci_hcd *uhci, char *buf, int len)
 	unsigned short portsc1, portsc2;
 
 
-	usbcmd    = uhci_readw(uhci, USBCMD);
-	usbstat   = uhci_readw(uhci, USBSTS);
-	usbint    = uhci_readw(uhci, USBINTR);
-	usbfrnum  = uhci_readw(uhci, USBFRNUM);
+	usbcmd    = uhci_readl(uhci, USBCMD);
+	usbstat   = uhci_readl(uhci, USBSTS);
+	usbint    = uhci_readl(uhci, USBINTR);
+	usbfrnum  = uhci_readl(uhci, USBFRNUM);
 	flbaseadd = uhci_readl(uhci, USBFLBASEADD);
-	sof       = uhci_readb(uhci, USBSOF);
-	portsc1   = uhci_readw(uhci, USBPORTSC1);
-	portsc2   = uhci_readw(uhci, USBPORTSC2);
+	sof       = uhci_readl(uhci, USBSOF);
+	portsc1   = uhci_readl(uhci, USBPORTSC1);
+	portsc2   = uhci_readl(uhci, USBPORTSC2);
 
 	out += sprintf(out, "  usbcmd    =     %04x   %s%s%s%s%s%s%s%s\n",
 		usbcmd,

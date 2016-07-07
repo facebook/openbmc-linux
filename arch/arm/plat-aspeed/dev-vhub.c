@@ -40,7 +40,7 @@
 static struct resource ast_vhub_resource[] = {
 	[0] = {
 		.start = AST_VHUB_BASE,
-		.end = AST_VHUB_BASE + SZ_128,
+		.end = AST_VHUB_BASE + SZ_1K,
 		.flags = IORESOURCE_MEM,
 	},
 	[1] = {
@@ -65,6 +65,7 @@ static struct platform_device ast_vhub_device = {
 
 void __init ast_add_device_vhub(void)
 {
+	ast_scu_multi_func_usb_port1_mode(0);
 	ast_scu_init_usb_port1();
 
 	platform_device_register(&ast_vhub_device);

@@ -47,6 +47,7 @@ extern u32 ast_get_d2_pll_clk(void);
 extern void ast_set_d2_pll_clk(u32 pll_setting);
 
 extern u32 ast_get_lhclk(void);
+extern void ast_scu_osc_clk_output(void);
 
 extern void ast_scu_set_vga_display(u8 enable);
 extern u8 ast_scu_get_vga_display(void);
@@ -59,6 +60,7 @@ extern void ast_scu_init_video(u8 dynamic_en);
 extern void ast_scu_reset_video(void);
 extern void ast_scu_init_eth(u8 num);
 extern void ast_scu_init_lpc(void);
+extern void ast_scu_reset_espi(void);
 extern u8 ast_scu_get_lpc_plus_enable(void);
 extern void ast_scu_init_usb_port1(void);
 extern void ast_scu_init_usb_port2(void);

@@ -20,9 +20,11 @@
 #define AST_VIDEO_SEQ_CTRL		0x004		/*	Video Sequence Control register	*/
 #define AST_VIDEO_PASS_CTRL		0x008		/*	Video Pass 1 Control register	*/
 
+//VR008[5]=1
 #define AST_VIDEO_DIRECT_BASE	0x00C		/*	Video Direct Frame buffer mode control Register VR008[5]=1 */
 #define AST_VIDEO_DIRECT_CTRL	0x010		/*	Video Direct Frame buffer mode control Register VR008[5]=1 */
 
+//VR008[5]=0
 #define AST_VIDEO_TIMING_H		0x00C		/*	Video Timing Generation Setting Register */
 #define AST_VIDEO_TIMING_V		0x010		/*	Video Timing Generation Setting Register */
 #define AST_VIDEO_SCAL_FACTOR	0x014		/*	Video Scaling Factor Register */
@@ -53,9 +55,12 @@
 
 #define AST_VIDEO_COMPRESS_DATA_COUNT		0x070		/* Video Total Size of Compressed Video Stream Read Back Register */
 #define AST_VIDEO_COMPRESS_BLOCK_COUNT		0x074		/* Video Total Number of Compressed Video Block Read Back Register */
+#define AST_VIDEO_COMPRESS_FRAME_END		0x078		/* Video Frame-end offset of compressed video stream buffer read back Register */
+
 
 
 #define AST_VIDEO_DEF_HEADER	0x080		/* Video User Defined Header Parameter Setting with Compression */
+#define AST_VIDEO_JPEG_COUNT	0x084		/*  */
 
 #define AST_VIDEO_H_DETECT_STS  0x090		/* Video Source Left/Right Edge Detection Read Back Register */
 #define AST_VIDEO_V_DETECT_STS  0x094		/* Video Source Top/Bottom Edge Detection Read Back Register */
@@ -66,13 +71,20 @@
 #define AST_VIDEO_MODE_DET1		0x0A4		/* Video Mode Detection Control Register 1*/
 
 #define AST_VM_SEQ_CTRL			0x204		/* Video Management Control Sequence Register */
-#define AST_VM_JPEG_HEADER_BUFF		0x240		/*	Video Management Based Address of JPEG Header Buffer Register */
+#define AST_VM_PASS_CTRL			0x208		/* Video Management Pass 1 Control register	*/
+#define AST_VM_SCAL_FACTOR		0x214		/* Video Management Scaling Factor Register */
+#define AST_VM_BCD_CTRL			0x22C		/* Video Management BCD Control Register */
+#define AST_VM_CAPTURE_WIN		0x230		/* Video Management Capturing Window Setting Register */
+#define AST_VM_COMPRESS_WIN		0x234		/* Video Management Compression Window Setting Register */
+#define AST_VM_JPEG_HEADER_BUFF	0x240		/* Video Management Based Address of JPEG Header Buffer Register */
 #define AST_VM_SOURCE_BUFF0		0x244		/* Video Management Based Address of Video Source Buffer Register */
+#define AST_VM_SOURCE_SCAN_LINE	0x248		/* Video Management Scan Line Offset of Video Source Buffer Register */
 
 #define AST_VM_COMPRESS_BUFF		0x254		/* Video Management Based Address of Compressed Video Buffer Register */
 #define AST_VM_STREAM_SIZE			0x258		/* Video Management Buffer Size Register */
 #define AST_VM_COMPRESS_CTRL			0x260		/* Video Management Compression or Video Profile 2-5 Decompression Control Register */
 #define AST_VM_COMPRESS_VR264			0x264		/* VR264 REserved */
+#define AST_VM_COMPRESS_FRAME_END	0x278		/* Video Management Frame-end offset of compressed video stream buffer read back Register */
 
 
 #define AST_VIDEO_CTRL			0x300		/* Video Control Register */
@@ -146,13 +158,15 @@
 #define VIDEO_DUAL_EDGE_MODE			(1 << 13)	//0 : Single edage
 #define VIDEO_18BIT_SINGLE_EDGE			(1 << 12)	//0: 24bits
 #define VIDEO_DVO_INPUT_DELAY_MASK		(7 << 9)	
-#define VIDEO_DVO_INPUT_DELAY(x)		(x << 9) //0 : no delay , 1: 1ns, 2: 2ns, 3:3ns 
+#define VIDEO_DVO_INPUT_DELAY(x)		(x << 9) //0 : no delay , 1: 1ns, 2: 2ns, 3:3ns, 4: inversed clock but no delay
 // if biit 5 : 0
 #define VIDEO_HW_CURSOR_DIS				(1 << 8)
 // if biit 5 : 1
-#define VIDEO_AUTO_FATCH				(1 << 8)
-#define VIDEO_SET_CAPTURE_FORMATE(x)			(x << 6)
-#define YUV_MODE		1
+#define VIDEO_AUTO_FATCH					(1 << 8)	//
+#define VIDEO_CAPTURE_FORMATE_MASK		(3 << 6)
+
+#define VIDEO_SET_CAPTURE_FORMAT(x)			(x << 6)
+#define JPEG_MODE		1
 #define RGB_MODE		2
 #define GRAY_MODE		3
 #define VIDEO_DIRT_FATCH				(1 << 5)
@@ -170,7 +184,9 @@
 
 /*	AST_VIDEO_TIMING_H		0x00C		Video Timing Generation Setting Register */
 #define VIDEO_HSYNC_PIXEL_FIRST_SET(x)	((x) << 16)
+#define VIDEO_HSYNC_PIXEL_FIRST_MASK	0x0000FFFF
 #define VIDEO_HSYNC_PIXEL_LAST_SET(x)	(x)
+#define VIDEO_HSYNC_PIXEL_LAST_MASK	0xFFFF0000
 
 
 /*	AST_VIDEO_DIRECT_CTRL	0x010		Video Direct Frame buffer mode control Register VR008[5]=1 */
@@ -184,7 +200,10 @@
 
 /*	AST_VIDEO_SCAL_FACTOR	0x014		Video Scaling Factor Register */
 #define VIDEO_V_SCAL_FACTOR(x)			(((x) & 0xffff) << 16)
+#define VIDEO_V_SCAL_FACTOR_MASK		(0x0000ffff)
 #define VIDEO_H_SCAL_FACTOR(x)			(x & 0xffff)
+#define VIDEO_H_SCAL_FACTOR_MASK		(0xffff0000)
+
 
 
 /*	AST_VIDEO_SCALING0		0x018		Video Scaling Filter Parameter Register #0 */

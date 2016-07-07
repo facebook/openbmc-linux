@@ -95,6 +95,10 @@ static void __init ast_init(void)
 #ifdef CONFIG_ARCH_AST2500
 	ast_uart_sdma_init();
 #endif
+#ifdef CONFIG_ARCH_AST3200
+	//AST3200 usb audio codec clock
+	ast_scu_osc_clk_output();
+#endif
 
 	ast_add_all_devices();		
 

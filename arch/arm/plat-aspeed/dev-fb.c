@@ -30,12 +30,7 @@
 #include <plat/ast-scu.h>
 
 #include <mach/ast_lcd.h>
-
-#if defined(CONFIG_ARCH_AST2500)
-#undef AST_CRT1_BASE
-#undef AST_CRT2_BASE
-#undef AST_CRT3_BASE
-#endif
+#include <plat/aspeed.h>
 
 /* --------------------------------------------------------------------
  *  ASPEED FB
@@ -47,10 +42,10 @@ static u64 ast_device_fb_dmamask = 0xffffffffUL;
 static struct ast_fb_plat_data fb_plat_data = {
 #ifdef AST_SOC_G5
 #ifdef CONFIG_ARCH_AST3200
-	.set_pclk = ast_set_d2_pll_clk,
+	.set_pll = ast_set_d2_pll_clk,
 #else	
 	//AST2500 force d2 pll for support 800x600
-	.set_pclk = NULL,
+	.set_pll = NULL,
 #endif
 #endif	
 	.disp_dev_no = 0,
@@ -69,12 +64,12 @@ static struct resource ast_fb0_resources[] = {
 	},
 	[2] = {
 		.start = AST_CRT0_MEM_BASE,
-		.end = AST_CRT0_MEM_BASE + AST_CRT0_MEM_SIZE,
+		.end = AST_CRT0_MEM_BASE + AST_CRT0_MEM_SIZE - 1,
 		.flags = IORESOURCE_DMA,
 	},	
 	[3] = {
 		.start = AST_CURSOR0_MEM_BASE,
-		.end = AST_CURSOR0_MEM_BASE + AST_CURSOR0_MEM_SIZE,
+		.end = AST_CURSOR0_MEM_BASE + AST_CURSOR0_MEM_SIZE -1,
 		.flags = IORESOURCE_DMA,
 	},	
 };
@@ -96,7 +91,7 @@ struct platform_device ast_fb0_device = {
 static struct resource ast_fb1_resources[] = {
 	[0] = {
 		.start = AST_CRT1_BASE,
-		.end = AST_CRT0_BASE + SZ_256 - 1,
+		.end = AST_CRT1_BASE + SZ_256 - 1,
 		.flags = IORESOURCE_MEM,
 	},
 	[1] = {
@@ -106,7 +101,7 @@ static struct resource ast_fb1_resources[] = {
 	},
 	[2] = {
 		.start = AST_CRT1_MEM_BASE,
-		.end = AST_CRT1_MEM_BASE + AST_CRT1_MEM_SIZE,
+		.end = AST_CRT1_MEM_BASE + AST_CRT1_MEM_SIZE - 1,
 		.flags = IORESOURCE_DMA,
 	},	
 };
@@ -139,7 +134,7 @@ static struct resource ast_fb2_resources[] = {
 	},
 	[2] = {
 		.start = AST_CRT2_MEM_BASE,
-		.end = AST_CRT2_MEM_BASE + AST_CRT1_MEM_SIZE,
+		.end = AST_CRT2_MEM_BASE + AST_CRT1_MEM_SIZE - 1,
 		.flags = IORESOURCE_DMA,
 	},	
 };
@@ -172,7 +167,7 @@ static struct resource ast_fb3_resources[] = {
 	},
 	[2] = {
 		.start = AST_CRT3_MEM_BASE,
-		.end = AST_CRT3_MEM_BASE + AST_CRT1_MEM_SIZE,
+		.end = AST_CRT3_MEM_BASE + AST_CRT1_MEM_SIZE - 1,
 		.flags = IORESOURCE_DMA,
 	},	
 };

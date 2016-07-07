@@ -90,14 +90,14 @@
 
 #define	AST_PTCR_CTRL_FAN_NUM_EN(x)		(0x1 << (16+x))
 
-#define	AST_PTCR_CTRL_PMWD			(11)
-#define	AST_PTCR_CTRL_PMWD_EN		(0x1 << 11)
-#define	AST_PTCR_CTRL_PMWC			(10)
-#define	AST_PTCR_CTRL_PMWC_EN		(0x1 << 10)
-#define	AST_PTCR_CTRL_PMWB			(9)
-#define	AST_PTCR_CTRL_PMWB_EN		(0x1 << 9)
-#define	AST_PTCR_CTRL_PMWA			(8)
-#define	AST_PTCR_CTRL_PMWA_EN		(0x1 << 8)
+#define	AST_PTCR_CTRL_PWMD			(11)
+#define	AST_PTCR_CTRL_PWMD_EN		(0x1 << 11)
+#define	AST_PTCR_CTRL_PWMC			(10)
+#define	AST_PTCR_CTRL_PWMC_EN		(0x1 << 10)
+#define	AST_PTCR_CTRL_PWMB			(9)
+#define	AST_PTCR_CTRL_PWMB_EN		(0x1 << 9)
+#define	AST_PTCR_CTRL_PWMA			(8)
+#define	AST_PTCR_CTRL_PWMA_EN		(0x1 << 8)
 
 #define	AST_PTCR_CTRL_CLK_MCLK		0x2		//0:24Mhz, 1:MCLK
 #define	AST_PTCR_CTRL_CLK_EN		0x1
@@ -209,14 +209,14 @@
 #define AST_PTCR_CTRL_GET_PWME_TYPE(x)		(((x&(0x1<<4))>>3) | ((x&(0x1<<12))>>12))
 #define AST_PTCR_CTRL_SET_PWME_TYPE_MASK	((0x1<<4) | (0x1<<12))
 
-#define	AST_PTCR_CTRL_PMWH			(11)
-#define	AST_PTCR_CTRL_PMWH_EN		(0x1 << 11)
-#define	AST_PTCR_CTRL_PMWG			(10)
-#define	AST_PTCR_CTRL_PMWG_EN		(0x1 << 10)
-#define	AST_PTCR_CTRL_PMWF			(9)
-#define	AST_PTCR_CTRL_PMWF_EN		(0x1 << 9)
-#define	AST_PTCR_CTRL_PMWE			(8)
-#define	AST_PTCR_CTRL_PMWE_EN		(0x1 << 8)
+#define	AST_PTCR_CTRL_PWMH			(11)
+#define	AST_PTCR_CTRL_PWMH_EN		(0x1 << 11)
+#define	AST_PTCR_CTRL_PWMG			(10)
+#define	AST_PTCR_CTRL_PWMG_EN		(0x1 << 10)
+#define	AST_PTCR_CTRL_PWMF			(9)
+#define	AST_PTCR_CTRL_PWMF_EN		(0x1 << 9)
+#define	AST_PTCR_CTRL_PWME			(8)
+#define	AST_PTCR_CTRL_PWME_EN		(0x1 << 8)
 
 // AST_PTCR_CLK_EXT_CTRL : 0x44 - Clock Control Extension #1 
 //TYPE O

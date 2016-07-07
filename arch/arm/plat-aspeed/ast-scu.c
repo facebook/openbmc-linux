@@ -378,9 +378,16 @@ ast_scu_init_sdhci(void)
 	ast_scu_write(ast_scu_read(AST_SCU_CLK_SEL) | SCU_CLK_SD_EN, AST_SCU_CLK_SEL);
 	mdelay(10);
 
-	// SDCLK = H-PLL / 4, G5 = H-PLL /8
+#ifdef CONFIG_ARCH_AST3200
+	// SDCLK = H-PLL / 12
+	ast_scu_write((ast_scu_read(AST_SCU_CLK_SEL) & ~SCU_CLK_SD_MASK) | SCU_CLK_SD_DIV(7),
+		AST_SCU_CLK_SEL);
+#else
+	// SDCLK = G4  H-PLL / 4, G5 = H-PLL /8
 	ast_scu_write((ast_scu_read(AST_SCU_CLK_SEL) & ~SCU_CLK_SD_MASK) | SCU_CLK_SD_DIV(1), 
 		AST_SCU_CLK_SEL);
+#endif
+
 	mdelay(10);
 	
 	ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_SD, AST_SCU_RESET);
@@ -434,16 +441,27 @@ EXPORT_SYMBOL(ast_scu_init_adc);
 extern void
 ast_scu_init_pcie(void)
 {
-	//pcie host reset 
-	ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_PCIE, AST_SCU_RESET);
-	//p2x reset
-	ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_P2X, AST_SCU_RESET);
+	if((ast_scu_read(AST_SCU_RESET) & SCU_RESET_PCIE_DIR) && (!(ast_scu_read(AST_SCU_RESET) & SCU_RESET_PCIE))) {
+		//do nothing
+		//printk("No need init PCIe \n");
+	} else {
+		//pcie host reset
+		ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_PCIE, AST_SCU_RESET);
+		ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_PCIE_DIR, AST_SCU_RESET);
+		ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_PCIE, AST_SCU_RESET);
+		mdelay(10);
+		ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_PCIE, AST_SCU_RESET);
 
-	//use 0x7c for clr 
-	ast_scu_write(SCU_HW_STRAP_VGA_MASK, AST_SCU_REVISION_ID);
-	ast_scu_write(SCU_HW_STRAP_VGA_SIZE_SET(VGA_64M_DRAM), AST_SCU_HW_STRAP1);
+		//p2x reset
+		ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_P2X, AST_SCU_RESET);
 
-	ast_scu_write(ast_scu_read(AST_SCU_MISC2_CTRL) | SCU_PCIE_MAPPING_HIGH | SCU_MALI_RC_MODE | SCU_MALI_DTY_MODE, AST_SCU_MISC2_CTRL);	
+		//use 0x7c for clr
+		ast_scu_write(SCU_HW_STRAP_VGA_MASK, AST_SCU_REVISION_ID);
+		ast_scu_write(SCU_HW_STRAP_VGA_SIZE_SET(VGA_64M_DRAM), AST_SCU_HW_STRAP1);
+
+		ast_scu_write(ast_scu_read(AST_SCU_MISC2_CTRL) | SCU_PCIE_MAPPING_HIGH | SCU_MALI_RC_MODE | SCU_MALI_DTY_MODE, AST_SCU_MISC2_CTRL);
+	}
+
 }
 EXPORT_SYMBOL(ast_scu_init_pcie);
 #endif
@@ -515,6 +533,17 @@ ast_scu_init_hace(void)
 }
 EXPORT_SYMBOL(ast_scu_init_hace);
 #endif
+
+extern void
+ast_scu_reset_espi(void)
+{
+	//Note .. It have been enable in U-boot.....
+	ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_ESPI, AST_SCU_RESET);
+
+	ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_ESPI, AST_SCU_RESET);
+}
+
+EXPORT_SYMBOL(ast_scu_reset_espi);
 
 extern void
 ast_scu_reset_lpc(void)
@@ -1167,6 +1196,19 @@ ast_get_lhclk(void)
 
 EXPORT_SYMBOL(ast_get_lhclk);
 
+extern void
+ast_scu_osc_clk_output(void)
+{
+	//in ast3200 for usb audio code clock
+//	if (!(ast_scu_read(AST_SCU_HW_STRAP1) & CLK_25M_IN))
+//	{
+		ast_scu_write(ast_scu_read(AST_SCU_MISC1_CTRL) | SCU_MISC_OSC_CLK_OUT_PIN, AST_SCU_MISC1_CTRL);
+		ast_scu_write((ast_scu_read(AST_SCU_COUNT_CTRL) & ~SCU_FREQ_SOURCE_FOR_MEASU_MASK) | SCU_FREQ_SOURCE_FOR_MEASU(SCU_FREQ_SOURCE_FOR_MEASU_12MHZ), AST_SCU_COUNT_CTRL);
+//	}
+}
+
+EXPORT_SYMBOL(ast_scu_osc_clk_output);
+
 //Because value 0 is not allowed in SDIO12C D[15:8]: Host Control Settings #1 Register, we have to increase the maximum
 //host's clock in case that system will not ask host to set 1 in the sdhci_set_clock() function
 /*
@@ -1223,27 +1265,33 @@ ast_scu_show_system_info (void)
 {
 
 #ifdef AST_SOC_G5
-	unsigned int axi_div, ahb_div, h_pll;
+	u32 axi_div, ahb_div, h_pll, pclk_div;
 
 	h_pll = ast_get_h_pll_clk();
 
 	//AST2500 A1 fix 
 	axi_div = 2;
 	ahb_div = (SCU_HW_STRAP_GET_AXI_AHB_RATIO(ast_scu_read(AST_SCU_HW_STRAP1)) + 1);
+	pclk_div = (SCU_GET_PCLK_DIV(ast_scu_read(AST_SCU_CLK_SEL)) + 1) * 4;
 
-	SCUMSG("CPU = %d MHz , AXI = %d MHz, AHB = %d MHz (%d:%d:1) \n", 
+	SCUMSG("CPU = %d MHz , AXI = %d MHz, AHB = %d MHz, PCLK = %d Mhz (div: %d:%d:%d) \n",
 			h_pll/1000000, 
 			h_pll/axi_div/1000000,
-			h_pll/axi_div/ahb_div/1000000, axi_div, ahb_div); 
+			h_pll/axi_div/ahb_div/1000000,
+			h_pll/pclk_div/1000000, axi_div, ahb_div, pclk_div);
 
 #else
-	u32 h_pll, div;
+	u32 h_pll, ahb_div, pclk_div;
 
 	h_pll = ast_get_h_pll_clk();
 
-	div = SCU_HW_STRAP_GET_CPU_AHB_RATIO(ast_scu_read(AST_SCU_HW_STRAP1));
-	div += 1;
-	SCUMSG("CPU = %d MHz ,AHB = %d MHz (%d:1) \n", h_pll/1000000, h_pll/div/1000000,div); 
+	ahb_div = SCU_HW_STRAP_GET_CPU_AHB_RATIO(ast_scu_read(AST_SCU_HW_STRAP1));
+	ahb_div += 1;
+	pclk_div = (SCU_GET_PCLK_DIV(ast_scu_read(AST_SCU_CLK_SEL)) + 1) * 4;
+
+	SCUMSG("CPU = %d MHz ,AHB = %d MHz, PCLK = %d Mhz (div : %d:%d) \n",
+			h_pll/1000000, h_pll/ahb_div/1000000, h_pll/ahb_div/1000000,
+			ahb_div, pclk_div);
 #endif
 	return ;
 }
@@ -1578,34 +1626,35 @@ ast_scu_multi_func_i2c(void)
 					SCU_FUN_PIN_SDA12,
 			AST_SCU_FUN_PIN_CTRL1);
 #else
-	// In AST2400 and AST2500, i2c 10 - 13 pins are shared w/ SD/MMC.
+       // In AST2400 and AST2500, i2c 10 - 13 pins are shared w/ SD/MMC.
 #ifdef CONFIG_MMC_AST
-	ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | 
-			SCU_FUC_PIN_I2C3 | 
-			SCU_FUC_PIN_I2C4 | 
-			SCU_FUC_PIN_I2C5 | 
-			SCU_FUC_PIN_I2C6 | 
-			SCU_FUC_PIN_I2C7 | 
-			SCU_FUC_PIN_I2C8 | 
-			SCU_FUC_PIN_I2C9 | 
-			SCU_FUC_PIN_I2C14, 
-		AST_SCU_FUN_PIN_CTRL5);
+       ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
+                       SCU_FUC_PIN_I2C3 |
+                       SCU_FUC_PIN_I2C4 |
+                       SCU_FUC_PIN_I2C5 |
+                       SCU_FUC_PIN_I2C6 |
+                       SCU_FUC_PIN_I2C7 |
+                       SCU_FUC_PIN_I2C8 |
+                       SCU_FUC_PIN_I2C9 |
+                       SCU_FUC_PIN_I2C14,
+               AST_SCU_FUN_PIN_CTRL5);
 #else
-	ast_scu_write((ast_scu_read(AST_SCU_FUN_PIN_CTRL5) | 
-			SCU_FUC_PIN_I2C3 | 
-			SCU_FUC_PIN_I2C4 | 
-			SCU_FUC_PIN_I2C5 | 
-			SCU_FUC_PIN_I2C6 | 
-			SCU_FUC_PIN_I2C7 | 
-			SCU_FUC_PIN_I2C8 | 
-			SCU_FUC_PIN_I2C9 | 
-			SCU_FUC_PIN_I2C10 | 
-			SCU_FUC_PIN_I2C11 | 
-			SCU_FUC_PIN_I2C12 | 
-			SCU_FUC_PIN_I2C13 | 
+       ast_scu_write((ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
+			SCU_FUC_PIN_I2C3 |
+			SCU_FUC_PIN_I2C4 |
+			SCU_FUC_PIN_I2C5 |
+			SCU_FUC_PIN_I2C6 |
+			SCU_FUC_PIN_I2C7 |
+			SCU_FUC_PIN_I2C8 |
+			SCU_FUC_PIN_I2C9 |
+			SCU_FUC_PIN_I2C10 |
+			SCU_FUC_PIN_I2C11 |
+			SCU_FUC_PIN_I2C12 |
+			SCU_FUC_PIN_I2C13 |
 			SCU_FUC_PIN_I2C14) &
-			~(SCU_FUC_PIN_SD1 | SCU_FUC_PIN_SD2), 
+			~(SCU_FUC_PIN_SD1 | SCU_FUC_PIN_SD2),
 		AST_SCU_FUN_PIN_CTRL5);
+
 #endif
 #endif
 }	

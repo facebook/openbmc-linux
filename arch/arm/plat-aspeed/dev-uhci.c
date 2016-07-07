@@ -33,7 +33,7 @@
 /* --------------------------------------------------------------------
  *  UHCI
  * -------------------------------------------------------------------- */
-#if defined(CONFIG_AST_USB_UHCI_HCD) || defined(CONFIG_AST_USB_UHCI_HCD_MODULE)
+#if defined(CONFIG_USB_UHCI_AST) || defined(CONFIG_USB_UHCI_AST_MODULE)
 static struct resource ast_uchi_resource[] = {
 	[0] = {
 		.start = AST_UHCI_BASE,
@@ -50,7 +50,7 @@ static struct resource ast_uchi_resource[] = {
 static u64 ast_uhci_dma_mask = 0xffffffffUL;
 
 static struct platform_device ast_uhci_device = {
-	.name	= "ast_uhci",
+	.name 	= "platform-uhci",
     .id = 0,
     .dev = {
             .dma_mask = &ast_uhci_dma_mask,

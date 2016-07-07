@@ -242,7 +242,7 @@ void ast_jtag_run_test_idle(struct ast_jtag_info *ast_jtag, struct runtest_idle 
 {
 	int i = 0;
 
-	JTAG_DBUG(":%s mode\n", mode? "SW":"HW");
+	JTAG_DBUG(":%s mode\n", runtest->mode? "SW":"HW");
 
 	if(runtest->mode) {
 		//SW mode
@@ -395,7 +395,7 @@ int ast_jtag_sdr_xfer(struct ast_jtag_info *ast_jtag, struct sdr_xfer *sdr)
 	int i;
 	u32 remain_xfer = sdr->length;
 
-	JTAG_DBUG("%s mode, ENDDR : %d, len : %d \n", sdr->mode? "SW":"HW", sdr->endir, sdr->length);
+	JTAG_DBUG("%s mode, len : %d \n", sdr->mode? "SW":"HW", sdr->length);
 
 	if(sdr->mode) {
 		//SW mode 
@@ -409,6 +409,8 @@ int ast_jtag_sdr_xfer(struct ast_jtag_info *ast_jtag, struct sdr_xfer *sdr)
 		TCK_Cycle(ast_jtag, 0, 0);		// go to DRCap
 		TCK_Cycle(ast_jtag, 0, 0);		// go to DRShift
 		
+		if(!sdr->direct)
+			sdr->tdio[index] = 0;
 		while (remain_xfer) {
 			if(sdr->direct) {
 				//write
@@ -439,6 +441,7 @@ int ast_jtag_sdr_xfer(struct ast_jtag_info *ast_jtag, struct sdr_xfer *sdr)
 			remain_xfer--;
 			if((shift_bits % 32) == 0) {
 				index ++;
+				sdr->tdio[index] = 0;
 			}
 			 
 		}
@@ -647,15 +650,70 @@ static int jtag_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static ssize_t show_tdo(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%s\n", ast_jtag_read(ast_jtag, AST_JTAG_SW) & JTAG_SW_MODE_TDIO? "1":"0");
+}
+
+static DEVICE_ATTR(tdo, S_IRUGO, show_tdo, NULL);
+
+static ssize_t store_tdi(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	u32 tdi;
+	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
+
+	tdi = simple_strtoul(buf, NULL, 1);
+
+	ast_jtag_write(ast_jtag, ast_jtag_read(ast_jtag, AST_JTAG_SW) | JTAG_SW_MODE_EN | (tdi * JTAG_SW_MODE_TDIO), AST_JTAG_SW);
+
+	return count;
+}
+
+static DEVICE_ATTR(tdi, S_IWUSR, NULL, store_tdi);
+
+static ssize_t store_tms(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	u32 tms;
+	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
+
+	tms = simple_strtoul(buf, NULL, 1);
+
+	ast_jtag_write(ast_jtag, ast_jtag_read(ast_jtag, AST_JTAG_SW) | JTAG_SW_MODE_EN | (tms * JTAG_SW_MODE_TMS), AST_JTAG_SW);
+
+	return count;
+}
+
+static DEVICE_ATTR(tms, S_IWUSR, NULL, store_tms);
+
+static ssize_t store_tck(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	u32 tck;
+	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
+
+	tck = simple_strtoul(buf, NULL, 1);
+
+	ast_jtag_write(ast_jtag, ast_jtag_read(ast_jtag, AST_JTAG_SW) | JTAG_SW_MODE_EN | (tck * JTAG_SW_MODE_TDIO), AST_JTAG_SW);
+
+	return count;
+}
+
+static DEVICE_ATTR(tck, S_IWUSR, NULL, store_tck);
+
 static ssize_t show_sts(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
-	
+
 	return sprintf(buf, "%s\n", ast_jtag->sts? "Pause":"Idle");
 }
 
-static DEVICE_ATTR(sts, S_IRUGO, show_sts, NULL); 
+static DEVICE_ATTR(sts, S_IRUGO, show_sts, NULL);
 
 static ssize_t show_frequency(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -683,6 +741,10 @@ static DEVICE_ATTR(freq, S_IRUGO | S_IWUSR, show_frequency, store_frequency);
 static struct attribute *jtag_sysfs_entries[] = {
 	&dev_attr_freq.attr,		
 	&dev_attr_sts.attr,
+	&dev_attr_tck.attr,
+	&dev_attr_tms.attr,
+	&dev_attr_tdi.attr,
+	&dev_attr_tdo.attr,
 	NULL
 };
 

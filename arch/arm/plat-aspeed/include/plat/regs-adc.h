@@ -13,9 +13,9 @@
 #ifndef __ASM_ARCH_REGS_ADC_H
 #define __ASM_ARCH_REGS_ADC_H __FILE__
 
-#if defined(CONFIG_ARCH_AST2300)
+#if defined(AST_SOC_G3)
 #define MAX_CH_NO		12
-#elif defined(CONFIG_ARCH_AST2400) || defined(CONFIG_ARCH_AST2500) 
+#elif defined(AST_SOC_G4) || defined(AST_SOC_G5)
 #define MAX_CH_NO		16
 #elif defined(CONFIG_ARCH_AST1010)
 #define MAX_CH_NO		8
@@ -23,7 +23,7 @@
 #err "ADC NO define MAX CHANNEL NO"
 #endif
 
-#if defined(CONFIG_ARCH_AST2500) 
+#if defined(AST_SOC_G5)
 #define TEMPER_CH_NO	2
 #endif
 
@@ -76,7 +76,7 @@
 #define AST_ADC_HYSTER14		0xa8
 #define AST_ADC_HYSTER15		0xac
 #define AST_ADC_INTR_SEL		0xC0
-#if defined(CONFIG_ARCH_AST2500)
+#if defined(AST_SOC_G5)
 #define AST_ADC_CH16			0xD0
 #define AST_ADC_CH17			0xD4
 #define AST_ADC_COMP_TRIM		0xC4
@@ -100,12 +100,12 @@
 #define AST_ADC_CTRL_CH1_EN			(0x1 << 17)
 #define AST_ADC_CTRL_CH0_EN			(0x1 << 16)
 
-#if defined(CONFIG_ARCH_AST2300)
+#if defined(AST_SOC_G3)
 #define AST_ADC_CTRL_COMPEN_CLR		(0x1 << 6)
 #define AST_ADC_CTRL_COMPEN			(0x1 << 5)
-#elif defined(CONFIG_ARCH_AST2400)
+#elif defined(AST_SOC_G4)
 #define AST_ADC_CTRL_COMPEN			(0x1 << 4)
-#elif defined(CONFIG_ARCH_AST2500)
+#elif defined(AST_SOC_G5)
 #define AST_ADC_CTRL_INIT_RDY		(0x1 << 8)
 #define AST_ADC_CTRL_COMPEN			(0x1 << 5)
 #else
@@ -175,7 +175,7 @@
 
 #define AST_ADC_HYSTER_EN			(0x1 << 31)
 
-#if defined(CONFIG_ARCH_AST2500)
+#if defined(AST_SOC_G5)
 /* AST_ADC_CH16	 : 0xD0 - */
 /* AST_ADC_CH17	 : 0xD4 - */
 #define AST_TEMP_CH_RDY				(0x1 << 31)

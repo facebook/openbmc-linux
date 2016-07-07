@@ -49,6 +49,8 @@
 #include <plat/regs-pcie.h>
 #include <plat/ast-scu.h>
 #include <plat/ast-ahbc.h>
+#include <plat/ast-sdmc.h>
+#include <plat/ast-pciarbiter.h>
 #include <plat/ast_p2x.h>
 
 //#define CONFIG_PCIE_DEBUG
@@ -156,16 +158,32 @@ ast_pcie_setup(int nr, struct pci_sys_data *sys)
 {
 	AST_PCIEDBG("PCI nr : %d >>> \n", nr);
 
-	if(ast_pcie_read(AST_PCIE_LINK) & PCIE_LINK_STS)
-		printk("PCI0 : Link\n");
-	else
-		printk("PCI1 : No link\n");
+	//px2 decode addr
+	ast_p2x_addr_map(0xF0000000, AST_PCIE_WIN_BASE);
+
+	//VGA Init for memory cycle
+	ast_pciarbiter_pcie_init();
+
+	ast_sdmc_disable_mem_protection(16);
 
 	//Add for Gen2
 	ast_pcie_write(0x20, AST_PCIE_CFG_DIN);
 	ast_pcie_write((ast_pcie_read(AST_PCIE_CFG3) & ~(PCIE_CFG_ADDR_MASK| PCIE_CFG_WRITE)) | PCIE_CFG_ADDR(0x090), AST_PCIE_CFG3);
 	ast_pcie_write(ast_pcie_read(AST_PCIE_CFG3) | PCIE_CFG_WRITE , AST_PCIE_CFG3);
 	ast_pcie_write((ast_pcie_read(AST_PCIE_CFG3) & ~PCIE_CFG_WRITE) , AST_PCIE_CFG3);	
+
+	ast_pcie_cfg_write(0, (((1 << 4) -1) << (PCI_PRIMARY_BUS & 0x3)),
+				(PCI_PRIMARY_BUS & ~3), 0 << ((PCI_PRIMARY_BUS & 0x3) * 8));
+
+	ast_pcie_cfg_write(0, (((1 << 4) -1) << (PCI_SECONDARY_BUS & 0x3)),
+				(PCI_SECONDARY_BUS & ~3), 1 << ((PCI_SECONDARY_BUS & 0x3) * 8));
+
+	ast_pcie_cfg_write(0, (((1 << 4) -1) << (PCI_SUBORDINATE_BUS & 0x3)),
+				(PCI_SUBORDINATE_BUS & ~3), 0xf << ((PCI_SUBORDINATE_BUS & 0x3) * 8));
+
+//	ast_pcie_cfg_write(0, 0xf, PCI_PRIMARY_BUS, 0);
+//	ast_pcie_cfg_write(0, 0xf, PCI_SECONDARY_BUS, 1);
+//	ast_pcie_cfg_write(0, 0xf, PCI_SUBORDINATE_BUS, 1);
 
 	if (request_resource(&iomem_resource, &non_mem)) {
 		printk(KERN_ERR "PCI: unable to allocate non-prefetchable "
@@ -204,8 +222,6 @@ init_pcie_rc_bridge(void)
 	ast_pcie_write(PCIE_CFG_CLASS_CODE(0x60400) | PCIE_CFG_REV_ID(4), AST_PCIE_CFG2);
 	ast_pcie_write(ROOT_COMPLEX_ID(0x3), AST_PCIE_GLOBAL);
 
-	//px2 decode addr
-	ast_p2x_addr_map(0xF0000000, AST_PCIE_WIN_BASE);
 
 
 #if 0
@@ -220,41 +236,14 @@ init_pcie_rc_bridge(void)
 #endif
 #endif
 
-}
-
-
-static void __init
-ast_pcie_preinit(void)
-{
-	AST_PCIEDBG("\n");
-
-	init_pcie_rc_bridge();
-}
-
-#if 0
-static void __init
-ast_pcie_postinit(void)
-{
-//	struct pci_dev *dev;
-
-	AST_PCIEDBG(" \n");
-
-	dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-	if (!dev) {
-		printk("ast_pcie_postinit(): can not find the device!\n");
-		BUG();
-	}
 
 }
-#endif 
 
 static struct hw_pci ast_pcie = {
 	.nr_controllers = 1,
 	.setup          = ast_pcie_setup,
 	.ops			= &ast_pcie_ops,	
-	.preinit        = ast_pcie_preinit,	
 	.map_irq        = ast_pcie_map_irq,
-//	.postinit       = ast_pcie_postinit,	
 };
 
 /**
@@ -270,9 +259,16 @@ static int ast_pcie_probe(struct platform_device *pdev)
 	ast_pcie_base =  ioremap(AST_PCIE_PLDA_BASE , SZ_256);	
 
 	AST_PCIEDBG("\n");
+	init_pcie_rc_bridge();
 
-	if(ast_pcie_read(AST_PCIE_LINK) & PCIE_LINK_STS)
+	mdelay(30);
+
+	if(ast_pcie_read(AST_PCIE_LINK) & PCIE_LINK_STS) {
+		printk("PCIE Link \n");
 		pci_common_init_dev(&pdev->dev, &ast_pcie);
+	} else {
+		printk("PCIE unLink \n");
+	}
 
 	return 0;
 }

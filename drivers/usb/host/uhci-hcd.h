@@ -24,7 +24,7 @@
 #define   USBCMD_MAXP		0x0080	/* Max Packet (0 = 32, 1 = 64) */
 
 /* Status register */
-#define USBSTS		2
+#define USBSTS		(0x04)
 #define   USBSTS_USBINT		0x0001	/* Interrupt due to IOC */
 #define   USBSTS_ERROR		0x0002	/* Interrupt due to error */
 #define   USBSTS_RD		0x0004	/* Resume Detect */
@@ -34,20 +34,20 @@
 #define   USBSTS_HCH		0x0020	/* HC Halted */
 
 /* Interrupt enable register */
-#define USBINTR		4
+#define USBINTR		(0x08)
 #define   USBINTR_TIMEOUT	0x0001	/* Timeout/CRC error enable */
 #define   USBINTR_RESUME	0x0002	/* Resume interrupt enable */
 #define   USBINTR_IOC		0x0004	/* Interrupt On Complete enable */
 #define   USBINTR_SP		0x0008	/* Short packet interrupt enable */
 
-#define USBFRNUM	6
-#define USBFLBASEADD	8
-#define USBSOF		12
+#define USBFRNUM	(0x80)
+#define USBFLBASEADD	(0x0C)
+#define USBSOF		(0x84)
 #define   USBSOF_DEFAULT	64	/* Frame length is exactly 1 ms */
 
 /* USB port status and control registers */
-#define USBPORTSC1	16
-#define USBPORTSC2	18
+#define USBPORTSC1	(0x88)
+#define USBPORTSC2	(0x8C)
 #define   USBPORTSC_CCS		0x0001	/* Current Connect Status
 					 * ("device present") */
 #define   USBPORTSC_CSC		0x0002	/* Connect Status Change */

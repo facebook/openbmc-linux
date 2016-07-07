@@ -926,28 +926,28 @@ ast_get_pwm_en(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 pwm_ch)
 
     switch (pwm_ch) {
 	case PWMA:
-		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & AST_PTCR_CTRL_PMWA_EN) >> AST_PTCR_CTRL_PMWA;
+		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & AST_PTCR_CTRL_PWMA_EN) >> AST_PTCR_CTRL_PWMA;
 		break;
 	case PWMB:
-		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & AST_PTCR_CTRL_PMWB_EN) >> AST_PTCR_CTRL_PMWB;
+		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & AST_PTCR_CTRL_PWMB_EN) >> AST_PTCR_CTRL_PWMB;
 		break;
 	case PWMC:
-		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & AST_PTCR_CTRL_PMWC_EN) >> AST_PTCR_CTRL_PMWC;
+		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & AST_PTCR_CTRL_PWMC_EN) >> AST_PTCR_CTRL_PWMC;
 		break;
 	case PWMD:
-		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & AST_PTCR_CTRL_PMWD_EN) >> AST_PTCR_CTRL_PMWD;
+		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & AST_PTCR_CTRL_PWMD_EN) >> AST_PTCR_CTRL_PWMD;
 		break;
 	case PWME:
-		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & AST_PTCR_CTRL_PMWE_EN) >> AST_PTCR_CTRL_PMWE;
+		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & AST_PTCR_CTRL_PWME_EN) >> AST_PTCR_CTRL_PWME;
 		break;
 	case PWMF:
-		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & AST_PTCR_CTRL_PMWF_EN) >> AST_PTCR_CTRL_PMWF;
+		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & AST_PTCR_CTRL_PWMF_EN) >> AST_PTCR_CTRL_PWMF;
 		break;
 	case PWMG:
-		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & AST_PTCR_CTRL_PMWG_EN) >> AST_PTCR_CTRL_PMWG;
+		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & AST_PTCR_CTRL_PWMG_EN) >> AST_PTCR_CTRL_PWMG;
 		break;
 	case PWMH:
-		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & AST_PTCR_CTRL_PMWH_EN) >> AST_PTCR_CTRL_PMWH;
+		tmp = (ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & AST_PTCR_CTRL_PWMH_EN) >> AST_PTCR_CTRL_PWMH;
 		break;
 	default:
 		printk("error channel ast_get_pwm_type %d \n",pwm_ch);
@@ -965,87 +965,87 @@ ast_set_pwm_en(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 pwm_ch, u8 enable)
 	case PWMA:
 		if(enable)
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) | AST_PTCR_CTRL_PMWA_EN, 
+					ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) | AST_PTCR_CTRL_PWMA_EN,
 					AST_PTCR_CTRL);
 		else
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & ~AST_PTCR_CTRL_PMWA_EN, 
+					ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & ~AST_PTCR_CTRL_PWMA_EN,
 					AST_PTCR_CTRL);
 			
 		break;
 	case PWMB:
 		if(enable)		
 			ast_pwm_tacho_write(ast_pwm_tacho,	
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) | AST_PTCR_CTRL_PMWB_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) | AST_PTCR_CTRL_PWMB_EN),
 					AST_PTCR_CTRL);
 		else
 			ast_pwm_tacho_write(ast_pwm_tacho,	
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & ~AST_PTCR_CTRL_PMWB_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & ~AST_PTCR_CTRL_PWMB_EN),
 					AST_PTCR_CTRL);			
 		break;
 	case PWMC:
 		if(enable)
 			ast_pwm_tacho_write(ast_pwm_tacho,	
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) | AST_PTCR_CTRL_PMWC_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) | AST_PTCR_CTRL_PWMC_EN),
 					AST_PTCR_CTRL);
 		else
 			ast_pwm_tacho_write(ast_pwm_tacho,	
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & ~AST_PTCR_CTRL_PMWC_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & ~AST_PTCR_CTRL_PWMC_EN),
 					AST_PTCR_CTRL);
 			
 		break;
 	case PWMD:
 		if(enable)
 			ast_pwm_tacho_write(ast_pwm_tacho,	
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) | AST_PTCR_CTRL_PMWD_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) | AST_PTCR_CTRL_PWMD_EN),
 					AST_PTCR_CTRL);
 		else
 			ast_pwm_tacho_write(ast_pwm_tacho,	
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & ~AST_PTCR_CTRL_PMWD_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL) & ~AST_PTCR_CTRL_PWMD_EN),
 					AST_PTCR_CTRL);
 			
 		break;
 	case PWME:
 		if(enable)
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) | AST_PTCR_CTRL_PMWE_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) | AST_PTCR_CTRL_PWME_EN),
 					AST_PTCR_CTRL_EXT);
 		else
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & ~AST_PTCR_CTRL_PMWE_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & ~AST_PTCR_CTRL_PWME_EN),
 					AST_PTCR_CTRL_EXT);
 			
 		break;
 	case PWMF:
 		if(enable)
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) | AST_PTCR_CTRL_PMWF_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) | AST_PTCR_CTRL_PWMF_EN),
 					AST_PTCR_CTRL_EXT);
 		else
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & ~AST_PTCR_CTRL_PMWF_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & ~AST_PTCR_CTRL_PWMF_EN),
 					AST_PTCR_CTRL_EXT);
 			
 		break;
 	case PWMG:
 		if(enable)
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) | AST_PTCR_CTRL_PMWG_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) | AST_PTCR_CTRL_PWMG_EN),
 					AST_PTCR_CTRL_EXT);
 		else
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & ~AST_PTCR_CTRL_PMWG_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & ~AST_PTCR_CTRL_PWMG_EN),
 					AST_PTCR_CTRL_EXT);
 			
 		break;
 	case PWMH:
 		if(enable)
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) | AST_PTCR_CTRL_PMWH_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) | AST_PTCR_CTRL_PWMH_EN),
 					AST_PTCR_CTRL_EXT);
 		else
 			ast_pwm_tacho_write(ast_pwm_tacho,
-					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & ~AST_PTCR_CTRL_PMWH_EN),
+					(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_CTRL_EXT) & ~AST_PTCR_CTRL_PWMH_EN),
 					AST_PTCR_CTRL_EXT);
 
 		break;

@@ -54,7 +54,7 @@ struct ast_monitor_info {
 
 struct ast_fb_plat_data {
 #ifdef AST_SOC_G5	
-	void (*set_pclk)(u32 pll_setting);
+	void (*set_pll)(u32 pll_setting);
 	u32 clock_src;	//0: 24Mhz, 1: 25Mhz
 #endif
 	int disp_dev_no;

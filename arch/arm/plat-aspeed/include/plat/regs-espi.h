@@ -155,10 +155,13 @@
 #define FLASH_WRITE				0x01
 #define FLASH_ERASE				0x02
 
-
-
 /* OOB Message Channel	*/	
 
+/* AST_ESPI_SYS1_EVENT			0x104 : Interrupt enable of System Event from Master */
+/* AST_ESPI_SYS1_INT_STS		0x12C		*/
+#define ESPI_SYS_SUS_ACK		(0x1 << 20)
+
+#define ESPI_SYS_SUS_WARN		(0x1)
 
 /* AST_ESPI_SYS_EVENT			0x98		System Event from and to Master */
 /* AST_ESPI_SYS_EVENT_ISR		0x11C	System Event from and to Master interrupt sts */
@@ -184,14 +187,9 @@
 #define ESPI_SYS_S4_SLEEP		(0x1 << 1)
 #define ESPI_SYS_S3_SLEEP		(0x1)
 
-
-
 /* AST_ESPI_GCAP_CONFIG	0xA0		General Capabilities and Configuration  */
 #define GET_GCAP_IO_MODE(x)		((x >> 26) & 0x3)
 #define GET_GCAP_OP_FREQ(x)		((x >> 20) & 0x7)
 #define GET_GCAP_CH_SUPPORT(x)	(x & 0xf)
-
-
-
 
 #endif 

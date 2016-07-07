@@ -136,7 +136,7 @@ static void finish_reset(struct uhci_hcd *uhci)
 	 * We have to clear them by hand.
 	 */
 	for (port = 0; port < uhci->rh_numports; ++port)
-		uhci_writew(uhci, 0, USBPORTSC1 + (port * 2));
+		uhci_writel(uhci, 0, USBPORTSC1 + (port * 4));
 
 	uhci->port_c_suspend = uhci->resuming_ports = 0;
 	uhci->rh_state = UHCI_RH_RESET;
@@ -188,17 +188,17 @@ static void uhci_generic_reset_hc(struct uhci_hcd *uhci)
 	 * ports due to the virtual disconnect that it
 	 * implies.
 	 */
-	uhci_writew(uhci, USBCMD_HCRESET, USBCMD);
+	uhci_writel(uhci, USBCMD_HCRESET, USBCMD);
 	mb();
 	udelay(5);
-	if (uhci_readw(uhci, USBCMD) & USBCMD_HCRESET)
+	if (uhci_readl(uhci, USBCMD) & USBCMD_HCRESET)
 		dev_warn(uhci_dev(uhci), "HCRESET not completed yet!\n");
 
 	/* Just to be safe, disable interrupt requests and
 	 * make sure the controller is stopped.
 	 */
-	uhci_writew(uhci, 0, USBINTR);
-	uhci_writew(uhci, 0, USBCMD);
+	uhci_writel(uhci, 0, USBINTR);
+	uhci_writel(uhci, 0, USBCMD);
 }
 
 /*
@@ -221,14 +221,14 @@ static int uhci_generic_check_and_reset_hc(struct uhci_hcd *uhci)
 	 * If any of these conditions are violated we do a complete reset.
 	 */
 
-	cmd = uhci_readw(uhci, USBCMD);
+	cmd = uhci_readl(uhci, USBCMD);
 	if ((cmd & USBCMD_RS) || !(cmd & USBCMD_CF) || !(cmd & USBCMD_EGSM)) {
 		dev_dbg(uhci_dev(uhci), "%s: cmd = 0x%04x\n",
 				__func__, cmd);
 		goto reset_needed;
 	}
 
-	intr = uhci_readw(uhci, USBINTR);
+	intr = uhci_readl(uhci, USBINTR);
 	if (intr & (~USBINTR_RESUME)) {
 		dev_dbg(uhci_dev(uhci), "%s: intr = 0x%04x\n",
 				__func__, intr);
@@ -249,13 +249,13 @@ reset_needed:
 static void configure_hc(struct uhci_hcd *uhci)
 {
 	/* Set the frame length to the default: 1 ms exactly */
-	uhci_writeb(uhci, USBSOF_DEFAULT, USBSOF);
+	uhci_writel(uhci, USBSOF_DEFAULT, USBSOF);
 
 	/* Store the frame list base address */
 	uhci_writel(uhci, uhci->frame_dma_handle, USBFLBASEADD);
 
 	/* Set the current frame number */
-	uhci_writew(uhci, uhci->frame_number & UHCI_MAX_SOF_NUMBER,
+	uhci_writel(uhci, uhci->frame_number & UHCI_MAX_SOF_NUMBER,
 			USBFRNUM);
 
 	/* perform any arch/bus specific configuration */
@@ -340,8 +340,8 @@ __acquires(uhci->lock)
 		egsm_enable = int_enable = 0;
 
 	uhci->RD_enable = !!int_enable;
-	uhci_writew(uhci, int_enable, USBINTR);
-	uhci_writew(uhci, egsm_enable | USBCMD_CF, USBCMD);
+	uhci_writel(uhci, int_enable, USBINTR);
+	uhci_writel(uhci, egsm_enable | USBCMD_CF, USBCMD);
 	mb();
 	udelay(5);
 
@@ -350,7 +350,7 @@ __acquires(uhci->lock)
 	 * controller should stop after a few microseconds.  Otherwise
 	 * we will give the controller one frame to stop.
 	 */
-	if (!auto_stop && !(uhci_readw(uhci, USBSTS) & USBSTS_HCH)) {
+	if (!auto_stop && !(uhci_readl(uhci, USBSTS) & USBSTS_HCH)) {
 		uhci->rh_state = UHCI_RH_SUSPENDING;
 		spin_unlock_irq(&uhci->lock);
 		msleep(1);
@@ -358,7 +358,7 @@ __acquires(uhci->lock)
 		if (uhci->dead)
 			return;
 	}
-	if (!(uhci_readw(uhci, USBSTS) & USBSTS_HCH))
+	if (!(uhci_readl(uhci, USBSTS) & USBSTS_HCH))
 		dev_warn(uhci_dev(uhci), "Controller not stopped yet!\n");
 
 	uhci_get_current_frame_number(uhci);
@@ -387,8 +387,8 @@ static void start_rh(struct uhci_hcd *uhci)
 	/* Mark it configured and running with a 64-byte max packet.
 	 * All interrupts are enabled, even though RESUME won't do anything.
 	 */
-	uhci_writew(uhci, USBCMD_RS | USBCMD_CF | USBCMD_MAXP, USBCMD);
-	uhci_writew(uhci, USBINTR_TIMEOUT | USBINTR_RESUME |
+	uhci_writel(uhci, USBCMD_RS | USBCMD_CF | USBCMD_MAXP, USBCMD);
+	uhci_writel(uhci, USBINTR_TIMEOUT | USBINTR_RESUME |
 		USBINTR_IOC | USBINTR_SP, USBINTR);
 	mb();
 	uhci->rh_state = UHCI_RH_RUNNING;
@@ -412,9 +412,9 @@ __acquires(uhci->lock)
 		unsigned egsm;
 
 		/* Keep EGSM on if it was set before */
-		egsm = uhci_readw(uhci, USBCMD) & USBCMD_EGSM;
+		egsm = uhci_readl(uhci, USBCMD) & USBCMD_EGSM;
 		uhci->rh_state = UHCI_RH_RESUMING;
-		uhci_writew(uhci, USBCMD_FGR | USBCMD_CF | egsm, USBCMD);
+		uhci_writel(uhci, USBCMD_FGR | USBCMD_CF | egsm, USBCMD);
 		spin_unlock_irq(&uhci->lock);
 		msleep(20);
 		spin_lock_irq(&uhci->lock);
@@ -422,10 +422,10 @@ __acquires(uhci->lock)
 			return;
 
 		/* End Global Resume and wait for EOP to be sent */
-		uhci_writew(uhci, USBCMD_CF, USBCMD);
+		uhci_writel(uhci, USBCMD_CF, USBCMD);
 		mb();
 		udelay(4);
-		if (uhci_readw(uhci, USBCMD) & USBCMD_FGR)
+		if (uhci_readl(uhci, USBCMD) & USBCMD_FGR)
 			dev_warn(uhci_dev(uhci), "FGR not stopped yet!\n");
 	}
 
@@ -445,10 +445,10 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd)
 	 * interrupt cause.  Contrary to the UHCI specification, the
 	 * "HC Halted" status bit is persistent: it is RO, not R/WC.
 	 */
-	status = uhci_readw(uhci, USBSTS);
+	status = uhci_readl(uhci, USBSTS);
 	if (!(status & ~USBSTS_HCH))	/* shared interrupt, not mine */
 		return IRQ_NONE;
-	uhci_writew(uhci, status, USBSTS);		/* Clear it */
+	uhci_writel(uhci, status, USBSTS);		/* Clear it */
 
 	spin_lock(&uhci->lock);
 	if (unlikely(!uhci->is_initialized))	/* not yet configured */
@@ -462,7 +462,7 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd)
 			dev_err(uhci_dev(uhci),
 				"host controller process error, something bad happened!\n");
 		if (status & USBSTS_HCH) {
-			if (uhci->rh_state >= UHCI_RH_RUNNING) {
+			if (uhci->rh_state > UHCI_RH_RUNNING) {
 				dev_err(uhci_dev(uhci),
 					"host controller halted, very bad!\n");
 				if (debug > 1 && errbuf) {
@@ -506,7 +506,7 @@ static void uhci_get_current_frame_number(struct uhci_hcd *uhci)
 	if (!uhci->is_stopped) {
 		unsigned delta;
 
-		delta = (uhci_readw(uhci, USBFRNUM) - uhci->frame_number) &
+		delta = (uhci_readl(uhci, USBFRNUM) - uhci->frame_number) &
 				(UHCI_NUMFRAMES - 1);
 		uhci->frame_number += delta;
 	}
@@ -798,7 +798,7 @@ static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
 	/* Minimize latency by avoiding the spinlock */
 	frame_number = uhci->frame_number;
 	barrier();
-	delta = (uhci_readw(uhci, USBFRNUM) - frame_number) &
+	delta = (uhci_readl(uhci, USBFRNUM) - frame_number) &
 			(UHCI_NUMFRAMES - 1);
 	return frame_number + delta;
 }
@@ -806,6 +806,7 @@ static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
 /* Determines number of ports on controller */
 static int uhci_count_ports(struct usb_hcd *hcd)
 {
+#if 0
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned io_size = (unsigned) hcd->rsrc_len;
 	int port;
@@ -818,10 +819,10 @@ static int uhci_count_ports(struct usb_hcd *hcd)
 	 * a nonexistent register is addressed is to return all ones, so
 	 * we test for that also.
 	 */
-	for (port = 0; port < (io_size - USBPORTSC1) / 2; port++) {
+	for (port = 0; port < (io_size - USBPORTSC1) / 4; port++) {
 		unsigned int portstatus;
 
-		portstatus = uhci_readw(uhci, USBPORTSC1 + (port * 2));
+		portstatus = uhci_readl(uhci, USBPORTSC1 + (port * 2));
 		if (!(portstatus & 0x0080) || portstatus == 0xffff)
 			break;
 	}
@@ -836,6 +837,16 @@ static int uhci_count_ports(struct usb_hcd *hcd)
 	}
 
 	return port;
+#else
+#ifdef CONFIG_AST_USB_UHCI_2_PORT
+	return 2;
+#elif defined (CONFIG_AST_USB_UHCI_4_PORT)
+	return 4;
+#else
+	return 1;
+#endif
+
+#endif
 }
 
 static const char hcd_name[] = "uhci_hcd";
