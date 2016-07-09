@@ -629,8 +629,8 @@
 
 /*	AST_SCU_HW_STRAP1			0x70		hardware strapping register */
 #ifdef AST_SOC_G5
-
-#define CLK_25M_IN					(0x1 << 23)
+#define SCU_HW_STRAP_ESPI_MODE			(0x1 << 25)
+#define CLK_25M_IN				(0x1 << 23)
 
 #define SCU_HW_STRAP_2ND_BOOT_WDT		(0x1 << 17)
 #define SCU_HW_STRAP_SUPER_IO_CONFIG	(0x1 << 16)

@@ -42,113 +42,62 @@
 /* --------------------------------------------------------------------
  *  KCS
  * -------------------------------------------------------------------- */
-#if defined(CONFIG_AST_KCS) || defined(CONFIG_AST_KCS_MODULE)
+#if defined(CONFIG_AST_IPMI_KCS) || defined(CONFIG_AST_IPMI_KCS_MODULE)
 static u64 ast_kcs_dma_mask = 0xffffffffUL;
-
-static struct resource ast_kcs0_resource[] = {
-	[0] = {
-		.start = IRQ_LPC,
-		.end = IRQ_LPC,
-		.flags = IORESOURCE_IRQ,
-	},
-};
 
 static struct platform_device ast_kcs0_device = {
 	.name	= "ast-kcs",
-    .id = 0,
-    .dev = {
+	.id = 0,
+	.dev = {
 		.dma_mask = &ast_kcs_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-    },
-	.resource = ast_kcs0_resource,
-	.num_resources = ARRAY_SIZE(ast_kcs0_resource),
-};
-
-static struct resource ast_kcs1_resource[] = {
-	[0] = {
-		.start = IRQ_LPC,
-		.end = IRQ_LPC,
-		.flags = IORESOURCE_IRQ,
 	},
 };
 
 static struct platform_device ast_kcs1_device = {
 	.name	= "ast-kcs",
-    .id = 1,
-    .dev = {
+	.id = 1,
+	.dev = {
 		.dma_mask = &ast_kcs_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-    },
-	.resource = ast_kcs1_resource,
-	.num_resources = ARRAY_SIZE(ast_kcs1_resource),
-};
-
-static struct resource ast_kcs2_resource[] = {
-	[0] = {
-		.start = IRQ_LPC,
-		.end = IRQ_LPC,
-		.flags = IORESOURCE_IRQ,
 	},
 };
 
 static struct platform_device ast_kcs2_device = {
 	.name	= "ast-kcs",
-    .id = 2,
-    .dev = {
-            .dma_mask = &ast_kcs_dma_mask,
-            .coherent_dma_mask = 0xffffffff,
-    },
-	.resource = ast_kcs2_resource,
-	.num_resources = ARRAY_SIZE(ast_kcs2_resource),
-};
-
-static struct resource ast_kcs3_resource[] = {
-	[0] = {
-		.start = IRQ_LPC,
-		.end = IRQ_LPC,
-		.flags = IORESOURCE_IRQ,
+	.id = 2,
+	.dev = {
+	        .dma_mask = &ast_kcs_dma_mask,
+	        .coherent_dma_mask = 0xffffffff,
 	},
 };
 
 static struct platform_device ast_kcs3_device = {
 	.name	= "ast-kcs",
-    .id = 3,
-    .dev = {
-            .dma_mask = &ast_kcs_dma_mask,
-            .coherent_dma_mask = 0xffffffff,
-    },
-	.resource = ast_kcs3_resource,
-	.num_resources = ARRAY_SIZE(ast_kcs3_resource),
-};
-
-static struct resource ast_kcs4_resource[] = {
-	[0] = {
-		.start = IRQ_LPC,
-		.end = IRQ_LPC,
-		.flags = IORESOURCE_IRQ,
+	.id = 3,
+	.dev = {
+	        .dma_mask = &ast_kcs_dma_mask,
+	        .coherent_dma_mask = 0xffffffff,
 	},
 };
 
 static struct platform_device ast_kcs4_device = {
 	.name	= "ast-kcs",
-    .id = 4,
-    .dev = {
-            .dma_mask = &ast_kcs_dma_mask,
-            .coherent_dma_mask = 0xffffffff,
-    },
-	.resource = ast_kcs4_resource,
-	.num_resources = ARRAY_SIZE(ast_kcs4_resource),
+	.id = 4,
+	.dev = {
+	        .dma_mask = &ast_kcs_dma_mask,
+	        .coherent_dma_mask = 0xffffffff,
+	},
 };
 
 void __init ast_add_device_kcs(void)
 {
 	platform_device_register(&ast_kcs0_device);
-//	platform_device_register(&ast_kcs1_device);
-//	platform_device_register(&ast_kcs2_device);
-//	platform_device_register(&ast_kcs3_device);
-//	platform_device_register(&ast_kcs4_device);
+	platform_device_register(&ast_kcs1_device);
+	platform_device_register(&ast_kcs2_device);
+	platform_device_register(&ast_kcs3_device);
+	platform_device_register(&ast_kcs4_device);
 }
 #else
 void __init ast_add_device_kcs(void) {}
 #endif
-

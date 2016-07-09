@@ -71,20 +71,18 @@ ast_lpc_plus_write(u32 val, u32 reg)
 
 static int __init ast_lpc_plus_probe(struct platform_device *pdev)
 {
-	static struct ast_lpc_driver_data *lpc_plus_driver_data;
+	static struct ast_lpc_data *ast_lpc_plus;
 //	const struct platform_device_id *id = platform_get_device_id(pdev);
 	struct resource *res;
 	int ret = 0;
 
-	lpc_plus_driver_data = kzalloc(sizeof(struct ast_lpc_driver_data), GFP_KERNEL);
-	if (lpc_plus_driver_data == NULL) {
+	ast_lpc_plus = kzalloc(sizeof(struct ast_lpc_data), GFP_KERNEL);
+	if (ast_lpc_plus == NULL) {
 		dev_err(&pdev->dev, "failed to allocate memory\n");
 		return -ENOMEM;
 	}
 
-	lpc_plus_driver_data->pdev = pdev;
-
-	lpc_plus_driver_data->bus_info = pdev->dev.platform_data;
+	ast_lpc_plus->pdev = pdev;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (res == NULL) {
@@ -100,57 +98,53 @@ static int __init ast_lpc_plus_probe(struct platform_device *pdev)
 		goto err_free;
 	}
 
-	lpc_plus_driver_data->reg_base = ioremap(res->start, resource_size(res));
-	if (lpc_plus_driver_data->reg_base == NULL) {
+	ast_lpc_plus->reg_base = ioremap(res->start, resource_size(res));
+	if (ast_lpc_plus->reg_base == NULL) {
 		dev_err(&pdev->dev, "failed to ioremap() registers\n");
 		ret = -ENODEV;
 		goto err_free_mem;
 	}
 
 #ifdef CONFIG_ARCH_AST1070
-	if(lpc_plus_driver_data->bus_info->lpc_bus_mode) {
-		printk("LPC PLUS Scan Device...  ");
-		for(i=0;i<lpc_plus_driver_data->bus_info->scan_node;i++) {
-			ast1070_scu_init(i ,lpc_plus_driver_data->bus_info->bridge_phy_addr + i*0x10000);
-			printk("C%d-[%x] ", i, ast1070_revision_id_info(i));
-			ast1070_vic_init(i, (lpc_plus_driver_data->bus_info->bridge_phy_addr + i*0x10000), IRQ_C0_VIC_CHAIN + i, IRQ_C0_VIC_CHAIN_START + (i*AST_CVIC_NUM));
-			ast1070_scu_dma_init(i);
-			ast1070_uart_dma_init(i, lpc_plus_driver_data->bus_info->bridge_phy_addr);
-			ast_add_device_cuart(i,lpc_plus_driver_data->bus_info->bridge_phy_addr + i*0x10000);
-			ast_add_device_ci2c(i,lpc_plus_driver_data->bus_info->bridge_phy_addr + i*0x10000);
-		}
-		printk("\n");
-
+	printk("LPC PLUS Scan Device...  ");
+	for(i=0;i<ast_lpc_plus->bus_info->scan_node;i++) {
+		ast1070_scu_init(i ,AST_LPC_PLUS_BRIDGE + i*0x10000);
+		printk("C%d-[%x] ", i, ast1070_revision_id_info(i));
+		ast1070_vic_init(i, (AST_LPC_PLUS_BRIDGE + i*0x10000), IRQ_C0_VIC_CHAIN + i, IRQ_C0_VIC_CHAIN_START + (i*AST_CVIC_NUM));
+		ast1070_scu_dma_init(i);
+		ast1070_uart_dma_init(i, AST_LPC_PLUS_BRIDGE);
+		ast_add_device_cuart(i,AST_LPC_PLUS_BRIDGE + i*0x10000);
+		ast_add_device_ci2c(i,AST_LPC_PLUS_BRIDGE + i*0x10000);
 	}
-	
+	printk("\n");	
 #endif
 
-	platform_set_drvdata(pdev, lpc_plus_driver_data);
+	platform_set_drvdata(pdev, ast_lpc_plus);
 	return 0;
 
 err_free_mem:
 	release_mem_region(res->start, resource_size(res));
 err_free:
-	kfree(lpc_plus_driver_data);
+	kfree(ast_lpc_plus);
 
 	return ret;
 }
 
 static int __exit ast_lpc_plus_remove(struct platform_device *pdev)
 {
-	struct ast_lpc_driver_data *lpc_plus_driver_data;
+	struct ast_lpc_data *ast_lpc_plus;
 	struct resource *res;
 
-	lpc_plus_driver_data = platform_get_drvdata(pdev);
-	if (lpc_plus_driver_data == NULL)
+	ast_lpc_plus = platform_get_drvdata(pdev);
+	if (ast_lpc_plus == NULL)
 		return -ENODEV;
 
-	iounmap(lpc_plus_driver_data->reg_base);
+	iounmap(ast_lpc_plus->reg_base);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	release_mem_region(res->start, resource_size(res));
 
-	kfree(lpc_plus_driver_data);
+	kfree(ast_lpc_plus);
 
 	return 0;
 }

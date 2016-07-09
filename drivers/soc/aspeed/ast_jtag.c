@@ -392,7 +392,6 @@ int ast_jtag_sdr_xfer(struct ast_jtag_info *ast_jtag, struct sdr_xfer *sdr)
 	unsigned int index = 0;
 	u32 shift_bits =0;
 	u32 tdo = 0;
-	int i;
 	u32 remain_xfer = sdr->length;
 
 	JTAG_DBUG("%s mode, len : %d \n", sdr->mode? "SW":"HW", sdr->length);

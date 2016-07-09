@@ -398,7 +398,13 @@ EXPORT_SYMBOL(ast_scu_init_sdhci);
 extern void
 ast_scu_init_i2c(void)
 {
+	spin_lock(&ast_scu_lock);
+
+	ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_I2C, AST_SCU_RESET);
+	udelay(3);
 	ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_I2C, AST_SCU_RESET);
+
+	spin_unlock(&ast_scu_lock);
 }
 
 EXPORT_SYMBOL(ast_scu_init_i2c);
@@ -410,6 +416,7 @@ ast_scu_init_pwm_tacho(void)
 
 	ast_scu_write(ast_scu_read(AST_SCU_RESET) | SCU_RESET_PWM, AST_SCU_RESET);
 	ast_scu_write(ast_scu_read(AST_SCU_RESET) & ~SCU_RESET_PWM, AST_SCU_RESET);
+
 	spin_unlock(&ast_scu_lock);	
 }
 
@@ -1259,6 +1266,15 @@ ast_get_sd_clock_src(void)
 }
 
 EXPORT_SYMBOL(ast_get_sd_clock_src);
+
+extern void
+ast_scu_set_lpc_mode(void)
+{
+#ifdef AST_SOC_G5
+	ast_scu_write(SCU_HW_STRAP_ESPI_MODE , AST_SCU_REVISION_ID);
+#endif
+}
+EXPORT_SYMBOL(ast_scu_set_lpc_mode);
 
 extern void
 ast_scu_show_system_info (void)

@@ -30,7 +30,7 @@ extern u32 ast_scu_get_phy_interface(u8 mac_num);
 extern u32 ast_scu_get_phy_config(u8 mac_num);
 extern u32 ast_scu_get_vga_memsize(void);
 extern void ast_scu_get_who_init_dram(void);
-
+extern void ast_scu_set_lpc_mode(void);
 
 //CLK 
 extern void ast_scu_uart_div(void);

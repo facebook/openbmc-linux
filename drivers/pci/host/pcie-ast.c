@@ -273,10 +273,17 @@ static int ast_pcie_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id ast_pcie_of_match[] = {
+	{ .compatible = "ast,ast-pcie", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, ast_pcie_of_match);
+
 static struct platform_driver ast_pcie_driver = {
 	.driver = {
 		.name	= "ast-pcie",
 		.owner	= THIS_MODULE,
+		.of_match_table = ast_pcie_of_match,
 	},
 	.probe = ast_pcie_probe,
 };

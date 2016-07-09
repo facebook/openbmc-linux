@@ -134,13 +134,13 @@ static struct platform_device my_mouse_hid = {
 
 static struct resource ast_udc11_resource[] = {
 	[0] = {
-		.start = AST_UDC11_BASE,
-		.end = AST_UDC11_BASE + SZ_256,
+		.start = AST_HID_BASE,
+		.end = AST_HID_BASE + SZ_64,
 		.flags = IORESOURCE_MEM,
 	},
 	[1] = {
-		.start = IRQ_UDC11,
-		.end = IRQ_UDC11,
+		.start = IRQ_HID,
+		.end = IRQ_HID,
 		.flags = IORESOURCE_IRQ,
 	},
 };

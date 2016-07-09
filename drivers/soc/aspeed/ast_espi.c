@@ -336,13 +336,18 @@ static void ast_espi_init(struct ast_espi_data *ast_espi) {
 
 static irqreturn_t ast_espi_reset_isr(int this_irq, void *dev_id)
 {
+	u32 sw_mode = 0; 
 	struct ast_espi_data *ast_espi = dev_id;
-
+	
 	ESPI_DBUG("ast_espi_reset_isr\n");
+
+	sw_mode = ast_espi_read(ast_espi, AST_ESPI_CTRL) & ESPI_CTRL_SW_FLASH_READ;
 
 	ast_scu_reset_espi();
 	ast_espi_init(ast_espi);
 
+	ast_espi_write(ast_espi, ast_espi_read(ast_espi, AST_ESPI_CTRL) | sw_mode, AST_ESPI_CTRL);
+	
 	return IRQ_HANDLED;
 }
 
@@ -1070,6 +1075,8 @@ static int __init ast_espi_probe(struct platform_device *pdev)
 		return -1;
 	}
 
+	printk(KERN_INFO "ast_espi: driver successfully loaded.\n");
+
 	return 0;
 
 err_free_irq:
@@ -1093,7 +1100,10 @@ static int __exit ast_espi_remove(struct platform_device *pdev)
 	if (ast_espi == NULL)
 		return -ENODEV;
 
+	free_irq(IRQ_GPIOAC7, ast_espi);
+	free_irq(ast_espi->irq, ast_espi);
 	iounmap(ast_espi->reg_base);
+	sysfs_remove_group(&pdev->dev.kobj, &espi_attribute_group);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	release_mem_region(res->start, resource_size(res));

@@ -17,6 +17,16 @@
 *   History      : 
 *    1. 2013/05/15 Ryan Chen Create
 * 
+*Check Host is in Continuous mode
+*Check under Host : SIRQ_CNTL
+   (Serial IRQ Mode Select (SIRQMD) �X R/W.
+   0 =  The serial IRQ machine will be in quiet mode. 
+   1 =  The serial IRQ machine will be in continuous mode.)
+*Checked under BMC: SIRQCR0 0x70[7] = 0/1 (Quiet/Continuous mode)
+
+*In ICH6, GEN1_DEC = C81h / GEN2_DEC = 81h
+In ICH7 or newer, choose any 2 of GENx_DEC, set 00040081h & 007C0C81h
+
 ********************************************************************************/
 #include <linux/platform_device.h>
 #include <linux/slab.h>
@@ -43,9 +53,6 @@
 #include <linux/miscdevice.h>
 #include <linux/hwmon-sysfs.h>
 
-
-//#include <linux/ipmi.h>
-
 //#define AST_LPC_DEBUG
 
 #ifdef AST_LPC_DEBUG
@@ -55,7 +62,7 @@
 #endif
 
 static inline u32 
-ast_lpc_read(struct ast_lpc_driver_data *ast_lpc, u32 reg)
+ast_lpc_read(struct ast_lpc_data *ast_lpc, u32 reg)
 {
 #if 0
 	u32 val;
@@ -68,13 +75,13 @@ ast_lpc_read(struct ast_lpc_driver_data *ast_lpc, u32 reg)
 }
 
 static inline void
-ast_lpc_write(struct ast_lpc_driver_data *ast_lpc, u32 val, u32 reg) 
+ast_lpc_write(struct ast_lpc_data *ast_lpc, u32 val, u32 reg) 
 {
 //	LPC_DBUG("ast_lpc_write : reg = 0x%08x, val = 0x%08x\n", reg, val);
 	writel(val, ast_lpc->reg_base + reg);
 }
 
-static u32 StrToHex(char *p)
+extern u32 StrToHex(char *p)
 {
 	int i, sum;
 	int temp, length;
@@ -98,672 +105,83 @@ static u32 StrToHex(char *p)
 	}
 	return sum;
 }
+EXPORT_SYMBOL(StrToHex);
 
-/***************** BT Handle ******************************************************/
-static int bt_debug; /* 0 == BT_DEBUG_OFF */
+static struct ast_lpc_data *ast_lpc;
 
-static void 
-write_all_bytes(struct ast_lpc_driver_data *ast_lpc, struct ast_bt_data *bt)
+/**************************   IPMI KCS Function  **********************************************************/
+//Set default KCS address KCS0 : CA0/CA4, KCS1 : CA8/CAC, KCS3 : CA2/CA3, KCS4 : CB2/CB3
+struct ast_kcs_data *register_ipmi_kcs_drv(u8 kcs_no)
 {
-	int i;
-
-	if (bt_debug & BT_DEBUG_MSG) {
-		printk(KERN_WARNING "BT: write %d bytes seq=0x%02X",
-			bt->write_count, bt->seq);
-		for (i = 0; i < bt->write_count; i++)
-			printk(" %02x", bt->write_data[i]);
-		printk("\n");
-	}
-	for (i = 0; i < bt->write_count; i++)
-		ast_lpc_write(ast_lpc, bt->write_data[i], bt->fifo);
-}
-
-static int 
-read_all_bytes(struct ast_lpc_driver_data *ast_lpc, struct ast_bt_data *bt)
-{
-	unsigned char i;
-
-	/*
-	 * length is "framing info", minimum = 3: NetFn, Seq, Cmd
-	 * Keep layout of first four bytes aligned with write_data[]
-	 */
-
-	bt->read_data[0] = ast_lpc_read(ast_lpc, bt->fifo);
-	bt->read_count = bt->read_data[0];
-	printk ("in read_all_bytes bt->read_count = %x\n", bt->read_count);
-
-	if (bt->read_count < 3 || bt->read_count >= IPMI_MAX_MSG_LENGTH) {
-		if (bt_debug & BT_DEBUG_MSG)
-			printk(KERN_WARNING "BT: bad raw rsp len=%d\n",
-				bt->read_count);
-		bt->truncated = 1;
-		return 1;	/* let next XACTION START clean it up */
-	}
-	for (i = 1; i <= bt->read_count; i++)
-		bt->read_data[i] = ast_lpc_read(ast_lpc, bt->fifo);
-	bt->read_count++;	/* Account internally for length byte */
-
-	printk ("bt->read_data = ");
-	for (i = 0; i < bt->read_count; i++) {
-		printk ("%x ", bt->read_data[i]);
-	}
-	if (bt_debug & BT_DEBUG_MSG) {
-		int max = bt->read_count;
-
-		printk(KERN_WARNING "BT: got %d bytes seq=0x%02X",
-			max, bt->read_data[2]);
-		if (max > 16)
-			max = 16;
-		for (i = 0; i < max; i++)
-			printk(KERN_CONT " %02x", bt->read_data[i]);
-		printk(KERN_CONT "%s\n", bt->read_count == max ? "" : " ...");
-	}
-
-	return 0;
-}
-
-#define BT_STATE_CHANGE(X, Y) { bt->state = X; return Y; }
-#define BT_SI_SM_RETURN(Y)   { last_printed = BT_STATE_PRINTME; return Y; }
-/* Check status and (usually) take action and change this state machine. */
-static enum si_sm_result ibt_event(struct ast_lpc_driver_data *ast_lpc, struct ast_bt_data *bt)
-{
-	unsigned char status;
-	static enum bt_states last_printed = BT_STATE_PRINTME;
-	int i;
-
-	status = ast_lpc_read(ast_lpc, bt->str);
-	bt->nonzero_status |= status;
-
-	if ((bt->state < BT_STATE_WRITE_BYTES) && (status & BT_B2H_ATN)) {
-//		drain_BMC2HOST(bt);
-//		BT_SI_SM_RETURN(SI_SM_CALL_WITH_DELAY);
-//yriver
-		printk ("Buffer was not empty !!\n");
-	}
-	
-	switch (bt->state) {
-	/* 
-	 * Idle state first checks for asynchronous messages from another
-	 * channel, then does some opportunistic housekeeping.
-	 */
-
-	case BT_STATE_IDLE:
-		if (status & BT_B_BUSY)		/* clear a leftover B_BUSY */
-			ast_lpc_write(ast_lpc, BT_B_BUSY, bt->str);
-
-		BT_STATE_CHANGE(BT_STATE_READ_WAIT,
-				SI_SM_CALL_WITHOUT_DELAY);
-		
-	case BT_STATE_XACTION_START:
-		if (status & (BT_H_BUSY | BT_B2H_ATN))
-			BT_SI_SM_RETURN(SI_SM_CALL_WITH_DELAY);
-		if (ast_lpc_read(ast_lpc, bt->str) & BT_B_BUSY)
-			ast_lpc_write(ast_lpc, BT_B_BUSY, bt->str);	/* force clear */
-		BT_STATE_CHANGE(BT_STATE_WRITE_BYTES,
-				SI_SM_CALL_WITHOUT_DELAY);
-
-	case BT_STATE_WRITE_BYTES:
-		if (status & BT_B_BUSY)
-			ast_lpc_write(ast_lpc, BT_B_BUSY, bt->str);	/* clear */
-//yriver
-//		BT_CONTROL(BT_CLR_WR_PTR);
-		write_all_bytes(ast_lpc, bt);
-		ast_lpc_write(ast_lpc, BT_B2H_ATN, bt->str);
-
-		bt->state = bt->complete;
-		return bt->state == BT_STATE_IDLE ?	/* where to next? */
-			SI_SM_TRANSACTION_COMPLETE :	/* normal */
-			SI_SM_CALL_WITHOUT_DELAY;	/* Startup magic */
-
-	case BT_STATE_READ_WAIT:
-		if (!(status & BT_H2B_ATN))
-			BT_SI_SM_RETURN(SI_SM_CALL_WITH_DELAY);
-		ast_lpc_write(ast_lpc, BT_B_BUSY, bt->str);		/* set */
-		ast_lpc_write(ast_lpc, BT_B2H_ATN, bt->str);		/* clear it to ACK the host */
-		BT_STATE_CHANGE(BT_STATE_CLEAR_H2B,
-				SI_SM_CALL_WITHOUT_DELAY);
-
-	case BT_STATE_CLEAR_H2B:
-		if (status & BT_H2B_ATN) {
-			/* keep hitting it */
-			ast_lpc_write(ast_lpc, BT_B2H_ATN, bt->str);
-			BT_SI_SM_RETURN(SI_SM_CALL_WITH_DELAY);
-		}
-		BT_STATE_CHANGE(BT_STATE_READ_BYTES,
-				SI_SM_CALL_WITHOUT_DELAY);
-
-	case BT_STATE_READ_BYTES:
-		if (!(status & BT_B_BUSY))
-			/* check in case of retry */
-			ast_lpc_write(ast_lpc, BT_B_BUSY, bt->str);	
-//yriver
-//		BT_CONTROL(BT_CLR_RD_PTR);	/* start of BMC2HOST buffer */
-		i = read_all_bytes(ast_lpc, bt);		/* true == packet seq match */
-		ast_lpc_write(ast_lpc, BT_B_BUSY, bt->str);			/* NOW clear */
-		BT_STATE_CHANGE(BT_STATE_IDLE,
-				SI_SM_READ_COMPLETE);
-
-	default:
-		return SI_SM_CALL_WITH_DELAY;
-	}
-	return SI_SM_CALL_WITH_DELAY;
-}
-
-static void ast_ipmi_bt_handle(struct ast_lpc_driver_data *ast_lpc, struct ast_bt_data *bt_data) 
-{
-	u8 result;
-	unsigned int count = 0;	
-	
-	do {
-		result = ibt_event(ast_lpc, bt_data);
-		count++;
-	} while (((result != SI_SM_READ_COMPLETE) && (count <= 100000)));
-	if (count >= 100000) printk ("SI_SM_READ_NOT_COMPLETE\n");
-
-	count = 0;
-	printk ("driver finished read\n");
-//	flag = 1;
-//	wake_up_interruptible (&my_queue);
-
-	return;
-}
-
-static u16 
-ast_get_ipmi_bt_addr(struct ast_lpc_driver_data *ast_lpc, u8 bt_ch)
-{
-	u16 tmp = 0;
-	switch(bt_ch) {
-		case 0:	//0xca2, 0xca3 is kcs , ca4,ca5,ca6 is bt
-			tmp = ((ast_lpc_read(ast_lpc, AST_LPC_LADR3H) << 8) | ast_lpc_read(ast_lpc, AST_LPC_LADR3L)) + 2;
-			break;
-		case 1:	//ibt
-			tmp = LPC_iBT_GET_ADDR(ast_lpc_read(ast_lpc, AST_LPC_IBTCR0));
-			break;
-		default:
-			break;
-	}
-	return tmp;
-}
-
-static void 
-ast_set_ipmi_bt_addr(struct ast_lpc_driver_data *ast_lpc, u8 bt_ch, u16 bt_addr)
-{
-	LPC_DBUG("set ch %d, addr %x \n", bt_ch, bt_addr);
-	switch(bt_ch) {
-		case 0:	//0xca2, 0xca3 is kcs , ca4,ca5,ca6 is bt
-			ast_lpc_write(ast_lpc, (bt_addr - 2) >> 8,AST_LPC_LADR3H);
-			ast_lpc_write(ast_lpc, (bt_addr - 2) & 0xff, AST_LPC_LADR3L);
-			break;
-		case 1:	//ibt [31:16] ex  == 0x00e4 --> BTCR : 0xE4 , BTDTR : 0xE4 + 1, BTIMSR : 0xE4 + 2
-			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) & ~LPC_iBT_ADDR_MASK) | LPC_iBT_SET_ADDR(bt_addr), AST_LPC_IBTCR0);
-			break;
-		default:
-			break;
-	}
-}
-
-static u8 
-ast_get_ipmi_bt_en(struct ast_lpc_driver_data *ast_lpc, u8 bt_ch)
-{
-	u8 tmp = 0;
-	switch(bt_ch) {
+	switch(kcs_no) {
 		case 0:
-			if((ast_lpc_read(ast_lpc, AST_LPC_HICR0) & LPC_LPC3_EN) && (ast_lpc_read(ast_lpc, AST_LPC_HICR4) & LPC_HICS_BTENBL))
-				tmp = 1;
-			else
-				tmp = 0;
+			ast_lpc->ast_kcs[0].kcs_reg = 1;
+			ast_lpc->ast_kcs[0].ast_lpc = ast_lpc;
+			ast_lpc->ast_kcs[0].regspacings = AST_IPMI_KCS0_REGSPACINGS;	//fix
+			ast_lpc->ast_kcs[0].kcs_irq_hander = NULL;			
+			ast_lpc->ast_kcs[0].str = ast_lpc->reg_base + AST_LPC_STR1;
+			ast_lpc->ast_kcs[0].idr = ast_lpc->reg_base + AST_LPC_IDR1;
+			ast_lpc->ast_kcs[0].odr = ast_lpc->reg_base + AST_LPC_ODR1;	
+			ast_set_ipmi_kcs_addr(ast_lpc, 0, 0xCA0);
 			break;
-		case 1:	//ibt
-			if(ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) & LPC_iBT_ENABLE)
-				tmp = 1;
-			else
-				tmp = 0;
+		case 1:
+			ast_lpc->ast_kcs[1].kcs_reg = 1;			
+			ast_lpc->ast_kcs[1].ast_lpc = ast_lpc;
+			ast_lpc->ast_kcs[1].regspacings = AST_IPMI_KCS1_REGSPACINGS;	//fix			
+			ast_lpc->ast_kcs[1].kcs_irq_hander = NULL;
+			ast_lpc->ast_kcs[1].str = ast_lpc->reg_base + AST_LPC_STR2;
+			ast_lpc->ast_kcs[1].idr = ast_lpc->reg_base + AST_LPC_IDR2;
+			ast_lpc->ast_kcs[1].odr = ast_lpc->reg_base + AST_LPC_ODR2;			
+			ast_set_ipmi_kcs_addr(ast_lpc, 1, 0xCA8);
 			break;
-			
-		default:
-			printk("Error Ch no !!\n");
+		case 2:
+			ast_lpc->ast_kcs[2].kcs_reg = 1;			
+			ast_lpc->ast_kcs[2].ast_lpc = ast_lpc;	
+			ast_lpc->ast_kcs[2].regspacings = AST_IPMI_KCS2_REGSPACINGS;	//fix		
+			ast_lpc->ast_kcs[2].kcs_irq_hander = NULL;
+			ast_lpc->ast_kcs[2].str = ast_lpc->reg_base + AST_LPC_STR3;
+			ast_lpc->ast_kcs[2].idr = ast_lpc->reg_base + AST_LPC_IDR3;
+			ast_lpc->ast_kcs[2].odr = ast_lpc->reg_base + AST_LPC_ODR3;			
+			ast_set_ipmi_kcs_addr(ast_lpc, 2, 0xCA2);
 			break;
-	}
-		
-	return tmp;
-
-}
-
-static void 
-ast_set_ipmi_bt_en(struct ast_lpc_driver_data *ast_lpc, u8 bt_ch, u8 enable)
-{
-	if(enable) {
-		switch(bt_ch) {
-			case 0: //bt		--> fix 0xca4 / 0xca5 / 0xca6
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC3_EN, AST_LPC_HICR0);
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) | LPC_HICS_BTENBL, AST_LPC_HICR4);
-				//TODO .....
-				break;
-			case 1:	//ibt 
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) | LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1);	//Enable BT H2B interrupt Interrupt
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) | LPC_iBT_ENABLE | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN, AST_LPC_IBTCR0);	//Enable BT Interface
-				break;
-		}
-	} else {
-		switch(bt_ch) {
-			case 0:	//bt 
-				//TODO
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) & ~LPC_HICS_BTENBL, AST_LPC_HICR4);
-				break;
-			case 1:	//ibt
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) & ~LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1);	//Enable BT H2B interrupt Interrupt
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) & ~(LPC_iBT_ENABLE | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN), AST_LPC_IBTCR0);	//Enable BT Interface
-				break;
-		}	
-
-	}	
-}
-
-/**************************   LPC  BT SYSFS  **********************************************************/
-static ssize_t 
-ast_store_ipmi_bt(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
-{
-	u32 input_val;
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
-
-//	input_val = simple_strtoul(sysfsbuf, NULL, 10);
-	input_val = StrToHex(sysfsbuf);
-	//sensor_attr->index : ch#
-	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
-	{
-		case 0: //enable, disable
-			ast_set_ipmi_bt_en(ast_lpc, sensor_attr->index, input_val);
-			break;
-		case 1: //addr 
-			ast_set_ipmi_bt_addr(ast_lpc, sensor_attr->index, input_val);
-			break;
-		default:
-			return -EINVAL;
-			break;
-	}
-
-	return count;
-}
-
-static ssize_t 
-ast_show_ipmi_bt(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
-{
-
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
-
-	//sensor_attr->index : ch#
-	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
-	{
-		case 0: //channel enable, disable
-			return sprintf(sysfsbuf, "%d : %s\n", ast_get_ipmi_bt_en(ast_lpc, sensor_attr->index),ast_get_ipmi_bt_en(ast_lpc,sensor_attr->index) ? "Enable":"Disable");
-			break;
-		case 1: //addr
-			return sprintf(sysfsbuf, "%x \n", ast_get_ipmi_bt_addr(ast_lpc, sensor_attr->index));
+		case 3:
+			ast_lpc->ast_kcs[3].kcs_reg = 1;			
+			ast_lpc->ast_kcs[3].ast_lpc = ast_lpc;	
+			ast_lpc->ast_kcs[3].regspacings = AST_IPMI_KCS3_REGSPACINGS;	//can change any					
+			ast_lpc->ast_kcs[3].kcs_irq_hander = NULL;
+			ast_lpc->ast_kcs[3].str = ast_lpc->reg_base + AST_LPC_STR4;
+			ast_lpc->ast_kcs[3].idr = ast_lpc->reg_base + AST_LPC_IDR4;
+			ast_lpc->ast_kcs[3].odr = ast_lpc->reg_base + AST_LPC_ODR4;
+			ast_set_ipmi_kcs_addr(ast_lpc, 3, 0xCB2);
 			break;			
-		default:
-			return -EINVAL;
-			break;
-	}
-	return -EINVAL;
-}
-
-#define sysfs_ipmi_bt_ch(index) \
-static SENSOR_DEVICE_ATTR_2(ipmi_bt##index##_en, S_IRUGO | S_IWUSR, \
-	ast_show_ipmi_bt, ast_store_ipmi_bt, 0, index); \
-static SENSOR_DEVICE_ATTR_2(ipmi_bt##index##_addr, S_IRUGO | S_IWUSR, \
-	ast_show_ipmi_bt, ast_store_ipmi_bt, 1, index); \
-\
-static struct attribute *ipmi_bt##index##_attributes[] = { \
-	&sensor_dev_attr_ipmi_bt##index##_en.dev_attr.attr, \
-	&sensor_dev_attr_ipmi_bt##index##_addr.dev_attr.attr, \
-	NULL \
-};
-
-sysfs_ipmi_bt_ch(0);
-sysfs_ipmi_bt_ch(1);
-
-static const struct attribute_group ipmi_bt_attribute_groups[] = {
-	{ .attrs = ipmi_bt0_attributes },
-	{ .attrs = ipmi_bt1_attributes },	
-};
-
-/***************** KCS Handle ******************************************************/
-static void ast_ipmi_kcs_tx(struct ast_lpc_driver_data *ast_lpc, struct ast_kcs_data *kcs_data)
-{
-	LPC_DBUG("\n");
-	/* Send the first byte */
-	kcs_data->KCSSendPktIx = 0;
-	ast_lpc_write(ast_lpc, kcs_data->pKCSSendPkt[0], kcs_data->odr);
-	kcs_data->KCSSendPktIx++;
-	//SA Set OBF Byte
-}
-
-static void ast_ipmi_kcs_rx(struct ast_lpc_driver_data *ast_lpc, struct ast_kcs_data *kcs_data)
-{
-	u8 b;
-	int i;
-	switch (kcs_data->KCSPhase) {
-	case KCS_PHASE_WRITE:
-		LPC_DBUG("KCS_PHASE_WRITE \n");
-		/* Set the state to write state */
-		ast_lpc_write(ast_lpc, ((ast_lpc_read(ast_lpc, kcs_data->str) & (~0xC0)) | (KCS_WRITE_STATE << 6)), kcs_data->str);
-		/* Read the BYTE from the data register */
-		kcs_data->pKCSRcvPkt[kcs_data->KCSRcvPktIx] = ast_lpc_read(ast_lpc, kcs_data->idr);
-		LPC_DBUG("rx data = [%x] \n", kcs_data->pKCSRcvPkt[kcs_data->KCSRcvPktIx]);
-		kcs_data->KCSRcvPktIx++;
-		if(kcs_data->KCSRcvPktIx > MAX_KCS_PKT_LEN)
-			printk("ERROR ---> TODO ... \n");
-		break;
-		
-	case KCS_PHASE_WRITE_END :
-		LPC_DBUG("KCS_PHASE_WRITE_END \n");
-		/* Set the state to READ_STATE */
-		ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, kcs_data->str) & (~0xC0)) | (KCS_READ_STATE << 6), kcs_data->str);
-		/* Read the BYTE from the data register */
-		kcs_data->pKCSRcvPkt[kcs_data->KCSRcvPktIx] = ast_lpc_read(ast_lpc, kcs_data->idr);
-		kcs_data->KCSRcvPktIx++;
-
-		//SA lets print all data received from SMS
-		LPC_DBUG("rx data = [%x] \n", kcs_data->pKCSRcvPkt[kcs_data->KCSRcvPktIx]);
-		
-		/* Move to READ Phase */
-		kcs_data->KCSPhase = KCS_PHASE_READ;
-		/* Signal receive data ready */
-#if 1		
-		printk("Total Rx Data : [");
-		for(i=0; i <kcs_data->KCSRcvPktIx; i++)
-			printk("%x ", kcs_data->pKCSRcvPkt[i]);
-		printk("] \n");
-#endif		
-
-#if 1
-		//TODO ...... send message to ipmi handle....
-		/* Send the first byte */
-		kcs_data->KCSSendPktIx = 0;
-		printk("send %x \n",kcs_data->pKCSSendPkt[kcs_data->KCSSendPktIx]);
-		ast_lpc_write(ast_lpc, kcs_data->pKCSSendPkt[0], kcs_data->odr);
-		kcs_data->KCSSendPktIx++;
-#else
-		ast_ipmi_kcs_message_rcv(ast_lpc, kcs_data);
-#endif
-		break;
-	case KCS_PHASE_READ:
-		LPC_DBUG("KCS_PHASE_READ \n");
-
-		/* If we have reached the end of the packet move to idle state */
-		if (kcs_data->KCSSendPktIx == kcs_data->KCSSendPktLen)
-			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, kcs_data->str) & (~0xC0)) | (KCS_IDLE_STATE << 6), kcs_data->str);
-
-		/* Read the byte returned by the SMS */
-		b = ast_lpc_read(ast_lpc, kcs_data->idr);
-		//SA Need to clear IBF
-		//sa_0111 CLEAR_IBF_STATUS(ChannelNum);
-
-		if (b != KCS_READ_BYTE)
-		{
-			LPC_DBUG("KCS_PHASE_READ : Set Error State\n");
-			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, kcs_data->str) & (~0xC0)) | (KCS_ERROR_STATE << 6), kcs_data->str);
-			ast_lpc_write(ast_lpc, 0, kcs_data->odr);
-			//SA Set OBF Byte
-			break;
-		}
-
-		/* If we are finished transmitting, send the dummy byte */
-		if (kcs_data->KCSSendPktIx == kcs_data->KCSSendPktLen)
-		{
-			LPC_DBUG("KCS_PHASE_READ : finished transmitting\n");
-			kcs_data->KCSPhase = KCS_PHASE_IDLE;
-			ast_lpc_write(ast_lpc, 0, kcs_data->odr);
-			//SA Set OBF Byte
-
-			/* Set Transmission Complete */
-			break;
-		}
-		/* Transmit the next byte from the send buffer */
-		printk("send idx %d : %x \n",kcs_data->KCSSendPktIx, kcs_data->pKCSSendPkt[kcs_data->KCSSendPktIx]);
-		ast_lpc_write(ast_lpc, kcs_data->pKCSSendPkt[kcs_data->KCSSendPktIx], kcs_data->odr);
-		kcs_data->KCSSendPktIx++;
-
-		break;
-		
-	case KCS_PHASE_ERROR1:
-		LPC_DBUG("KCS_PHASE_ERROR1 \n");
-		/* Set the KCS State to READ_STATE */
-		ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, kcs_data->str) & (~0xC0)) | (KCS_READ_STATE << 6), kcs_data->str);
-		/* Read the Dummy byte  */
-		ast_lpc_read(ast_lpc, kcs_data->idr);
-		/* Write the error code to Data out register */
-		printk("TODO ...... \n");
-		ast_lpc_write(ast_lpc, KCS_ABORTED_BY_COMMAND, kcs_data->odr);
-		
-		//SA Set OBF Byte
-
-		/* Set the abort phase to be error2 */
-		kcs_data->KCSPhase = KCS_PHASE_ERROR2;
-//		pKCSBuf->AbortPhase = ABORT_PHASE_ERROR2;
-		break;
-	case KCS_PHASE_ERROR2:
-		LPC_DBUG("ABORT_PHASE_ERROR2 \n");
-		/**  * The system software has read the error code. Go to idle  * state. 	**/
-		ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, kcs_data->str) & (~0xC0)) | (KCS_IDLE_STATE << 6), kcs_data->str);
-
-		/* Read the Dummy byte  */
-		ast_lpc_read(ast_lpc, kcs_data->idr);
-
-		kcs_data->KCSPhase = KCS_PHASE_IDLE;
-//		pKCSBuf->AbortPhase = 0;
-		/* Send the dummy byte  */
-		ast_lpc_write(ast_lpc, 0, kcs_data->odr);
-		
-		break;
-	default:
-		LPC_DBUG("rx default == > TODO .. \n");		
-		/* Read the Dummy byte  */
-		ast_lpc_read(ast_lpc, kcs_data->idr);
 	}
 
+	return &(ast_lpc->ast_kcs[kcs_no]);
 }
+EXPORT_SYMBOL(register_ipmi_kcs_drv);
 
-static void ast_ipmi_kcs_cmd_dat(struct ast_lpc_driver_data *ast_lpc, struct ast_kcs_data *kcs_data)
+void request_ipmi_kcs_irq(u8 kcs_no, ast_ipmi_irq handler)
 {
-	u8 cmd;
+	ast_lpc->ast_kcs[kcs_no].kcs_irq_hander = handler;
 
-	/* Set the status to WRITE_STATE */
-	ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, kcs_data->str) & (~0xC0)) | (KCS_WRITE_STATE << 6), kcs_data->str);
-	/* Read the command */
-	cmd = ast_lpc_read(ast_lpc, kcs_data->idr);
-	LPC_DBUG("cmd = %x \n", cmd);
-
-	switch (cmd) {
-		case KCS_WRITE_START:
-			LPC_DBUG("KCS_WRITE_START \n");
-			/* Set the Index to 0 */
-			kcs_data->KCSRcvPktIx = 0;
-			/* Set the phase to WRITE */
-			kcs_data->KCSPhase = KCS_PHASE_WRITE;
+	switch(kcs_no) {
+		case 0:
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) | LPC_IBFIF1, AST_LPC_HICR2);
 			break;
-		case KCS_WRITE_END:
-			/* Set the phase to write end */
-			LPC_DBUG("KCS_WRITE_END \n");
-			kcs_data->KCSPhase = KCS_PHASE_WRITE_END;
+		case 1:
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) | LPC_IBFIF2, AST_LPC_HICR2);
 			break;
-	        case KCS_GET_STATUS_ABORT:
-			/* Set the error code */
-			LPC_DBUG("KCS_GET_STATUS_ABORT TODO ...\n");
-	//			kcs_data->KCSError = KCS_ABORTED_BY_COMMAND;
-
-			/* Set the phase to write end */
-			/* Set the abort phase to be error1 */
-			kcs_data->KCSPhase = KCS_PHASE_ERROR1;
-
-			/* Send the dummy byte  */
-			ast_lpc_write(ast_lpc, 0, kcs_data->odr);
+		case 2:
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR3) | LPC_IBFIF3, AST_LPC_HICR2);				
 			break;
-		default:
-			LPC_DBUG("default -- > TODO .... \n");
-
-			/* Set the error code */
-	//			kcs_data->KCSError = KCS_ILLEGAL_CONTROL_CODE;
-			/* Invalid command code - Set an error state */
-			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, kcs_data->str) & (~0xC0)) | (KCS_ERROR_STATE << 6), kcs_data->str);
-			/* Set the phase to error phase */
-			kcs_data->KCSPhase = KCS_PHASE_ERROR;
-			break;
+		case 3:
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICRB) | LPC_KCS4_RCV_INTR, AST_LPC_HICRB);
+			break;			
 	}
 }
+EXPORT_SYMBOL(request_ipmi_kcs_irq);
 
-static void ast_snoop_dma_handler(struct ast_lpc_driver_data *ast_lpc)
-{
-	u32 snoop_dma_sts, lpc_sts;
-
-	snoop_dma_sts = ast_lpc_read(ast_lpc, AST_LPC_PCCR2);
-	lpc_sts = ast_lpc_read(ast_lpc, AST_LPC_HICR2);
-	
-	printk("ISR : snoop_dma_sts = %x , lpc_sts = %x \n",snoop_dma_sts, lpc_sts);
-
-	if(lpc_sts & LPC_LRST) {
-		printk("LPC RST === >TODO .... \n");
-		//clear fifo ??		
-		ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) | LPC_RX_FIFO_CLR, AST_LPC_PCCR0);
-		//clear 
-		ast_lpc_write(ast_lpc, lpc_sts & ~LPC_LRST, AST_LPC_HICR2);
-		
-	}
-
-	if(snoop_dma_sts & LPC_POST_CODE_DMA_RDY) {
-		
-		
-	}
-}
-
-static void ast_ipmi_kcs_handle(struct ast_lpc_driver_data *ast_lpc, struct ast_kcs_data *kcs_data) 
-{
-	u32 str= ast_lpc_read(ast_lpc, kcs_data->str);
-	if (str) {
-		str &= 0xb;
-		switch(str) {
-			case (LPC_STR_CMD_DAT | LPC_STR_IBF):
-				LPC_DBUG("LPC_STR_CMD_DAT | LPC_STR_IBF \n");
-				ast_ipmi_kcs_cmd_dat(ast_lpc, kcs_data);
-				break;
-
-			case LPC_STR_OBF:
-				LPC_DBUG("LPC_STR_OBF -- TODO ..\n");
-				ast_ipmi_kcs_cmd_dat(ast_lpc, kcs_data);
-				break;
-			case LPC_STR_IBF:
-				LPC_DBUG("LPC_STR_IBF \n");
-				ast_ipmi_kcs_rx(ast_lpc, kcs_data);
-				break;
-			default:
-				printk("ERROR 1111 \n");
-				break;
-
-		}
-				
-	}
-
-}
-
-static irqreturn_t ast_lpc_isr (int this_irq, void *dev_id)
-{
-	struct ast_lpc_driver_data *ast_lpc = dev_id;
-	LPC_DBUG("\n");
-	
-	//SNOOP 
-	if(ast_lpc->bus_info->snoop_enable) {
-		if(ast_lpc_read(ast_lpc, AST_LPC_PCCR0) & LPC_POST_CODE_EN)
-			ast_snoop_dma_handler(ast_lpc);
-		
-		if(!(ast_lpc_read(ast_lpc, AST_LPC_HICR5) & (LPC_HICR5_SNP0INT_EN | LPC_HICR5_SNP1INT_EN))) {
-//			printk("SNOOP not enable \n");
-			goto next;
-		}
-
-		//sts
-		if(!(ast_lpc_read(ast_lpc, AST_LPC_HICR6) & (LPC_HICR6_STR_SNP1W | LPC_HICR6_STR_SNP0W))) {
-//			printk("SNOOP sts none \n");			
-			goto next;
-		}
-		
-		//ch1	
-		if(ast_lpc_read(ast_lpc, AST_LPC_HICR6) & LPC_HICR6_STR_SNP1W) {
-			ast_lpc->snoop_data[1].fifo[ast_lpc->snoop_data[1].write_idx] = GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
-//			printk("Ch1 data %x \n", GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR)));
-			printk("Ch1 data in fifo widx %d : %x \n", ast_lpc->snoop_data[1].write_idx, ast_lpc->snoop_data[1].fifo[ast_lpc->snoop_data[1].write_idx]);
-			ast_lpc->snoop_data[1].write_idx++;
-			ast_lpc->snoop_data[1].write_idx %= SNOOP_FIFO_SIZE;
-			if(ast_lpc->snoop_data[1].write_idx == ast_lpc->snoop_data[1].read_idx) {
-				ast_lpc->snoop_data[1].read_idx++;
-				ast_lpc->snoop_data[1].read_idx %= SNOOP_FIFO_SIZE;
-			}
-			ast_lpc_write(ast_lpc, LPC_HICR6_STR_SNP1W,  AST_LPC_HICR6);
-		}
-
-		//ch0
-		if(ast_lpc_read(ast_lpc, AST_LPC_HICR6) & LPC_HICR6_STR_SNP0W) {
-			ast_lpc->snoop_data[0].fifo[ast_lpc->snoop_data[0].write_idx] = GET_LPC_SNPD0(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
-//			printk("Ch0 data %x \n", GET_LPC_SNPD0(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR)));
-			printk("Ch0 data in fifo widx %d : %x \n", ast_lpc->snoop_data[0].write_idx, ast_lpc->snoop_data[0].fifo[ast_lpc->snoop_data[0].write_idx]);
-			ast_lpc->snoop_data[0].write_idx++;
-			ast_lpc->snoop_data[0].write_idx %= SNOOP_FIFO_SIZE;
-			if(ast_lpc->snoop_data[0].write_idx == ast_lpc->snoop_data[0].read_idx) {
-				ast_lpc->snoop_data[0].read_idx++;
-				ast_lpc->snoop_data[0].read_idx %= SNOOP_FIFO_SIZE;
-			}
-			ast_lpc_write(ast_lpc, LPC_HICR6_STR_SNP0W,  AST_LPC_HICR6);
-		}
-
-		
-	}
-
-next:
-
-	if(ast_lpc->bus_info->ipmi_kcs_enable) {
-		//kcs 1: 
-		if(ast_lpc_read(ast_lpc, AST_LPC_HICR2) & LPC_IBFIF1) {
-			ast_ipmi_kcs_handle(ast_lpc, &ast_lpc->kcs_data[0]);
-		}
-		//kcs 2
-		if(ast_lpc_read(ast_lpc, AST_LPC_HICR2) & LPC_IBFIF2) {
-			ast_ipmi_kcs_handle(ast_lpc, &ast_lpc->kcs_data[1]);
-		}
-		//kcs 3
-		if(ast_lpc_read(ast_lpc, AST_LPC_HICR2) & LPC_IBFIF3) {
-			ast_ipmi_kcs_handle(ast_lpc, &ast_lpc->kcs_data[2]);
-		}
-		//kcs 4
-		if(ast_lpc_read(ast_lpc, AST_LPC_HICRB) & LPC_KCS4_RCV_INTR) {
-			ast_ipmi_kcs_handle(ast_lpc, &ast_lpc->kcs_data[3]);
-		}
-	}
-
-	if(ast_lpc->bus_info->ipmi_bt_enable) {
-		//bt 0
-		if(ast_lpc_read(ast_lpc, AST_LPC_HICR4) & LPC_HICS_BTENBL) {
-			ast_ipmi_bt_handle(ast_lpc, &ast_lpc->bt_data[0]);
-		}
-		//ibt 1
-		if(ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) & LPC_iBT_ENABLE) {
-			if(ast_lpc_read(ast_lpc, AST_LPC_IBTCR2) & LPC_iBT_H2B_RISING_ISR) {
-				ast_lpc_write(ast_lpc, LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR2);
-				ast_ipmi_bt_handle(ast_lpc, &ast_lpc->bt_data[1]);
-			}	
-			
-		}		
-	}
-
-	return IRQ_HANDLED;
-}		
-
-/**************************   LPC  KCS Function  **********************************************************/
-////////////
-static u16 
-ast_get_ipmi_kcs_addr(struct ast_lpc_driver_data *ast_lpc, u8 kcs_ch)
+u16 ast_get_ipmi_kcs_addr(struct ast_lpc_data *ast_lpc, u8 kcs_ch)
 {
 	u16 tmp = 0;
 	switch(kcs_ch) {
@@ -776,29 +194,30 @@ ast_get_ipmi_kcs_addr(struct ast_lpc_driver_data *ast_lpc, u8 kcs_ch)
 			tmp = (ast_lpc_read(ast_lpc, AST_LPC_LADR12H) << 8) | ast_lpc_read(ast_lpc, AST_LPC_LADR12L);
 			break;
 		case 2:
-			tmp = (ast_lpc_read(ast_lpc, AST_LPC_LADR3H) << 8) | ast_lpc_read(ast_lpc, AST_LPC_LADR3L);
+			tmp = (ast_lpc_read(ast_lpc, AST_LPC_LADR3H) << 8) | ast_lpc_read(ast_lpc, AST_LPC_LADR3L);			
 			break;
 		case 3:
-			break;
-		case 4:
+			tmp = ast_lpc_read(ast_lpc, AST_LPC_LADR4) & 0xffff;
 			break;
 		default:
 			break;
 	}
 	return tmp;
 }
+EXPORT_SYMBOL(ast_get_ipmi_kcs_addr);
 
-static void 
-ast_set_ipmi_kcs_addr(struct ast_lpc_driver_data *ast_lpc, u8 kcs_ch, u16 kcs_addr)
+void ast_set_ipmi_kcs_addr(struct ast_lpc_data *ast_lpc, u8 kcs_ch, u16 kcs_addr)
 {
 	LPC_DBUG("set ch %d, addr %x \n", kcs_ch, kcs_addr);
 	switch(kcs_ch) {
 		case 0:	//0xca0, 0xca4
+			/* channel address select for channel 0  */
 			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) & ~LPC_HICS_LADR12AS, AST_LPC_HICR4);
 			ast_lpc_write(ast_lpc, kcs_addr >> 8, AST_LPC_LADR12H);
 			ast_lpc_write(ast_lpc, kcs_addr & 0xff, AST_LPC_LADR12L);
 			break;
 		case 1:	//0xca2, 0xca6
+			/* channel address select for channel 1  */		
 			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) | LPC_HICS_LADR12AS, AST_LPC_HICR4);
 			ast_lpc_write(ast_lpc, kcs_addr >> 8, AST_LPC_LADR12H);
 			ast_lpc_write(ast_lpc, kcs_addr & 0xff, AST_LPC_LADR12L);
@@ -817,9 +236,9 @@ ast_set_ipmi_kcs_addr(struct ast_lpc_driver_data *ast_lpc, u8 kcs_ch, u16 kcs_ad
 			break;
 	}
 }
+EXPORT_SYMBOL(ast_set_ipmi_kcs_addr);
 
-static u8 
-ast_get_ipmi_kcs_en(struct ast_lpc_driver_data *ast_lpc, u8 kcs_ch)
+u8 ast_get_ipmi_kcs_en(struct ast_lpc_data *ast_lpc, u8 kcs_ch)
 {
 	u8 tmp = 0;
 	switch(kcs_ch) {
@@ -855,24 +274,21 @@ ast_get_ipmi_kcs_en(struct ast_lpc_driver_data *ast_lpc, u8 kcs_ch)
 	return tmp;
 
 }
+EXPORT_SYMBOL(ast_get_ipmi_kcs_en);
 
-static void 
-ast_set_ipmi_kcs_en(struct ast_lpc_driver_data *ast_lpc, u8 kcs_ch, u8 enable)
+void ast_set_ipmi_kcs_en(struct ast_lpc_data *ast_lpc, u8 kcs_ch, u8 enable)
 {
 	if(enable) {
 		switch(kcs_ch) {
 			case 0: //kcs1
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC1_EN, AST_LPC_HICR0);					
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) | LPC_IBFIF1, AST_LPC_HICR2);	
 				break;
 			case 1:	//kcs2
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC2_EN, AST_LPC_HICR0);					
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) | LPC_IBFIF2, AST_LPC_HICR2);	
 				break;
 			case 2: //kcs3	--> fix 0xca2 / 0xca3
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC3_EN, AST_LPC_HICR0);
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) | LPC_HICS_KCSENBL, AST_LPC_HICR4);
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR3) | LPC_IBFIF1, AST_LPC_HICR2);	
 				break;
 			case 3: //kcs4	
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICRB) | LPC_KCS4_EN, AST_LPC_HICRB);
@@ -901,114 +317,264 @@ ast_set_ipmi_kcs_en(struct ast_lpc_driver_data *ast_lpc, u8 kcs_ch, u8 enable)
 
 	}	
 }
+EXPORT_SYMBOL(ast_set_ipmi_kcs_en);
 
-/**************************   LPC  KCS SYSFS  **********************************************************/
-static ssize_t 
-ast_store_ipmi_kcs(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
+/**************************   IPMI BT Function  **********************************************************/
+//Set default BT address BT0 : 
+struct ast_bt_data *register_ipmi_bt_drv(u8 bt_no)
 {
-	u32 input_val;
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
-
-//	input_val = simple_strtoul(sysfsbuf, NULL, 10);
-	input_val = StrToHex(sysfsbuf);		
-	//sensor_attr->index : ch#
-	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
-	{
-		case 0: //enable, disable
-			ast_set_ipmi_kcs_en(ast_lpc, sensor_attr->index, input_val);
-			break;
-		case 1: //addr 
-			ast_set_ipmi_kcs_addr(ast_lpc, sensor_attr->index, input_val);
-			break;
-		default:
-			return -EINVAL;
-			break;
-	}
-
-	return count;
-}
-
-static ssize_t 
-ast_show_ipmi_kcs(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
-{
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
-
-	//sensor_attr->index : ch#
-	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
-	{
-		case 0: //channel enable, disable
-			return sprintf(sysfsbuf, "%d : %s\n", ast_get_ipmi_kcs_en(ast_lpc, sensor_attr->index),ast_get_ipmi_kcs_en(ast_lpc,sensor_attr->index) ? "Enable":"Disable");
-			break;
-		case 1: //addr
-			return sprintf(sysfsbuf, "%x \n", ast_get_ipmi_kcs_addr(ast_lpc, sensor_attr->index));
-			break;			
-		default:
-			return -EINVAL;
-			break;
-	}
-	return -EINVAL;
-}
-
-#define sysfs_ipmi_kcs_ch(index) \
-static SENSOR_DEVICE_ATTR_2(ipmi_kcs##index##_en, S_IRUGO | S_IWUSR, \
-	ast_show_ipmi_kcs, ast_store_ipmi_kcs, 0, index); \
-static SENSOR_DEVICE_ATTR_2(ipmi_kcs##index##_addr, S_IRUGO | S_IWUSR, \
-	ast_show_ipmi_kcs, ast_store_ipmi_kcs, 1, index); \
-\
-static struct attribute *ipmi_kcs##index##_attributes[] = { \
-	&sensor_dev_attr_ipmi_kcs##index##_en.dev_attr.attr, \
-	&sensor_dev_attr_ipmi_kcs##index##_addr.dev_attr.attr, \
-	NULL \
-};
-
-sysfs_ipmi_kcs_ch(0);
-sysfs_ipmi_kcs_ch(1);
-sysfs_ipmi_kcs_ch(2);
-sysfs_ipmi_kcs_ch(3);
-
-static const struct attribute_group ipmi_kcs_attribute_groups[] = {
-	{ .attrs = ipmi_kcs0_attributes },
-	{ .attrs = ipmi_kcs1_attributes },	
-	{ .attrs = ipmi_kcs2_attributes },	
-	{ .attrs = ipmi_kcs3_attributes },	
-};
-
-/**************************   LPC  Snoop Function  **********************************************************/
-static u16 
-ast_get_lpc2gpio(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch)
-{
-	u16 tmp;
-	switch(snoop_ch) {
+	switch(bt_no) {
 		case 0:
-			tmp = LPC_HICR5_GET_SEL80HGIO(ast_lpc_read(ast_lpc, AST_LPC_HICR5));
+			ast_lpc->ast_bt[0].bt_reg = 1;
+			ast_lpc->ast_bt[0].ast_lpc = ast_lpc;
+			ast_lpc->ast_bt[0].regspacings = AST_IPMI_KCS0_REGSPACINGS;	//fix
+			ast_lpc->ast_bt[0].bt_irq_hander = NULL;			
+			
+			ast_lpc->ast_bt[0].str = ast_lpc->reg_base + AST_LPC_BTDTR;
+			ast_lpc->ast_bt[0].fifo = ast_lpc->reg_base + AST_LPC_BTR1;
+			ast_lpc->ast_bt[0].seq = 0;
+			ast_lpc->ast_bt[0].state = BT_STATE_IDLE;	/* start here */
+			ast_lpc->ast_bt[0].complete = BT_STATE_IDLE;	/* end here */
+			ast_lpc->ast_bt[0].BT_CAP_req2rsp = BT_NORMAL_TIMEOUT * 1000000;
+			ast_lpc->ast_bt[0].BT_CAP_retries = BT_NORMAL_RETRY_LIMIT;
+			break;
+		case 1:
+			ast_lpc->ast_bt[1].bt_reg = 1;
+			ast_lpc->ast_bt[1].ast_lpc = ast_lpc;
+			ast_lpc->ast_bt[1].regspacings = AST_IPMI_KCS0_REGSPACINGS;	//fix
+			ast_lpc->ast_bt[1].bt_irq_hander = NULL;			
+
+			ast_lpc->ast_bt[1].isr = ast_lpc->reg_base + AST_LPC_IBTCR2;			
+			ast_lpc->ast_bt[1].str = ast_lpc->reg_base + AST_LPC_IBTCR4;
+			ast_lpc->ast_bt[1].fifo = ast_lpc->reg_base + AST_LPC_IBTCR5;
+			ast_lpc->ast_bt[1].fifo_sts = ast_lpc->reg_base + AST_LPC_IBTCR3;
+			ast_lpc->ast_bt[1].seq = 0;
+			ast_lpc->ast_bt[1].state = BT_STATE_IDLE;	/* start here */
+			ast_lpc->ast_bt[1].complete = BT_STATE_IDLE;	/* end here */
+			ast_lpc->ast_bt[1].BT_CAP_req2rsp = BT_NORMAL_TIMEOUT * 1000000;
+			ast_lpc->ast_bt[1].BT_CAP_retries = BT_NORMAL_RETRY_LIMIT;
+			ast_set_ipmi_bt_addr(ast_lpc, 1, 0xca0);
+//			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) | LPC_iBT_ENABLE | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN, AST_LPC_IBTCR0); //Enable BT Interface
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN, AST_LPC_IBTCR0); //Enable BT Interface
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) | LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1); //Enable BT H2B interrupt Interrupt 
+#if 1			
+			if(ast_lpc_read(ast_lpc, AST_LPC_IBTCR4) & BT_B_BUSY) {
+				ast_lpc_write(ast_lpc, BT_B_BUSY, AST_LPC_IBTCR4); 
+				printk("change to IDLE \n");
+			}
+#endif		
+			break;
+	}
+
+	return &(ast_lpc->ast_bt[bt_no]);
+}
+EXPORT_SYMBOL(register_ipmi_bt_drv);
+
+void request_ipmi_bt_irq(u8 bt_no, ast_ipmi_irq handler)
+{
+	ast_lpc->ast_bt[bt_no].bt_irq_hander = handler;
+
+	switch(bt_no) {
+		case 0:
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) | LPC_IBFIF1, AST_LPC_HICR2);
+			break;
+		case 1:
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) | LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1);	//Enable BT H2B interrupt Interrupt
+			break;
+	
+	}
+}
+EXPORT_SYMBOL(request_ipmi_bt_irq);
+
+u16 ast_get_ipmi_bt_irq(struct ast_lpc_data *ast_lpc, u8 bt_ch)
+{
+	u16 tmp = 0;
+	switch(bt_ch) {
+		case 0:	
+			//TODO
+			tmp = 0;
+			break;
+		case 1:	//ibt
+			tmp = LPC_iBT_GET_IRQ(ast_lpc_read(ast_lpc, AST_LPC_IBTCR0));
 			break;
 		default:
-			printk("Error Ch no !!\n");
 			break;
 	}
 	return tmp;
 }
+EXPORT_SYMBOL(ast_get_ipmi_bt_irq);
 
-static void 
-ast_set_lpc2gpio(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch, u16 sel80hgio)
+void ast_set_ipmi_bt_irq(struct ast_lpc_data *ast_lpc, u8 bt_ch, u16 bt_addr)
+{
+	LPC_DBUG("set ch %d, addr %x \n", bt_ch, bt_addr);
+	switch(bt_ch) {
+		case 0:	
+			//TODO ~~
+			break;
+		case 1:	
+			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) & ~LPC_iBT_IRQ_MASK) | LPC_iBT_SET_IRQ(bt_addr), AST_LPC_IBTCR0);
+			break;
+		default:
+			break;
+	}
+}
+EXPORT_SYMBOL(ast_set_ipmi_bt_irq);
+
+u16 ast_get_ipmi_bt_addr(struct ast_lpc_data *ast_lpc, u8 bt_ch)
+{
+	u16 tmp = 0;
+	switch(bt_ch) {
+		case 0:	//0xca2, 0xca3 is kcs , ca4,ca5,ca6 is bt
+			tmp = ((ast_lpc_read(ast_lpc, AST_LPC_LADR3H) << 8) | ast_lpc_read(ast_lpc, AST_LPC_LADR3L)) + 2;
+			break;
+		case 1:	//ibt
+			tmp = LPC_iBT_GET_ADDR(ast_lpc_read(ast_lpc, AST_LPC_IBTCR0));
+			break;
+		default:
+			break;
+	}
+	return tmp;
+}
+EXPORT_SYMBOL(ast_get_ipmi_bt_addr);
+
+void ast_set_ipmi_bt_addr(struct ast_lpc_data *ast_lpc, u8 bt_ch, u16 bt_addr)
+{
+	LPC_DBUG("set ch %d, addr %x \n", bt_ch, bt_addr);
+	u32 iBT_Ctrl = 0;
+	switch(bt_ch) {
+		case 0:	//0xca2, 0xca3 is kcs , ca4,ca5,ca6 is bt
+			ast_lpc_write(ast_lpc, (bt_addr - 2) >> 8,AST_LPC_LADR3H);
+			ast_lpc_write(ast_lpc, (bt_addr - 2) & 0xff, AST_LPC_LADR3L);
+			break;
+		case 1:	//ibt [31:16] ex  == 0x00e4 --> BTCR : 0xE4 , BTDTR : 0xE4 + 1, BTIMSR : 0xE4 + 2
+			iBT_Ctrl = ast_lpc_read(ast_lpc, AST_LPC_IBTCR0);
+			iBT_Ctrl &= ~(LPC_iBT_ADDR_MASK | LPC_iBT_IRQ_TYPE_MASK);
+			//set Host SerIRQ interrupt type for iBT is 11: rising edge trig					
+			iBT_Ctrl |= (0x3 << 10) | LPC_iBT_SET_ADDR(bt_addr);
+			ast_lpc_write(ast_lpc, iBT_Ctrl, AST_LPC_IBTCR0);
+			break;
+		default:
+			break;
+	}
+}
+EXPORT_SYMBOL(ast_set_ipmi_bt_addr);
+
+u8 ast_get_ipmi_bt_en(struct ast_lpc_data *ast_lpc, u8 bt_ch)
+{
+	u8 tmp = 0;
+	switch(bt_ch) {
+		case 0:
+			if((ast_lpc_read(ast_lpc, AST_LPC_HICR0) & LPC_LPC3_EN) && (ast_lpc_read(ast_lpc, AST_LPC_HICR4) & LPC_HICS_BTENBL))
+				tmp = 1;
+			else
+				tmp = 0;
+			break;
+		case 1:	//ibt
+			if(ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) & LPC_iBT_ENABLE)
+				tmp = 1;
+			else
+				tmp = 0;
+			break;
+			
+		default:
+			printk("Error Ch no !!\n");
+			break;
+	}
+		
+	return tmp;
+
+}
+EXPORT_SYMBOL(ast_get_ipmi_bt_en);
+
+void ast_set_ipmi_bt_en(struct ast_lpc_data *ast_lpc, u8 bt_ch, u8 enable)
+{
+	if(enable) {
+		switch(bt_ch) {
+			case 0: //bt		--> fix 0xca4 / 0xca5 / 0xca6
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC3_EN, AST_LPC_HICR0);
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) | LPC_HICS_BTENBL, AST_LPC_HICR4);
+				//TODO .....
+				break;
+			case 1:	//ibt 
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) | LPC_iBT_ENABLE | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN, AST_LPC_IBTCR0);	//Enable BT Interface
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) | LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1);	//Enable BT H2B interrupt Interrupt				
+				break;
+		}
+	} else {
+		switch(bt_ch) {
+			case 0:	//bt 
+				//TODO
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) & ~LPC_HICS_BTENBL, AST_LPC_HICR4);
+				break;
+			case 1:	//ibt
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) & ~LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1);	//Enable BT H2B interrupt Interrupt
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) & ~(LPC_iBT_ENABLE | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN), AST_LPC_IBTCR0);	//Enable BT Interface
+				break;
+		}	
+
+	}	
+}
+
+EXPORT_SYMBOL(ast_set_ipmi_bt_en);
+/**************************   SNOOP Function  **********************************************************/
+struct ast_snoop_data *register_snoop_drv(u8 snoop_no)
+{
+	switch(snoop_no) {
+		case 0:
+			ast_lpc->ast_snoop[0].snoop_reg = 1;
+			ast_lpc->ast_snoop[0].ast_lpc = ast_lpc;
+			ast_lpc->ast_snoop[0].snoop_irq_hander = NULL;			
+			break;
+		case 1:
+			ast_lpc->ast_snoop[0].snoop_reg = 1;
+			ast_lpc->ast_snoop[0].ast_lpc = ast_lpc;
+			ast_lpc->ast_snoop[0].snoop_irq_hander = NULL;			
+			break;
+	}
+	return &(ast_lpc->ast_snoop[snoop_no]);
+}
+EXPORT_SYMBOL(register_snoop_drv);
+
+void request_snoop_irq(u8 snoop_no, ast_ipmi_irq handler)
+{
+	ast_lpc->ast_snoop[snoop_no].snoop_irq_hander = handler;
+
+	switch(snoop_no) {
+		case 0:
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP0INT_EN, AST_LPC_HICR5); 				
+			break;
+		case 1:
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP1INT_EN, AST_LPC_HICR5); 				
+			break;
+	
+	}
+}
+EXPORT_SYMBOL(request_snoop_irq);
+
+u16 ast_get_lpc2gpio(struct ast_lpc_data *ast_lpc, u8 snoop_ch)
+{
+	u16 tmp = 0;
+	switch(snoop_ch) {
+		case 0:
+			tmp = LPC_HICR5_GET_SEL80HGIO(ast_lpc_read(ast_lpc, AST_LPC_HICR5));
+			break;
+	}
+	return tmp;
+}
+EXPORT_SYMBOL(ast_get_lpc2gpio);
+
+void ast_set_lpc2gpio(struct ast_lpc_data *ast_lpc, u8 snoop_ch, u16 sel80hgio)
 {
 	switch(snoop_ch) {
 		case 0:
 			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_HICR5) & (~(0x1f << 24))) | (sel80hgio << 24), 
 					AST_LPC_HICR5);
 			break;
-		default:
-			printk("Error Ch no !!\n");
-			break;
 	}
 }
+EXPORT_SYMBOL(ast_set_lpc2gpio);
 
-static u16 
-ast_get_lpc2gpio_en(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch)
+u16 ast_get_lpc2gpio_en(struct ast_lpc_data *ast_lpc, u8 snoop_ch)
 {
 	u16 tmp = 0;
 	switch(snoop_ch) {
@@ -1018,15 +584,12 @@ ast_get_lpc2gpio_en(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch)
 			else
 				tmp = 0;
 			break;
-		default:
-			printk("Error Ch no !!\n");
-			break;
 	}
 	return tmp;
 }
+EXPORT_SYMBOL(ast_get_lpc2gpio_en);
 
-static void 
-ast_set_lpc2gpio_en(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch, u8 enable)
+void ast_set_lpc2gpio_en(struct ast_lpc_data *ast_lpc, u8 snoop_ch, u8 enable)
 {
 	switch(snoop_ch) {
 		case 0:
@@ -1042,33 +605,33 @@ ast_set_lpc2gpio_en(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch, u8 enable)
 			break;
 	}
 }
+EXPORT_SYMBOL(ast_set_lpc2gpio_en);
 
-static u8 
-ast_get_snoop_data(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch)
+u8 ast_get_snoop_data(struct ast_lpc_data *ast_lpc, u8 snoop_ch)
 {
 	u8 tmp;
 	
-	LPC_DBUG("Get CH%d data %d:[%x]",snoop_ch,ast_lpc->snoop_data[snoop_ch].read_idx,ast_lpc->snoop_data[snoop_ch].fifo[ast_lpc->snoop_data[snoop_ch].read_idx]);
-//	if(!((ast_lpc->snoop_data[snoop_ch].read_idx + 1) >= ast_lpc->snoop_data[snoop_ch].write_idx)) {
-	if(ast_lpc->snoop_data[snoop_ch].write_idx > (ast_lpc->snoop_data[snoop_ch].read_idx)) {
-		tmp = ast_lpc->snoop_data[snoop_ch].fifo[ast_lpc->snoop_data[snoop_ch].read_idx];		
-		ast_lpc->snoop_data[snoop_ch].read_idx ++;
-		ast_lpc->snoop_data[snoop_ch].read_idx %= SNOOP_FIFO_SIZE;
+	LPC_DBUG("Get CH%d data %d:[%x]",snoop_ch,ast_lpc->ast_snoop[snoop_ch].read_idx,ast_lpc->ast_snoop[snoop_ch].fifo[ast_lpc->ast_snoop[snoop_ch].read_idx]);
+//	if(!((ast_lpc->ast_snoop[snoop_ch].read_idx + 1) >= ast_lpc->ast_snoop[snoop_ch].write_idx)) {
+	if(ast_lpc->ast_snoop[snoop_ch].write_idx > (ast_lpc->ast_snoop[snoop_ch].read_idx)) {
+		tmp = ast_lpc->ast_snoop[snoop_ch].fifo[ast_lpc->ast_snoop[snoop_ch].read_idx];		
+		ast_lpc->ast_snoop[snoop_ch].read_idx ++;
+		ast_lpc->ast_snoop[snoop_ch].read_idx %= SNOOP_FIFO_SIZE;
 	} else {
-		if(ast_lpc->snoop_data[snoop_ch].read_idx == 0)
-			tmp = ast_lpc->snoop_data[snoop_ch].fifo[SNOOP_FIFO_SIZE - 1];	
+		if(ast_lpc->ast_snoop[snoop_ch].read_idx == 0)
+			tmp = ast_lpc->ast_snoop[snoop_ch].fifo[SNOOP_FIFO_SIZE - 1];	
 		else
-			tmp = ast_lpc->snoop_data[snoop_ch].fifo[ast_lpc->snoop_data[snoop_ch].read_idx -1];	
+			tmp = ast_lpc->ast_snoop[snoop_ch].fifo[ast_lpc->ast_snoop[snoop_ch].read_idx -1];	
 	}
 	//tmp = GET_LPC_SNPD0(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
 	//tmp = GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
 	return tmp;
 }
+EXPORT_SYMBOL(ast_get_snoop_data);
 
-static u16 
-ast_get_snoop_port(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch)
+u16 ast_get_snoop_port(struct ast_lpc_data *ast_lpc, u8 snoop_ch)
 {
-	u16 tmp;
+	u16 tmp = 0;
 	switch(snoop_ch) {
 		case 0:
 			tmp = LPC_GET_SNOOP_ADDR0(ast_lpc_read(ast_lpc, AST_LPC_SNPWADR));
@@ -1076,17 +639,15 @@ ast_get_snoop_port(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch)
 		case 1:
 			tmp = LPC_GET_SNOOP_ADDR1(ast_lpc_read(ast_lpc, AST_LPC_SNPWADR));
 			break;
-		case 2:
-			tmp = LPC_GET_CAPTURE_ADDR(ast_lpc_read(ast_lpc, AST_LPC_PCCR1));
 		default:
 			printk("Error Ch no !!\n");
 			break;
 	}
 	return tmp;
 }
+EXPORT_SYMBOL(ast_get_snoop_port);
 
-static void 
-ast_set_snoop_port(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch, u16 snoop_port)
+void ast_set_snoop_port(struct ast_lpc_data *ast_lpc, u8 snoop_ch, u16 snoop_port)
 {
 	switch(snoop_ch) {
 		case 0:
@@ -1098,19 +659,14 @@ ast_set_snoop_port(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch, u16 snoop_p
 			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_SNPWADR) & ~LPC_SNOOP_ADDR1_MASK) | (snoop_port << 16), 
 					AST_LPC_SNPWADR);
 			break;
-		case 2:
-			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_PCCR1) & ~LPC_POST_ADDR_MASK) |
-								LPC_CAPTURE_BASE_ADDR(snoop_port),
-								AST_LPC_PCCR1);
-			break;
 		default:
 			printk("Error Ch no !!\n");
 			break;
 	}
 }
+EXPORT_SYMBOL(ast_set_snoop_port);
 
-static void 
-ast_set_snoop_en(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch, u8 enable)
+void ast_set_snoop_en(struct ast_lpc_data *ast_lpc, u8 snoop_ch, u8 enable)
 {
 	switch(snoop_ch) {
 		case 0:
@@ -1119,7 +675,6 @@ ast_set_snoop_en(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch, u8 enable)
 			else
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) & ~LPC_HICR5_SNP0W_EN, AST_LPC_HICR5);
 			break;
-
 		case 1:
 			if(enable)
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP1W_EN, AST_LPC_HICR5);								
@@ -1128,20 +683,18 @@ ast_set_snoop_en(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch, u8 enable)
 			break;
 		case 2:
 			if(enable)
-				ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_PCCR0) & ~LPC_POST_CODE_MODE_MASK) |
-							LPC_POST_CODE_MODE(BYTE_MODE) | LPC_POST_DMA_MODE_EN |LPC_POST_DMA_INT_EN |LPC_POST_CODE_EN,
-							AST_LPC_PCCR0);	
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) | LPC_POST_CODE_EN, AST_LPC_PCCR0);	
 			else 
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) & ~(LPC_POST_DMA_MODE_EN | LPC_POST_DMA_INT_EN | LPC_POST_CODE_EN), AST_LPC_PCCR0);
-
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) & ~LPC_POST_CODE_EN, AST_LPC_PCCR0);
 		default:
 			printk("Error Ch no !!\n");
 			break;
 	}
 
 }
-static u8 
-ast_get_snoop_en(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch)
+EXPORT_SYMBOL(ast_set_snoop_en);
+
+u8 ast_get_snoop_en(struct ast_lpc_data *ast_lpc, u8 snoop_ch)
 {
 	u8 tmp = 0;
 	switch(snoop_ch) {
@@ -1170,239 +723,137 @@ ast_get_snoop_en(struct ast_lpc_driver_data *ast_lpc, u8 snoop_ch)
 	return tmp;
 
 }
-/**************************   LPC  Snoop Function  End **********************************************************/
-
-/**************************   LPC  Snoop Sys fs   **********************************************************/
-static ssize_t 
-ast_store_snoop(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
+EXPORT_SYMBOL(ast_get_snoop_en);
+/**************************   SNOOP DMA Function  **********************************************************/
+extern struct ast_snoop_dma_data *register_snoop_dma_drv(void)
 {
-	u32 input_val;
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
+	ast_lpc->ast_snoop_dma->snoop_dma_reg = 1;
+	ast_lpc->ast_snoop_dma->ast_lpc = ast_lpc;
+	ast_lpc->ast_snoop_dma->snoop_irq_hander = NULL;			
 
-	//input_val = simple_strtoul(sysfsbuf, NULL, 10);
-	input_val = StrToHex(sysfsbuf);
-	//sensor_attr->index : pwm_ch#
-	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
-	{
-		case 0: //enable, disable
-			ast_set_snoop_en(ast_lpc, sensor_attr->index, input_val);
-			break;
-		case 1: //port
-			ast_set_snoop_port(ast_lpc, sensor_attr->index, input_val);
-			break;
-		case 2: 
-			break;			
-		case 3: 
-			ast_set_lpc2gpio_en(ast_lpc, sensor_attr->index, input_val);
-			break;
-		case 4: 
-			ast_set_lpc2gpio(ast_lpc, sensor_attr->index, input_val);
-			break;
-
-		default:
-			return -EINVAL;
-			break;
-	}
-
-	return count;
+	return ast_lpc->ast_snoop_dma;
 }
+EXPORT_SYMBOL(register_snoop_dma_drv);
 
-static ssize_t 
-ast_show_snoop(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
+void request_snoop_dma_irq(ast_ipmi_irq handler)
 {
+	ast_lpc->ast_snoop_dma->snoop_irq_hander = handler;
+	ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) | LPC_POST_DMA_INT_EN, AST_LPC_PCCR0);
 
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
-
-	//sensor_attr->index : pwm_ch#
-	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
-	{
-		case 0: //channel enable, disable
-			return sprintf(sysfsbuf, "%d : %s\n", ast_get_snoop_en(ast_lpc, sensor_attr->index),ast_get_snoop_en(ast_lpc,sensor_attr->index) ? "Enable":"Disable");
-			break;
-		case 1: //port
-			return sprintf(sysfsbuf, "%x\n",ast_get_snoop_port(ast_lpc, sensor_attr->index));
-			break;			
-		case 2: //data
-			return sprintf(sysfsbuf, "%x\n",ast_get_snoop_data(ast_lpc, sensor_attr->index));
-			break;			
-		case 3: //LPC port to GPIO Enable
-			return sprintf(sysfsbuf, "%d : %s\n", ast_get_lpc2gpio_en(ast_lpc, sensor_attr->index),ast_get_lpc2gpio_en(ast_lpc,sensor_attr->index) ? "Enable":"Disable");
-			break;			
-		case 4: //LPC port to GPIO Port source 
-			return sprintf(sysfsbuf, "%x\n",ast_get_lpc2gpio(ast_lpc, sensor_attr->index));
-			break;			
-		default:
-			return -EINVAL;
-			break;
-	}
 }
+EXPORT_SYMBOL(request_snoop_dma_irq);
 
-/* attr SNOOP sysfs 0~max snoop channel 
-*	 0 - show 80h data
-*/
-
-#define sysfs_snoop_ch(index) \
-static SENSOR_DEVICE_ATTR_2(snoop##index##_en, S_IRUGO | S_IWUSR, \
-	ast_show_snoop, ast_store_snoop, 0, index); \
-static SENSOR_DEVICE_ATTR_2(snoop##index##_port, S_IRUGO | S_IWUSR, \
-	ast_show_snoop, ast_store_snoop, 1, index); \
-static SENSOR_DEVICE_ATTR_2(snoop##index##_data, S_IRUGO | S_IWUSR, \
-	ast_show_snoop, NULL, 2, index); \
-static SENSOR_DEVICE_ATTR_2(snoop##index##_p2gpio_en, S_IRUGO | S_IWUSR, \
-	ast_show_snoop, ast_store_snoop, 3, index); \
-static SENSOR_DEVICE_ATTR_2(snoop##index##_p2gpio, S_IRUGO | S_IWUSR, \
-	ast_show_snoop, ast_store_snoop, 4, index); \	
-\
-static struct attribute *snoop##index##_attributes[] = { \
-	&sensor_dev_attr_snoop##index##_en.dev_attr.attr, \
-	&sensor_dev_attr_snoop##index##_port.dev_attr.attr, \
-	&sensor_dev_attr_snoop##index##_data.dev_attr.attr, \
-	&sensor_dev_attr_snoop##index##_p2gpio_en.dev_attr.attr, \
-	&sensor_dev_attr_snoop##index##_p2gpio.dev_attr.attr, \	
-	NULL \
-};
-
-/*
- * Create the needed functions for each pwm using the macro defined above
- * (4 snoop are supported)
- */
-sysfs_snoop_ch(0);
-sysfs_snoop_ch(1);
-
-
-static const struct attribute_group snoop_attribute_groups[] = {
-	{ .attrs = snoop0_attributes },
-	{ .attrs = snoop1_attributes },	
-};
-
-/************************************************** SYS FS **************************************************************/
-static ssize_t show_snoop_dma_data(struct device *dev,
-	struct device_attribute *attr, char *buf)
+/****************************************************************************************************/
+static irqreturn_t ast_lpc_isr (int this_irq, void *dev_id)
 {
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
+	struct ast_lpc_data *ast_lpc = dev_id;
+	LPC_DBUG("\n");
 
-	return sprintf(buf, "%x\n", ast_lpc_read(ast_lpc, AST_LPC_HICR7) );
-}
-
-static DEVICE_ATTR(snoop_dma_data, S_IRUGO | S_IWUSR, show_snoop_dma_data, NULL); 
-
-static ssize_t show_snoop_dma_port_mask(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-
-	return sprintf(buf, "%x\n", (ast_lpc_read(ast_lpc, AST_LPC_PCCR1) & 0xff0000) >> 16);
-}
-
-static ssize_t store_snoop_dma_port_mask(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
-{
-	u32 val;	
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-
-	val = StrToHex(buf);		
-
-	ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_PCCR1) & 0xff00ffff) | val, AST_LPC_PCCR1);
-	return count;
-}
-
-static DEVICE_ATTR(snoop_dma_port_mask, S_IRUGO | S_IWUSR, show_snoop_dma_port_mask, store_snoop_dma_port_mask); 
-
-static ssize_t show_snoop_dma_port(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-
-	return sprintf(buf, "%x\n", ast_lpc_read(ast_lpc, AST_LPC_PCCR1) & 0xffff);
-}
-
-static ssize_t store_snoop_dma_port(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
-{
-	u32 val;	
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-
-	val = StrToHex(buf);		
-
-	ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_PCCR1) & 0xffff0000) | val, AST_LPC_PCCR1);
-	return count;
-}
-
-static DEVICE_ATTR(snoop_dma_port, S_IRUGO | S_IWUSR, show_snoop_dma_port, store_snoop_dma_port); 
-
-static ssize_t show_snoop_dma_en(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-
-	if(ast_lpc_read(ast_lpc, AST_LPC_PCCR0) & LPC_POST_CODE_EN)
-		return sprintf(buf, "1: Enable\n");
-	else
-		return sprintf(buf, "0: Disable\n");	
-}
-
-static ssize_t store_snoop_dma_en(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
-{
-	u32 val;	
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
-
-	val = simple_strtoul(buf, NULL, 10);
-	//use byte mode snoop 
-	if(val)
-		ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_PCCR0) & ~LPC_POST_CODE_MODE_MASK) |
-					LPC_POST_CODE_MODE(BYTE_MODE) | LPC_POST_DMA_MODE_EN |LPC_POST_DMA_INT_EN |LPC_POST_CODE_EN,
-					AST_LPC_PCCR0); 
-	else 
-		ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) & ~LPC_POST_CODE_EN, AST_LPC_PCCR0);
-
-	return count;
-}
-
-static DEVICE_ATTR(snoop_dma_en, S_IRUGO | S_IWUSR, show_snoop_dma_en, store_snoop_dma_en); 
-
-static struct attribute *snoop_dma_attributes[] = {
-	&dev_attr_snoop_dma_en.attr,
-	&dev_attr_snoop_dma_port.attr,
-	&dev_attr_snoop_dma_port_mask.attr,	
-	&dev_attr_snoop_dma_data.attr,
-	NULL
-};
-
-static const struct attribute_group snoop_dma_attribute_group = {
-	.attrs = snoop_dma_attributes
-};
-
-
-//Suppose you are going to snoop 0x80 ~ 0x87
-//snoop_init(0x80, 0x7, WORD_MODE, buf_dma, (SNOOP_DMA_BOUNDARY / 4)); //register in unit of DWORD
 #if 0
-extern void
-ast_lpc_snoop_dma_enable(u16 port_number, u8 port_mask, u8 mode, dma_addr_t dma_base, u16 size)
-{
-	write_register(0x1e789134, (port_mask << 16) + port_number);
-	write_register(0x1e7890d0, dma_base);
-	write_register(0x1e7890d4, (size - 1));
-	write_register(0x1e789130, (mode << 4) | ENABLE_DMA_INTERRUPT | ENABLE_POST_CODE_FUNCTION | ENABLE_SNOOP_DMA_MODE);
+	if(ast_lpc_read(ast_lpc, AST_LPC_HICR2) & LPC_LRST) {
+		printk("LPC_LRST TODO ~~\n");
+	}
 
-	//Enable error interrupt to check LPC reset
-	write_register_or(0x1e789008, 1);
+	if(ast_lpc_read(ast_lpc, AST_LPC_HICR2) & LPC_SDWN) {
+		printk("LPC_SDWN TODO ~~\n");
+	}
 
-}
+	if(ast_lpc_read(ast_lpc, AST_LPC_HICR2) & LPC_ABRT) {
+		printk("LPC_ABRT TODO ~~\n");
+	}
+#endif 
 
-EXPORT_SYMBOL(ast_lpc_snoop_dma_init);
+	//SNOOP 
+#ifdef CONFIG_AST_SNOOP
+	if(ast_lpc_read(ast_lpc, AST_LPC_HICR6) & LPC_HICR6_STR_SNP0W) {
+		ast_lpc->ast_snoop[0].fifo[ast_lpc->ast_snoop[0].write_idx] = GET_LPC_SNPD0(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
+	//	printk("Ch0 data %x \n", GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR)));
+		printk("Ch0 data in fifo widx %d : %x \n", ast_lpc->ast_snoop[0].write_idx, ast_lpc->ast_snoop[0].fifo[ast_lpc->ast_snoop[0].write_idx]);		
+		ast_lpc->ast_snoop[0].snoop_irq_hander(&ast_lpc->ast_snoop[0]);		
+		ast_lpc_write(ast_lpc, LPC_HICR6_STR_SNP0W,  AST_LPC_HICR6);
+	}
+
+	if(ast_lpc_read(ast_lpc, AST_LPC_HICR6) & LPC_HICR6_STR_SNP1W) {
+		ast_lpc->ast_snoop[1].fifo[ast_lpc->ast_snoop[1].write_idx] = GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
+	//	printk("Ch1 data %x \n", GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR)));
+		printk("Ch1 data in fifo widx %d : %x \n", ast_lpc->ast_snoop[0].write_idx, ast_lpc->ast_snoop[1].fifo[ast_lpc->ast_snoop[1].write_idx]);		
+		ast_lpc->ast_snoop[1].snoop_irq_hander(&ast_lpc->ast_snoop[1]);
+		ast_lpc_write(ast_lpc, LPC_HICR6_STR_SNP1W,  AST_LPC_HICR6);		
+	}
+#endif 
+
+#ifdef CONFIG_AST_SNOOP_DMA
+	if(ast_lpc_read(ast_lpc, AST_LPC_PCCR2) & LPC_POST_CODE_STS) {
+		ast_lpc->ast_snoop_dma->snoop_irq_hander(ast_lpc->ast_snoop_dma);
+	}
 #endif
 
+#ifdef CONFIG_AST_IPMI_KCS
+	//kcs 1: 
+	if(ast_lpc_read(ast_lpc, AST_LPC_STR1) & LPC_STR_IBF) {
+		ast_lpc->ast_kcs[0].kcs_irq_hander(&ast_lpc->ast_kcs[0]);
+	}
+	//kcs 2
+	if(ast_lpc_read(ast_lpc, AST_LPC_STR2) & LPC_STR_IBF) {
+		ast_lpc->ast_kcs[2].kcs_irq_hander(&ast_lpc->ast_kcs[1]);
+	}
+	//kcs 3
+	if(ast_lpc_read(ast_lpc, AST_LPC_STR3) & LPC_STR_IBF) {
+		ast_lpc->ast_kcs[2].kcs_irq_hander(&ast_lpc->ast_kcs[2]);
+	}
+	//kcs 4
+	if(ast_lpc_read(ast_lpc, AST_LPC_STR4) & LPC_STR_IBF) {
+		ast_lpc->ast_kcs[3].kcs_irq_hander(&ast_lpc->ast_kcs[3]);
+	}
+#endif
+
+#ifdef CONFIG_AST_IPMI_BT
+	//bt 0
+	if(ast_lpc_read(ast_lpc, AST_LPC_HICR4) & LPC_HICS_BTENBL) {
+		ast_lpc->ast_bt[0].bt_irq_hander(&ast_lpc->ast_bt[0]);
+	}
+	//ibt 1
+	if(ast_lpc_read(ast_lpc, AST_LPC_IBTCR2) & LPC_iBT_H2B_RISING_ISR) {
+		ast_lpc->ast_bt[1].bt_irq_hander(&ast_lpc->ast_bt[1]);
+	}	
+#endif
+	return IRQ_HANDLED;
+}		
 /************************************************** SYS FS **************************************************************/
+/* SERIRQ generate 
+SBIOS Programming:
+SIORD_70[3:0]=Ah (for SERIRQ#10)
+SIORD_30[4]=1b (for enabling)
+SIORx_20[4] (for status reading; write 1 clear)
+
+BMC Programming:
+1e789108[0] (HISR0) =0b then =1b (triggering SERIRQ by setting 0->1)
+1e789178[4] (for status reading)
+
+*/
+static ssize_t store_sio_irq(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	u32 val;	
+	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
+
+	val = simple_strtoul(buf, NULL, 10);
+
+	if(val) 
+		ast_lpc_write(ast_lpc, val, AST_LPC_HISR0);
+	else
+		ast_lpc_write(ast_lpc, 0, AST_LPC_HISR0);
+
+	return count;
+}
+
+static DEVICE_ATTR(sio_irq, S_IWUSR, NULL, store_sio_irq); 
+
 static ssize_t store_lpc2ahb_en(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	u32 val;	
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
+	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
 	val = simple_strtoul(buf, NULL, 10);
 
@@ -1419,7 +870,7 @@ static ssize_t store_lpc2ahb_en(struct device *dev,
 static ssize_t show_lpc2ahb_en(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
+	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
 	if(ast_lpc_read(ast_lpc, AST_LPC_HICR5) & LPC_HICR5_ENL2H)
 		return sprintf(buf, "1: Enable\n");
@@ -1433,7 +884,7 @@ static ssize_t store_fwcycle_en(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	u32 val;	
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
+	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
 	val = simple_strtoul(buf, NULL, 10);
 
@@ -1448,7 +899,7 @@ static ssize_t store_fwcycle_en(struct device *dev,
 static ssize_t show_fwcycle_en(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
+	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
 	if(ast_lpc_read(ast_lpc, AST_LPC_HICR5) & LPC_HICR5_ENFWH)
 		return sprintf(buf, "1: Enable\n");
@@ -1461,7 +912,7 @@ static DEVICE_ATTR(fwcycle_en, S_IRUGO | S_IWUSR, show_fwcycle_en, store_fwcycle
 static ssize_t show_fwcycle_addr(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
+	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%x\n", ast_lpc_read(ast_lpc, AST_LPC_HICR7) );
 }
@@ -1470,7 +921,7 @@ static ssize_t store_fwcycle_addr(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	u32 val;	
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
+	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
 	val = StrToHex(buf);		
 
@@ -1484,6 +935,7 @@ static struct attribute *ast_lpc_attributes[] = {
 	&dev_attr_fwcycle_en.attr,
 	&dev_attr_fwcycle_addr.attr,
 	&dev_attr_lpc2ahb_en.attr,	
+	&dev_attr_sio_irq.attr,		
 	NULL
 };
 
@@ -1493,7 +945,7 @@ static const struct attribute_group lpc_attribute_group = {
 
 /**************************   LPC  Snoop Sys fs   End **********************************************************/
 static int
-ast_get_route_selio(struct ast_lpc_driver_data *ast_lpc, u8 io_ch, char *sysfsbuf)
+ast_get_route_selio(struct ast_lpc_data *ast_lpc, u8 io_ch, char *sysfsbuf)
 {
 	u8 tmp = 0;
 	switch(io_ch) {
@@ -1526,7 +978,7 @@ ast_get_route_selio(struct ast_lpc_driver_data *ast_lpc, u8 io_ch, char *sysfsbu
 }
 
 static int 
-ast_get_route_seldw(struct ast_lpc_driver_data *ast_lpc, u8 io_ch, char *sysfsbuf)
+ast_get_route_seldw(struct ast_lpc_data *ast_lpc, u8 io_ch, char *sysfsbuf)
 {
 	u8 tmp = 0;
 	switch(io_ch) {
@@ -1555,7 +1007,7 @@ ast_get_route_seldw(struct ast_lpc_driver_data *ast_lpc, u8 io_ch, char *sysfsbu
 }
 
 static void
-ast_set_route_selio(struct ast_lpc_driver_data *ast_lpc, u8 io_ch, u8 value)
+ast_set_route_selio(struct ast_lpc_data *ast_lpc, u8 io_ch, u8 value)
 {
 	switch(io_ch) {
 		case 0:
@@ -1591,7 +1043,7 @@ ast_set_route_selio(struct ast_lpc_driver_data *ast_lpc, u8 io_ch, u8 value)
 }
 
 static void
-ast_set_route_seldw(struct ast_lpc_driver_data *ast_lpc, u8 io_ch, u8 value)
+ast_set_route_seldw(struct ast_lpc_data *ast_lpc, u8 io_ch, u8 value)
 {
 	switch(io_ch) {
 		case 0:
@@ -1625,7 +1077,7 @@ static ssize_t
 ast_store_route(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
 {
 	u32 input_val;
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
+	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
 
 	input_val = simple_strtoul(sysfsbuf, NULL, 10);
@@ -1652,7 +1104,7 @@ static ssize_t
 ast_show_route(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 {
 
-	struct ast_lpc_driver_data *ast_lpc = dev_get_drvdata(dev);
+	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
 
 	//sensor_attr->index : ch#
@@ -1704,31 +1156,21 @@ static const struct attribute_group route_attribute_groups[] = {
 };
 
 /**************************   LPC  route Sys fs   End **********************************************************/
-u8 sbuf[18] = {0x1c, 0x01, 0x00, 0x20, 0x01, 0x01, 0x01, 0x02,
-                 0xBF, 0x00, 0x00, 0x00, 0xBB, 0xAA, 0x00, 0x00,
-                 0x00, 0x00};
-///////////////////////////////////
-
-#define SNOOP_DMA_BOUNDARY 0x1000
-
 static int ast_lpc_probe(struct platform_device *pdev)
 {
 //	const struct platform_device_id *id = platform_get_device_id(pdev);
-	static struct ast_lpc_driver_data *ast_lpc;
 	struct resource *res;
 	int ret = 0;
 	int i = 0;
 	LPC_DBUG("\n");	
 
-	ast_lpc = kzalloc(sizeof(struct ast_lpc_driver_data), GFP_KERNEL);
+	ast_lpc = kzalloc(sizeof(struct ast_lpc_data), GFP_KERNEL);
 	if (ast_lpc == NULL) {
 		dev_err(&pdev->dev, "failed to allocate memory\n");
 		return -ENOMEM;
 	}
 
 	ast_lpc->pdev = pdev;
-
-	ast_lpc->bus_info = pdev->dev.platform_data;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (res == NULL) {
@@ -1764,130 +1206,54 @@ static int ast_lpc_probe(struct platform_device *pdev)
 		goto err_free_mem;
 	}
 
-	if(ast_lpc->bus_info->lpc_bus_mode) {
-		printk("LPC Scan Device... \n");
+#ifdef CONFIG_AST_LPC_MASTER
+	printk("LPC Scan Device... \n");
 #ifdef CONFIG_ARCH_AST1070			
-		for(i=0;i<ast_lpc->bus_info->scan_node;i++) {
-			ast1070_scu_init(i ,ast_lpc->bus_info->bridge_phy_addr + i*0x10000);
-			printk("C%d-[%x] ", i, ast1070_revision_id_info(i));
-			ast1070_vic_init(i, (ast_lpc->bus_info->bridge_phy_addr + i*0x10000), IRQ_C0_VIC_CHAIN + i, IRQ_C0_VIC_CHAIN_START + (i*AST_CVIC_NUM));
-			ast1070_i2c_irq_init(i, (ast_lpc->bus_info->bridge_phy_addr + i*0x10000), IRQ_C0_VIC_CHAIN + i, IRQ_C0_VIC_CHAIN_START + (i*AST_CVIC_NUM));
-			ast1070_scu_dma_init(i);
-			ast1070_uart_dma_init(i, ast_lpc->bus_info->bridge_phy_addr);
-			ast_add_device_cuart(i,ast_lpc->bus_info->bridge_phy_addr + i*0x10000);
-			ast_add_device_ci2c(i,ast_lpc->bus_info->bridge_phy_addr + i*0x10000);
-		}
+	for(i=0;i<ast_lpc->bus_info->scan_node;i++) {
+		ast1070_scu_init(i ,AST_LPC_BRIDGE + i*0x10000);
+		printk("C%d-[%x] ", i, ast1070_revision_id_info(i));
+		ast1070_vic_init(i, (AST_LPC_BRIDGE + i*0x10000), IRQ_C0_VIC_CHAIN + i, IRQ_C0_VIC_CHAIN_START + (i*AST_CVIC_NUM));
+		ast1070_i2c_irq_init(i, (AST_LPC_BRIDGE + i*0x10000), IRQ_C0_VIC_CHAIN + i, IRQ_C0_VIC_CHAIN_START + (i*AST_CVIC_NUM));
+		ast1070_scu_dma_init(i);
+		ast1070_uart_dma_init(i, AST_LPC_BRIDGE);
+		ast_add_device_cuart(i,AST_LPC_BRIDGE + i*0x10000);
+		ast_add_device_ci2c(i,AST_LPC_BRIDGE + i*0x10000);
+	}
 #endif			
-		printk("\n");
-		platform_set_drvdata(pdev, ast_lpc);
-	} else {
-		platform_set_drvdata(pdev, ast_lpc);
+	printk("\n");
+	platform_set_drvdata(pdev, ast_lpc);
+#else
+	platform_set_drvdata(pdev, ast_lpc);
 
-		dev_set_drvdata(&pdev->dev, ast_lpc);
+	dev_set_drvdata(&pdev->dev, ast_lpc);
 
-		ret = sysfs_create_group(&pdev->dev.kobj, &lpc_attribute_group);
+	ret = sysfs_create_group(&pdev->dev.kobj, &lpc_attribute_group);
+	if (ret)
+		goto err_free_mem;
+
+	for(i=0; i< 7; i++) {
+		ret = sysfs_create_group(&pdev->dev.kobj, &route_attribute_groups[i]);
 		if (ret)
 			goto err_free_mem;
-
-		for(i=0; i< 7; i++) {
-			ret = sysfs_create_group(&pdev->dev.kobj, &route_attribute_groups[i]);
-			if (ret)
-				goto err_free_mem;
-		}
-
-		if(ast_lpc->bus_info->snoop_enable) {
-			LPC_DBUG("SNOOP Init \n");
-			ast_lpc->snoop_data = kzalloc(sizeof(struct ast_snoop_data) * 2, GFP_KERNEL);
-			//enable irq
-			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP0INT_EN | LPC_HICR5_SNP1INT_EN, 
-						AST_LPC_HICR5); 	
-
-			for(i=0; i< 2; i++) {
-				ret = sysfs_create_group(&pdev->dev.kobj, &snoop_attribute_groups[i]);
-				if (ret)
-					goto err_free_mem;
-			}
-			//snoop dma
-			ast_lpc->ast_lpc_snoop_dma_virt = (unsigned char *)dma_alloc_coherent(NULL, 
-										SNOOP_DMA_BOUNDARY, &ast_lpc->ast_lpc_snoop_dma, GFP_KERNEL);
-
-			ast_lpc_write(ast_lpc, ast_lpc->ast_lpc_snoop_dma, AST_LPC_PCCR4);
-			//dma size
-			ast_lpc_write(ast_lpc, SNOOP_DMA_BOUNDARY/4, AST_LPC_PCCR5);
-			ret = sysfs_create_group(&pdev->dev.kobj, &snoop_dma_attribute_group);
-			if (ret)
-				goto err_free_mem;
-			
-		}
-
-		//snoop dma mode
-//		ret = sysfs_create_file(&pdev->dev.kobj, &snoop_dma_attribute);
-//		if (ret)
-//			goto err_free_mem;
-		
-		if(ast_lpc->bus_info->ipmi_kcs_enable) {
-			LPC_DBUG("IPMI KCS Init \n");
-			ast_lpc->kcs_data = kzalloc(sizeof(struct ast_kcs_data) * 4, GFP_KERNEL);
-			
-			ast_lpc->kcs_data[0].str = AST_LPC_STR1;
-			ast_lpc->kcs_data[0].idr = AST_LPC_IDR1;
-			ast_lpc->kcs_data[0].odr = AST_LPC_ODR1;
-			ast_lpc->kcs_data[0].pKCSRcvPkt = kmalloc(IPMI_MAX_MSG_LENGTH, GFP_KERNEL);
-			ast_lpc->kcs_data[0].pKCSSendPkt = sbuf; //kmalloc(IPMI_MAX_MSG_LENGTH, GFP_KERNEL);
-
-			ast_lpc->kcs_data[1].str = AST_LPC_STR2;
-			ast_lpc->kcs_data[1].idr = AST_LPC_IDR2;
-			ast_lpc->kcs_data[1].odr = AST_LPC_ODR2;
-			ast_lpc->kcs_data[1].pKCSRcvPkt = kmalloc(IPMI_MAX_MSG_LENGTH, GFP_KERNEL);
-			ast_lpc->kcs_data[1].pKCSSendPkt = sbuf; //kmalloc(IPMI_MAX_MSG_LENGTH, GFP_KERNEL);
-			
-			ast_lpc->kcs_data[2].str = AST_LPC_STR3;
-			ast_lpc->kcs_data[2].idr = AST_LPC_IDR3;
-			ast_lpc->kcs_data[2].odr = AST_LPC_ODR3;
-			ast_lpc->kcs_data[2].pKCSRcvPkt = kmalloc(IPMI_MAX_MSG_LENGTH, GFP_KERNEL);
-			ast_lpc->kcs_data[2].pKCSSendPkt = sbuf; //kmalloc(IPMI_MAX_MSG_LENGTH, GFP_KERNEL);
-			ast_lpc->kcs_data[2].KCSSendPktLen = 18;
-			
-			ast_lpc->kcs_data[3].str = AST_LPC_STR4;
-			ast_lpc->kcs_data[3].idr = AST_LPC_IDR4;
-			ast_lpc->kcs_data[3].odr = AST_LPC_ODR4;
-			ast_lpc->kcs_data[3].pKCSRcvPkt = kmalloc(IPMI_MAX_MSG_LENGTH, GFP_KERNEL);
-			ast_lpc->kcs_data[3].pKCSSendPkt = sbuf; //kmalloc(IPMI_MAX_MSG_LENGTH, GFP_KERNEL);
-
-			for(i=0; i< 4; i++) {
-				ret = sysfs_create_group(&pdev->dev.kobj, &ipmi_kcs_attribute_groups[i]);
-				if (ret)
-					goto err_free_mem;
-			}
-		}
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////					
-		if(ast_lpc->bus_info->ipmi_bt_enable) {
-			LPC_DBUG("IPMI BT Init \n");
-			ast_lpc->bt_data = kzalloc(sizeof(struct ast_bt_data) * 2, GFP_KERNEL);
-			ast_lpc->bt_data[0].str = AST_LPC_BTDTR;
-			ast_lpc->bt_data[0].fifo = AST_LPC_BTR1;
-			ast_lpc->bt_data[0].seq = 0;
-			ast_lpc->bt_data[0].state = BT_STATE_IDLE;	/* start here */
-			ast_lpc->bt_data[0].complete = BT_STATE_IDLE;	/* end here */
-			ast_lpc->bt_data[0].BT_CAP_req2rsp = BT_NORMAL_TIMEOUT * 1000000;
-			ast_lpc->bt_data[0].BT_CAP_retries = BT_NORMAL_RETRY_LIMIT;
-
-			ast_lpc->bt_data[1].str = AST_LPC_IBTCR4;
-			ast_lpc->bt_data[1].fifo = AST_LPC_IBTCR5;
-			ast_lpc->bt_data[1].seq = 0;
-			ast_lpc->bt_data[1].state = BT_STATE_IDLE;	/* start here */
-			ast_lpc->bt_data[1].complete = BT_STATE_IDLE;	/* end here */
-			ast_lpc->bt_data[1].BT_CAP_req2rsp = BT_NORMAL_TIMEOUT * 1000000;
-			ast_lpc->bt_data[1].BT_CAP_retries = BT_NORMAL_RETRY_LIMIT;
-
-			for(i=0; i< 2; i++) {
-				ret = sysfs_create_group(&pdev->dev.kobj, &ipmi_bt_attribute_groups[i]);
-				if (ret)
-					goto err_free_mem;
-			}
-		}	
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////						
 	}
+
+#ifdef CONFIG_AST_SNOOP
+	ast_lpc->ast_snoop = kzalloc(sizeof(struct ast_snoop_data) * AST_SNOOP_NUM, GFP_KERNEL);
+#endif
+
+#ifdef CONFIG_AST_SNOOP_DMA
+	ast_lpc->ast_snoop_dma = kzalloc(sizeof(struct ast_snoop_dma_data), GFP_KERNEL);
+#endif
+	
+#ifdef CONFIG_AST_IPMI_KCS
+	ast_lpc->ast_kcs = kzalloc(sizeof(struct ast_kcs_data) * AST_KCS_NUM, GFP_KERNEL);
+#endif
+
+#ifdef CONFIG_AST_IPMI_BT
+	ast_lpc->ast_bt = kzalloc(sizeof(struct ast_bt_data) * AST_BT_NUM, GFP_KERNEL);
+#endif
+
+#endif
 	
 	return 0;
 
@@ -1899,20 +1265,12 @@ err_free:
 	return ret;
 }
 
-#if 0
-static struct ast_lpc_data ast_lpc_data = {
-	.counter_width = 16,
-};
-#endif
-
 static struct platform_driver ast_lpc_driver = {
 	.driver		= {
 		.name			= "ast-lpc",
 		.owner			= THIS_MODULE,
 	},
 	.probe 		= ast_lpc_probe,
-//	.remove		= ast_lpc_remove,	
-//	.id_table		= ast_lpc_idtable,	
 };
 
 static int __init ast_lpc_init(void)

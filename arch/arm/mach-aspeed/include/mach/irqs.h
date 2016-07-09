@@ -24,6 +24,7 @@
 #include <mach/ast_i2c_irqs.h>
 #include <mach/ast_sdhci_irqs.h>
 #include <mach/ast_gpio_irqs.h>
+#include <mach/ast_pcie_irqs.h>
 //#include <mach/ast_lpc_irqs.h>
 #include <mach/ast_egfx_irqs.h>
 #endif

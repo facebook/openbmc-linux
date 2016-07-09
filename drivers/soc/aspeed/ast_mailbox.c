@@ -89,6 +89,7 @@ ast_mbx_read(struct ast_mailbox_data *ast_mbx, u32 reg)
 	return val;
 }
 
+#if 0
 static void ast_mailbox_host_mask_int(struct ast_mailbox_data *ast_mbx, u8 enable)
 {
 	if(enable)
@@ -96,6 +97,7 @@ static void ast_mailbox_host_mask_int(struct ast_mailbox_data *ast_mbx, u8 enabl
 	else
 		ast_mbx_write(ast_mbx, ast_mbx_read(ast_mbx, AST_MBX_BCR) & ~MBHMK, AST_MBX_BCR);
 }
+#endif
 
 static void ast_mailbox_ctrl_init(struct ast_mailbox_data *ast_mbx)
 {
@@ -138,7 +140,7 @@ static long ast_mailbox_ioctl(struct file *fp,
 			     unsigned int cmd, unsigned long arg)
 {
 	long ret = 0;
-	void __user *argp = (void __user *)arg;
+//	void __user *argp = (void __user *)arg;
 
 
 	MBX_DBG("ast_mailbox_ioctl cmd %x \n", cmd);

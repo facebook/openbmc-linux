@@ -24,45 +24,17 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/platform_device.h>
-#include <asm/io.h>
-#include <mach/hardware.h>
 #include <mach/irqs.h>
 #include <mach/platform.h>
 #include <plat/devs.h>
 #include <plat/ast-scu.h>
 #include <plat/ast-lpc.h>
-#include <plat/regs-lpc.h>
 #include <mach/gpio.h>
 
 /* --------------------------------------------------------------------
  *  LPC
  * -------------------------------------------------------------------- */
 #if defined(CONFIG_AST_LPC) || defined(CONFIG_AST_LPC_MODULE)
-static struct ast_lpc_bus_info ast_lpc_info = {
-#ifdef CONFIG_AST_MASTER
-	.lpc_bus_mode = 1,	//0: slave , 1: master
-#else
-	.lpc_bus_mode = 0,	//0: slave , 1: master
-#endif	
-	.lpc_mode = 0,
-#ifdef CONFIG_AST_LPC_SNOOP	
-	.snoop_enable = 1,
-#else	
-	.snoop_enable = 0,	
-#endif
-#ifdef CONFIG_AST_IPMI_KCS
-	.ipmi_kcs_enable = 1,
-#else	
-	.ipmi_kcs_enable = 0,	
-#endif
-#ifdef CONFIG_AST_IPMI_BT
-	.ipmi_bt_enable = 1,
-#else	
-	.ipmi_bt_enable = 0,	
-#endif
-	.bridge_phy_addr = AST_LPC_BRIDGE,
-};
-
 static struct resource ast_lpc_resource[] = {
 	[0] = {
 		.start = AST_LPC_BASE,
@@ -84,22 +56,11 @@ static struct platform_device ast_lpc_device = {
     .dev = {
             .dma_mask = &ast_lpc_dma_mask,
             .coherent_dma_mask = 0xffffffff,
-			.platform_data = &ast_lpc_info,
     },
 	.resource = ast_lpc_resource,
 	.num_resources = ARRAY_SIZE(ast_lpc_resource),
 };
 #ifdef AST_LPC_PLUS_BASE
-static struct ast_lpc_bus_info ast_lpc_plus_info = {
-#ifdef CONFIG_AST_MASTER
-	.lpc_bus_mode = 1,	//0: slave , 1: master
-#else
-	.lpc_bus_mode = 0,	//0: slave , 1: master
-#endif	
-	.lpc_mode = 1,
-	.bridge_phy_addr = AST_LPC_PLUS_BRIDGE,
-};
-
 static struct resource ast_lpc_plus_resource[] = {
 	[0] = {
 		.start = AST_LPC_PLUS_BASE,
@@ -114,7 +75,6 @@ static struct platform_device ast_lpc_plus_device = {
     .dev = {
             .dma_mask = &ast_lpc_dma_mask,
             .coherent_dma_mask = 0xffffffff,
-			.platform_data = &ast_lpc_plus_info,
     },
 	.resource = ast_lpc_plus_resource,
 	.num_resources = ARRAY_SIZE(ast_lpc_plus_resource),
@@ -153,6 +113,9 @@ void __init ast_add_device_lpc(void)
 	
 #endif	//End AST1070
 
+#ifndef CONFIG_AST_ESPI
+	ast_scu_set_lpc_mode();
+#endif 
 	platform_device_register(&ast_lpc_device);
 #ifdef AST_LPC_PLUS_BASE	
 	if(ast_scu_get_lpc_plus_enable())
@@ -160,15 +123,5 @@ void __init ast_add_device_lpc(void)
 #endif
 }
 #else
-void __init ast_add_device_lpc(void) {
-    // Since we disable LPC, bring the UART1 and UART2 out from LPC control
-
-    void __iomem *reg_base;
-
-    reg_base = ioremap(AST_LPC_BASE, SZ_256);
-    writel(readl(reg_base + AST_LPC_HICR9)
-           & ~(LPC_HICR9_SOURCE_UART1|LPC_HICR9_SOURCE_UART2
-               |LPC_HICR9_SOURCE_UART3|LPC_HICR9_SOURCE_UART4),
-           reg_base + AST_LPC_HICR9);
-}
+void __init ast_add_device_lpc(void) {}
 #endif

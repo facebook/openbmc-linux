@@ -144,7 +144,6 @@
 /* bit 1 reserved */
 #define LPC_HICS_BTENBL				(1)
 
-
 /*	AST_LPC_STR1				0: 0x03C, 1: 0x40, 2 : 0x44, 3: 4:		*/
 #define LPC_STR_DBU4				(1 << 7)		
 #define LPC_STR_DBU3				(1 << 6)
@@ -154,7 +153,6 @@
 #define LPC_STR_DBU0				(1 << 2)
 #define LPC_STR_IBF					(1 << 1)
 #define LPC_STR_OBF					(1)
-
 
 /* AST_LPC_HICR5				0x080	- LPC Host interface Control Register */
 #define LPC_HICR5_ENSIOGIO			(1 << 31)
@@ -232,6 +230,7 @@
 #define LPC_RX_FIFO_CLR				(1 << 7)
 #define LPC_POST_
 #define LPC_POST_CODE_MODE_MASK		(0x3 << 4)
+#define GET_LPC_POST_CODE_MODE(x)		((x >> 4) & 0x3)
 #define LPC_POST_CODE_MODE(x)		(x << 4)
 #define BYTE_MODE	0
 #define WORD_MODE	1
@@ -244,10 +243,9 @@
 #define LPC_POST_CODE_EN			(1)
 
 /*AST_LPC_PCCR1				0x134	Post Code Contol Register 1 */
-#define LPC_POST_ADDR_MASK		0x3fffff
-#define LPC_CAPTURE_ADDR_MASK(x)	(x << 16)
-#define LPC_CAPTURE_BASE_ADDR(x)	(x)
-#define LPC_GET_CAPTURE_ADDR(x)	(x & 0xffff)
+#define LPC_POST_ADDR_MASK		0x00ffff
+#define LPC_DONT_CARE_MASK		0x3f0000
+
 
 /*AST_LPC_PCCR2				0x138	Post Code Contol Register 2 */
 #define LPC_POST_CODE_DMA_RDY		(1 << 4)
@@ -257,14 +255,43 @@
 #define LPC_iBT_SET_ADDR(x)		(x << 16)
 #define LPC_iBT_GET_ADDR(x)		((x & 0xffff0000) >> 16)
 #define LPC_iBT_ADDR_MASK		(0xffff << 16)
+
+#define LPC_iBT_SET_IRQ(x)		((x & 0xf) << 12)
+#define LPC_iBT_GET_IRQ(x)		((x & 0xf000) >> 12)
+#define LPC_iBT_IRQ_MASK		(0xf << 12)
+#define LPC_iBT_IRQ_TYPE_MASK	(0x3 << 10)
+
 #define LPC_iBT_ClrSvWrP_EN		(1 << 3)
 #define LPC_iBT_ClrSvRdP_EN 		(1 << 2)
 #define LPC_iBT_ENABLE 			(1)
 
 /* AST_LPC_IBTCR1				0x144	iBT Control Register 1 */
-#define LPC_iBT_H2B_RISING_ISR		(1)
 
 /* AST_LPC_IBTCR2				0x148	iBT Control Register 2 */
+#define LPC_iBT_BMC_HWRST_ISR		(0x1 << 15)
+
+#define LPC_iBT_OEM3_RISING_ISR		(0x1 << 14)
+#define LPC_iBT_OEM2_RISING_ISR		(0x1 << 13)
+#define LPC_iBT_OEM1_RISING_ISR		(0x1 << 12)
+
+#define LPC_iBT_SREAD_OV_ISR		(0x1 << 11)
+#define LPC_iBT_SWRITE_OV_ISR		(0x1 << 10)
+#define LPC_iBT_HREAD_OV_ISR		(0x1 << 9)
+#define LPC_iBT_HWRITE_OV_ISR		(0x1 << 8)
+
+#define LPC_iBT_HBUSY_FALLING_ISR	(0x1 << 6)
+#define LPC_iBT_SMS_FALLING_ISR		(0x1 << 5)
+#define LPC_iBT_B2H_FALLING_ISR		(0x1 << 4)
+
+#define LPC_iBT_OEM0_RISING_ISR		(0x1 << 1)
+#define LPC_iBT_H2B_RISING_ISR		(0x1)
+
+/* #define AST_LPC_IBTCR3				0x14C */
+#define LPC_iBT_GET_HOST_RP(x)		((x & 0x7F000000) >> 24)
+#define LPC_iBT_GET_HOST_WP(x)		((x & 0x007F0000) >> 16)
+
+
+
 
 /* AST_LPC_IBTCR4				0x150	iBT Control Register 4 */
 #define BT_CLR_WR_PTR	0x01	/* See IPMI 1.5 table 11.6.4 */

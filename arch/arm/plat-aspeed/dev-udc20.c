@@ -36,7 +36,7 @@
 /* --------------------------------------------------------------------
  *  UDC 1.1
  * -------------------------------------------------------------------- */
-#if defined(CONFIG_USB_AST_UDC20) || defined(CONFIG_USB_AST_UDC20_MODULE)
+#if defined(CONFIG_USB_AST) || defined(CONFIG_USB_AST_MODULE)
 /* hid descriptor for a keyboard */
 static struct hidg_func_descriptor my_keyboard_data = {
 	.subclass		= 0, /* No subclass */
@@ -88,38 +88,39 @@ static struct platform_device my_keyboard_hid = {
 };
 
 static struct hidg_func_descriptor my_mouse_data = {
-    .subclass = 0,
-    .protocol = 0,
-    .report_length = 3,
-	.report_desc_length= 50,
-	.report_desc= {
-    0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
-    0x09, 0x02,                    // USAGE (Mouse)
-    0xa1, 0x01,                    // COLLECTION (Application)
-    0x09, 0x01,                    //   USAGE (Pointer)
-    0xa1, 0x00,                    //   COLLECTION (Physical)
-    0x05, 0x09,                    //     USAGE_PAGE (Button)
-    0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
-    0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
-    0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-    0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
-    0x95, 0x03,                    //     REPORT_COUNT (3)
-    0x75, 0x01,                    //     REPORT_SIZE (1)
-    0x81, 0x02,                    //     INPUT (Data,Var,Abs)
-    0x95, 0x01,                    //     REPORT_COUNT (1)
-    0x75, 0x05,                    //     REPORT_SIZE (5)
-    0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
-    0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
-    0x09, 0x30,                    //     USAGE (X)
-    0x09, 0x31,                    //     USAGE (Y)
-    0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
-    0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
-    0x75, 0x08,                    //     REPORT_SIZE (8)
-    0x95, 0x02,                    //     REPORT_COUNT (2)
-    0x81, 0x06,                    //     INPUT (Data,Var,Rel)
-    0xc0,                          //   END_COLLECTION
-    0xc0                           // END_COLLECTION
-        }
+	.subclass = 0,
+	.protocol = 2,
+	.report_length = 4,
+	.report_desc_length= 52,
+	.report_desc={
+		0x05,0x01,	/*Usage Page (Generic Desktop Controls)*/
+		0x09,0x02,	/*Usage (Mouse)*/
+		0xa1,0x01,	/*Collction (Application)*/
+		0x09,0x01,	/*Usage (pointer)*/
+		0xa1,0x00,	/*Collction (Physical)*/
+		0x05,0x09,	/*Usage Page (Button)*/
+		0x19,0x01,	/*Usage Minimum(1)*/
+		0x29,0x03,	/*Usage Maximum(3) */ 
+		0x15,0x00,	/*Logical Minimum(1)*/
+		0x25,0x01,	/*Logical Maximum(1)*/
+		0x95,0x03,	/*Report Count(5)  */
+		0x75,0x01,	/*Report Size(1)*/
+		0x81,0x02,	/*Input(Data,Variable,Absolute,BitFiled)*/
+		0x95,0x01,	/*Report Count(1)*/
+		0x75,0x05,	/*Report Size(5) */
+		0x81,0x01,	/*Input(Constant,Array,Absolute,BitFiled) */
+		0x05,0x01,	/*Usage Page (Generic Desktop Controls)*/
+		0x09,0x30,	/*Usage(x)*/
+		0x09,0x31,	/*Usage(y)*/
+		0x09,0x38,	/*Usage(Wheel)*/
+		0x15,0x81,	/*Logical Minimum(-127)*/
+		0x25,0x7f,	/*Logical Maximum(127)*/
+		0x75,0x08,	/*Report Size(8)*/
+		0x95,0x02,	/*Report Count(2)  */
+		0x81,0x06,	/*Input(Data,Variable,Relative,BitFiled)*/
+		0xc0,	/*End Collection*/
+		0xc0	/*End Collection*/
+	}
 };
 
 static struct platform_device my_mouse_hid = {
@@ -132,10 +133,10 @@ static struct platform_device my_mouse_hid = {
         }
 };
 
-static struct resource ast_usb20_resource[] = {
+static struct resource ast_vhub_resource[] = {
 	[0] = {
-		.start = AST_USB20_BASE,
-		.end = AST_USB20_BASE + SZ_1K,
+		.start = AST_VHUB_BASE,
+		.end = AST_VHUB_BASE + SZ_1K,
 		.flags = IORESOURCE_MEM,
 	},
 	[1] = {
@@ -145,26 +146,28 @@ static struct resource ast_usb20_resource[] = {
 	},
 };
 
-static u64 ast_usb20_dma_mask = 0xffffffffUL;
-
-static struct platform_device ast_usb20_device = {
-	.name	= "ast_usb20",
-    .id = 0,
-    .dev = {
-            .dma_mask = &ast_usb20_dma_mask,
-            .coherent_dma_mask = 0xffffffff,
-    },
-	.resource = ast_usb20_resource,
-	.num_resources = ARRAY_SIZE(ast_usb20_resource),
+static u64 ast_udc_dma_mask = 0xffffffffUL;
+static struct platform_device ast_udc_device = {
+	.name	= "ast_udc",
+	.id 		= 0,
+	.resource = ast_vhub_resource,
+	.num_resources = ARRAY_SIZE(ast_vhub_resource),
+	.dev = {
+		.dma_mask = &ast_udc_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+	},	
 };
 
-void __init ast_add_device_usb20(void)
+void __init ast_add_device_udc20(void)
 {
-//	platform_device_register(&my_keyboard_hid);
-//	platform_device_register(&my_mouse_hid);
+	ast_scu_multi_func_usb_port1_mode(0);
+	ast_scu_init_usb_port1();
 
-	platform_device_register(&ast_usb20_device);
+	platform_device_register(&my_keyboard_hid);
+	platform_device_register(&my_mouse_hid);
+
+	platform_device_register(&ast_udc_device);
 }
 #else
-void __init ast_add_device_usb20(void) {}
+void __init ast_add_device_udc20(void) {}
 #endif

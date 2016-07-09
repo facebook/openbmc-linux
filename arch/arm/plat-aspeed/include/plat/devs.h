@@ -33,6 +33,9 @@ extern void __init ast_add_device_sgpio(void);
 extern void __init ast_add_device_lpc(void);
 extern void __init ast_add_device_espi(void);
 extern void __init ast_add_device_kcs(void);
+extern void __init ast_add_device_bt(void);
+extern void __init ast_add_device_snoop(void);
+
 extern void __init ast_add_device_mailbox(void);
 extern void __init ast_add_device_i2c(void);
 extern void __init ast_add_device_i2c_common(void);
@@ -42,6 +45,9 @@ extern void __init ast_add_device_uhci(void);
 extern void __init ast_add_device_gmac(void);
 extern void __init ast_add_device_udc11(void);
 extern void __init ast_add_device_hid(void);
+
+//USB 
+extern void __init ast_add_device_udc20(void);
 
 extern void __init ast_add_device_pcie(void);
 

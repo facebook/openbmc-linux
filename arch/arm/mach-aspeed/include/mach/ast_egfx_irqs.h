@@ -21,6 +21,8 @@
 #ifndef _EGFX_IRQS_H_
 #define _EGFX_IRQS_H_                 1
 
+#define ARCH_NR_EGFX 					(32)
+
 #define IRQ_BB_INT0						(IRQ_EGFX_CHAIN_START + 0)
 #define IRQ_BB_DONE						(IRQ_EGFX_CHAIN_START + 1)
 #define IRQ_BB_INT2						(IRQ_EGFX_CHAIN_START + 2)

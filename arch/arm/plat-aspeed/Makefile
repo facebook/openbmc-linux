@@ -24,7 +24,7 @@ obj-y			+= dev-uart.o dev-vuart.o dev-wdt.o dev-rtc.o dev-gpio.o dev-sgpio.o dev
 obj-y 	                += dev-nor.o dev-nand.o dev-sdhci.o
 
 #bus
-obj-y                   += dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o dev-peci.o dev-kcs.o dev-mbx.o dev-pcie.o dev-jtag.o dev-mctp.o dev-xdma.o
+obj-y                   += dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o dev-peci.o dev-kcs.o dev-bt.o dev-snoop.o dev-mbx.o dev-pcie.o dev-jtag.o dev-mctp.o dev-xdma.o
 
 ifdef CONFIG_CMM
 obj-y += dev-spi-cmm.o dev-i2c-cmm.o dev-i2c-common.o
@@ -37,7 +37,7 @@ endif
 endif
 
 #dev
-obj-y			+= dev-udc11.o dev-hid.o dev-vhub.o dev-udc20.o
+obj-y			+= dev-udc11.o dev-hid.o dev-udc20.o
 #net
 obj-y			+= dev-eth.o
 
