@@ -40,7 +40,8 @@
 #undef AST_MAC1_BASE
 #endif
 
-#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || defined(CONFIG_CMM)
+#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || \
+	defined(CONFIG_CMM) || defined(CONFIG_FBTP)
 #define DRVNAME "ftgmac100"
 #else
 #define DRVNAME "ast_gmac"

@@ -766,19 +766,31 @@ static irqreturn_t ast_lpc_isr (int this_irq, void *dev_id)
 	//SNOOP 
 #ifdef CONFIG_AST_SNOOP
 	if(ast_lpc_read(ast_lpc, AST_LPC_HICR6) & LPC_HICR6_STR_SNP0W) {
-		ast_lpc->ast_snoop[0].fifo[ast_lpc->ast_snoop[0].write_idx] = GET_LPC_SNPD0(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
-	//	printk("Ch0 data %x \n", GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR)));
-		printk("Ch0 data in fifo widx %d : %x \n", ast_lpc->ast_snoop[0].write_idx, ast_lpc->ast_snoop[0].fifo[ast_lpc->ast_snoop[0].write_idx]);		
-		ast_lpc->ast_snoop[0].snoop_irq_hander(&ast_lpc->ast_snoop[0]);		
+		ast_lpc->ast_snoop[0].fifo[ast_lpc->ast_snoop[0].write_idx] =
+			GET_LPC_SNPD0(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
+#if 0
+		printk("Ch0 data %x \n",
+			GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR)));
+		printk("Ch0 data in fifo widx %d : %x \n",
+		ast_lpc->ast_snoop[0].write_idx,
+		ast_lpc->ast_snoop[0].fifo[ast_lpc->ast_snoop[0].write_idx]);
+#endif
+		ast_lpc->ast_snoop[0].snoop_irq_hander(&ast_lpc->ast_snoop[0]);
 		ast_lpc_write(ast_lpc, LPC_HICR6_STR_SNP0W,  AST_LPC_HICR6);
 	}
 
 	if(ast_lpc_read(ast_lpc, AST_LPC_HICR6) & LPC_HICR6_STR_SNP1W) {
-		ast_lpc->ast_snoop[1].fifo[ast_lpc->ast_snoop[1].write_idx] = GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
-	//	printk("Ch1 data %x \n", GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR)));
-		printk("Ch1 data in fifo widx %d : %x \n", ast_lpc->ast_snoop[0].write_idx, ast_lpc->ast_snoop[1].fifo[ast_lpc->ast_snoop[1].write_idx]);		
+		ast_lpc->ast_snoop[1].fifo[ast_lpc->ast_snoop[1].write_idx] =
+			GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
+#if 0
+		printk("Ch1 data %x \n",
+			GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR)));
+		printk("Ch1 data in fifo widx %d : %x \n",
+		ast_lpc->ast_snoop[0].write_idx,
+		ast_lpc->ast_snoop[1].fifo[ast_lpc->ast_snoop[1].write_idx]);
+#endif
 		ast_lpc->ast_snoop[1].snoop_irq_hander(&ast_lpc->ast_snoop[1]);
-		ast_lpc_write(ast_lpc, LPC_HICR6_STR_SNP1W,  AST_LPC_HICR6);		
+		ast_lpc_write(ast_lpc, LPC_HICR6_STR_SNP1W,  AST_LPC_HICR6);
 	}
 #endif 
 

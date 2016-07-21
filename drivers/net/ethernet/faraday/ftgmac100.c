@@ -44,6 +44,9 @@
 #define MAX_PKT_SIZE		1518
 #define RX_BUF_SIZE		PAGE_SIZE	/* must be smaller than 0x3fff */
 
+
+#define NCSI_SUPPORT 1
+
 /******************************************************************************
  * private data
  *****************************************************************************/
@@ -76,10 +79,1191 @@ struct ftgmac100 {
 	int phy_irq[PHY_MAX_ADDR];
 	struct phy_device *phydev;
 	int old_speed;
+#ifdef NCSI_SUPPORT
+	NCSI_Command_Packet NCSI_Request;
+	NCSI_Response_Packet NCSI_Respond;
+	NCSI_Capability NCSI_Cap;
+	unsigned int  InstanceID;
+	unsigned int  Retry;
+	unsigned char Payload_Data[64];
+	unsigned char Payload_Pad[4];
+	unsigned long Payload_Checksum;
+#endif
 };
 
 static int ftgmac100_alloc_rx_page(struct ftgmac100 *priv,
                                    int rxdes_idx,  gfp_t gfp);
+
+#ifdef NCSI_SUPPORT
+
+#define TX_BUF_SIZE 1536
+/******************************************************************************
+ * NCSI Functions
+ *****************************************************************************/
+/* Forward delcarations */
+static int ftgmac100_hard_start_xmit(struct sk_buff *skb,
+		struct net_device *dev);
+static struct
+ftgmac100_rxdes *ftgmac100_rx_locate_first_segment(struct ftgmac100 *priv);
+static bool ftgmac100_rxdes_last_segment(struct ftgmac100_rxdes *rxdes);
+static int ftgmac100_current_rxdes_idx(const struct ftgmac100 *priv);
+static struct page *ftgmac100_rxdes_get_page(struct ftgmac100 *priv, int idx);
+static unsigned int ftgmac100_rxdes_data_length(struct ftgmac100_rxdes *rxdes);
+static void ftgmac100_rxdes_set_dma_own(struct ftgmac100_rxdes *rxdes);
+static void ftgmac100_rx_pointer_advance(struct ftgmac100 *priv);
+static void ftgmac100_set_mac(struct ftgmac100 *priv, const unsigned char *mac);
+
+static int
+ftgmac100_wait_to_send_packet(struct sk_buff *skb, struct net_device *dev) {
+	return ftgmac100_hard_start_xmit(skb, dev);
+}
+
+void NCSI_Struct_Initialize(struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long i;
+
+	for (i = 0; i < 6; i++) {
+		lp->NCSI_Request.DA[i] = 0xFF;
+		lp->NCSI_Respond.DA[i] = 0xFF;
+		lp->NCSI_Respond.SA[i] = 0xFF;
+		lp->NCSI_Request.SA[i] = dev->dev_addr[i];
+	}
+	lp->NCSI_Request.EtherType = 0xF888;
+	lp->NCSI_Request.MC_ID = 0;
+	lp->NCSI_Request.Header_Revision = 0x01;
+	lp->NCSI_Request.Reserved_1 = 0;
+	lp->NCSI_Request.Reserved_2 = 0;
+	lp->NCSI_Request.Reserved_3 = 0;
+	lp->NCSI_Respond.EtherType = 0xF888;
+	lp->NCSI_Respond.MC_ID = 0;
+	lp->NCSI_Respond.Header_Revision = 0x01;
+	lp->NCSI_Respond.Reserved_1 = 0;
+	lp->NCSI_Respond.Reserved_2 = 0;
+	lp->NCSI_Respond.Reserved_3 = 0;
+
+	lp->InstanceID = 0;
+	lp->Payload_Checksum = 0;
+	for (i = 0; i < 4; i++)
+		lp->Payload_Pad[i] = 0;
+
+	for (i = 0; i < 64; i++)
+		lp->Payload_Data[i] = 0;
+}
+
+void Calculate_Checksum(struct net_device *dev, unsigned char *buffer_base,
+		int Length)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned int i, CheckSum = 0;
+	unsigned int Data, Data1;
+
+	for (i = 0; i < ((Length - 14) / 2); i++) {
+		Data = buffer_base[i * 2];
+		Data1 = buffer_base[i * 2 + 1];
+		CheckSum += ((Data << 8) + Data1);
+	}
+	lp->Payload_Checksum = (~(CheckSum) + 1); /* 2's complement */
+	/* Inverse for insert into buffer */
+	Data = (lp->Payload_Checksum & 0xFF000000) >> 24;
+	Data1 = (lp->Payload_Checksum & 0x000000FF) << 24;
+	lp->Payload_Checksum =
+		(lp->Payload_Checksum & 0x00FFFF00) + Data + Data1;
+	Data = (lp->Payload_Checksum & 0x00FF0000) >> 8;
+	Data1 = (lp->Payload_Checksum & 0x0000FF00) << 8;
+	lp->Payload_Checksum =
+		(lp->Payload_Checksum & 0xFF0000FF) + Data + Data1;
+}
+
+void copy_data(struct net_device *dev, struct sk_buff *skb, int Length)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+
+	memcpy((unsigned char *)(skb->data + 30), &lp->Payload_Data, Length);
+	Calculate_Checksum(dev, skb->data + 14, 30 + Length);
+	memcpy((unsigned char *)(skb->data + 30 + Length),
+			&lp->Payload_Checksum, 4);
+}
+
+void NCSI_Rx(struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+
+	unsigned long length, i = 0;
+	int count = 0;
+	struct ftgmac100_rxdes *rxdes;
+
+ncsi_rx:
+	i = 0;
+	do {
+		rxdes = ftgmac100_rx_locate_first_segment(lp);
+		i++;
+		udelay(1000);
+	} while ((!rxdes) && (i < NCSI_LOOP));
+
+	if (i == NCSI_LOOP) {
+		/* printk("NCSI_Rx: Failed\n"); */
+		return;
+	}
+
+	if (!ftgmac100_rxdes_last_segment(rxdes)) {
+		/* printk("NCSI_RX: Skip Partial Packet\n"); */
+		ftgmac100_rxdes_set_dma_own(rxdes);
+		ftgmac100_rx_pointer_advance(lp);
+		/* Check next descriptor for response packet */
+		if (count++ <= RX_QUEUE_ENTRIES)
+			goto ncsi_rx;
+	}
+
+	int rxdes_idx = ftgmac100_current_rxdes_idx(lp);
+	struct page *page = ftgmac100_rxdes_get_page(lp, rxdes_idx);
+	unsigned char *tbuf = (unsigned char *)page_address(page);
+
+	length = ftgmac100_rxdes_data_length(rxdes);
+	if (length <= 128 && tbuf[12] == 0x88 && tbuf[13] == 0xF8) {
+		memcpy(&lp->NCSI_Respond, tbuf, length);
+		ftgmac100_rxdes_set_dma_own(rxdes);
+		ftgmac100_rx_pointer_advance(lp);
+		return;
+	} else {
+#if 0
+		printk("NCSI_RX: Skip len: %d, proto: %x:%x\n",
+				length, tbuf[12], tbuf[13]);
+#endif
+		ftgmac100_rxdes_set_dma_own(rxdes);
+		ftgmac100_rx_pointer_advance(lp);
+		/* Check next descriptor for response packet */
+		if (count++ <= RX_QUEUE_ENTRIES)
+			goto ncsi_rx;
+	}
+}
+
+void DeSelect_Package(struct net_device *dev, int Package_ID)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff *skb;
+
+	do {
+		skb = dev_alloc_skb(TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		/* TX */
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = DESELECT_PACKAGE;
+		/* Internal Channel ID = 0x1F, 0x1F means all channel */
+		Combined_Channel_ID = (Package_ID << 5) + 0x1F;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data(dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet(skb, dev);
+		/* RX */
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (DESELECT_PACKAGE | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+#if 0
+			printk("Retry: Command = %x, Response_Code = %x\n",
+				lp->NCSI_Request.Command,
+				lp->NCSI_Respond.Response_Code);
+			printk("IID: %x:%x, Command: %x:%x\n", lp->InstanceID,
+				lp->NCSI_Respond.IID, lp->NCSI_Request.Command,
+				lp->NCSI_Respond.Command);
+#endif
+			lp->Retry++;
+			lp->InstanceID--;
+		} else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+int Select_Package(struct net_device *dev, int Package_ID)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID, Found = 0;
+	struct sk_buff *skb;
+
+	do {
+		skb = dev_alloc_skb(TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+
+		/* RX */
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (SELECT_PACKAGE | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+#if 0
+			printk("Retry: Command = %x, Response_Code = %x\n",
+				lp->NCSI_Request.Command,
+				lp->NCSI_Respond.Response_Code);
+			printk("IID: %x:%x, Command: %x:%x\n", lp->InstanceID,
+				lp->NCSI_Respond.IID, lp->NCSI_Request.Command,
+				lp->NCSI_Respond.Command);
+#endif
+			lp->Retry++;
+			Found = 0;
+			lp->InstanceID--;
+		} else {
+			lp->Retry = 0;
+			Found = 1;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+
+	return Found;
+}
+
+void DeSelect_Active_Package(struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff *skb;
+
+	do {
+		skb = dev_alloc_skb(TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		/* TX */
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = DESELECT_PACKAGE;
+		/* Internal Channel ID = 0x1F, 0x1F means all channel */
+		Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + 0x1F;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data(dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet(skb, dev);
+
+		/* RX */
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (DESELECT_PACKAGE | 0x80))
+		|| (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED))
+		&& (lp->Retry != RETRY_COUNT)) {
+#if 0
+			printk("Retry: Command = %x, Response_Code = %x\n",
+				lp->NCSI_Request.Command,
+				lp->NCSI_Respond.Response_Code);
+#endif
+			lp->Retry++;
+			lp->InstanceID--;
+		} else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+int Select_Active_Package(struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID, Found = 0;
+	struct sk_buff *skb;
+
+	do {
+		skb = dev_alloc_skb(TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		/* TX */
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = SELECT_PACKAGE;
+		/* Internal Channel ID = 0x1F */
+		Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + 0x1F;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (4 << 8);
+		memcpy((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		lp->NCSI_Request.Payload_Length = 4;
+		memset((void *)lp->Payload_Data, 0, 4);
+		lp->Payload_Data[3] = 1; /* Arbitration Disable */
+		copy_data(dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len = 30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet(skb, dev);
+
+		/* RX */
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (SELECT_PACKAGE | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+#if 0
+			printk("Retry: Command = %x, Response_Code = %x\n",
+					lp->NCSI_Request.Command,
+					lp->NCSI_Respond.Response_Code);
+			printk("IID: %x:%x, Command: %x:%x\n", lp->InstanceID,
+					lp->NCSI_Respond.IID,
+					lp->NCSI_Request.Command,
+					lp->NCSI_Respond.Command);
+#endif
+			lp->Retry++;
+			lp->InstanceID--;
+			Found = 0;
+		} else {
+			lp->Retry = 0;
+			Found = 1;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+
+	return Found;
+}
+
+int Clear_Initial_State(struct net_device *dev, int Channel_ID)
+{
+  struct ftgmac100 *lp = netdev_priv(dev);
+  unsigned long Combined_Channel_ID, Found = 0;
+  struct sk_buff * skb;
+
+    do {
+  skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+  memset(skb->data, 0, TX_BUF_SIZE + 16);
+//TX
+  lp->InstanceID++;
+  lp->NCSI_Request.IID = lp->InstanceID;
+  lp->NCSI_Request.Command = CLEAR_INITIAL_STATE;
+  Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + Channel_ID; //Internal Channel ID = 0
+  lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+  lp->NCSI_Request.Payload_Length = 0;
+  memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+  copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+  skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+  ftgmac100_wait_to_send_packet (skb, dev);
+
+//RX
+  NCSI_Rx(dev);
+  if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (CLEAR_INITIAL_STATE | 0x80)) || (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) && (lp->Retry != RETRY_COUNT)) {
+    //printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+    //printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+    lp->Retry++;
+    lp->InstanceID--;
+    Found = 0;
+  }
+  else {
+    lp->Retry = 0;
+    Found = 1;
+  }
+    } while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+    lp->Retry = 0;
+
+    return Found;
+}
+
+void Get_Version_ID (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = GET_VERSION_ID;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+			(lp->NCSI_Respond.Command != (GET_VERSION_ID | 0x80)) ||
+			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+			(lp->Retry != RETRY_COUNT)) {
+#if 0
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Get_Capabilities (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = GET_CAPABILITIES;
+		Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (GET_CAPABILITIES | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+			lp->NCSI_Cap.Capabilities_Flags = lp->NCSI_Respond.Payload_Data[0];
+			lp->NCSI_Cap.Broadcast_Packet_Filter_Capabilities = lp->NCSI_Respond.Payload_Data[1];
+			lp->NCSI_Cap.Multicast_Packet_Filter_Capabilities = lp->NCSI_Respond.Payload_Data[2];
+			lp->NCSI_Cap.Buffering_Capabilities = lp->NCSI_Respond.Payload_Data[3];
+			lp->NCSI_Cap.AEN_Control_Support = lp->NCSI_Respond.Payload_Data[4];
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Enable_AEN (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = AEN_ENABLE;
+		Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (8 << 8);
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		lp->NCSI_Request.Payload_Length = 8;
+		lp->Payload_Data[3] = 0; //MC ID
+		lp->Payload_Data[7] = 1; //Link Status Change AEN
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+			(lp->NCSI_Respond.Command != (AEN_ENABLE | 0x80)) ||
+			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+			(lp->Retry != RETRY_COUNT)) {
+		  //printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+		  //printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;    lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Get_MAC_Address (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID, i;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = 0x50;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (8 << 8);
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		lp->NCSI_Request.Payload_Length = 8;
+		lp->Payload_Data[0] = 0x00;
+		lp->Payload_Data[1] = 0x00;
+		lp->Payload_Data[2] = 0x81;
+		lp->Payload_Data[3] = 0x19;
+
+		lp->Payload_Data[4] = 0x00;
+		lp->Payload_Data[5] = 0x00;
+		lp->Payload_Data[6] = 0x1B;
+		lp->Payload_Data[7] = 0x00;
+
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+			(lp->NCSI_Respond.Command != (0x50 | 0x80)) ||
+			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+			(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+
+	// Update MAC Address
+	printk("NCSI: MAC  ");
+	for (i = 0; i < 6; i++)
+		printk("%02X:", lp->NCSI_Respond.Payload_Data[12+i]);
+	printk("\n");
+	memcpy(lp->NCSI_Request.SA, &lp->NCSI_Respond.Payload_Data[12], 6);
+	memcpy(dev->dev_addr, &lp->NCSI_Respond.Payload_Data[12], 6);
+
+	/* Update the MAC address */
+	ftgmac100_set_mac(lp, dev->dev_addr);
+}
+
+void Set_MAC_Affinity (struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID, i;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = 0x50;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (60 << 8);
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+
+		lp->NCSI_Request.Payload_Length = 60;
+		memset(lp->Payload_Data, 0x00, 60);
+		lp->Payload_Data[0] = 0x00;
+		lp->Payload_Data[1] = 0x00;
+		lp->Payload_Data[2] = 0x81;
+		lp->Payload_Data[3] = 0x19;
+
+		lp->Payload_Data[4] = 0x00;
+		lp->Payload_Data[5] = 0x01;
+		lp->Payload_Data[6] = 0x07;
+		lp->Payload_Data[7] = 0x00;
+
+		for (i = 0; i < 6; i++) {
+			lp->Payload_Data[8+i] = lp->NCSI_Request.SA[i];
+		}
+
+		lp->Payload_Data[14] = 0x09;
+
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+			(lp->NCSI_Respond.Command != (0x50 | 0x80)) ||
+			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+			(lp->Retry != RETRY_COUNT)) {
+
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Enable_Set_MAC_Address (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID, i;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = SET_MAC_ADDRESS;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (8 << 8);
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		lp->NCSI_Request.Payload_Length = 8;
+		for (i = 0; i < 6; i++) {
+			lp->Payload_Data[i] = lp->NCSI_Request.SA[i];
+		}
+		/* MAC Addr Num = 1 --> addrs filter 1, fixed in sample code */
+		lp->Payload_Data[6] = 1;
+		/* AT + Reserved + E */
+		lp->Payload_Data[7] = UNICAST + 0 + ENABLE_MAC_ADDRESS_FILTER;
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (SET_MAC_ADDRESS | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Enable_Broadcast_Filter (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = ENABLE_BROADCAST_FILTERING;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (4 << 8);
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		lp->NCSI_Request.Payload_Length = 4;
+		memset ((void *)lp->Payload_Data, 0, 4);
+		lp->Payload_Data[3] = 0x1; //ARP, DHCP, NetBIOS
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (ENABLE_BROADCAST_FILTERING | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+		lp->Retry = 0;
+}
+
+void Disable_Multicast_Filter (struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff *skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = DISABLE_GLOBAL_MULTICAST_FILTERING;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (DISABLE_GLOBAL_MULTICAST_FILTERING | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) && (lp->Retry != RETRY_COUNT)) {
+
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;    lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Disable_VLAN (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = DISABLE_VLAN;
+		Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (DISABLE_VLAN | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;    lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Get_Parameters (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = GET_PARAMETERS;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (GET_PARAMETERS | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+#if 0
+			printk ("Retry: Command = %x, Response_Code = %x,
+				Resonpd.Command = %x, IID = %x,
+				lp->InstanceID = %x\n",
+				lp->NCSI_Request.Command,
+				lp->NCSI_Respond.Response_Code,
+				lp->NCSI_Respond.Command, lp->NCSI_Respond.IID,
+				lp->InstanceID);
+#endif
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+			lp->NCSI_Cap.Capabilities_Flags = lp->NCSI_Respond.Payload_Data[0];
+			lp->NCSI_Cap.Broadcast_Packet_Filter_Capabilities = lp->NCSI_Respond.Payload_Data[1];
+			lp->NCSI_Cap.Multicast_Packet_Filter_Capabilities = lp->NCSI_Respond.Payload_Data[2];
+			lp->NCSI_Cap.Buffering_Capabilities = lp->NCSI_Respond.Payload_Data[3];
+			lp->NCSI_Cap.AEN_Control_Support = lp->NCSI_Respond.Payload_Data[4];
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Enable_Network_TX (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = ENABLE_CHANNEL_NETWORK_TX;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (ENABLE_CHANNEL_NETWORK_TX | 0x80))
+		|(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+		lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Disable_Network_TX (struct net_device * dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = DISABLE_CHANNEL_NETWORK_TX;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length +
+			(lp->NCSI_Request.Payload_Length % 4) + 8;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (DISABLE_CHANNEL_NETWORK_TX | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		} else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Enable_Channel (struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = ENABLE_CHANNEL;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (ENABLE_CHANNEL | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+void Disable_Channel (struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = DISABLE_CHANNEL;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (4 << 8);
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		lp->NCSI_Request.Payload_Length = 4;
+		memset ((void *)lp->Payload_Data, 0, 4);
+		lp->Payload_Data[3] = 0x1; //ALD
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (DISABLE_CHANNEL | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+}
+
+int Get_Link_Status (struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = GET_LINK_STATUS;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = 0;
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (GET_LINK_STATUS | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+
+	lp->Retry = 0;
+	if (lp->NCSI_Respond.Payload_Data[3] & 0x40) {
+		return (lp->NCSI_Respond.Payload_Data[3] & 0x01); //Link Up or Not
+	}
+	else {
+		return 0; //Auto Negotiate did not finish
+	}
+}
+
+void Set_Link (struct net_device *dev)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = SET_LINK;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (8 << 8);
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		lp->NCSI_Request.Payload_Length = 8;
+		memset ((void *)lp->Payload_Data, 0, 8);
+		lp->Payload_Data[2] = 0x02; //full duplex
+		lp->Payload_Data[3] = 0x04; //100M, auto-disable
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+		NCSI_Rx(dev);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		(lp->NCSI_Respond.Command != (SET_LINK | 0x80)) ||
+		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+		(lp->Retry != RETRY_COUNT)) {
+			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+
+	lp->Retry = 0;
+}
+
+void ncsi_start(struct net_device *dev) {
+	struct ftgmac100 *priv = netdev_priv(dev);
+	unsigned long Package_Found = 0, Channel_Found = 0, Re_Send = 0, Link_Status;
+
+	int i = 0;
+	//NCSI Start
+	//DeSelect Package/ Select Package
+	NCSI_Struct_Initialize(dev);
+	for (i = 0; i < 4; i++) {
+		DeSelect_Package (dev, i);
+		Package_Found = Select_Package (dev, i);
+		if (Package_Found == 1) {
+			//AST2100/AST2050/AST1100 supports 1 slave only
+			priv->NCSI_Cap.Package_ID = i;
+			break;
+		}
+	}
+	if (Package_Found != 0) {
+		/*
+		 * Initiali State
+		 * Suppose 2 channels in current version, You could modify it to
+		 * 0x1F to support 31 channels
+		 */
+		for (i = 0; i < 1; i++) {
+			//Channel_Found = Clear_Initial_State(dev, i);
+			Channel_Found = 1;
+			if (Channel_Found == 1) {
+				priv->NCSI_Cap.Channel_ID = i;
+				printk ("Found NCSI NW Controller at (%d, %d)\n",
+					priv->NCSI_Cap.Package_ID,
+					priv->NCSI_Cap.Channel_ID);
+				Get_MAC_Address(dev);
+				Set_MAC_Affinity(dev);
+				Clear_Initial_State(dev, i);
+				//Get Version and Capabilities
+				Get_Version_ID(dev);
+				Get_Capabilities(dev);
+				//Set MAC Address
+				Enable_Set_MAC_Address(dev);
+				//Enable Broadcast Filter
+				Enable_Broadcast_Filter(dev);
+				//Disable Multicast Filter
+				Disable_Multicast_Filter(dev);
+				//Disable VLAN
+				Disable_VLAN(dev);
+				//Enable AEN
+				//Enable_AEN(dev);
+				//Get Parameters
+				Get_Parameters(dev);
+				//Enable TX
+				Enable_Network_TX(dev);
+				//Enable Channel
+				Enable_Channel(dev);
+				//Get Link Status
+Re_Get_Link_Status:
+				//TODO: Workaround for CX4 Link status issue
+				//Link_Status = Get_Link_Status(dev);
+				Link_Status = LINK_UP;
+				if (Link_Status == LINK_UP) {
+					printk("Using NCSI Network Controller (%d, %d)\n",
+						priv->NCSI_Cap.Package_ID,
+						priv->NCSI_Cap.Channel_ID);
+					netif_carrier_on(dev);
+					break;
+				}
+				else if ((Link_Status == LINK_DOWN) && (Re_Send < 2)) {
+					Re_Send++;
+					netif_carrier_off(dev);
+					goto Re_Get_Link_Status;
+				}
+
+				//Disable TX
+				Disable_Network_TX(dev);
+				//Disable Channel
+				//Disable_Channel(dev);
+				Re_Send = 0;
+				Channel_Found = 0;
+			}
+		}
+	}
+}
+#endif /* NCSI_SUPPORT */
 
 /******************************************************************************
  * internal functions (hardware register access)
@@ -89,6 +1273,13 @@ static int ftgmac100_alloc_rx_page(struct ftgmac100 *priv,
 				 FTGMAC100_INT_XPKT_LOST	| \
 				 FTGMAC100_INT_AHB_ERR		| \
 				 FTGMAC100_INT_PHYSTS_CHG	| \
+				 FTGMAC100_INT_RPKT_BUF		| \
+				 FTGMAC100_INT_NO_RXBUF)
+
+#define INT_MASK_NCSI_ENABLED	(FTGMAC100_INT_RPKT_LOST	| \
+				 FTGMAC100_INT_XPKT_ETH		| \
+				 FTGMAC100_INT_XPKT_LOST	| \
+				 FTGMAC100_INT_AHB_ERR		| \
 				 FTGMAC100_INT_RPKT_BUF		| \
 				 FTGMAC100_INT_NO_RXBUF)
 
@@ -373,7 +1564,7 @@ static bool ftgmac100_rx_packet_error(struct ftgmac100 *priv,
 		error = true;
 	} else if (unlikely(ftgmac100_rxdes_ipcs_err(rxdes))) {
 		if (net_ratelimit())
-			netdev_info(netdev, "rx IP checksum err\n");
+			;//netdev_info(netdev, "rx IP checksum err\n");
 
 		error = true;
 	}
@@ -1046,11 +2237,10 @@ static int ftgmac100_poll(struct napi_struct *napi, int budget)
 	if (status & (FTGMAC100_INT_NO_RXBUF | FTGMAC100_INT_RPKT_LOST |
 		      FTGMAC100_INT_AHB_ERR | FTGMAC100_INT_PHYSTS_CHG)) {
 		if (net_ratelimit())
-			netdev_info(netdev, "[ISR] = 0x%x: %s%s%s%s\n", status,
-				    status & FTGMAC100_INT_NO_RXBUF ? "NO_RXBUF " : "",
-				    status & FTGMAC100_INT_RPKT_LOST ? "RPKT_LOST " : "",
-				    status & FTGMAC100_INT_AHB_ERR ? "AHB_ERR " : "",
-				    status & FTGMAC100_INT_PHYSTS_CHG ? "PHYSTS_CHG" : "");
+			netdev_info(netdev, "[ISR] = 0x%x: %s%s%s\n", status,
+			status & FTGMAC100_INT_NO_RXBUF ? "NO_RXBUF " : "",
+			status & FTGMAC100_INT_RPKT_LOST ? "RPKT_LOST " : "",
+			status & FTGMAC100_INT_AHB_ERR ? "AHB_ERR " : "");
 
 		if (status & FTGMAC100_INT_NO_RXBUF) {
 			/* RX buffer unavailable */
@@ -1067,7 +2257,14 @@ static int ftgmac100_poll(struct napi_struct *napi, int budget)
 		napi_complete(napi);
 
 		/* enable all interrupts */
-		iowrite32(INT_MASK_ALL_ENABLED, priv->base + FTGMAC100_OFFSET_IER);
+#ifdef NCSI_SUPPORT
+		iowrite32(INT_MASK_NCSI_ENABLED,
+				priv->base + FTGMAC100_OFFSET_IER);
+#else
+		iowrite32(INT_MASK_ALL_ENABLED,
+				priv->base + FTGMAC100_OFFSET_IER);
+#endif
+
 	}
 
 	return rx;
@@ -1087,7 +2284,8 @@ static int ftgmac100_open(struct net_device *netdev)
 		goto err_alloc;
 	}
 
-	err = request_irq(priv->irq, ftgmac100_interrupt, 0, netdev->name, netdev);
+	err = request_irq(priv->irq,
+			ftgmac100_interrupt, 0, netdev->name, netdev);
 	if (err) {
 		netdev_err(netdev, "failed to request irq %d\n", priv->irq);
 		goto err_irq;
@@ -1106,17 +2304,28 @@ static int ftgmac100_open(struct net_device *netdev)
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || defined(CONFIG_CMM)
 	ftgmac100_start_hw(priv, 1000);
+#elif defined(CONFIG_FBTP)
+	ftgmac100_start_hw(priv, 100);
 #else
 	ftgmac100_start_hw(priv, 10);
 #endif
 
+#ifdef NCSI_SUPPORT
+  ncsi_start(netdev);
+#else
 	phy_start(priv->phydev);
+#endif
+
 
 	napi_enable(&priv->napi);
 	netif_start_queue(netdev);
 
 	/* enable all interrupts */
+#ifdef NCSI_SUPPORT
+	iowrite32(INT_MASK_NCSI_ENABLED, priv->base + FTGMAC100_OFFSET_IER);
+#else
 	iowrite32(INT_MASK_ALL_ENABLED, priv->base + FTGMAC100_OFFSET_IER);
+#endif
 	return 0;
 
 err_hw:
@@ -1307,6 +2516,7 @@ static int ftgmac100_probe(struct platform_device *pdev)
 
 	priv->irq = irq;
 
+#ifndef NCSI_SUPPORT
 	/* initialize mdio bus */
 	priv->mii_bus = mdiobus_alloc();
 	if (!priv->mii_bus) {
@@ -1336,6 +2546,8 @@ static int ftgmac100_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "MII Probe failed!\n");
 		goto err_mii_probe;
 	}
+
+#endif
 
 	/* register network device */
 	err = register_netdev(netdev);

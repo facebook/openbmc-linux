@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
  * Copyright (C) 1998  Eddie C. Dost  (ecd@skynet.be)
- * Copyright (C) 2001,2002  Andi Kleen, SuSE Labs 
+ * Copyright (C) 2001,2002  Andi Kleen, SuSE Labs
  * Copyright (C) 2003       Pavel Machek (pavel@ucw.cz)
  *
  * These routines maintain argument size conversion between 32bit and 64bit
@@ -1465,6 +1465,7 @@ static long do_ioctl_trans(int fd, unsigned int cmd,
 	case I2C_FUNCS:
 		return w_long(fd, cmd, argp);
 	case I2C_RDWR:
+	case I2C_SLAVE_RDWR:
 		return do_i2c_rdwr_ioctl(fd, cmd, argp);
 	case I2C_SMBUS:
 		return do_i2c_smbus_ioctl(fd, cmd, argp);

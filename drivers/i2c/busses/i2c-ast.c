@@ -371,36 +371,37 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 			}
 			break;
 		case I2C_M_RD:	//slave write
-//			printk("slave write \n");
+			dev_info(i2c_dev->device, "slave write\n");
 			memcpy(msgs->buf, i2c_dev->slave_tx_msg.buf, I2C_S_BUF_SIZE);
 			break;
 		case I2C_S_EN:
 			if((msgs->addr < 0x1) || (msgs->addr > 0xff)) {
 				ret = -1;
-				printk("addrsss not correct !! \n");
+				dev_err(i2c_dev->device, "addrsss not correct !!\n");
 				return ret;
 			}
-			if(msgs->len != 1) printk("ERROR \n");
+			if(msgs->len != 1)
+				dev_err(i2c_dev->device, "ERROR\n");
+
 			ast_slave_mode_enable(i2c_dev, msgs);
 			break;
 		case I2C_S_ALT:
-//			printk("slave issue alt\n");
-			if(msgs->len != 1) printk("ERROR \n");
-			if(msgs->buf[0]==1)
+			dev_err(i2c_dev->device, "slave issue alt\n");
+			if (msgs->len != 1)
+				dev_err(i2c_dev->device, "ERROR\n");
+			if (msgs->buf[0] == 1)
 				ast_slave_issue_alert(i2c_dev, 1);
 			else
 				ast_slave_issue_alert(i2c_dev, 0);
 			break;
 
 		default:
-			printk("slave xfer error \n");
+			dev_err(i2c_dev->device, "slave xfer error\n");
 			break;
 
 	}
 	return ret;
 }
-
-
 #endif
 
 static u8

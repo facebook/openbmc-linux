@@ -2116,7 +2116,7 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 EXPORT_SYMBOL(i2c_transfer);
 
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
-int i2c_slave_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
+int i2c_slave_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	unsigned long orig_jiffies;
 	int ret, try;
@@ -2127,16 +2127,24 @@ int i2c_slave_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 			"len=%d\n", (msgs->flags & I2C_S_RD)
 			? 'R' : 'W', msgs->addr, msgs->len);
 #endif
-		i2c_lock_adapter(adap);
-		ret = adap->algo->slave_xfer(adap, msgs);
-		i2c_unlock_adapter(adap);
+		if (in_atomic() || irqs_disabled()) {
+				ret = i2c_trylock_adapter(adap);
+		if (!ret)
+			/* I2C activity is ongoing. */
+			return -EAGAIN;
 
+		i2c_lock_adapter(adap);
+
+		ret = adap->algo->slave_xfer(adap, msgs);
+
+		i2c_unlock_adapter(adap);
 		return ret;
 	} else {
 		dev_dbg(&adap->dev, "I2C level transfers not supported\n");
 		return -EOPNOTSUPP;
 	}
 }
+
 EXPORT_SYMBOL(i2c_slave_transfer);
 
 #endif

@@ -242,4 +242,152 @@ struct ftgmac100_rxdes {
 #define FTGMAC100_RXDES1_UDP_CHKSUM_ERR	(1 << 26)
 #define FTGMAC100_RXDES1_IP_CHKSUM_ERR	(1 << 27)
 
+/* NCSI */
+
+/* NCSI define & structure */
+/* NC-SI Command Packet */
+typedef struct {
+/* Ethernet Header */
+	unsigned char  DA[6];
+	unsigned char  SA[6];
+	unsigned short EtherType;	/*DMTF NC-SI */
+/* NC-SI Control Packet */
+	/* Management Controller should set this field to 0x00 */
+	unsigned char  MC_ID;
+	/* For NC-SI 1.0 spec, this field has to set 0x01 */
+	unsigned char  Header_Revision;
+	unsigned char  Reserved_1; /* Reserved has to set to 0x00 */
+	unsigned char  IID;	/* Instance ID */
+	unsigned char  Command;
+	unsigned char  Channel_ID;
+	/* Payload Length = 12 bits, 4 bits are reserve */
+	unsigned short Payload_Length;
+	unsigned long  Reserved_2;
+	unsigned long  Reserved_3;
+} NCSI_Command_Packet;
+
+/* Command and Response Type */
+#define CLEAR_INITIAL_STATE     0x00
+#define SELECT_PACKAGE        0x01
+#define DESELECT_PACKAGE      0x02
+#define ENABLE_CHANNEL        0x03
+#define DISABLE_CHANNEL       0x04
+#define RESET_CHANNEL       0x05
+#define ENABLE_CHANNEL_NETWORK_TX   0x06
+#define DISABLE_CHANNEL_NETWORK_TX    0x07
+#define AEN_ENABLE        0x08
+#define SET_LINK        0x09
+#define GET_LINK_STATUS       0x0A
+#define SET_VLAN_FILTER       0x0B
+#define ENABLE_VLAN       0x0C
+#define DISABLE_VLAN        0x0D
+#define SET_MAC_ADDRESS       0x0E
+#define ENABLE_BROADCAST_FILTERING    0x10
+#define DISABLE_BROADCAST_FILTERING   0x11
+#define ENABLE_GLOBAL_MULTICAST_FILTERING 0x12
+#define DISABLE_GLOBAL_MULTICAST_FILTERING  0x13
+#define SET_NCSI_FLOW_CONTROL     0x14
+#define GET_VERSION_ID        0x15
+#define GET_CAPABILITIES      0x16
+#define GET_PARAMETERS        0x17
+#define GET_CONTROLLER_PACKET_STATISTICS  0x18
+#define GET_NCSI_STATISTICS     0x19
+#define GET_NCSI_PASS_THROUGH_STATISTICS  0x1A
+
+/* NC-SI Response Packet */
+typedef struct {
+	unsigned char  DA[6];
+	unsigned char  SA[6];
+	unsigned short EtherType; /* DMTF NC-SI */
+/* NC-SI Control Packet */
+	/* Management Controller should set this field to 0x00 */
+	unsigned char  MC_ID;
+	/* For NC-SI 1.0 spec, this field has to set 0x01 */
+	unsigned char  Header_Revision;
+	unsigned char  Reserved_1; /* Reserved has to set to 0x00 */
+	unsigned char  IID; /* Instance ID */
+	unsigned char  Command;
+	unsigned char  Channel_ID;
+	/* Payload Length = 12 bits, 4 bits are reserved */
+	unsigned short Payload_Length;
+	unsigned short  Reserved_2;
+	unsigned short  Reserved_3;
+	unsigned short  Reserved_4;
+	unsigned short  Reserved_5;
+	unsigned short  Response_Code;
+	unsigned short  Reason_Code;
+	unsigned char   Payload_Data[128];
+} NCSI_Response_Packet;
+
+/* Standard Response Code */
+#define COMMAND_COMPLETED     0x00
+#define COMMAND_FAILED        0x01
+#define COMMAND_UNAVAILABLE     0x02
+#define COMMAND_UNSUPPORTED     0x03
+
+/* Standard Reason Code */
+#define NO_ERROR        0x0000
+#define INTERFACE_INITIALIZATION_REQUIRED 0x0001
+#define PARAMETER_IS_INVALID      0x0002
+#define CHANNEL_NOT_READY     0x0003
+#define PACKAGE_NOT_READY     0x0004
+#define INVALID_PAYLOAD_LENGTH      0x0005
+#define UNKNOWN_COMMAND_TYPE      0x7FFF
+
+struct AEN_Packet {
+/* Ethernet Header */
+	unsigned char  DA[6];
+	unsigned char  SA[6]; /* Network Controller SA = FF:FF:FF:FF:FF:FF */
+	unsigned short EtherType; /* DMTF NC-SI */
+/* AEN Packet Format */
+	/* Network Controller should set this field to 0x00 */
+	unsigned char  MC_ID;
+	/* For NC-SI 1.0 spec, this field has to set 0x01 */
+	unsigned char  Header_Revision;
+	unsigned char  Reserved_1; /* Reserved has to set to 0x00 */
+/*    unsigned char  IID = 0x00; // Instance ID = 0 in Network Controller */
+/*    unsigned char  Command = 0xFF; // AEN = 0xFF */
+	unsigned char  Channel_ID;
+	/* Payload Length = 4 in Network Controller AEN Packet */
+/*    unsigned short Payload_Length = 0x04; */
+	unsigned long  Reserved_2;
+	unsigned long  Reserved_3;
+	unsigned char  AEN_Type;
+/*    unsigned char  Reserved_4[3] = {0x00, 0x00, 0x00}; */
+	unsigned long  Optional_AEN_Data;
+	unsigned long  Payload_Checksum;
+};
+
+/* AEN Type */
+#define LINK_STATUS_CHANGE      0x0
+#define CONFIGURATION_REQUIRED      0x1
+#define HOST_NC_DRIVER_STATUS_CHANGE    0x2
+
+typedef struct {
+	unsigned char Package_ID;
+	unsigned char Channel_ID;
+	unsigned long Capabilities_Flags;
+	unsigned long Broadcast_Packet_Filter_Capabilities;
+	unsigned long Multicast_Packet_Filter_Capabilities;
+	unsigned long Buffering_Capabilities;
+	unsigned long AEN_Control_Support;
+} NCSI_Capability;
+NCSI_Capability NCSI_Cap;
+
+/* SET_MAC_ADDRESS */
+#define UNICAST   (0x00 << 5)
+#define MULTICAST_ADDRESS (0x01 << 5)
+#define DISABLE_MAC_ADDRESS_FILTER  0x00
+#define ENABLE_MAC_ADDRESS_FILTER 0x01
+
+/* GET_LINK_STATUS */
+#define LINK_DOWN 0
+#define LINK_UP   1
+
+#define NCSI_LOOP   100
+#define RETRY_COUNT     1
+
+/* Reversed because of 0x88 is low byte, 0xF8 is high byte in memory */
+#define NCSI_HEADER 0xF888
+
 #endif /* __FTGMAC100_H */

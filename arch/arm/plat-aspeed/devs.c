@@ -74,7 +74,7 @@ init_fnc_t __initdata *init_all_device[] = {
 	//ast_add_device_hid,	
 	//ast_add_device_video,		
 	//ast_add_device_fb,	
-	//ast_add_device_kcs,
+	ast_add_device_kcs,
 	ast_add_device_bt,
 	ast_add_device_snoop,
 	//ast_add_device_mailbox,

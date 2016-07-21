@@ -32,6 +32,9 @@ else
 ifdef CONFIG_WEDGE
 obj-y += dev-spi-wedge.o dev-i2c.o
 else
+ifdef CONFIG_FBTP
+obj-y += dev-spi-cmm.o dev-i2c.o
+endif
 obj-y += dev-spi.o dev-i2c.o
 endif
 endif

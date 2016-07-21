@@ -436,7 +436,237 @@ struct platform_device ast_i2c_dev13_device = {
 #endif
 
 /*--------- I2C Board devices ------------*/
-//AST EVB I2C Device 
+#ifdef CONFIG_FBTP
+static struct i2c_board_info ast_i2c_board_info_0[] __initdata = {
+	// SMBus for LAN
+
+	// U5D1, CPU0, PIROM, 0xA0
+
+	// U2D1, CPU1, PIROM, 0xA2
+
+	// J1C1, Airmax ConnB, FRU 0xA8, Temp 0x98
+
+	// Can probe: 0xA0, 0xA2
+	// TODO: the PIROM supports only smbus-read/write a single byte
+	//  might need to write a driver or library function
+};
+
+static struct i2c_board_info ast_i2c_board_info_1[] __initdata = {
+	// SMBus for SlotX24 devices
+
+	// J9F1, HSCE8 200, NA
+
+	// J1T1, HSEC8 60, NA
+
+	// EU9E4, P17C9X1172, 0x6A
+
+	// U8D7, CPLD, UART, 0x8C
+
+	//TODO: probed 0x40 and 0xE2 only
+};
+
+static struct i2c_board_info ast_i2c_board_info_2[] __initdata = {
+#if 0
+	// SMBus for OCP LAN
+
+	// J9B3, Mezz A connector
+	// NIC: 0xE0, 0xC8
+	// Temp: 0x3E
+	// FRU: None
+
+	//TODO: probed 0x2C only
+#endif
+};
+
+/*
+ * Under I2C Dev 3
+ */
+static struct i2c_board_info ast_i2c_board_info_3[] __initdata = {
+	// SMBus for Host interface
+
+	// EU8E1, CKMNG+, 0xD0
+
+	// EU4C4, DB1200ZL, 0xD8
+
+	// J8B1, ME Debug, NA
+
+	// U2M3, Board ID EEPROM, 0xA8(ONLY for BIOS?)
+
+	// JPA3, XDP, N/A
+
+	// PCH, SMT1 0x90, Slave 0x88
+
+	// TODO: Probed 0x10, 0x88, 0x90, 0xA8, 0xD0, 0xD8
+};
+/*
+ * Under I2C Dev 4
+ */
+static struct i2c_board_info ast_i2c_board_info_4[] __initdata = {
+	// SMBus for SML0
+
+	// EU9E1, I210, 0xC6
+
+	// PCH, SML0, SMT2, 0x2C
+
+	// TODO: probed 0x2C
+};
+/*
+ * Under I2C Dev 5
+ */
+static struct i2c_board_info ast_i2c_board_info_5[] __initdata = {
+	// SMBus for VR Devices
+
+	// EU1F3, PXM1310B, 0x0C(found:cpu1/vddqGHJ)
+
+	// EU1B1, PXM1310B, 0x04(cpu1/vddqKLM)
+
+	// EU7A5, PXM1310B, 0x14(found: cpu0/vddqDEF)
+
+	// EU8A1, PXE1110J, 0xD0(found: PCH/pvnn)
+
+	// J4B2, MCP CPU1, N/A
+
+	// EU4D2, PXE1610B, 0x90(found: cpu0/vccIn)
+
+	// EU4D3, PXE1110J, 0xB4(cpu1/vccIO)
+
+	// EU1C2, PXE1610B, 0xB0(cpu1/vccIn)
+
+	// EU7F1, PXM1310B, 0x1C(found: CPU0/vddqABC)
+
+	// EU3N1, PXE1110J, 0x94(found: cpu0/vccIO)
+
+	//TODO: Probed 0xC, 0x14, 0x1C, 0x90, 0x94, 0xD0
+};
+
+/*
+ * Under I2C Dev 6
+ */
+static struct i2c_board_info ast_i2c_board_info_6[] __initdata = {
+	// SMBus for Sensors
+
+	// U8D7, CPLD:
+	// 0x80: Programming, 0x82: I2C dev1, 0x84: I2C dev2, 0x86: I2C master rst#
+
+
+	// J8E1, TPM, 0xDC
+
+	// U8D1, AT24C64, 0xA8
+	      {
+		I2C_BOARD_INFO("24c64", 0x54),
+	      },
+
+	// J9F1, HSCE8 200, N/A
+
+	// U9B1, TMP421, 0x9C
+	      {
+		I2C_BOARD_INFO("tmp421", 0x4e),
+	      },
+
+	// U1D1, TMP421, 0x9E
+	      {
+		I2C_BOARD_INFO("tmp421", 0x4f),
+	      },
+
+	// EU9F1, ADC128D818, 0x1D
+
+	//TODO: Probed 0x3A, 0x40, 0x80, 0x82, 0x86, 0x9C, 0x9e, 0xA8
+};
+/*
+ * Under I2C Dev 7
+ */
+static struct i2c_board_info ast_i2c_board_info_7[] __initdata = {
+	// SMBus for PMBUS
+
+	// J1F1, AirMax conn A, FRU 0xA8, Temp 0x98
+
+
+	// J1E3, 1X8 conn, NA
+
+	// EU1D1, ADM1278, 0x22
+	{
+		I2C_BOARD_INFO("adm1278", 0x11),
+	},
+
+
+	// U2M2, PCA9517, EN
+
+	// PCH, SML1, SMT3, 0x2E
+
+	// TODO: probed 0x22
+};
+/*
+ * Under I2C Dev 8
+ */
+static struct i2c_board_info ast_i2c_board_info_8[] __initdata = {
+	// SMBus for OCP FRU devices
+
+	// J8E4, Mezz C connector
+	// FRU: 0xAE, Temp: 0x3E(0x98 rsvd)
+	{
+		I2C_BOARD_INFO("tmp421", 0x1f),
+	},
+
+	// J9B3, Mezz A connector
+	// FRU: 0xA2, Temp: 0x3E(0x92 rsvd)
+
+	// J8A4, MCP Sideband HFI
+	// FRU: 0xA2, Temp: 0x3E(0x92 rsvd)
+
+	//TODO: probed 0x3e, 0xc2
+};
+
+/*
+ * Under I2C Dev 9
+ */
+static struct i2c_board_info ast_i2c_board_info_9[] __initdata = {
+	// SMBus for Debug
+
+	// U9A3, PCA9555, 0x4E
+
+	// J9A5, USB3.0, NA
+};
+
+/*
+ * Under I2C Dev 10
+ */
+
+static struct i2c_board_info ast_i2c_board_info_10[] __initdata = {
+	// SMbus for PEHPCPU0
+	// 0x42, 0x44
+
+	// U5D1, CPU0, 0x22
+};
+
+/*
+ * Under I2C Dev 11
+ */
+static struct i2c_board_info ast_i2c_board_info_11[] __initdata = {
+	// SMbus for PEHPCPU1
+
+	// J1C1, Airmax Conn B
+	// 0xB6, 0xC6
+
+	// U1B1, PCA9517, EN
+
+	// U2D1, CPU1, 0x22
+};
+
+/*
+ * Under I2C Dev 12
+ */
+static struct i2c_board_info ast_i2c_board_info_12[] __initdata = {
+	// SMbus for PEHPCPU0
+
+	// 0x46, 0x48
+
+	// U1R1, PCA9517, EN
+
+	// U5D1, CPU0, 0x22
+};
+
+#else
+//AST EVB I2C Device
 static struct i2c_board_info __initdata ast_i2c_board_info_0[] = {
 	{	
 		I2C_BOARD_INFO("ddc", 0x50),
@@ -494,6 +724,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 	}
 };
 
+#endif
 /*-------------------------------------*/
 #ifdef CONFIG_CMM
 void __init ast_add_device_i2c(void)
@@ -523,6 +754,61 @@ void __init ast_add_device_i2c(void)
    */
 
   platform_device_register(&ast_i2c_dev13_device);
+}
+
+#elif CONFIG_FBTP
+void __init ast_add_device_i2c(void)
+{
+	/* I2C Multi-Pin */
+	ast_scu_multi_func_i2c();
+
+	ast_i2c_data.reg_gr = ioremap(AST_I2C_BASE, 4*SZ_16);
+	if (!ast_i2c_data.reg_gr) {
+		printk(KERN_ERR "ast_add_device_i2c ERROR \n");
+		return;
+	}
+
+	platform_device_register(&ast_i2c_dev0_device);
+	platform_device_register(&ast_i2c_dev1_device);
+	platform_device_register(&ast_i2c_dev2_device);
+	platform_device_register(&ast_i2c_dev3_device);
+	platform_device_register(&ast_i2c_dev4_device);
+	platform_device_register(&ast_i2c_dev5_device);
+	platform_device_register(&ast_i2c_dev6_device);
+	platform_device_register(&ast_i2c_dev7_device);
+	platform_device_register(&ast_i2c_dev8_device);
+	platform_device_register(&ast_i2c_dev9_device);
+	platform_device_register(&ast_i2c_dev10_device);
+	platform_device_register(&ast_i2c_dev11_device);
+	platform_device_register(&ast_i2c_dev12_device);
+	platform_device_register(&ast_i2c_dev13_device);
+
+	i2c_register_board_info(0, ast_i2c_board_info_0,
+			ARRAY_SIZE(ast_i2c_board_info_0));
+	i2c_register_board_info(1, ast_i2c_board_info_1,
+			ARRAY_SIZE(ast_i2c_board_info_1));
+	i2c_register_board_info(2, ast_i2c_board_info_2,
+			ARRAY_SIZE(ast_i2c_board_info_2));
+	i2c_register_board_info(3, ast_i2c_board_info_3,
+			ARRAY_SIZE(ast_i2c_board_info_3));
+	i2c_register_board_info(4, ast_i2c_board_info_4,
+			ARRAY_SIZE(ast_i2c_board_info_4));
+	i2c_register_board_info(5, ast_i2c_board_info_5,
+			ARRAY_SIZE(ast_i2c_board_info_5));
+	i2c_register_board_info(6, ast_i2c_board_info_6,
+			ARRAY_SIZE(ast_i2c_board_info_6));
+	i2c_register_board_info(7, ast_i2c_board_info_7,
+			ARRAY_SIZE(ast_i2c_board_info_7));
+	i2c_register_board_info(8, ast_i2c_board_info_8,
+			ARRAY_SIZE(ast_i2c_board_info_8));
+	i2c_register_board_info(9, ast_i2c_board_info_9,
+			ARRAY_SIZE(ast_i2c_board_info_9));
+	i2c_register_board_info(10, ast_i2c_board_info_10,
+			ARRAY_SIZE(ast_i2c_board_info_10));
+	i2c_register_board_info(11, ast_i2c_board_info_11,
+			ARRAY_SIZE(ast_i2c_board_info_11));
+	i2c_register_board_info(12, ast_i2c_board_info_12,
+			ARRAY_SIZE(ast_i2c_board_info_12));
 }
 
 #else

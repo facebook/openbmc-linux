@@ -71,6 +71,8 @@ extern int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
 /* Unlocked flavor */
 extern int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
 			  int num);
+extern int i2c_slave_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+			int num);
 
 /* This is the very generalized SMBus access routine. You probably do not
    want to use this, though; one of the functions below may be much easier,
@@ -607,14 +609,6 @@ static inline u32 i2c_get_functionality(struct i2c_adapter *adap)
 {
 	return adap->algo->functionality(adap);
 }
-
-#ifdef CONFIG_AST_I2C_SLAVE_RDWR
-static inline int i2cdev_ioctl_slave_rdrw(struct i2c_adapter *adap,
-		struct i2c_msg *msgs)
-{
-	return adap->algo->slave_xfer(adap, msgs);
-}
-#endif
 
 /* Return 1 if adapter supports everything we need, 0 if not. */
 static inline int i2c_check_functionality(struct i2c_adapter *adap, u32 func)
