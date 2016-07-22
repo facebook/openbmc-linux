@@ -427,7 +427,7 @@ static int adm1275_probe(struct i2c_client *client,
 		info->format[PSC_POWER] = direct;
 		info->format[PSC_TEMPERATURE] = direct;
 		info->func[0] |= PMBUS_HAVE_VIN | PMBUS_HAVE_VOUT
-		  | PMBUS_HAVE_STATUS_INPUT
+		  | PMBUS_HAVE_STATUS_INPUT | PMBUS_HAVE_PIN
 		  | PMBUS_HAVE_TEMP | PMBUS_HAVE_STATUS_TEMP;
 		info->m[PSC_POWER] = 6123 * r_sense / 1000;
 		info->b[PSC_POWER] = 0;

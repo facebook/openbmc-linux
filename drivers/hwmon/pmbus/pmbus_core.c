@@ -506,13 +506,13 @@ static long pmbus_reg2data_direct(struct pmbus_data *data,
 		R += 3;
 		b *= 1000;
 	}
-
+#if 0
 	/* scale result to micro-units for power sensors */
 	if (sensor->class == PSC_POWER) {
 		R += 3;
 		b *= 1000;
 	}
-
+#endif
 	while (R > 0) {
 		val *= 10;
 		R--;
@@ -775,7 +775,7 @@ static ssize_t pmbus_show_sensor(struct device *dev,
 
 	if (sensor->data < 0)
 		return sensor->data;
-	if (sensor->data == 0xffff) 
+	if (sensor->data == 0xffff)
 		return 0;
 
 	return snprintf(buf, PAGE_SIZE, "%ld\n", pmbus_reg2data(data, sensor));
@@ -1664,7 +1664,7 @@ static const u32 pmbus_mfr_registers[] = {
 	PMBUS_MFR_ID,
 	PMBUS_MFR_MODEL,
 	PMBUS_MFR_REVISION,
-	/* 
+	/*
 	 * PMBUS_MFR_LOCATION is not implemented according to spec
 	 * in the pfe1100;  rather than showing up as a block read,
 	 * it's a word read.  Even worse, our block read implementation
@@ -1706,7 +1706,7 @@ static int pmbus_add_mfr_attributes(struct i2c_client *client,
 
 		pmbus_wait(client);
 		ret = i2c_smbus_read_block_data(client, pmbus_mfr_registers[f],
-						buf);	
+						buf);
 		pmbus_update_wait(client);
 		if (ret <= 0)
 			continue;
