@@ -1,5 +1,5 @@
 /*
- *  ast_i2c_h  
+ *  ast_i2c_h
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,11 +17,11 @@
 #if defined(AST_SOC_G4)
 #define AST_I2C_DMA_SIZE				0
 #define AST_I2C_PAGE_SIZE 				256
-#define MASTER_XFER_MODE				BUFF_MODE
+#define MASTER_XFER_MODE				INC_DMA_MODE
 #define SLAVE_XFER_MODE				BYTE_MODE
 #define NUM_BUS 14
 
-#define AST_I2C_POOL_BUFF_2048	
+#define AST_I2C_POOL_BUFF_2048
 #define AST_I2C_BUFFER_POOL2	0x200
 #define AST_I2C_BUFFER_POOL1	0x800
 #elif defined(AST_SOC_G3)
@@ -63,7 +63,7 @@ typedef enum i2c_slave_stage {
 
 typedef enum i2c_xfer_mode {
 	BYTE_XFER,
-	BUFF_XFER,			
+	BUFF_XFER,
 	DEC_DMA_XFER,
 	INC_DMA_XFER
 } i2c_xfer_mode_t;
@@ -80,9 +80,9 @@ struct buf_page
 
 typedef enum i2c_slave_event_e {
         I2C_SLAVE_EVENT_START_READ,
-        I2C_SLAVE_EVENT_READ,			
+        I2C_SLAVE_EVENT_READ,
         I2C_SLAVE_EVENT_START_WRITE,
-        I2C_SLAVE_EVENT_WRITE,     
+        I2C_SLAVE_EVENT_WRITE,
         I2C_SLAVE_EVENT_NACK,
         I2C_SLAVE_EVENT_STOP
 } i2c_slave_event_t;
