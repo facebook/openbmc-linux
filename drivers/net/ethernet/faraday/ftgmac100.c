@@ -88,6 +88,7 @@ struct ftgmac100 {
 	unsigned char Payload_Data[64];
 	unsigned char Payload_Pad[4];
 	unsigned long Payload_Checksum;
+  unsigned int mezz_type;
 #endif
 };
 
@@ -495,6 +496,13 @@ void Get_Version_ID (struct net_device * dev)
 		}
 	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
 	lp->Retry = 0;
+  // Set mezz type based on IANA ID
+  if (lp->NCSI_Respond.Payload_Data[32] == 0x00 && lp->NCSI_Respond.Payload_Data[33] == 0x00 &&
+    lp->NCSI_Respond.Payload_Data[34] == 0x81 && lp->NCSI_Respond.Payload_Data[35] == 0x19) {
+    lp->mezz_type = 0x01;
+  } else {
+    lp->mezz_type = -1;
+  }
 }
 
 void Get_Capabilities (struct net_device * dev)
@@ -582,7 +590,7 @@ void Enable_AEN (struct net_device * dev)
 	lp->Retry = 0;
 }
 
-void Get_MAC_Address (struct net_device * dev)
+void Get_MAC_Address_mlx(struct net_device * dev)
 {
 	struct ftgmac100 *lp = netdev_priv(dev);
 	unsigned long Combined_Channel_ID, i;
@@ -644,7 +652,70 @@ void Get_MAC_Address (struct net_device * dev)
 	ftgmac100_set_mac(lp, dev->dev_addr);
 }
 
-void Set_MAC_Affinity (struct net_device *dev)
+void Get_MAC_Address_bcm(struct net_device * dev)
+{
+  struct ftgmac100 *lp = netdev_priv(dev);
+  unsigned long Combined_Channel_ID, i;
+  struct sk_buff * skb;
+
+    do {
+  skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+  memset(skb->data, 0, TX_BUF_SIZE + 16);
+//TX
+  lp->InstanceID++;
+  lp->NCSI_Request.IID = lp->InstanceID;
+  lp->NCSI_Request.Command = 0x50;
+  Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+  lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+  lp->NCSI_Request.Payload_Length = (12 << 8);
+  memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+  lp->NCSI_Request.Payload_Length = 12;
+  lp->Payload_Data[0] = 0x00;
+  lp->Payload_Data[1] = 0x00;
+  lp->Payload_Data[2] = 0x11;
+  lp->Payload_Data[3] = 0x3D;
+
+  lp->Payload_Data[4] = 0x00;
+  lp->Payload_Data[5] = 0x01;
+  lp->Payload_Data[6] = 0x00;
+  lp->Payload_Data[7] = 0x00;
+
+  //copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+  memcpy ((unsigned char *)(skb->data + 30), &lp->Payload_Data, lp->NCSI_Request.Payload_Length);
+  //skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+  skb->len =  30 + lp->NCSI_Request.Payload_Length;
+  ftgmac100_wait_to_send_packet (skb, dev);
+
+//RX
+  NCSI_Rx(dev);
+  if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (0x50 | 0x80)) || (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) && (lp->Retry != RETRY_COUNT)) {
+    //printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+    //printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+    lp->Retry++;
+    lp->InstanceID--;
+  }
+  else {
+    lp->Retry = 0;
+  }
+    } while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+    lp->Retry = 0;
+
+  // Update MAC Address
+  printk("NCSI: MAC  ");
+  for (i = 0; i < 6; i++)
+    printk("%02X:", lp->NCSI_Respond.Payload_Data[32+i]);
+  printk("\n");
+
+  // Increase mac address by 1 for BMC's address
+  lp->NCSI_Respond.Payload_Data[37] = lp->NCSI_Respond.Payload_Data[37] + 1;;
+  memcpy(lp->NCSI_Request.SA, &lp->NCSI_Respond.Payload_Data[32], 6);
+  memcpy(dev->dev_addr, &lp->NCSI_Respond.Payload_Data[32], 6);
+
+  /* Update the MAC address */
+  ftgmac100_set_mac(lp, dev->dev_addr);
+}
+
+void Set_MAC_Affinity_mlx(struct net_device *dev)
 {
 	struct ftgmac100 *lp = netdev_priv(dev);
 	unsigned long Combined_Channel_ID, i;
@@ -1191,8 +1262,9 @@ void ncsi_start(struct net_device *dev) {
 	//DeSelect Package/ Select Package
 	NCSI_Struct_Initialize(dev);
 	for (i = 0; i < 4; i++) {
-		DeSelect_Package (dev, i);
-		Package_Found = Select_Package (dev, i);
+		// DeSelect_Package (dev, i);
+		// Package_Found = Select_Package (dev, i);
+    Package_Found = 1;
 		if (Package_Found == 1) {
 			//AST2100/AST2050/AST1100 supports 1 slave only
 			priv->NCSI_Cap.Package_ID = i;
@@ -1213,11 +1285,18 @@ void ncsi_start(struct net_device *dev) {
 				printk ("Found NCSI NW Controller at (%d, %d)\n",
 					priv->NCSI_Cap.Package_ID,
 					priv->NCSI_Cap.Channel_ID);
-				Get_MAC_Address(dev);
-				Set_MAC_Affinity(dev);
 				Clear_Initial_State(dev, i);
-				//Get Version and Capabilities
+        mdelay(500);
 				Get_Version_ID(dev);
+        mdelay(500);
+        if (priv->mezz_type == 0x01) {
+          Get_MAC_Address_mlx(dev);
+          Set_MAC_Affinity_mlx(dev);
+        } else {
+          Get_MAC_Address_bcm(dev);
+          mdelay(500);
+        }
+
 				Get_Capabilities(dev);
 				//Set MAC Address
 				Enable_Set_MAC_Address(dev);
@@ -2345,7 +2424,9 @@ static int ftgmac100_stop(struct net_device *netdev)
 
 	netif_stop_queue(netdev);
 	napi_disable(&priv->napi);
+#ifndef NCSI_SUPPORT
 	phy_stop(priv->phydev);
+#endif
 
 	ftgmac100_stop_hw(priv);
 	free_irq(priv->irq, netdev);
