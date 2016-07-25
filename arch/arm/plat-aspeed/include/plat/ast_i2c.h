@@ -17,7 +17,7 @@
 #if defined(AST_SOC_G4)
 #define AST_I2C_DMA_SIZE				0
 #define AST_I2C_PAGE_SIZE 				256
-#define MASTER_XFER_MODE				INC_DMA_MODE
+#define MASTER_XFER_MODE				BUFF_MODE
 #define SLAVE_XFER_MODE				BYTE_MODE
 #define NUM_BUS 14
 
@@ -42,7 +42,7 @@
 #define AST_I2C_DMA_SIZE 				4095
 #define AST_I2C_PAGE_SIZE 				16
 #define MASTER_XFER_MODE				INC_DMA_MODE
-#define SLAVE_XFER_MODE				INC_DMA_MODE
+#define SLAVE_XFER_MODE				BYTE_MODE
 
 #define NUM_BUS 8
 
