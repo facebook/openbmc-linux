@@ -2132,8 +2132,9 @@ int i2c_slave_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 		if (!ret)
 			/* I2C activity is ongoing. */
 			return -EAGAIN;
-
-		i2c_lock_adapter(adap);
+    } else {
+      i2c_lock_adapter(adap);
+    }
 
 		ret = adap->algo->slave_xfer(adap, msgs);
 

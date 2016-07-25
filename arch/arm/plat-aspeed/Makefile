@@ -26,17 +26,24 @@ obj-y 	                += dev-nor.o dev-nand.o dev-sdhci.o
 #bus
 obj-y                   += dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o dev-peci.o dev-kcs.o dev-bt.o dev-snoop.o dev-mbx.o dev-pcie.o dev-jtag.o dev-mctp.o dev-xdma.o
 
-ifdef CONFIG_CMM
-obj-y += dev-spi-cmm.o dev-i2c-cmm.o dev-i2c-common.o
-else
-ifdef CONFIG_WEDGE
-obj-y += dev-spi-wedge.o dev-i2c.o
-else
-ifdef CONFIG_FBTP
-obj-y += dev-spi-cmm.o dev-i2c.o
+PLATFB := 0
+ifeq ($(CONFIG_CMM),y)
+  obj-y += dev-spi-cmm.o dev-i2c-cmm.o dev-i2c-common.o
+  PLATFB = 1
 endif
-obj-y += dev-spi.o dev-i2c.o
+
+ifeq ($(CONFIG_WEDGE), y)
+  obj-y += dev-spi-wedge.o dev-i2c.o
+  PLATFB = 1
 endif
+
+ifeq ($(CONFIG_FBTP), y)
+  obj-y += dev-spi-cmm.o dev-i2c.o
+  PLATFB = 1
+endif
+
+ifneq ($(PLATFB), 1)
+  obj-y += dev-spi.o dev-i2c.o
 endif
 
 #dev
