@@ -2,23 +2,23 @@
 * File Name     : ast_kcs.c
 * Author         : Ryan Chen
 * Description   : AST IPMI KCS
-* 
+*
 * Copyright (C) 2012-2020  ASPEED Technology Inc.
-* This program is free software; you can redistribute it and/or modify 
-* it under the terms of the GNU General Public License as published by the Free Software Foundation; 
-* either version 2 of the License, or (at your option) any later version. 
-* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY; 
-* without even the implied warranty of MERCHANTABILITY or 
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
-* You should have received a copy of the GNU General Public License 
-* along with this program; if not, write to the Free Software 
-* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by the Free Software Foundation;
+* either version 2 of the License, or (at your option) any later version.
+* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
+* without even the implied warranty of MERCHANTABILITY or
+* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 *
 *   Version      : 1.0
-*   History      : 
-*      1. 2016/01/30 Ryan Chen create this file 
-*    
-# Linux x86 host 
+*   History      :
+*      1. 2016/01/30 Ryan Chen create this file
+*
+# Linux x86 host
 # modprobe ipmi_si type=kcs ports=0xca2 regspacings=1
 # modprobe ipmi_si type=kcs ports=0xca8 regspacings=4
 # x86 KCS Port : CA2/CA3, CB2/CB3, CA0/CA4, CA8/CAC
@@ -48,7 +48,7 @@
 
 struct kcs_parameter {
 	u8	ch_enable;
-	u8	ch_type;	
+	u8	ch_type;
 };
 
 
@@ -82,7 +82,7 @@ struct kcs_parameter {
 #define KCS_UNSPECIFIED_ERROR		0xff
 
 ////////////////////////////////////////////////////////////////
-//read id 
+//read id
 u8 sbuf[18] = {0x1c, 0x01, 0x00, 0x20, 0x01, 0x01, 0x01, 0x02,
                  0xBF, 0x00, 0x00, 0x00, 0xBB, 0xAA, 0x00, 0x00,
                  0x00, 0x00};
@@ -112,25 +112,25 @@ static inline void write_kcs_data(struct ast_kcs_data *ast_kcs, unsigned char da
 
 static inline void write_kcs_status(struct ast_kcs_data *ast_kcs, unsigned char str)
 {
-	u32 sts = readl(ast_kcs->str) & (~0xC0);	
+	u32 sts = readl(ast_kcs->str) & (~0xC0);
 	writel( sts | str, ast_kcs->str);
 }
 
 /**************************   LPC  KCS SYSFS  **********************************************************/
-static ssize_t 
+static ssize_t
 store_ipmi_kcs_sms_atn(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
 {
 	u32 input_val;
 	struct ast_kcs_data *ast_kcs = dev_get_drvdata(dev);
 	input_val = simple_strtoul(sysfsbuf, NULL, 10);
-	if(input_val) 
+	if(input_val)
 		writel(readl(ast_kcs->str) | (0x1 << 2), ast_kcs->str);
 	else
 		writel(readl(ast_kcs->str) & ~(0x1 << 2), ast_kcs->str);
 	return count;
 }
 
-static ssize_t 
+static ssize_t
 show_ipmi_kcs_sms_atn(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 {
 	struct ast_kcs_data *ast_kcs = dev_get_drvdata(dev);
@@ -138,7 +138,7 @@ show_ipmi_kcs_sms_atn(struct device *dev, struct device_attribute *attr, char *s
 }
 static DEVICE_ATTR(sms_atn, S_IRUGO | S_IWUSR, show_ipmi_kcs_sms_atn, store_ipmi_kcs_sms_atn);
 
-static ssize_t 
+static ssize_t
 store_ipmi_kcs_oem(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
 {
 	u32 input_val;
@@ -149,7 +149,7 @@ store_ipmi_kcs_oem(struct device *dev, struct device_attribute *attr, const char
 	return count;
 }
 
-static ssize_t 
+static ssize_t
 show_ipmi_kcs_oem(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 {
 	struct ast_kcs_data *ast_kcs = dev_get_drvdata(dev);
@@ -157,7 +157,7 @@ show_ipmi_kcs_oem(struct device *dev, struct device_attribute *attr, char *sysfs
 }
 static DEVICE_ATTR(oem, S_IRUGO | S_IWUSR, show_ipmi_kcs_oem, store_ipmi_kcs_oem);
 
-static ssize_t 
+static ssize_t
 store_ipmi_kcs_str(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
 {
 	u32 input_val;
@@ -167,7 +167,7 @@ store_ipmi_kcs_str(struct device *dev, struct device_attribute *attr, const char
 	return count;
 }
 
-static ssize_t 
+static ssize_t
 show_ipmi_kcs_str(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 {
 	struct ast_kcs_data *ast_kcs = dev_get_drvdata(dev);
@@ -175,7 +175,7 @@ show_ipmi_kcs_str(struct device *dev, struct device_attribute *attr, char *sysfs
 }
 static DEVICE_ATTR(str, S_IRUGO | S_IWUSR, show_ipmi_kcs_str, store_ipmi_kcs_str);
 
-static ssize_t 
+static ssize_t
 store_ipmi_kcs_addr(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
 {
 	u32 input_val;
@@ -185,7 +185,7 @@ store_ipmi_kcs_addr(struct device *dev, struct device_attribute *attr, const cha
 	return count;
 }
 
-static ssize_t 
+static ssize_t
 show_ipmi_kcs_addr(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 {
 	struct ast_kcs_data *ast_kcs = dev_get_drvdata(dev);
@@ -193,7 +193,7 @@ show_ipmi_kcs_addr(struct device *dev, struct device_attribute *attr, char *sysf
 }
 static DEVICE_ATTR(addr, S_IRUGO | S_IWUSR, show_ipmi_kcs_addr, store_ipmi_kcs_addr);
 
-static ssize_t 
+static ssize_t
 store_ipmi_kcs_en(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
 {
 	u32 input_val;
@@ -203,7 +203,7 @@ store_ipmi_kcs_en(struct device *dev, struct device_attribute *attr, const char 
 	return count;
 }
 
-static ssize_t 
+static ssize_t
 show_ipmi_kcs_en(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 {
 	struct ast_kcs_data *ast_kcs = dev_get_drvdata(dev);
@@ -216,10 +216,10 @@ static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR, show_ipmi_kcs_en, store_ipmi_kcs_e
 static struct attribute *ast_ipmi_kcs_attributes[] = {
 	&dev_attr_enable.attr,
 	&dev_attr_addr.attr,
-	&dev_attr_str.attr,	
-	&dev_attr_sms_atn.attr,	
-	&dev_attr_oem.attr,		
-//	&dev_attr_buff.attr,		
+	&dev_attr_str.attr,
+	&dev_attr_sms_atn.attr,
+	&dev_attr_oem.attr,
+//	&dev_attr_buff.attr,
 	NULL
 };
 
@@ -240,7 +240,7 @@ static int ast_kcs_open(struct inode *inode, struct file *file)
 	/* Flush input queue on first open */
 	if (ast_kcs->open_count)
 		return -1;
-	
+
 	ast_kcs->open_count++;
 	return 0;
 }
@@ -252,22 +252,22 @@ static int ast_kcs_release(struct inode *inode, struct file *file)
 
 	KCS_DBG("ast_kcs_release\n");
 	ast_kcs->open_count--;
-	
-	return 0;	
+
+	return 0;
 }
 
 static ssize_t ast_kcs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
 	struct miscdevice *c = file->private_data;
 	struct ast_kcs_data *ast_kcs = dev_get_drvdata(c->this_device);
-	
+
 
 	if(ast_kcs->KCSPktRdy) {
 		if(copy_to_user(buf, ast_kcs->pKCSRcvPkt, ast_kcs->KCSRcvPktIx)) {
 			dev_err(&(ast_kcs->pdev->dev), "read fail \n");
-			return -EINVAL;			
+			return -EINVAL;
 		}
-		ast_kcs->KCSSendWait = 1;		
+		ast_kcs->KCSSendWait = 1;
 		ast_kcs->KCSPktRdy = 0;
 		return ast_kcs->KCSRcvPktIx;
 	} else {
@@ -292,7 +292,7 @@ ssize_t ast_kcs_write(struct file *file, const char __user *buf, size_t count, l
 				dev_err(&(ast_kcs->pdev->dev), "copy fail = %d, \n", (int)count);
 				return -EINVAL;
 			}
-			ast_kcs->KCSSendWait = 0;		
+			ast_kcs->KCSSendWait = 0;
 			/* Send the first byte */
 			ast_kcs->KCSSendPktIx = 0;
 			ast_kcs->KCSSendPktLen = count;
@@ -305,25 +305,25 @@ ssize_t ast_kcs_write(struct file *file, const char __user *buf, size_t count, l
 				return -EINVAL;
 			}
 		} else {
-			ast_kcs->KCSSendWait = 0;		
+			ast_kcs->KCSSendWait = 0;
 			/* Send the first byte */
 			ast_kcs->KCSSendPktIx = 0;
 			ast_kcs->KCSSendPktLen = 0;
 			write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
 		}
-		
+
 		return count;
 	} else {
 		return -EINVAL;
 	}
-	
+
 }
 
 static const struct file_operations ast_kcs_fops = {
 	.owner 			=	THIS_MODULE,
 	.llseek 			=	no_llseek,
 	.read 			= 	ast_kcs_read,
-	.write 			= 	ast_kcs_write,	
+	.write 			= 	ast_kcs_write,
 	.open 			=	ast_kcs_open,
 	.release 		=	ast_kcs_release,
 };
@@ -345,7 +345,7 @@ static void ast_ipmi_kcs_rx(struct ast_kcs_data *ast_kcs)
 			if(ast_kcs->KCSRcvPktIx > 272)
 				printk("ERROR ---> TODO ... \n");
 			break;
-			
+
 		case KCS_PHASE_WRITE_END :
 			KCS_DBG("KCS_PHASE_WRITE_END \n");
 			/* Set the state to READ_STATE */
@@ -359,12 +359,12 @@ static void ast_ipmi_kcs_rx(struct ast_kcs_data *ast_kcs)
 			ast_kcs->KCSPhase = KCS_PHASE_READ;
 			/* Signal receive data ready */
 			ast_kcs->KCSPktRdy = 1;
-#if 1		
+#if 0
 			printk(KERN_DEBUG "Total Rx Data : [");
 			for(i=0; i < ast_kcs->KCSRcvPktIx; i++)
 				printk(KERN_DEBUG " %x", ast_kcs->pKCSRcvPkt[i]);
 			printk(KERN_DEBUG "] \n");
-#endif		
+#endif
 			//trigger timeout --> TODO ~~~~
 			break;
 		case KCS_PHASE_READ:
@@ -405,7 +405,7 @@ static void ast_ipmi_kcs_rx(struct ast_kcs_data *ast_kcs)
 			ast_kcs->KCSSendPktIx++;
 
 			break;
-			
+
 		case KCS_PHASE_ERROR1:
 			KCS_DBG("KCS_PHASE_ERROR1 \n");
 			/* Set the KCS State to READ_STATE */
@@ -433,10 +433,10 @@ static void ast_ipmi_kcs_rx(struct ast_kcs_data *ast_kcs)
 			ast_kcs->KCSPhase = KCS_PHASE_IDLE;
 	//		pKCSBuf->AbortPhase = 0;
 			/* Send the dummy byte  */
-			write_kcs_data(ast_kcs, 0);			
+			write_kcs_data(ast_kcs, 0);
 			break;
 		default:
-			KCS_DBG("rx default == > TODO .. \n");		
+			KCS_DBG("rx default == > TODO .. \n");
 			/* Read the Dummy byte  */
 			read_kcs_data(ast_kcs);
 			break;
@@ -448,12 +448,12 @@ static void ast_ipmi_kcs_cmd_dat(struct ast_kcs_data *ast_kcs)
 	u8 cmd;
 
 	if((ast_kcs->KCSPhase == KCS_PHASE_IDLE) || (ast_kcs->KCSPhase == KCS_PHASE_WRITE)) {
-		/* Set the status to WRITE_STATE */	
+		/* Set the status to WRITE_STATE */
 		write_kcs_status(ast_kcs, IPMI_KCS_WRITE_STATE);
 	} else if(ast_kcs->KCSPhase == KCS_PHASE_READ) {
-		//recovery 
+		//recovery
 		cmd = read_kcs_cmd(ast_kcs);
-//		printk("Err STAT %d, cmd %x \n", ast_kcs->KCSPhase, cmd);		
+//		printk("Err STAT %d, cmd %x \n", ast_kcs->KCSPhase, cmd);
 		write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
 		ast_kcs->KCSPktRdy = 0;
 		ast_kcs->KCSPhase = KCS_PHASE_IDLE;
@@ -461,10 +461,10 @@ static void ast_ipmi_kcs_cmd_dat(struct ast_kcs_data *ast_kcs)
 		return;
 	} else {
 		printk("Err STAT %x \n", ast_kcs->KCSPhase );
-		ast_kcs->KCSPktRdy = 0;	
-		write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);		
+		ast_kcs->KCSPktRdy = 0;
+		write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
 	}
-	
+
 	/* Read the command */
 	cmd = read_kcs_cmd(ast_kcs);
 	switch (cmd) {
@@ -533,7 +533,7 @@ static void ast_kcs_timeout(unsigned long data)
 	write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
 	ast_kcs->KCSPktRdy = 0;
 	ast_kcs->KCSPhase = KCS_PHASE_ERROR;
-	
+
 }
 
 static int ast_kcs_probe(struct platform_device *pdev)
@@ -542,10 +542,10 @@ static int ast_kcs_probe(struct platform_device *pdev)
 	char kcs_name[10];
 	struct ast_kcs_data *ast_kcs = register_ipmi_kcs_drv(pdev->id);
 
-	KCS_DBG("ast_kcs_probe\n");	
+	KCS_DBG("ast_kcs_probe\n");
 
 	ast_kcs->pKCSRcvPkt = kmalloc(AST_IPMI_PKT_SIZE * 2, GFP_KERNEL);
-	ast_kcs->KCSRcvPktIx = 0;	
+	ast_kcs->KCSRcvPktIx = 0;
 	ast_kcs->KCSPktRdy = 0;
 	ast_kcs->pKCSSendPkt = ast_kcs->pKCSRcvPkt + AST_IPMI_PKT_SIZE;
 	ast_kcs->KCSPhase = KCS_PHASE_IDLE;
@@ -555,7 +555,7 @@ static int ast_kcs_probe(struct platform_device *pdev)
 //	ast_kcs->kcs_timer.data = (unsigned long) ast_kcs;
 //	ast_kcs->kcs_timer.function = ast_kcs_timeout;
 //	ast_kcs->kcs_timer.expires = jiffies + 5 * HZ;	//5 second
-#endif 
+#endif
 
 	ret = sysfs_create_group(&pdev->dev.kobj, &ipmi_kcs_attribute_group);
 	if (ret)
@@ -570,16 +570,16 @@ static int ast_kcs_probe(struct platform_device *pdev)
 	ast_kcs->miscdev.parent = &pdev->dev;
 	ast_kcs->miscdev.name = kcs_name;
 	ret = misc_register(&ast_kcs->miscdev);
-	if (ret){		
+	if (ret){
 		printk(KERN_ERR "KCS : failed to request interrupt\n");
 		goto err_free_mem;
 	}
 
 	request_ipmi_kcs_irq(pdev->id, ast_ipmi_kcs_handle);
 
-	platform_set_drvdata(pdev, ast_kcs);		
-	
-	dev_set_drvdata(ast_kcs->miscdev.this_device, ast_kcs);	
+	platform_set_drvdata(pdev, ast_kcs);
+
+	dev_set_drvdata(ast_kcs->miscdev.this_device, ast_kcs);
 
 	printk(KERN_INFO "ast_kcs.%d: driver successfully loaded.\n",pdev->id);
 
@@ -596,12 +596,12 @@ err_free_mem:
 static int ast_kcs_remove(struct platform_device *pdev)
 {
 	struct ast_kcs_data *ast_kcs = platform_get_drvdata(pdev);
-	KCS_DBG("ast_kcs_remove\n");	
+	KCS_DBG("ast_kcs_remove\n");
 	misc_deregister(&ast_kcs->miscdev);
 	ast_kcs->kcs_reg = 0;
 	kfree(ast_kcs->pKCSRcvPkt);
 
-	return 0;	
+	return 0;
 }
 
 static struct platform_driver ast_kcs_driver = {
