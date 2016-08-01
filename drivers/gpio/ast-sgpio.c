@@ -38,23 +38,23 @@
 #endif
 
 /*************************************************************/
-//GPIO group structure 
+//GPIO group structure
 struct ast_sgpio_bank {
     int 	irq;
-	u32  	base;	
-//TODO remove base	
-	u32  	index;	
+	u32  	base;
+//TODO remove base
+	u32  	index;
 	u32		data_offset;
-	u32		data_read_offset;	
-	u32		int_en_offset;	
-	u32		int_type_offset;		
-	u32		int_sts_offset;	
-	u32		rst_tol_offset;		
+	u32		data_read_offset;
+	u32		int_en_offset;
+	u32		int_type_offset;
+	u32		int_sts_offset;
+	u32		rst_tol_offset;
 	struct gpio_chip chip;
-	
+
 };
 
-int ast_sgpio_to_irq(unsigned gpio)
+int ast_sgpio_to_irq(struct gpio_chip *chip, unsigned gpio)
 {
 	return (gpio + IRQ_SGPIO_CHAIN_START);
 }
@@ -140,7 +140,7 @@ ast_sgpio_set(struct gpio_chip *chip, unsigned offset, int val)
 
 	local_irq_restore(flags);
 }
-	
+
 
 #define AST_SGPIO_BANK(name, index_no, data, read_data, int_en, int_type, int_sts, rst_tol)	\
 	{												\
@@ -155,6 +155,7 @@ ast_sgpio_set(struct gpio_chip *chip, unsigned offset, int val)
 	        .label                  = name,  							\
 	        .get            = ast_sgpio_get,  \
 	        .set            = ast_sgpio_set,  \
+	        .to_irq         = ast_sgpio_to_irq,  \
 	        .ngpio          = GPIO_PER_PORT_PIN_NUM, \
 		}, \
 	}
@@ -169,7 +170,7 @@ static struct ast_sgpio_bank ast_sgpio_gp[] = {
 	AST_SGPIO_BANK("SGPIOG", 2, 0x01C, 0x074, 0x020, 0x024, 0x030, 0x034),
 	AST_SGPIO_BANK("SGPIOH", 3, 0x01C, 0x074, 0x020, 0x024, 0x030, 0x034),
 	AST_SGPIO_BANK("SGPIOI", 0, 0x038, 0x078, 0x03C, 0x040, 0x04C, 0x050),
-	AST_SGPIO_BANK("SGPIOJ", 1, 0x038, 0x078, 0x03C, 0x040, 0x04C, 0x050),	
+	AST_SGPIO_BANK("SGPIOJ", 1, 0x038, 0x078, 0x03C, 0x040, 0x04C, 0x050),
 };
 
 
@@ -184,7 +185,7 @@ static struct ast_sgpio_bank ast_sgpio_gp[] = {
  * line's interrupt handler has been run, we may miss some nested
  * interrupts.
  */
-static void 
+static void
 ast_sgpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 {
 	u32 isr;
@@ -197,7 +198,7 @@ ast_sgpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 
 	SGPIODBUG("ast_sgpio_irq_handler %d \n ", irq);
 
-	
+
 	chained_irq_enter(chip, desc);
 
 	for (i = 0; i < GPIO_PORT_NUM; i++) {
@@ -213,7 +214,7 @@ ast_sgpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 					generic_handle_irq(j + IRQ_SGPIO_CHAIN_START + (8 * i));
 				}
 			}
-		}		
+		}
 	}
 
 	chained_irq_exit(chip, desc);
@@ -229,7 +230,7 @@ static void ast_sgpio_ack_irq(struct irq_data *d)
 	SGPIODBUG("irq [%d] : ast_sgpio_ack_irq [%s] pin %d\n ",d->irq, ast_sgpio->chip.label, sgpio_irq);
 
 	SGPIODBUG("write clr [%x] %x\n ",ast_sgpio->int_sts_offset, 1<< (sgpio_irq + (ast_sgpio->index * 8)));
-		
+
 	ast_sgpio_write(ast_sgpio, 1<< (sgpio_irq + (ast_sgpio->index * 8)), ast_sgpio->int_sts_offset);
 
 	SGPIODBUG("read sts %x\n ",ast_sgpio_read(ast_sgpio, ast_sgpio->int_sts_offset));
@@ -271,7 +272,7 @@ ast_sgpio_irq_type(unsigned int irq, unsigned int type)
 	u32 sgpio_irq = (irq - IRQ_SGPIO_CHAIN_START) %8;
 
 	SGPIODBUG("irq %d,  sgpio_irq %d , irq_type %x \n",irq, sgpio_irq, type);
-	
+
 	if (type & ~IRQ_TYPE_SENSE_MASK)
 		return -EINVAL;
 
@@ -328,7 +329,7 @@ static struct irq_chip ast_sgpio_irq_chip = {
 };
 
 /*---------------------------------------------------------------------*/
-static int 
+static int
 ast_sgpio_probe(struct platform_device *pdev)
 {
 	int i, j;
@@ -337,22 +338,22 @@ ast_sgpio_probe(struct platform_device *pdev)
 	u32 sgpio_base;
 
 	printk("AST SGPIO Driver, (c) ASPEED Tech. Inc. no %d \n", SGPIO_CHAIN_CHIP_BASE);
-	
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res)
 			return -ENXIO;
-	
+
 	if (!request_mem_region(res->start, resource_size(res), res->name))
 			return -EBUSY;
-	
+
 	sgpio_base = (u32) ioremap(res->start, resource_size(res));
 	if (!sgpio_base)
 			return -ENOMEM;
-	
+
 	SGPIODBUG("virt sgpio_base = %x \n", sgpio_base);
 	SGPIODBUG("gpio port num %d, total gpio pin : %d\n",
 			SGPIO_PORT_NUM, ARCH_NR_SGPIOS);
-	
+
 	SGPIODBUG("sgpio chain start %d \n",IRQ_SGPIO_CHAIN_START);
 
 	for (i = 0; i < SGPIO_PORT_NUM; i++) {
@@ -372,7 +373,7 @@ ast_sgpio_probe(struct platform_device *pdev)
 		ast_sgpio_write(ast_sgpio, 0, ast_sgpio->int_type_offset + 0x08);
 
 		for(j=0;j<8;j++) {
-			SGPIODBUG("inst chip data %d\n",i*8 + j + IRQ_SGPIO_CHAIN_START);	
+			SGPIODBUG("inst chip data %d\n",i*8 + j + IRQ_SGPIO_CHAIN_START);
 			irq_set_chip_data(i*8 + j + IRQ_SGPIO_CHAIN_START, ast_sgpio);
 			irq_set_chip_and_handler(i*8 + j + IRQ_SGPIO_CHAIN_START, &ast_sgpio_irq_chip,
 						handle_level_irq);
@@ -386,7 +387,7 @@ ast_sgpio_probe(struct platform_device *pdev)
 	ast_sgpio_configuration(ast_sgpio);
 
 	return 0;
-	
+
 }
 
 static struct platform_driver ast_sgpio_driver = {
