@@ -713,7 +713,7 @@ static SENSOR_DEVICE_ATTR_2(adc##index##_hyster_upper, S_IRUGO | S_IWUSR, \
 static SENSOR_DEVICE_ATTR_2(adc##index##_hyster_lower, S_IRUGO | S_IWUSR, \
 	ast_show_adc, ast_store_adc, 7, index); \
 \
-static SENSOR_DEVICE_ATTR_2(adc##index##_voltage, S_IRUGO | S_IWUSR, \
+static SENSOR_DEVICE_ATTR_2(in##index##_input, S_IRUGO | S_IWUSR, \
 	ast_show_adc, NULL, 8, index); \
 \
 static SENSOR_DEVICE_ATTR_2(adc##index##_r1, S_IRUGO | S_IWUSR, \
@@ -734,7 +734,7 @@ static struct attribute *adc##index##_attributes[] = { \
 	&sensor_dev_attr_adc##index##_hyster_en.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_hyster_upper.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_hyster_lower.dev_attr.attr, \
-	&sensor_dev_attr_adc##index##_voltage.dev_attr.attr, \
+	&sensor_dev_attr_in##index##_input.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_r1.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_r2.dev_attr.attr, \
 	&sensor_dev_attr_adc##index##_v2.dev_attr.attr, \
