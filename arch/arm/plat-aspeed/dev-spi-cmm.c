@@ -120,6 +120,11 @@ static struct mtd_partition ast_spi_flash0_partitions[] = {
         .offset     = MTDPART_OFS_APPEND,
         .size       = MTDPART_SIZ_FULL,
     },
+    {
+        .name       = "flash0",
+        .offset     = 0,        /* From 0 */
+        .size       = MTDPART_SIZ_FULL,  /* full size */
+    },
 };
 
 static struct flash_platform_data ast_spi_flash0_data = {
