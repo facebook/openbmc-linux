@@ -36,4 +36,12 @@ config FTGMAC100
 	  from Faraday. It is used on Faraday A369, Andes AG102 and some
 	  other ARM/NDS32 SoC's.
 
+config FTGMAC100_NCSI
+	bool "Faraday FTGMAC100 Gigabit Ethernet NCSI support"
+	default n
+	depends on FTGMAC100
+	---help---
+	  If you use NCSI in your hardware, say Y.
+	  If you are in doubt, say N.
+
 endif # NET_VENDOR_FARADAY

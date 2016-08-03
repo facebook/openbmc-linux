@@ -44,9 +44,6 @@
 #define MAX_PKT_SIZE		1518
 #define RX_BUF_SIZE		PAGE_SIZE	/* must be smaller than 0x3fff */
 
-
-#define NCSI_SUPPORT 1
-
 /******************************************************************************
  * private data
  *****************************************************************************/
@@ -79,7 +76,7 @@ struct ftgmac100 {
 	int phy_irq[PHY_MAX_ADDR];
 	struct phy_device *phydev;
 	int old_speed;
-#ifdef NCSI_SUPPORT
+#ifdef CONFIG_FTGMAC100_NCSI
 	NCSI_Command_Packet NCSI_Request;
 	NCSI_Response_Packet NCSI_Respond;
 	NCSI_Capability NCSI_Cap;
@@ -95,7 +92,7 @@ struct ftgmac100 {
 static int ftgmac100_alloc_rx_page(struct ftgmac100 *priv,
                                    int rxdes_idx,  gfp_t gfp);
 
-#ifdef NCSI_SUPPORT
+#ifdef CONFIG_FTGMAC100_NCSI
 
 #define TX_BUF_SIZE 1536
 /******************************************************************************
@@ -1342,7 +1339,7 @@ Re_Get_Link_Status:
 		}
 	}
 }
-#endif /* NCSI_SUPPORT */
+#endif /* CONFIG_FTGMAC100_NCSI */
 
 /******************************************************************************
  * internal functions (hardware register access)
@@ -2336,7 +2333,7 @@ static int ftgmac100_poll(struct napi_struct *napi, int budget)
 		napi_complete(napi);
 
 		/* enable all interrupts */
-#ifdef NCSI_SUPPORT
+#ifdef CONFIG_FTGMAC100_NCSI
 		iowrite32(INT_MASK_NCSI_ENABLED,
 				priv->base + FTGMAC100_OFFSET_IER);
 #else
@@ -2389,7 +2386,7 @@ static int ftgmac100_open(struct net_device *netdev)
 	ftgmac100_start_hw(priv, 10);
 #endif
 
-#ifdef NCSI_SUPPORT
+#ifdef CONFIG_FTGMAC100_NCSI
   ncsi_start(netdev);
 #else
 	phy_start(priv->phydev);
@@ -2400,7 +2397,7 @@ static int ftgmac100_open(struct net_device *netdev)
 	netif_start_queue(netdev);
 
 	/* enable all interrupts */
-#ifdef NCSI_SUPPORT
+#ifdef CONFIG_FTGMAC100_NCSI
 	iowrite32(INT_MASK_NCSI_ENABLED, priv->base + FTGMAC100_OFFSET_IER);
 #else
 	iowrite32(INT_MASK_ALL_ENABLED, priv->base + FTGMAC100_OFFSET_IER);
@@ -2424,7 +2421,7 @@ static int ftgmac100_stop(struct net_device *netdev)
 
 	netif_stop_queue(netdev);
 	napi_disable(&priv->napi);
-#ifndef NCSI_SUPPORT
+#ifndef CONFIG_FTGMAC100_NCSI
 	phy_stop(priv->phydev);
 #endif
 
@@ -2597,7 +2594,7 @@ static int ftgmac100_probe(struct platform_device *pdev)
 
 	priv->irq = irq;
 
-#ifndef NCSI_SUPPORT
+#ifndef CONFIG_FTGMAC100_NCSI
 	/* initialize mdio bus */
 	priv->mii_bus = mdiobus_alloc();
 	if (!priv->mii_bus) {
