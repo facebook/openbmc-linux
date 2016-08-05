@@ -18,7 +18,7 @@ obj-$(CONFIG_AST2400_BMC) += ast2400-irq.o ast2400-scu.o dev-ast2400-uart.o #dev
 
 #obj-n   := dummy.o
 #platform
-obj-y			+= dev-uart.o dev-vuart.o dev-wdt.o dev-rtc.o dev-gpio.o dev-sgpio.o dev-crypto.o
+obj-y			+= dev-vuart.o dev-wdt.o dev-rtc.o dev-gpio.o dev-sgpio.o dev-crypto.o
 
 #Storage
 obj-y 	                += dev-nor.o dev-nand.o dev-sdhci.o
@@ -28,22 +28,22 @@ obj-y                   += dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o dev-peci.o
 
 PLATFB := 0
 ifeq ($(CONFIG_CMM),y)
-  obj-y += dev-spi-cmm.o dev-i2c-cmm.o dev-i2c-common.o
+  obj-y += dev-uart.o dev-spi-cmm.o dev-i2c-cmm.o dev-i2c-common.o
   PLATFB = 1
 endif
 
 ifeq ($(CONFIG_WEDGE), y)
-  obj-y += dev-spi-wedge.o dev-i2c.o
+  obj-y += dev-uart.o dev-spi-wedge.o dev-i2c.o
   PLATFB = 1
 endif
 
 ifeq ($(CONFIG_FBTP), y)
-  obj-y += dev-spi-cmm.o dev-i2c.o
+  obj-y += dev-uart-fbtp.o dev-spi-cmm.o dev-i2c.o
   PLATFB = 1
 endif
 
 ifneq ($(PLATFB), 1)
-  obj-y += dev-spi.o dev-i2c.o
+  obj-y += dev-uart.o dev-spi.o dev-i2c.o
 endif
 
 #dev
