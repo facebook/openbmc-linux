@@ -140,6 +140,7 @@ static void cmm_add_pca954x(void) {
                         }
 			for (m = 0; m < PCA954X_N_CHAN; m++) {
 				pmode[m].adap_id = cur_alloc++;
+				pmode[m].deselect_on_exit = 1;
 			}
 
 			/* link platform mode to platform data */
