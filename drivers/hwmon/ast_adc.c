@@ -43,7 +43,7 @@
 #include <plat/ast-scu.h>
 
 struct adc_ch_vcc_data {
-	int v2;
+	int v2;			/* in mV */
 	int r1;
 	int r2;	
 };
@@ -464,8 +464,7 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 
 	struct sensor_device_attribute_2 *sensor_attr = to_sensor_dev_attr_2(attr);
 	int index;
-	u16 tmp;
-	u32 voltage, tmp1, tmp2, tmp3;
+	u32 voltage;
 
 	index = sensor_attr->index;
 	if (index >= TOTAL_CHANNELS || index < 0) {
@@ -478,53 +477,32 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 	{
 		case 0: //channel enable, disable
 			return sprintf(sysfsbuf, "%d : %s\n", ast_get_adc_en(ast_adc, sensor_attr->index),ast_get_adc_en(ast_adc,index) ? "Enable":"Disable");
-			break;
 		case 1: //value
 			voltage = ast_get_voltage(ast_adc, index);
 			return sprintf(sysfsbuf, "%d.%03d (V)\n", voltage / 1000, voltage % 1000);
-			break;
 		case 2: //alarm
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_alarm(ast_adc, index));
-			break;			
 		case 3: //upper
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_upper(ast_adc, index));
-			break;			
 		case 4: //lower
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_lower(ast_adc, index));
-			break;			
 		case 5: //hystersis enable 
 			return sprintf(sysfsbuf, "%d : %s\n", ast_get_adc_hyster_en(ast_adc, index),
 				       ast_get_adc_hyster_en(ast_adc, index) ? "Enable":"Disable");
-			break;			
 		case 6: //hystersis upper
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_hyster_upper(ast_adc, index));
-			break;			
 		case 7: //hystersis lower
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_hyster_lower(ast_adc, index));
-			break;			
 		case 8: //voltage
-			tmp = ast_get_adc_value(ast_adc, index);
-			//Voltage Sense Method
-			tmp1 = (vcc_ref[index].r1 + vcc_ref[index].r2) * tmp * 25 * 10;
-			tmp2 = vcc_ref[index].r2 * 1023 ;
-
-			tmp3 = (vcc_ref[index].r1 * vcc_ref[index].v2) / vcc_ref[index].r2;
-		//	printk("tmp3 = %d \n",tmp3);
-			voltage = (tmp1/tmp2) - tmp3;
-			return sprintf(sysfsbuf, "%d.%d (V)\n",voltage/100, voltage%100);
-			break;
+			return sprintf(sysfsbuf, "%d\n", ast_get_voltage(ast_adc, index));
 		case 9: //r1
 			return sprintf(sysfsbuf, "%d\n", vcc_ref[index].r1);
-			break;
 		case 10: //r2
 			return sprintf(sysfsbuf, "%d\n", vcc_ref[index].r2);
-			break;
 		case 11: //v2
 			return sprintf(sysfsbuf, "%d\n", vcc_ref[index].v2);
-			break;
 		default:
 			return -EINVAL;
-			break;
 	}
 }
 
@@ -713,7 +691,7 @@ static SENSOR_DEVICE_ATTR_2(adc##index##_hyster_upper, S_IRUGO | S_IWUSR, \
 static SENSOR_DEVICE_ATTR_2(adc##index##_hyster_lower, S_IRUGO | S_IWUSR, \
 	ast_show_adc, ast_store_adc, 7, index); \
 \
-static SENSOR_DEVICE_ATTR_2(in##index##_input, S_IRUGO | S_IWUSR, \
+static SENSOR_DEVICE_ATTR_2(in##index##_input, S_IRUGO, \
 	ast_show_adc, NULL, 8, index); \
 \
 static SENSOR_DEVICE_ATTR_2(adc##index##_r1, S_IRUGO | S_IWUSR, \
