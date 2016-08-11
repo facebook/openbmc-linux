@@ -27,7 +27,8 @@
 #include <plat/aspeed.h>
 #endif 
 
-#define ARCH_NR_GPIOS 					(GPIO_PORT_NUM*8) 
+/* Add 256 more for IO expander */
+#define ARCH_NR_GPIOS 					(GPIO_PORT_NUM*8 + 256)
 
 #if defined(CONFIG_ARCH_AST1010)
 #define GPIO_PORT_NUM		19
