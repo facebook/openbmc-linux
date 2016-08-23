@@ -56,7 +56,8 @@ struct ast_gpio_bank {
 
 int ast_gpio_to_irq(struct gpio_chip *chip, unsigned gpio)
 {
-	return (gpio + IRQ_GPIO_CHAIN_START);
+	struct ast_gpio_bank *ast_gpio = container_of(chip, struct ast_gpio_bank, chip);
+	return (ast_gpio->irq + gpio);
 }
 
 EXPORT_SYMBOL(ast_gpio_to_irq);
@@ -612,8 +613,11 @@ ast_gpio_probe(struct platform_device *pdev)
 		//Enable IRQ
 //		ast_gpio_write(ast_gpio, 0xffffffff, ast_gpio->int_en_offset);
 
+		// Store the irq base for this port
+		ast_gpio->irq = i*8 + IRQ_GPIO_CHAIN_START;
 		for(j=0;j<8;j++) {
 			GPIODBUG("inst chip data %d\n",i*8 + j + IRQ_GPIO_CHAIN_START);
+
 			irq_set_chip_data(i*8 + j + IRQ_GPIO_CHAIN_START, ast_gpio);
 
 			irq_set_chip_and_handler(i*8 + j + IRQ_GPIO_CHAIN_START, &ast_gpio_irq_chip,
