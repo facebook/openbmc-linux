@@ -218,6 +218,12 @@ config FBTP
 	select EGFX_IRQ
     bool "Facebook FBTP"
 
+config FBTTN
+	select USB_ARCH_HAS_EHCI
+	select AST_UART_SDMA
+	select EGFX_IRQ
+    bool "Facebook FBTTN"
+
 config CMM
 	select USB_ARCH_HAS_EHCI
 	select AST_UART_SDMA
