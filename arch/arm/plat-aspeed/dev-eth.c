@@ -41,7 +41,8 @@
 #endif
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || \
-	defined(CONFIG_CMM) || defined(CONFIG_FBTP)
+	defined(CONFIG_CMM) || defined(CONFIG_FBTP) || \
+	defined(CONFIG_FBTTN)
 #define DRVNAME "ftgmac100"
 #else
 #define DRVNAME "ast_gmac"
