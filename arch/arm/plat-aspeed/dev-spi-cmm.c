@@ -82,6 +82,11 @@ static struct resource ast_fmc_spi_resource0[] = {
     },
 };
 
+static struct ast_spi_driver_data ast_spi0_data = {
+    .get_div = ast_spi_calculate_divisor,
+    .num_chipselect = 1,
+};
+
 static struct platform_device ast_fmc0_spi_device = {
     .name           = "fmc-spi",
     .id             = 0,
@@ -92,9 +97,26 @@ static struct platform_device ast_fmc0_spi_device = {
     .resource       = ast_fmc_spi_resource0,
 };
 
-static struct ast_spi_driver_data fmc_spix_data = {
-    .get_div = ast_spi_calculate_divisor,
-    .num_chipselect = AST_FMC_SPIx_CS_NUM,
+static struct resource ast_spi0_resource[] = {
+  {
+     .start  = AST_SPI0_BASE,
+     .end    = AST_SPI0_BASE + SZ_16,
+     .flags  = IORESOURCE_MEM,
+  },
+  {
+     .start  = AST_SPI0_CS0_BASE,
+     .end    = AST_SPI0_CS0_BASE + SZ_16,
+     .flags  = IORESOURCE_BUS,
+  },
+};
+static struct platform_device ast_spi0_device = {
+        .name           = "fmc-spi",
+        .id             = 1,
+        .dev = {
+          .platform_data = &ast_spi0_data,
+       },
+      .num_resources  = ARRAY_SIZE(ast_spi0_resource),
+      .resource       = ast_spi0_resource,
 };
 
 static struct mtd_partition ast_spi_flash0_partitions[] = {
@@ -133,6 +155,20 @@ static struct flash_platform_data ast_spi_flash0_data = {
     .parts      = ast_spi_flash0_partitions,
 };
 
+static struct mtd_partition ast_spi_flash1_partitions[] = {
+    {
+        .name       = "BIOS0",
+        .offset     = 0,        /* From 0 */
+        .size       = MTDPART_SIZ_FULL,  /* full size */
+    },
+};
+
+static struct flash_platform_data ast_spi_flash1_data = {
+    .type       = "mx25l25635e",
+    .nr_parts   = ARRAY_SIZE(ast_spi_flash1_partitions),
+    .parts      = ast_spi_flash1_partitions,
+};
+
 static struct spi_board_info ast_spi_devices[] = {
     {
         .modalias           = "m25p80",
@@ -144,10 +180,22 @@ static struct spi_board_info ast_spi_devices[] = {
     },
 };
 
+static struct spi_board_info ast_spi1_devices[] = {
+    {
+        .modalias           = "m25p80",
+        .platform_data      = &ast_spi_flash1_data,
+        .chip_select        = 0,
+        .max_speed_hz       = 50 * 1000 * 1000,
+        .bus_num            = 1,
+        .mode               = SPI_MODE_0,
+    },
+};
 void __init ast_add_device_spi(void)
 {
     platform_device_register(&ast_fmc0_spi_device);
     spi_register_board_info(ast_spi_devices, ARRAY_SIZE(ast_spi_devices));
+    platform_device_register(&ast_spi0_device);
+    spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
 }
 
 #else
