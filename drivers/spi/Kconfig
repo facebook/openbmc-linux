@@ -65,6 +65,13 @@ config SPI_FMC
         help
           This selects a driver for the AST FMC SPI Controller
 
+config SPI_FMC_ROM
+	bool "Aspeed FMC SPI ROM Configuration"
+	depends on SPI_FMC
+	help
+	  This supports an AST FMC-based board configuration using a ROM
+
+
 config SPI_ALTERA
 	tristate "Altera SPI Controller"
 	select SPI_BITBANG

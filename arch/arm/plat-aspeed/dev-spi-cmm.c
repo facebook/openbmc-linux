@@ -119,6 +119,20 @@ static struct platform_device ast_spi0_device = {
       .resource       = ast_spi0_resource,
 };
 
+static struct mtd_partition ast_spi_rom_partitions[] = {
+    {
+        .name       = "rom",
+        .offset     = 0,        /* From 0 */
+        .size       = MTDPART_SIZ_FULL,  /* full size */
+    },
+};
+
+static struct flash_platform_data ast_spi_rom_data = {
+    .type       = "mx25l25635e",
+    .nr_parts   = ARRAY_SIZE(ast_spi_rom_partitions),
+    .parts      = ast_spi_rom_partitions,
+};
+
 static struct mtd_partition ast_spi_flash0_partitions[] = {
     {
         .name       = "u-boot",
@@ -170,9 +184,25 @@ static struct flash_platform_data ast_spi_flash1_data = {
 };
 
 static struct spi_board_info ast_spi_devices[] = {
+#if defined(CONFIG_SPI_FMC_ROM)
+    /* Here the 'reverse' order allows for tooling backward-compatibility. */
     {
         .modalias           = "m25p80",
         .platform_data      = &ast_spi_flash0_data,
+        .chip_select        = 1,
+        .max_speed_hz       = 50 * 1000 * 1000,
+        .bus_num            = 0,
+        .mode               = SPI_MODE_0,
+    },
+#endif
+    {
+        .modalias           = "m25p80",
+        /* There are two potential layouts depending ROM availability. */
+#if defined(CONFIG_SPI_FMC_ROM)
+        .platform_data      = &ast_spi_rom_data,
+#else
+        .platform_data      = &ast_spi_flash0_data,
+#endif
         .chip_select        = 0,
         .max_speed_hz       = 50 * 1000 * 1000,
         .bus_num            = 0,
