@@ -42,6 +42,11 @@ ifeq ($(CONFIG_FBTP), y)
   PLATFB = 1
 endif
 
+ifeq ($(CONFIG_FBTTN), y)
+  obj-y += dev-uart.o dev-spi-cmm.o dev-i2c.o
+  PLATFB = 1
+endif
+
 ifneq ($(PLATFB), 1)
   obj-y += dev-uart.o dev-spi.o dev-i2c.o
 endif
