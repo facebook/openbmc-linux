@@ -213,12 +213,6 @@ unsigned int IRScan(struct JTAG_XFER *jtag_cmd)
 }
 #endif
 /******************************************************************************/
-void ast_jtag_wait_instruction_pause_complete(struct ast_jtag_info *ast_jtag)
-{
-	wait_event_interruptible(ast_jtag->jtag_wq, (ast_jtag->flag == JTAG_INST_PAUSE));
-	JTAG_DBUG("\n");
-	ast_jtag->flag = 0;
-}
 
 void ast_jtag_wait_instruction_complete(struct ast_jtag_info *ast_jtag)
 {
@@ -378,18 +372,16 @@ int ast_jtag_sir_xfer(struct ast_jtag_info *ast_jtag, struct sir_xfer *sir)
 		if(sir->endir) {
 			ast_jtag_write(ast_jtag, JTAG_ENG_EN | JTAG_ENG_OUT_EN | JTAG_SET_INST_LEN(sir->length), AST_JTAG_CTRL);
 			ast_jtag_write(ast_jtag, JTAG_ENG_EN | JTAG_ENG_OUT_EN | JTAG_SET_INST_LEN(sir->length) | JTAG_INST_EN, AST_JTAG_CTRL);
-			ast_jtag_wait_instruction_pause_complete(ast_jtag);
 		} else {
 			ast_jtag_write(ast_jtag, JTAG_ENG_EN | JTAG_ENG_OUT_EN | JTAG_LAST_INST | JTAG_SET_INST_LEN(sir->length), AST_JTAG_CTRL);
 			ast_jtag_write(ast_jtag, JTAG_ENG_EN | JTAG_ENG_OUT_EN | JTAG_LAST_INST | JTAG_SET_INST_LEN(sir->length) | JTAG_INST_EN, AST_JTAG_CTRL);		
-			ast_jtag_wait_instruction_complete(ast_jtag);
 		}
+		
+		ast_jtag_wait_instruction_complete(ast_jtag);
 	
 		sir->tdo = ast_jtag_read(ast_jtag, AST_JTAG_INST);
+		ast_jtag_write(ast_jtag, JTAG_SW_MODE_EN | JTAG_SW_MODE_TDIO, AST_JTAG_SW);
 		
-		if(sir->endir == 0) {
-			ast_jtag_write(ast_jtag, JTAG_SW_MODE_EN | JTAG_SW_MODE_TDIO, AST_JTAG_SW);
-		}
 	}
 	ast_jtag->sts = sir->endir;
 	return 0;
@@ -499,7 +491,6 @@ int ast_jtag_sdr_xfer(struct ast_jtag_info *ast_jtag, struct sdr_xfer *sdr)
 					ast_jtag_write(ast_jtag, 
 						JTAG_ENG_EN | JTAG_ENG_OUT_EN | JTAG_DR_UPDATE | 
 						JTAG_DATA_LEN(shift_bits) | JTAG_DATA_EN, AST_JTAG_CTRL);
-					ast_jtag_wait_data_pause_complete(ast_jtag);
 				} else {
 					JTAG_DBUG("DR go IDLE \n");					
 					ast_jtag_write(ast_jtag, 
@@ -508,8 +499,8 @@ int ast_jtag_sdr_xfer(struct ast_jtag_info *ast_jtag, struct sdr_xfer *sdr)
 					ast_jtag_write(ast_jtag, 
 						JTAG_ENG_EN | JTAG_ENG_OUT_EN | JTAG_LAST_DATA | 
 						JTAG_DATA_LEN(shift_bits) | JTAG_DATA_EN, AST_JTAG_CTRL);
-					ast_jtag_wait_data_complete(ast_jtag);
 				}
+				ast_jtag_wait_data_complete(ast_jtag);
 			}
 			
 			if(!sdr->direct) {
@@ -540,11 +531,6 @@ static irqreturn_t ast_jtag_interrupt (int this_irq, void *dev_id)
 	
     status = ast_jtag_read(ast_jtag, AST_JTAG_ISR);
 	JTAG_DBUG("sts %x \n",status);
-
-	if (status & JTAG_INST_PAUSE) {
-		ast_jtag_write(ast_jtag, JTAG_INST_PAUSE | (status & 0xf), AST_JTAG_ISR);
-		ast_jtag->flag = JTAG_INST_PAUSE;
-	}
 
 	if (status & JTAG_INST_COMPLETE) {
 		ast_jtag_write(ast_jtag, JTAG_INST_COMPLETE | (status & 0xf), AST_JTAG_ISR);
