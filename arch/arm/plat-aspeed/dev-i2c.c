@@ -664,7 +664,105 @@ static struct i2c_board_info ast_i2c_board_info_12[] __initdata = {
 
 	// U5D1, CPU0, 0x22
 };
+#elif  CONFIG_FBTTN
+//FBTTN start
+static struct i2c_board_info ast_i2c_board_info_0[] __initdata = {
+  //HSC    , ADM1278   0x20
+  //EEPROM , 24LC64    0xa0
+  //Temp Sensor, TMP75 0x94
+  	      {
+		I2C_BOARD_INFO("adm1278", 0x10),
+	      },
+  	      {
+		I2C_BOARD_INFO("24c64", 0x50),
+	      },
+	      {
+		I2C_BOARD_INFO("tmp75", 0x4a),
+	      },
+	      {
+		I2C_BOARD_INFO("tmp75", 0x48),
+	      },
+	      {
+		I2C_BOARD_INFO("tmp75", 0x4c),
+	      },
+  
+};
 
+static struct i2c_board_info ast_i2c_board_info_1[] __initdata = {
+  // IOC, Type7 0x0a
+};
+
+static struct i2c_board_info ast_i2c_board_info_2[] __initdata = {
+  //to Local SCC 
+};
+
+static struct i2c_board_info ast_i2c_board_info_3[] __initdata = {
+  // To BIC Mono Lake 0x40
+};
+
+static struct i2c_board_info ast_i2c_board_info_4[] __initdata = {
+  	// Mezz C connector -> OCP MEZZ
+          {
+		I2C_BOARD_INFO("tmp75", 0x1f),
+	      },
+	      {
+		I2C_BOARD_INFO("24c64", 0x51),
+	      },
+};
+
+static struct i2c_board_info ast_i2c_board_info_5[] __initdata = {
+  // DPB MISC TCA9555 0x48
+};
+
+static struct i2c_board_info ast_i2c_board_info_6[] __initdata = {
+
+	//Fan TACT, MXA31790
+	//DPB HSC , ADM1278 
+
+    // DPB
+	// ADM1278, 0x20 (8BIT)
+	// max31790, 0x40 (8bit) 
+         {
+		I2C_BOARD_INFO("adm1278", 0x10),
+		 },
+		 {
+		I2C_BOARD_INFO("max31790", 0x20),
+		 },
+
+};
+
+static struct i2c_board_info ast_i2c_board_info_7[] __initdata = {
+//M2
+};
+
+static struct i2c_board_info ast_i2c_board_info_8[] __initdata = {
+//M2
+};
+
+static struct i2c_board_info ast_i2c_board_info_9[] __initdata = {
+//IPMB SCC Local
+};
+
+static struct i2c_board_info ast_i2c_board_info_10[] __initdata = {
+//REMOTE SCC IPMB
+};
+
+static struct i2c_board_info ast_i2c_board_info_11[] __initdata = {
+//DEBUG Card i2c
+};
+
+static struct i2c_board_info ast_i2c_board_info_12[] __initdata = {
+//MEZZ OOB
+          //Get MEZZ TMP75
+          {
+		I2C_BOARD_INFO("tmp75", 0x1f),
+	      },
+};
+
+static struct i2c_board_info ast_i2c_board_info_13[] __initdata = {
+
+};
+//end for FBTTN
 #else
 //AST EVB I2C Device
 static struct i2c_board_info __initdata ast_i2c_board_info_0[] = {
@@ -809,6 +907,63 @@ void __init ast_add_device_i2c(void)
 			ARRAY_SIZE(ast_i2c_board_info_11));
 	i2c_register_board_info(12, ast_i2c_board_info_12,
 			ARRAY_SIZE(ast_i2c_board_info_12));
+}
+
+#elif CONFIG_FBTTN
+void __init ast_add_device_i2c(void)
+{
+	/* I2C Multi-Pin */
+	ast_scu_multi_func_i2c();
+
+	ast_i2c_data.reg_gr = ioremap(AST_I2C_BASE, 4*SZ_16);
+	if (!ast_i2c_data.reg_gr) {
+		printk(KERN_ERR "ast_add_device_i2c ERROR \n");
+		return;
+	}
+
+	platform_device_register(&ast_i2c_dev0_device);
+	platform_device_register(&ast_i2c_dev1_device);
+	platform_device_register(&ast_i2c_dev2_device);
+	platform_device_register(&ast_i2c_dev3_device);
+	platform_device_register(&ast_i2c_dev4_device);
+	platform_device_register(&ast_i2c_dev5_device);
+	platform_device_register(&ast_i2c_dev6_device);
+	platform_device_register(&ast_i2c_dev7_device);
+	platform_device_register(&ast_i2c_dev8_device);
+	platform_device_register(&ast_i2c_dev9_device);
+	platform_device_register(&ast_i2c_dev10_device);
+	platform_device_register(&ast_i2c_dev11_device);
+	platform_device_register(&ast_i2c_dev12_device);
+	platform_device_register(&ast_i2c_dev13_device);
+
+	i2c_register_board_info(0, ast_i2c_board_info_0,
+			ARRAY_SIZE(ast_i2c_board_info_0));
+	i2c_register_board_info(1, ast_i2c_board_info_1,
+			ARRAY_SIZE(ast_i2c_board_info_1));
+	i2c_register_board_info(2, ast_i2c_board_info_2,
+			ARRAY_SIZE(ast_i2c_board_info_2));
+	i2c_register_board_info(3, ast_i2c_board_info_3,
+			ARRAY_SIZE(ast_i2c_board_info_3));
+	i2c_register_board_info(4, ast_i2c_board_info_4,
+			ARRAY_SIZE(ast_i2c_board_info_4));
+	i2c_register_board_info(5, ast_i2c_board_info_5,
+			ARRAY_SIZE(ast_i2c_board_info_5));
+	i2c_register_board_info(6, ast_i2c_board_info_6,
+			ARRAY_SIZE(ast_i2c_board_info_6));
+	i2c_register_board_info(7, ast_i2c_board_info_7,
+			ARRAY_SIZE(ast_i2c_board_info_7));
+	i2c_register_board_info(8, ast_i2c_board_info_8,
+			ARRAY_SIZE(ast_i2c_board_info_8));
+	i2c_register_board_info(9, ast_i2c_board_info_9,
+			ARRAY_SIZE(ast_i2c_board_info_9));
+	i2c_register_board_info(10, ast_i2c_board_info_10,
+			ARRAY_SIZE(ast_i2c_board_info_10));
+	i2c_register_board_info(11, ast_i2c_board_info_11,
+			ARRAY_SIZE(ast_i2c_board_info_11));
+	i2c_register_board_info(12, ast_i2c_board_info_12,
+			ARRAY_SIZE(ast_i2c_board_info_12));
+	i2c_register_board_info(13, ast_i2c_board_info_13,
+			ARRAY_SIZE(ast_i2c_board_info_13));
 }
 
 #else
