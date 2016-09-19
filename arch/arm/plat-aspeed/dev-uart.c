@@ -190,7 +190,7 @@ static struct plat_serial8250_port ast_uart_data[] = {
 		.flags	= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},
 /* Without this, tty offset might change for others */
-#if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP)
+#if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP) || defined(CONFIG_FBTTN)
 	{
 		.mapbase	= AST_UART2_BASE,
 		.irq		= IRQ_UART2,
