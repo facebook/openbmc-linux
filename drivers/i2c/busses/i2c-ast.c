@@ -100,7 +100,7 @@ struct ast_i2c_dev {
 #endif
 };
 
-
+static u8 ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev);
 
 static inline void
 ast_i2c_write(struct ast_i2c_dev *i2c_dev, u32 val, u32 reg)
@@ -376,6 +376,7 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 
 		default:
 			printk("slave xfer error \n");
+			ast_i2c_bus_reset(i2c_dev);
 			break;
 
 	}
@@ -1544,7 +1545,6 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 
 		case AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP:
 			if(i2c_dev->slave_operation == 1) {
-				printk("SLAVE TODO .... \n");
         i2c_dev->slave_operation = 0;
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
 				i2c_dev->cmd_err |= AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP;
