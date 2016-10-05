@@ -464,7 +464,7 @@ static int ast_wdt_probe(struct platform_device *pdev)
    }
 
    /* interrupt the system while WDT timeout */
-   wdt_restart_new(TICKS_PER_uSEC*1000000*heartbeat, WDT_CLK_SRC_EXT, FALSE, TRUE, FALSE, TRUE);
+   wdt_restart_new(TICKS_PER_uSEC*1000000*heartbeat, WDT_CLK_SRC_EXT, FALSE, TRUE, TRUE, TRUE);
    
    printk(KERN_INFO "AST WDT is installed.(irq = %d, heartbeat = %d secs, nowayout = %d)\n",IRQ_WDT,heartbeat,nowayout);
 
