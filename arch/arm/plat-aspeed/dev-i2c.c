@@ -712,6 +712,10 @@ static struct i2c_board_info ast_i2c_board_info_4[] __initdata = {
 
 static struct i2c_board_info ast_i2c_board_info_5[] __initdata = {
   // DPB MISC TCA9555 0x48
+  // ADM1278, 0x22 (8BIT) -> ML HSC
+         {
+		I2C_BOARD_INFO("adm1278", 0x11),
+		 },
 };
 
 static struct i2c_board_info ast_i2c_board_info_6[] __initdata = {
