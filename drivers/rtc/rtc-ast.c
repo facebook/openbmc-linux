@@ -7,11 +7,11 @@
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by the Free Software Foundation;
 * either version 2 of the License, or (at your option) any later version.
-* 
+*
 * This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
 * without even the implied warranty of MERCHANTABILITY or
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-* 
+*
 * You should have received a copy of the GNU General Public License
 * along with this program; if not, write to the Free Software
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
@@ -67,7 +67,7 @@ ast_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
 {
 	struct ast_rtc *ast_rtc = dev_get_drvdata(dev);
 	pr_debug("cmd = 0x%08x, arg = 0x%08lx\n", cmd, arg);
-	
+
 	switch (cmd) {
 		case RTC_AIE_ON:	/* alarm on */
 			{
@@ -105,7 +105,7 @@ ast_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
 		default:
 				return -ENOTTY;
 	}
-		
+
 	return 0;
 }
 
@@ -122,7 +122,7 @@ ast_rtc_get_time(struct device *dev, struct rtc_time *rtc_tm)
 
 		reg_time = rtc_read(ast_rtc->base, RTC_CNTR_STS_1);
 		reg_date = rtc_read(ast_rtc->base, RTC_CNTR_STS_2);
-		
+
 		spin_unlock_irqrestore(&ast_rtc->lock, flags);
 
 		rtc_tm->tm_year = GET_CENT_VAL(reg_date)*1000 | GET_YEAR_VAL(reg_date);
@@ -132,7 +132,7 @@ ast_rtc_get_time(struct device *dev, struct rtc_time *rtc_tm)
 		rtc_tm->tm_hour = GET_HOUR_VAL(reg_time);
 		rtc_tm->tm_min = GET_MIN_VAL(reg_time);
 		rtc_tm->tm_sec = GET_SEC_VAL(reg_time);
-		
+
         pr_debug("read time %02x.%02x.%02x %02x/%02x/%02x\n",
                  rtc_tm->tm_year, rtc_tm->tm_mon, rtc_tm->tm_mday,
                  rtc_tm->tm_hour, rtc_tm->tm_min, rtc_tm->tm_sec);
@@ -155,7 +155,7 @@ ast_rtc_set_time(struct device *dev, struct rtc_time *tm)
 
 	/* set hours */
 	reg_time = SET_DAY_VAL(tm->tm_mday) | SET_HOUR_VAL(tm->tm_hour) | SET_MIN_VAL(tm->tm_min) | SET_SEC_VAL(tm->tm_sec);
-	
+
 	/* set century */
 	/* set mon */
 	reg_date = SET_CENT_VAL(tm->tm_year / 1000) |  SET_YEAR_VAL(tm->tm_year % 1000) | SET_MON_VAL(tm->tm_mon);
@@ -166,10 +166,10 @@ ast_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	rtc_write(ast_rtc->base, reg_date, RTC_CNTR_STS_2);
 
 	rtc_write(ast_rtc->base, rtc_read(ast_rtc->base, RTC_CONTROL) &~RTC_LOCK , RTC_CONTROL);
-	
+
 	spin_unlock_irqrestore(&ast_rtc->lock, flags);
 
-	return 0;	
+	return 0;
 }
 static int
 ast_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
@@ -183,7 +183,7 @@ ast_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	alarm_reg = rtc_read(ast_rtc->base, RTC_ALARM);
 	spin_unlock_irqrestore(&ast_rtc->lock, flags);
 
-//DAY	
+//DAY
 	alm_tm->tm_mday = GET_DAY_VAL(alarm_reg);
 
 //HR
@@ -221,7 +221,7 @@ ast_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
     if (tm->tm_mday <= 31 && tm->tm_mday >= 1) {
 			reg_alarm |= SET_DAY_VAL(tm->tm_mday);
     }
-    
+
 //HR
     /* set ten hours */
     if (tm->tm_hour <= 23 && tm->tm_hour >= 0) {
@@ -245,8 +245,8 @@ ast_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	spin_lock_irqsave(&ast_rtc->lock, flags);
 
 	rtc_write(ast_rtc->base, reg_alarm, RTC_ALARM);
-	
-	if(alarm->enabled)	
+
+	if(alarm->enabled)
 		rtc_write(ast_rtc->base, reg_alarm, RTC_CONTROL);
 	else
 		rtc_write(ast_rtc->base, reg_alarm, RTC_CONTROL);
@@ -329,7 +329,6 @@ static struct rtc_class_ops ast_rtcops = {
         .read_alarm       = ast_rtc_read_alarm,
         .set_alarm        = ast_rtc_set_alarm,
         .proc             = ast_rtc_proc,
-        .irq_set_freq     = ast_rtc_irq_set_freq,
 };
 
 /*
@@ -366,27 +365,29 @@ static int __init ast_rtc_probe(struct platform_device *pdev)
 			ret = -EBUSY;
 			goto free_rtc;
 	}
-	
+
 	ast_rtc->base = ioremap(res->start, resource_size(res));
 	if (!ast_rtc->base) {
 			dev_err(&pdev->dev, "cannot map SocleDev registers\n");
 			ret = -ENOMEM;
 			goto release_mem;
 	}
-	
+
 	pr_debug("base = 0x%p, irq = %d\n", ast_rtc->base, ast_rtc->irq);
+
+
+	ast_rtc->res = res;
+	spin_lock_init(&ast_rtc->lock);
+
+	platform_set_drvdata(pdev, ast_rtc);
 
 	rtc_dev = rtc_device_register(pdev->name, &pdev->dev, &ast_rtcops, THIS_MODULE);
 	if (IS_ERR(rtc_dev)) {
 			ret = PTR_ERR(rtc_dev);
 			goto unmap;
 	}
-	
-	ast_rtc->res = res;
-	ast_rtc->rtc_dev = rtc_dev;
-	spin_lock_init(&ast_rtc->lock);
 
-	platform_set_drvdata(pdev, ast_rtc);
+	ast_rtc->rtc_dev = rtc_dev;
 
 //	ast_rtc_irq_set_freq(&pdev->dev, 1);
 
@@ -406,9 +407,9 @@ static int __init ast_rtc_probe(struct platform_device *pdev)
 		printk("no need to enable RTC \n");
 
 	spin_unlock_irq(&ast_rtc->lock);
-	
+
 	/* register ISR */
-	ret = request_irq(ast_rtc->irq, ast_rtc_interrupt, IRQF_DISABLED, dev_name(&rtc_dev->dev), ast_rtc);
+	ret = request_irq(ast_rtc->irq, ast_rtc_interrupt, 0, dev_name(&rtc_dev->dev), ast_rtc);
 	if (ret) {
 		printk(KERN_ERR "ast_rtc: IRQ %d already in use.\n",
 				ast_rtc->irq);
