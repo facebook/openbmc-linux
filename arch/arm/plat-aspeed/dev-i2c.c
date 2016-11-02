@@ -754,12 +754,13 @@ static struct i2c_board_info ast_i2c_board_info_6[] __initdata = {
     // DPB
 	// ADM1278, 0x20 (8BIT)
 	// max31790, 0x40 (8bit)
-  {
-		I2C_BOARD_INFO("adm1278", 0x10),
-  },
-	{
-		I2C_BOARD_INFO("max31790", 0x20),
-	},
+        //{
+		//I2C_BOARD_INFO("adm1278", 0x10),
+		// },
+		// {
+		//I2C_BOARD_INFO("max31790", 0x20),
+		// },
+
 };
 
 static struct i2c_board_info ast_i2c_board_info_7[] __initdata = {
