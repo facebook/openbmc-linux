@@ -47,6 +47,49 @@ init_fnc_t __initdata *init_all_device[] = {
 
 typedef void (init_fnc_t) (void);
 
+#if defined(CONFIG_FBTTN)
+init_fnc_t __initdata *init_all_device[] = {
+	ast_add_device_uart,
+	//ast_add_device_vuart,
+	ast_add_device_gpio,
+	//ast_add_device_rng,
+	ast_add_device_i2c,
+	//ast_add_device_pcie,
+	ast_add_device_watchdog,
+	ast_add_device_rtc,	
+	ast_add_device_spi,
+	ast_add_device_ehci,
+	//ast_add_device_nand,
+	ast_add_device_flash,
+	ast_add_device_pwm_fan,
+	ast_add_device_adc,
+	//ast_add_device_lpc,	
+	//ast_add_device_espi,
+	//ast_add_device_sgpio,			
+	//ast_add_device_peci,	
+	ast_add_device_jtag,	
+	ast_add_device_sdhci,
+	ast_add_device_gmac,
+	//ast_add_device_uhci,
+	//ast_add_device_udc11,
+	//ast_add_device_hid,	
+	//ast_add_device_video,		
+	//ast_add_device_fb,	
+	//ast_add_device_kcs,
+	//ast_add_device_bt,
+	//ast_add_device_snoop,
+	//ast_add_device_mailbox,
+	//ast_add_device_mctp,
+	//ast_add_device_xdma,
+	//ast_add_device_rfx,
+	//ast_add_device_h264,
+	//ast_add_device_formatter,	
+	//ast_add_device_vhub,
+	ast_add_device_udc20,
+	//ast_add_device_crypto,
+	NULL,
+};
+#else
 init_fnc_t __initdata *init_all_device[] = {
 	ast_add_device_uart,
 	//ast_add_device_vuart,
@@ -88,6 +131,7 @@ init_fnc_t __initdata *init_all_device[] = {
 	//ast_add_device_crypto,
 	NULL,
 };
+#endif
 #endif
 
 void __init ast_add_all_devices(void)
