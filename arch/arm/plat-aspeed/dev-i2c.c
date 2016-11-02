@@ -7,11 +7,11 @@
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by the Free Software Foundation;
 * either version 2 of the License, or (at your option) any later version.
-* 
+*
 * This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
 * without even the implied warranty of MERCHANTABILITY or
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-* 
+*
 * You should have received a copy of the GNU General Public License
 * along with this program; if not, write to the Free Software
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
@@ -57,10 +57,23 @@ static struct ast_i2c_driver_data ast_i2c_data = {
 	.slave_dma = SLAVE_XFER_MODE,
 	.request_pool_buff_page = request_pool_buff_page,
 	.free_pool_buff_page = free_pool_buff_page,
-#ifdef CONFIG_AST_I2C_SLAVE_EEPROM	
+#ifdef CONFIG_AST_I2C_SLAVE_EEPROM
 	.slave_xfer = i2c_slave_xfer,
 	.slave_init = i2c_slave_init,
-#endif	
+#endif
+	.get_i2c_clock = ast_get_pclk,
+};
+
+static struct ast_i2c_driver_data ast_i2c_data_1M = {
+	.bus_clk = 1000000,		//bus clock 1M
+	.master_dma = MASTER_XFER_MODE,
+	.slave_dma = SLAVE_XFER_MODE,
+	.request_pool_buff_page = request_pool_buff_page,
+	.free_pool_buff_page = free_pool_buff_page,
+#ifdef CONFIG_AST_I2C_SLAVE_EEPROM
+	.slave_xfer = i2c_slave_xfer,
+	.slave_init = i2c_slave_init,
+#endif
 	.get_i2c_clock = ast_get_pclk,
 };
 
@@ -109,7 +122,7 @@ struct platform_device ast_i2c_dev1_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev1_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev1_resources),
@@ -134,7 +147,7 @@ struct platform_device ast_i2c_dev2_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev2_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev2_resources),
@@ -159,7 +172,19 @@ struct platform_device ast_i2c_dev3_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
+	},
+	.resource = ast_i2c_dev3_resources,
+	.num_resources = ARRAY_SIZE(ast_i2c_dev3_resources),
+};
+
+struct platform_device ast_i2c_dev3_device_1M = {
+	.name = "ast-i2c",
+	.id = 3,
+	.dev = {
+		.dma_mask = &ast_i2c_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+		.platform_data = &ast_i2c_data_1M,
 	},
 	.resource = ast_i2c_dev3_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev3_resources),
@@ -185,7 +210,7 @@ struct platform_device ast_i2c_dev4_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev4_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev4_resources),
@@ -212,7 +237,7 @@ struct platform_device ast_i2c_dev5_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev5_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev5_resources),
@@ -239,7 +264,7 @@ struct platform_device ast_i2c_dev6_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev6_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev6_resources),
@@ -266,7 +291,7 @@ struct platform_device ast_i2c_dev7_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev7_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev7_resources),
@@ -293,7 +318,7 @@ struct platform_device ast_i2c_dev8_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev8_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev8_resources),
@@ -320,7 +345,7 @@ struct platform_device ast_i2c_dev9_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev9_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev9_resources),
@@ -347,7 +372,7 @@ struct platform_device ast_i2c_dev10_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev10_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev10_resources),
@@ -374,7 +399,7 @@ struct platform_device ast_i2c_dev11_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev11_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev11_resources),
@@ -401,7 +426,7 @@ struct platform_device ast_i2c_dev12_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev12_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev12_resources),
@@ -428,7 +453,7 @@ struct platform_device ast_i2c_dev13_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
-		.platform_data = &ast_i2c_data,		
+		.platform_data = &ast_i2c_data,
 	},
 	.resource = ast_i2c_dev13_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev13_resources),
@@ -670,22 +695,22 @@ static struct i2c_board_info ast_i2c_board_info_0[] __initdata = {
   //HSC    , ADM1278   0x20
   //EEPROM , 24LC64    0xa0
   //Temp Sensor, TMP75 0x94
-  	      {
+  {
 		I2C_BOARD_INFO("adm1278", 0x10),
-	      },
-  	      {
+	},
+  {
 		I2C_BOARD_INFO("24c64", 0x50),
-	      },
-	      {
+	},
+  {
 		I2C_BOARD_INFO("tmp75", 0x4a),
-	      },
-	      {
+	},
+  {
 		I2C_BOARD_INFO("tmp75", 0x48),
-	      },
-	      {
+	},
+  {
 		I2C_BOARD_INFO("tmp75", 0x4c),
-	      },
-  
+  },
+
 };
 
 static struct i2c_board_info ast_i2c_board_info_1[] __initdata = {
@@ -693,7 +718,7 @@ static struct i2c_board_info ast_i2c_board_info_1[] __initdata = {
 };
 
 static struct i2c_board_info ast_i2c_board_info_2[] __initdata = {
-  //to Local SCC 
+  //to Local SCC
 };
 
 static struct i2c_board_info ast_i2c_board_info_3[] __initdata = {
@@ -701,35 +726,40 @@ static struct i2c_board_info ast_i2c_board_info_3[] __initdata = {
 };
 
 static struct i2c_board_info ast_i2c_board_info_4[] __initdata = {
-  	// Mezz C connector -> OCP MEZZ
-	      {
+  // Mezz C connector -> OCP MEZZ
+  {
+		I2C_BOARD_INFO("tmp75", 0x1f),
+	},
+	{
 		I2C_BOARD_INFO("24c64", 0x51),
-	      },
+  },
 };
 
 static struct i2c_board_info ast_i2c_board_info_5[] __initdata = {
   // DPB MISC TCA9555 0x48
   // ADM1278, 0x22 (8BIT) -> ML HSC
-         {
+  {
 		I2C_BOARD_INFO("adm1278", 0x10),
-		 },
+	},
+  //{
+  //  I2C_BOARD_INFO("pca9555", 0x24),
+  //},
 };
 
 static struct i2c_board_info ast_i2c_board_info_6[] __initdata = {
 
 	//Fan TACT, MXA31790
-	//DPB HSC , ADM1278 
+	//DPB HSC , ADM1278
 
     // DPB
 	// ADM1278, 0x20 (8BIT)
-	// max31790, 0x40 (8bit) 
-         {
+	// max31790, 0x40 (8bit)
+  {
 		I2C_BOARD_INFO("adm1278", 0x10),
-		 },
-		 {
+  },
+	{
 		I2C_BOARD_INFO("max31790", 0x20),
-		 },
-
+	},
 };
 
 static struct i2c_board_info ast_i2c_board_info_7[] __initdata = {
@@ -750,14 +780,17 @@ static struct i2c_board_info ast_i2c_board_info_10[] __initdata = {
 
 static struct i2c_board_info ast_i2c_board_info_11[] __initdata = {
 //DEBUG Card i2c
+//         {
+//		I2C_BOARD_INFO("pca9555", 0x27),
+//		 },
 };
 
 static struct i2c_board_info ast_i2c_board_info_12[] __initdata = {
-//MEZZ OOB
-          //Get MEZZ TMP75
-          {
-		I2C_BOARD_INFO("tmp75", 0x1f),
-	      },
+  //MEZZ OOB
+  //Get MEZZ TMP421
+  {
+		I2C_BOARD_INFO("tmp421", 0x1f),
+  },
 };
 
 static struct i2c_board_info ast_i2c_board_info_13[] __initdata = {
@@ -767,10 +800,10 @@ static struct i2c_board_info ast_i2c_board_info_13[] __initdata = {
 #else
 //AST EVB I2C Device
 static struct i2c_board_info __initdata ast_i2c_board_info_0[] = {
-	{	
+	{
 		I2C_BOARD_INFO("ddc", 0x50),
 	},
-#if defined(CONFIG_ARCH_AST3200)	
+#if defined(CONFIG_ARCH_AST3200)
 	{
 		.type	= "cat66121_hdmi",
 		.addr	= 0x4C,
@@ -784,12 +817,12 @@ static struct i2c_board_info __initdata ast_i2c_board_info_0[] = {
 		.flags	= 1,
 		.irq		= IRQ_GPIOB1,
 //		.platform_data	= &it66121_hdmi1_pdata,
-	},	
-#endif	
+	},
+#endif
 };
 
 static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
-#if defined(CONFIG_ARCH_AST3200)	
+#if defined(CONFIG_ARCH_AST3200)
 	{
 		.type	= "cat66121_hdmi",
 		.addr	= 0x4C,
@@ -803,8 +836,8 @@ static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
 		.flags	= 1,
 		.irq		= IRQ_GPIOB3,
 //		.platform_data 	= &it66121_hdmi3_pdata,
-	},	
-#endif	
+	},
+#endif
 };
 
 static struct i2c_board_info __initdata ast_i2c_board_info_2[] = {
@@ -813,13 +846,13 @@ static struct i2c_board_info __initdata ast_i2c_board_info_2[] = {
 //Under I2C Dev 3
 static struct i2c_board_info __initdata ast_i2c_board_info_3[] = {
 	{
-		I2C_BOARD_INFO("24c08", 0x50),						
+		I2C_BOARD_INFO("24c08", 0x50),
 	},
 };
 //Under I2C Dev 8
 static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 	{
-		I2C_BOARD_INFO("lm75", 0x4d),						
+		I2C_BOARD_INFO("lm75", 0x4d),
 	}
 };
 
@@ -922,10 +955,12 @@ void __init ast_add_device_i2c(void)
 		return;
 	}
 
+    ast_i2c_data_1M.reg_gr = ast_i2c_data.reg_gr;// 1MHz reg_gr setting
+
 	platform_device_register(&ast_i2c_dev0_device);
 	platform_device_register(&ast_i2c_dev1_device);
 	platform_device_register(&ast_i2c_dev2_device);
-	platform_device_register(&ast_i2c_dev3_device);
+	platform_device_register(&ast_i2c_dev3_device_1M);
 	platform_device_register(&ast_i2c_dev4_device);
 	platform_device_register(&ast_i2c_dev5_device);
 	platform_device_register(&ast_i2c_dev6_device);
@@ -991,11 +1026,11 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev8_device);
 
 #if defined(AST_I2C_DEV9_BASE)
-	platform_device_register(&ast_i2c_dev9_device);	
+	platform_device_register(&ast_i2c_dev9_device);
 #endif
-	
+
 #if defined(CONFIG_MMC_AST)
-	//Due to share pin with SD 
+	//Due to share pin with SD
 #else
 #if defined(AST_I2C_DEV10_BASE)
 	platform_device_register(&ast_i2c_dev10_device);
@@ -1003,18 +1038,18 @@ void __init ast_add_device_i2c(void)
 
 #if defined(AST_I2C_DEV11_BASE)
 	platform_device_register(&ast_i2c_dev11_device);
-#endif	
+#endif
 #if defined(AST_I2C_DEV12_BASE)
 	platform_device_register(&ast_i2c_dev12_device);
-#endif	
+#endif
 #if defined(AST_I2C_DEV13_BASE)
 	platform_device_register(&ast_i2c_dev13_device);
 #endif
-#endif	
-	
-	i2c_register_board_info(0, ast_i2c_board_info_0, ARRAY_SIZE(ast_i2c_board_info_0));	
-	i2c_register_board_info(1, ast_i2c_board_info_1, ARRAY_SIZE(ast_i2c_board_info_1));	
-	i2c_register_board_info(2, ast_i2c_board_info_2, ARRAY_SIZE(ast_i2c_board_info_2));		
+#endif
+
+	i2c_register_board_info(0, ast_i2c_board_info_0, ARRAY_SIZE(ast_i2c_board_info_0));
+	i2c_register_board_info(1, ast_i2c_board_info_1, ARRAY_SIZE(ast_i2c_board_info_1));
+	i2c_register_board_info(2, ast_i2c_board_info_2, ARRAY_SIZE(ast_i2c_board_info_2));
 	i2c_register_board_info(3, ast_i2c_board_info_3, ARRAY_SIZE(ast_i2c_board_info_3));
 	i2c_register_board_info(7, ast_i2c_board_info_7, ARRAY_SIZE(ast_i2c_board_info_7));
 }
