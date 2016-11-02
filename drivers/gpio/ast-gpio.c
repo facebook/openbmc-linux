@@ -124,11 +124,6 @@ ast_gpio_direction_output(struct gpio_chip *chip, unsigned offset, int val)
 
     local_irq_save(flags);
 
-	/* Drive as an output */
-	v = ast_gpio_read(ast_gpio, ast_gpio->dir_offset);
-	v |= (GPIO_OUTPUT_MODE << (offset + (ast_gpio->index * 8)));
-	ast_gpio_write(ast_gpio, v, ast_gpio->dir_offset);
-
 	/* Set the value */
 	v = ast_gpio_read(ast_gpio, ast_gpio->data_offset);
 
@@ -140,6 +135,11 @@ ast_gpio_direction_output(struct gpio_chip *chip, unsigned offset, int val)
 
 
 	ast_gpio_write(ast_gpio, v, ast_gpio->data_offset);
+
+	/* Drive as an output */
+	v = ast_gpio_read(ast_gpio, ast_gpio->dir_offset);
+	v |= (GPIO_OUTPUT_MODE << (offset + (ast_gpio->index * 8)));
+	ast_gpio_write(ast_gpio, v, ast_gpio->dir_offset);
 
 	local_irq_restore(flags);
 
