@@ -8,4 +8,5 @@
  * your option) any later version.
  */
 
-extern void ast_soc_wdt_reset(enum reboot_mode mode, const char *cmd);
+extern void ast_wdt_reset_soc(void);
+extern void ast_wdt_reset_full(void);

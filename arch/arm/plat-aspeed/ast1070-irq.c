@@ -25,7 +25,6 @@
 #include <linux/platform_device.h>
 #include <linux/sysdev.h>
 #include <linux/interrupt.h>
-#include <asm/system.h>
 #include <linux/irq.h>
 
 #include <mach/hardware.h>

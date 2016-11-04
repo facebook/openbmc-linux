@@ -115,13 +115,20 @@ static const char * const ast_dt_match[] = {
 	NULL
 };
 
+void ast_restart(enum reboot_mode mode, const char *cmd)
+{
+#if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP)
+	ast_wdt_reset_soc();
+#else
+	ast_wdt_reset_full();
+#endif
+}
+
 //Non-DT
 MACHINE_START(ASPEED, AST_MACH_NAME)
 	.map_io			= ast_map_io,
 	.init_irq			= ast_init_irq,	
 	.init_machine		= ast_init,	
 	.init_time			= ast_init_timer,
-#if defined(CONFIG_AST_WATCHDOG) || defined(CONFIG_AST_WATCHDOG_MODULE)	 	
-	.restart			= ast_soc_wdt_reset,
-#endif
+	.restart			= ast_restart,
 MACHINE_END
