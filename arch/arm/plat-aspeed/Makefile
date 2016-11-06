@@ -33,7 +33,7 @@ ifeq ($(CONFIG_CMM),y)
 endif
 
 ifeq ($(CONFIG_WEDGE), y)
-  obj-y += dev-uart.o dev-i2c.o
+  obj-y += dev-uart.o dev-i2c-wedge.o dev-i2c-common.o
   PLATFB = 1
 endif
 

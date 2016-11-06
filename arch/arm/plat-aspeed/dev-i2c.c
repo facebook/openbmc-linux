@@ -859,37 +859,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 
 #endif
 /*-------------------------------------*/
-#ifdef CONFIG_CMM
-void __init ast_add_device_i2c(void)
-{
-  ast_i2c_data.reg_gr = ioremap(AST_I2C_BASE, 4*SZ_16);
-  if (!ast_i2c_data.reg_gr) {
-    printk("ast_add_device_i2c ERROR \n");
-    return;
-  }
-
-  //I2C Multi-Pin
-  ast_scu_multi_func_i2c();
-
-  platform_device_register(&ast_i2c_dev0_device);
-  platform_device_register(&ast_i2c_dev1_device);
-  platform_device_register(&ast_i2c_dev2_device);
-  platform_device_register(&ast_i2c_dev3_device);
-  platform_device_register(&ast_i2c_dev4_device);
-  platform_device_register(&ast_i2c_dev5_device);
-  platform_device_register(&ast_i2c_dev6_device);
-  platform_device_register(&ast_i2c_dev7_device);
-  platform_device_register(&ast_i2c_dev8_device);
-
-  /*
-   * i2c buses 9, 10, 11, 12 share pins with eMMC.
-   * not used in this board.
-   */
-
-  platform_device_register(&ast_i2c_dev13_device);
-}
-
-#elif CONFIG_FBTP
+#ifdef CONFIG_FBTP
 void __init ast_add_device_i2c(void)
 {
 	/* I2C Multi-Pin */
