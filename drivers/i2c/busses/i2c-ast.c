@@ -105,7 +105,7 @@ struct ast_i2c_dev {
 #endif
 };
 
-
+static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev);
 
 static inline void
 ast_i2c_write(struct ast_i2c_dev *i2c_dev, u32 val, u32 reg)
@@ -408,10 +408,32 @@ static u8
 ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
 {
   u32 temp;
-
-  // Reset i2c controller
+  u32 ctrl_reg1, cmd_reg1;
   temp = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
 
+  // MASTER mode only - bus recover + reset
+  // MASTER & SLAVE mode - only reset
+  // Note: On Yosemite, this function is also called when i2c clock is detected
+  // interrupt context. Since the bus_error_recover() sleeps, the logic can not
+  // Bus recover
+  if ((temp & AST_I2CD_MASTER_EN) && !(temp & AST_I2CD_SLAVE_EN)) {
+    // Seen occurances on pfe1100 that some times the recovery fails,
+    // but a subsequent 'controller timed out' recovers it.
+    // So not handling the return code here.
+    ctrl_reg1 = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
+    cmd_reg1 = ast_i2c_read(i2c_dev, I2C_CMD_REG);
+
+    ast_i2c_bus_error_recover(i2c_dev);
+
+    dev_err(
+        i2c_dev->dev,
+        "I2C(%d) recover completed (ctrl,cmd): before(%x,%x) after(%x,%x)\n",
+        i2c_dev->bus_id, ctrl_reg1, cmd_reg1,
+        ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+        ast_i2c_read(i2c_dev, I2C_CMD_REG));
+  }
+
+  // Reset i2c controller
   ast_i2c_write(i2c_dev, temp & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN), I2C_FUN_CTRL_REG);
 
   ast_i2c_write(i2c_dev, temp, I2C_FUN_CTRL_REG);
