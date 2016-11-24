@@ -493,13 +493,13 @@ static long pmbus_reg2data_direct(struct pmbus_data *data,
 		R += 3;
 		b *= 1000;
 	}
-
+#if 0
 	/* scale result to micro-units for power sensors */
 	if (sensor->class == PSC_POWER) {
 		R += 3;
 		b *= 1000;
 	}
-
+#endif
 	while (R > 0) {
 		val *= 10;
 		R--;
