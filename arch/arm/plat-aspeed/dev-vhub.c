@@ -36,7 +36,7 @@
 /* --------------------------------------------------------------------
  *  VHUB
  * -------------------------------------------------------------------- */
-#if defined(CONFIG_AST_VHUB)
+//#if defined(CONFIG_AST_VHUB)
 static struct resource ast_vhub_resource[] = {
 	[0] = {
 		.start = AST_VHUB_BASE,
@@ -70,6 +70,6 @@ void __init ast_add_device_vhub(void)
 
 	platform_device_register(&ast_vhub_device);
 }
-#else
-void __init ast_add_device_vhub(void) {}
-#endif
+//#else
+//void __init ast_add_device_vhub(void) {}
+//#endif

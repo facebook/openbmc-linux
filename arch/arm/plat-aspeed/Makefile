@@ -43,7 +43,7 @@ ifeq ($(CONFIG_FBTP), y)
 endif
 
 ifeq ($(CONFIG_FBTTN), y)
-  obj-y += dev-uart.o dev-i2c.o
+  obj-y += dev-uart.o dev-i2c.o dev-vhub.o 
   PLATFB = 1
 endif
 
