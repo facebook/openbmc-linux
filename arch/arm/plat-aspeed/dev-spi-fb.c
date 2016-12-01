@@ -152,7 +152,7 @@ static struct spi_board_info ast_fmc_board_devices[] = {
 		.modalias    		= "m25p80",
 		.platform_data  = &ast_fmc_platform_data,
 		.chip_select    = 0,
-		.max_speed_hz   = 100 * 1000 * 1000,
+		.max_speed_hz   = 50 * 1000 * 1000,
 		.bus_num    		= 0,
 		.mode 			    = SPI_MODE_0,
 	},
