@@ -2384,6 +2384,8 @@ static int ftgmac100_open(struct net_device *netdev)
 	ftgmac100_start_hw(priv, 100);
 #elif defined(CONFIG_FBTTN)
 	ftgmac100_start_hw(priv, 100);
+#elif defined(CONFIG_FBY2)
+  ftgmac100_start_hw(priv, 100);
 #else
 	ftgmac100_start_hw(priv, 10);
 #endif

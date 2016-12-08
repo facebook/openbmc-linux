@@ -362,7 +362,7 @@ static ssize_t set_pwm_enable(struct device *dev,
 	err = i2c_smbus_write_byte_data(client,
 			MAX31790_REG_FAN_CONFIG(attr->index),
 			data->fan_config[attr->index]);
-	
+
 	mutex_unlock(&data->update_lock);
 
 	if (err < 0)
@@ -540,7 +540,7 @@ static int max31790_init_client(struct i2c_client *client,
 				MAX31790_REG_FAN_CONFIG(i));
 		if (rv < 0)
 			return rv;
-		#if defined(CONFIG_FBTTN)
+		#if defined(CONFIG_FBTTN)  || defined(CONFIG_FBY2)
 		data->fan_config[i] = MAX31790_FAN_CFG_RPM_MODE | MAX31790_FAN_CFG_TACH_INPUT_EN | MAX31790_FAN_CFG_TACH_INPUT;
 		i2c_smbus_write_byte_data(client,
 		MAX31790_REG_FAN_CONFIG(i),

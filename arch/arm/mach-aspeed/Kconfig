@@ -230,6 +230,12 @@ config CMM
 	select EGFX_IRQ
     bool "Facebook CMM"
 
+config FBY2
+ select USB_ARCH_HAS_EHCI
+ select AST_UART_SDMA
+ select EGFX_IRQ
+    bool "Facebook FBY2"
+
 config AST_CONSOLE_UART_BASE
     hex "Console UART base address"
     default 0x1e783000 if CMM
