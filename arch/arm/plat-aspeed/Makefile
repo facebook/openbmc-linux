@@ -38,7 +38,7 @@ ifeq ($(CONFIG_WEDGE), y)
 endif
 
 ifeq ($(CONFIG_FBTP), y)
-  obj-y += dev-uart-fbtp.o dev-i2c.o dev-spi-fbtp.o
+  obj-y += dev-uart-fbtp.o dev-i2c.o dev-spi-fb.o
   PLATFB = 1
 endif
 

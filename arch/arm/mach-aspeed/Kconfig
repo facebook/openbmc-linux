@@ -212,6 +212,9 @@ config YOSEMITE
 config FBPLATFORM1
         bool "Facebook Platform1"
 
+config AST_DUAL_FLASH
+    bool "Build expecting a dual SPI configuration"
+
 config FBTP
 	select USB_ARCH_HAS_EHCI
 	select AST_UART_SDMA
