@@ -609,10 +609,12 @@ static struct i2c_board_info ast_i2c_board_info_7[] __initdata = {
 	// J1E3, 1X8 conn, NA
 
 	// EU1D1, ADM1278, 0x22
+
+/* ADM1278 is being accessed via ME, so remove this node for now
 	{
 		I2C_BOARD_INFO("adm1278", 0x11),
 	},
-
+*/
 
 	// U2M2, PCA9517, EN
 
