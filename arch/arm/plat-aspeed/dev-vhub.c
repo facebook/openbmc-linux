@@ -39,11 +39,16 @@
 //#if defined(CONFIG_AST_VHUB)
 static struct resource ast_vhub_resource[] = {
 	[0] = {
-		.start = AST_VHUB_BASE,
-		.end = AST_VHUB_BASE + SZ_1K,
-		.flags = IORESOURCE_MEM,
-	},
-	[1] = {
+#if defined(CONFIG_LIGHTNING)
+                .start = AST_USB20_BASE,
+                .end = AST_USB20_BASE + SZ_1K,
+#else
+                .start = AST_VHUB_BASE,
+                .end = AST_VHUB_BASE + SZ_1K,
+#endif
+                .flags = IORESOURCE_MEM,
+        },
+        [1] = {
 		.start = IRQ_VHUB,
 		.end = IRQ_VHUB,
 		.flags = IORESOURCE_IRQ,
