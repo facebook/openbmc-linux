@@ -443,6 +443,7 @@ ast_uart_sdma_irq(int irq, void *dev_id)
 
 struct ast_sdma sdma;
 
+#ifdef CONFIG_ARCH_AST2500
 extern int
 ast_uart_sdma_init(void)
 {
@@ -524,3 +525,5 @@ ast_uart_sdma_init(void)
 }                                                                              
 
 EXPORT_SYMBOL(ast_uart_sdma_init);
+#endif
+
