@@ -402,7 +402,7 @@ static const struct attribute_group name_attribute_groups = {
 	.attrs = name_attributes,
 };
 
-#ifdef AST_SOC_G4
+#if defined(AST_SOC_G4)
 
 static u32
 ast_get_voltage(struct ast_adc_data *ast_adc, int idx) {
