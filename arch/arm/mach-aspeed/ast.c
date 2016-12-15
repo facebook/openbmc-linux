@@ -41,47 +41,47 @@
 #include <mach/ast_wdt.h>
 
 static struct map_desc ast_io_desc[] __initdata = {
-	{ 	
-		.virtual		= IO_ADDRESS(AST_VIC_BASE), 
+	{
+		.virtual		= IO_ADDRESS(AST_VIC_BASE),
 		.pfn			= __phys_to_pfn(AST_VIC_BASE),
 		.length 		= SZ_64K,
 		.type			= MT_DEVICE,
 	}, {
-		.virtual		= IO_ADDRESS(AST_SCU_BASE), 
+		.virtual		= IO_ADDRESS(AST_SCU_BASE),
 		.pfn			= __phys_to_pfn(AST_SCU_BASE),
 		.length 		= SZ_4K,
 		.type			= MT_DEVICE,
 	}, {
-		.virtual		= IO_ADDRESS(AST_WDT_BASE), 
+		.virtual		= IO_ADDRESS(AST_WDT_BASE),
 		.pfn			= __phys_to_pfn(AST_WDT_BASE),
 		.length 		= SZ_4K,
 		.type			= MT_DEVICE,
-	}, { 	
-		.virtual		= IO_ADDRESS(AST_SDMC_BASE), 
+	}, {
+		.virtual		= IO_ADDRESS(AST_SDMC_BASE),
 		.pfn			= __phys_to_pfn(AST_SDMC_BASE),
 		.length 		= SZ_4K,
-		.type			= MT_DEVICE,		
-	}, { 
-		.virtual		= IO_ADDRESS(AST_CRYPTO_BASE), 
+		.type			= MT_DEVICE,
+	}, {
+		.virtual		= IO_ADDRESS(AST_CRYPTO_BASE),
 		.pfn			= __phys_to_pfn(AST_CRYPTO_BASE),
 		.length 		= SZ_4K,
 		.type			= MT_DEVICE,
-	}, { 
-		.virtual		= IO_ADDRESS(AST_GPIO_BASE), 
+	}, {
+		.virtual		= IO_ADDRESS(AST_GPIO_BASE),
 		.pfn			= __phys_to_pfn(AST_GPIO_BASE),
 		.length 		= SZ_4K,
 		.type			= MT_DEVICE,
-	}, { 
-		.virtual		= IO_ADDRESS(AST_VIDEO_BASE), 
+	}, {
+		.virtual		= IO_ADDRESS(AST_VIDEO_BASE),
 		.pfn			= __phys_to_pfn(AST_VIDEO_BASE),
 		.length 		= SZ_4K,
 		.type			= MT_DEVICE,
-	}, { 
-	
-		.virtual		= IO_ADDRESS(AST_UART0_BASE), 
+	}, {
+
+		.virtual		= IO_ADDRESS(AST_UART0_BASE),
 		.pfn			= __phys_to_pfn(AST_UART0_BASE),
 		.length 		= SZ_4K,
-		.type			= MT_DEVICE,		
+		.type			= MT_DEVICE,
 	},
 };
 
@@ -100,14 +100,14 @@ static void __init ast_init(void)
 	ast_scu_osc_clk_output();
 #endif
 
-	ast_add_all_devices();		
+	ast_add_all_devices();
 
 	ast_scu_show_system_info();
 #ifdef CONFIG_AST2400_BMC
 	ast2400_scu_init(AST_PCI_EXT_SCU, SZ_4K);
 	ast2400_add_device_uart();
 //	ast2400_add_device_i2c();
-#endif	
+#endif
 }
 
 static const char * const ast_dt_match[] = {
@@ -117,7 +117,7 @@ static const char * const ast_dt_match[] = {
 
 void ast_restart(enum reboot_mode mode, const char *cmd)
 {
-#if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP) || defined(CONFIG_FBTTN) || defined(CONFIG_LIGHTNING)
+#if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP) || defined(CONFIG_FBTTN) || defined(CONFIG_LIGHTNING) ||  defined(CONFIG_FBY2)
 	ast_wdt_reset_soc();
 #else
 	ast_wdt_reset_full();
@@ -127,8 +127,8 @@ void ast_restart(enum reboot_mode mode, const char *cmd)
 //Non-DT
 MACHINE_START(ASPEED, AST_MACH_NAME)
 	.map_io			= ast_map_io,
-	.init_irq			= ast_init_irq,	
-	.init_machine		= ast_init,	
+	.init_irq			= ast_init_irq,
+	.init_machine		= ast_init,
 	.init_time			= ast_init_timer,
 	.restart			= ast_restart,
 MACHINE_END

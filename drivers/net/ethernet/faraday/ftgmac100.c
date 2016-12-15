@@ -1286,6 +1286,13 @@ void ncsi_start(struct net_device *dev) {
         mdelay(500);
 				Get_Version_ID(dev);
         mdelay(500);
+        //TODO: This is an issue in  Get_Version_ID that always returns
+        //mezz_type to be -1, so it only calls Get_MAC_Address_bcm.
+        //It may need to work with Mlx to find a solution.
+#if defined(CONFIG_FBY2)
+        Get_MAC_Address_mlx(dev);
+        Set_MAC_Affinity_mlx(dev);
+#else
         if (priv->mezz_type == 0x01) {
           Get_MAC_Address_mlx(dev);
           Set_MAC_Affinity_mlx(dev);
@@ -1293,6 +1300,7 @@ void ncsi_start(struct net_device *dev) {
           Get_MAC_Address_bcm(dev);
           mdelay(500);
         }
+#endif
 
 				Get_Capabilities(dev);
 				//Set MAC Address

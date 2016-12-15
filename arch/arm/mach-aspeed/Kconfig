@@ -251,6 +251,7 @@ config AST_CONSOLE_UART_BASE
     default 0x1e783000 if CMM
     default 0x1e78e000 if WEDGE || WEDGE100
     default 0x1e784000 if FBTP
+    default 0x1e784000 if FBY2
     default 0x1e784000
 	help
 	  Please provide the physical address corresponding to the
