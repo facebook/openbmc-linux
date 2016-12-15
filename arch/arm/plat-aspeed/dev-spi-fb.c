@@ -126,7 +126,7 @@ static struct platform_device ast_fmc_device = {
 };
 
 static struct platform_device ast_spi0_device = {
-        .name           = "spi-spi0",
+        .name           = "fmc-spi",
         .id             = 1,
         .dev = {
           .platform_data = &ast_spi0_driver_data,
