@@ -800,6 +800,109 @@ static struct i2c_board_info ast_i2c_board_info_13[] __initdata = {
 
 };
 //end for FBTTN
+#elif defined(CONFIG_LIGHTNING) 
+//FBLTN start
+static struct i2c_board_info __initdata ast_i2c_board_info_0[] = {
+};
+//Under I2C Dev 1
+static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
+};
+
+//Under I2C Dev 2
+static struct i2c_board_info __initdata ast_i2c_board_info_2[] = {
+};
+
+//Under I2C Dev 3
+static struct i2c_board_info __initdata ast_i2c_board_info_3[] = {
+};
+
+//Under I2C Dev 4
+static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
+	// PEB TEMP SENSOR (0x9A)
+	{
+    	I2C_BOARD_INFO("tmp75", 0x4d),
+	},
+	// PEB TEMP SENSOR (0x94)
+	{
+		I2C_BOARD_INFO("tmp75", 0x4a),
+	},
+	// PEB FRUID (0xA0)
+	{
+		I2C_BOARD_INFO("24c64", 0x50),
+	},
+	// PEB RTC PCF8563 (0xA2)
+	{
+		I2C_BOARD_INFO("pcf8563", 0x51),
+	},
+  
+};
+
+//Under I2C Dev 5
+static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
+	{
+		I2C_BOARD_INFO("24c64", 0x51),
+	},
+	// FCB LED Driver (0xC0)
+	{
+		I2C_BOARD_INFO("pca9551", 0x60),
+	},
+};
+
+//Under I2C Dev 6
+static struct i2c_board_info __initdata ast_i2c_board_info_6[] = {
+	// PDPB Temp Sensor (0x92)
+	  {
+	    I2C_BOARD_INFO("tmp75", 0x49),
+	  },
+	  // PDPB Temp Sensor (0x94)
+	  {
+	    I2C_BOARD_INFO("tmp75", 0x4a),
+	  },
+	  // PDPB Temp Sensor (0x96)
+	  {
+	    I2C_BOARD_INFO("tmp75", 0x4b),
+	  },
+	  // PDPB Temp Sensor (0x98)
+	  {
+	    I2C_BOARD_INFO("tmp75", 0x4c),
+	  },
+	  // PDPB FRUID (0xA2)
+	  {
+	    I2C_BOARD_INFO("24c64", 0x51),
+	  },
+};
+
+//Under I2C Dev 7
+static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
+};
+
+//Under I2C Dev 8
+static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
+};
+
+//Under I2C Dev 9
+static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
+};
+
+//Under I2C Dev 10
+static struct i2c_board_info __initdata ast_i2c_board_info_10[] = {
+};
+
+//Under I2C Dev 11
+static struct i2c_board_info __initdata ast_i2c_board_info_11[] = {
+};
+
+//Under I2C Dev 12
+static struct i2c_board_info __initdata ast_i2c_board_info_12[] = {
+};
+
+//Under I2C Dev 13
+static struct i2c_board_info __initdata ast_i2c_board_info_13[] = {
+};
+
+/* end of defined(CONFIG_LIGHTNING) */
+
+
 #else
 //AST EVB I2C Device
 static struct i2c_board_info __initdata ast_i2c_board_info_0[] = {
@@ -973,6 +1076,60 @@ void __init ast_add_device_i2c(void)
 			ARRAY_SIZE(ast_i2c_board_info_12));
 	i2c_register_board_info(13, ast_i2c_board_info_13,
 			ARRAY_SIZE(ast_i2c_board_info_13));
+}
+#elif defined(CONFIG_LIGHTNING)
+void __init ast_add_device_i2c(void)
+{
+	/* I2C Multi-Pin */
+	ast_scu_multi_func_i2c();
+
+	ast_i2c_data.reg_gr = ioremap(AST_I2C_BASE, 4*SZ_16);
+	if (!ast_i2c_data.reg_gr) {
+		printk(KERN_ERR "ast_add_device_i2c ERROR \n");
+		return;
+	}
+
+	platform_device_register(&ast_i2c_dev0_device);
+	platform_device_register(&ast_i2c_dev1_device);
+	platform_device_register(&ast_i2c_dev2_device);
+	platform_device_register(&ast_i2c_dev3_device);
+	platform_device_register(&ast_i2c_dev4_device);
+	platform_device_register(&ast_i2c_dev5_device);
+	platform_device_register(&ast_i2c_dev6_device);
+	platform_device_register(&ast_i2c_dev7_device);
+	platform_device_register(&ast_i2c_dev8_device);
+	platform_device_register(&ast_i2c_dev9_device);
+	platform_device_register(&ast_i2c_dev10_device);
+	platform_device_register(&ast_i2c_dev11_device);
+	platform_device_register(&ast_i2c_dev12_device);
+	platform_device_register(&ast_i2c_dev13_device);
+ 
+	i2c_register_board_info(0, ast_i2c_board_info_0,
+			ARRAY_SIZE(ast_i2c_board_info_0));
+	i2c_register_board_info(1, ast_i2c_board_info_1,
+			ARRAY_SIZE(ast_i2c_board_info_1));
+	i2c_register_board_info(2, ast_i2c_board_info_2,
+			ARRAY_SIZE(ast_i2c_board_info_2));
+	i2c_register_board_info(3, ast_i2c_board_info_3,
+			ARRAY_SIZE(ast_i2c_board_info_3));
+	i2c_register_board_info(4, ast_i2c_board_info_4,
+			ARRAY_SIZE(ast_i2c_board_info_4));
+	i2c_register_board_info(5, ast_i2c_board_info_5,
+			ARRAY_SIZE(ast_i2c_board_info_5));
+	i2c_register_board_info(6, ast_i2c_board_info_6,
+			ARRAY_SIZE(ast_i2c_board_info_6));
+	i2c_register_board_info(7, ast_i2c_board_info_7,
+			ARRAY_SIZE(ast_i2c_board_info_7));
+	i2c_register_board_info(8, ast_i2c_board_info_8,
+			ARRAY_SIZE(ast_i2c_board_info_8));
+	i2c_register_board_info(9, ast_i2c_board_info_9,
+			ARRAY_SIZE(ast_i2c_board_info_9));
+	i2c_register_board_info(10, ast_i2c_board_info_10,
+			ARRAY_SIZE(ast_i2c_board_info_10));
+	i2c_register_board_info(11, ast_i2c_board_info_11,
+			ARRAY_SIZE(ast_i2c_board_info_11));
+	i2c_register_board_info(12, ast_i2c_board_info_12,
+			ARRAY_SIZE(ast_i2c_board_info_12));
 }
 
 #else
