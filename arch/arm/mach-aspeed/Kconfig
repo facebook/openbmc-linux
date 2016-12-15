@@ -227,6 +227,13 @@ config FBTTN
 	select EGFX_IRQ
     bool "Facebook FBTTN"
 
+config LIGHTNING
+        select USB_ARCH_HAS_EHCI
+        select AST_UART_SDMA
+        select EGFX_IRQ
+    bool "Facebook Lightning"
+
+
 config CMM
 	select USB_ARCH_HAS_EHCI
 	select AST_UART_SDMA
