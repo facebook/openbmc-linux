@@ -47,6 +47,11 @@ ifeq ($(CONFIG_FBTTN), y)
   PLATFB = 1
 endif
 
+ifeq ($(CONFIG_LIGHTNING), y)
+  obj-y += dev-uart.o  dev-i2c.o dev-vhub.o
+  PLATFB = 1
+endif
+
 ifeq ($(CONFIG_FBY2),y)
   obj-y += dev-uart.o dev-i2c-fby2.o dev-i2c-common.o dev-spi-fb.o
   PLATFB = 1
