@@ -126,7 +126,7 @@ init_fnc_t __initdata *init_all_device[] = {
 	//ast_add_device_rfx,
 	//ast_add_device_h264,
 	//ast_add_device_formatter,
-	//ast_add_device_vhub,
+	ast_add_device_vhub,
 	ast_add_device_udc20,
 	//ast_add_device_crypto,
 	NULL,
