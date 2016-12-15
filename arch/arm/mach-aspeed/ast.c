@@ -117,7 +117,7 @@ static const char * const ast_dt_match[] = {
 
 void ast_restart(enum reboot_mode mode, const char *cmd)
 {
-#if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP) || defined(CONFIG_FBTTN)
+#if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP) || defined(CONFIG_FBTTN) || defined(CONFIG_LIGHTNING)
 	ast_wdt_reset_soc();
 #else
 	ast_wdt_reset_full();
