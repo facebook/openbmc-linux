@@ -16,7 +16,7 @@
 #ifndef _AST_LPC_H_
 #define _AST_LPC_H_
 
-#include <linux/platform_device.h> 
+#include <linux/platform_device.h>
 #include <linux/miscdevice.h>
 #include <linux/interrupt.h>
 
@@ -55,29 +55,29 @@ enum bt_states {
 };
 
 struct ast_bt_data {
-	//driver information 
-	struct platform_device *pdev;	
-	int 			open_count;	
+	//driver information
+	struct platform_device *pdev;
+	int 			open_count;
 	struct miscdevice	miscdev;
-	u8				bt_reg;				/* register info */		
+	u8				bt_reg;				/* register info */
 	struct ast_lpc_data	*ast_lpc;
 
 	//
-	void __iomem			*isr;	
+	void __iomem			*isr;
 	void __iomem			*str;
-	void __iomem			*fifo;	
-	void __iomem			*fifo_sts;		
+	void __iomem			*fifo;
+	void __iomem			*fifo_sts;
 	struct tasklet_struct	bt_tasklet;
 	enum bt_states	state;
 	unsigned char	seq;		/* BT sequence number */
 	unsigned char	write_data[AST_IPMI_PKT_SIZE];
 	int		write_count;
-	unsigned char	read_data[AST_IPMI_PKT_SIZE];	
+	unsigned char	read_data[AST_IPMI_PKT_SIZE];
 	int		read_count;
 	int		truncated;
 	long		timeout;	/* microseconds countdown */
 	int		error_retries;	/* end of "common" fields */
-	u8 		BTPktRdy;	
+	u8 		BTPktRdy;
 	enum bt_states	complete;	/* to divert the state machine */
 	int		BT_CAP_outreqs;
 	long		BT_CAP_req2rsp;
@@ -86,7 +86,7 @@ struct ast_bt_data {
 	unsigned int	completion_code_length;
 	u8	regspacings;
 	/* cdriver callbacks */
-	ast_ipmi_irq	 bt_irq_hander;	/* buffer done callback */	
+	ast_ipmi_irq	 bt_irq_hander;	/* buffer done callback */
 };
 
 
@@ -121,25 +121,25 @@ enum kcs_states {
 };
 
 struct ast_kcs_data {
-	//driver information 
-	struct platform_device *pdev;	
-	int 			open_count;	
+	//driver information
+	struct platform_device *pdev;
+	int 			open_count;
 	struct miscdevice	miscdev;
-	u8				kcs_reg;				/* register info */	
+	u8				kcs_reg;				/* register info */
 	struct ast_lpc_data	*ast_lpc;
-	
-	//-> phase state 
-	enum kcs_states		KCSPhase;	
-	//RX 
+
+	//-> phase state
+	enum kcs_states		KCSPhase;
+	//RX
 	u32	KCSRcvPktIx;
 	u8	*pKCSRcvPkt;
 	u8 	KCSPktRdy;
-	//Tx 
+	//Tx
 	u8 	KCSSendWait;
-	u8	KCSSendPktIx;
-	u8	KCSSendPktLen;
+	u16	KCSSendPktIx;
+	u16	KCSSendPktLen;
 	u8	*pKCSSendPkt;
-	//register offset -- > 
+	//register offset -- >
 	void __iomem			*str;
 	void __iomem			*idr;
 	void __iomem			*odr;
@@ -152,10 +152,10 @@ struct ast_kcs_data {
 #define SNOOP_DMA_SIZE 	0x1000	//4K
 
 struct ast_snoop_dma_data {
-	//driver information 
-	struct platform_device *pdev;	
+	//driver information
+	struct platform_device *pdev;
 	struct miscdevice	miscdev;
-	u8				snoop_dma_reg;				/* register info */	
+	u8				snoop_dma_reg;				/* register info */
 	struct ast_lpc_data	*ast_lpc;
 	ast_ipmi_irq	 snoop_irq_hander;	/* buffer done callback */
 
@@ -163,32 +163,32 @@ struct ast_snoop_dma_data {
 	void __iomem			*pccr1;
 	void __iomem			*pccr2;
 	void __iomem			*pccr3;
-	void __iomem			*pccr4;	
+	void __iomem			*pccr4;
 	void __iomem			*pccr5;
 	void __iomem			*pccr6;
 
 	u8	port0_data[SNOOP_DMA_SIZE];
 	u16	port0_rd_idx;
-	u16	port0_wr_idx;	
+	u16	port0_wr_idx;
 	u8	port1_data[SNOOP_DMA_SIZE];
 	u16	port1_rd_idx;
-	u16	port1_wr_idx;	
+	u16	port1_wr_idx;
 	u8	port2_data[SNOOP_DMA_SIZE];
 	u16	port2_rd_idx;
-	u16	port2_wr_idx;	
-	u8	port3_data[SNOOP_DMA_SIZE];	
+	u16	port2_wr_idx;
+	u8	port3_data[SNOOP_DMA_SIZE];
 	u16	port3_rd_idx;
-	u16	port3_wr_idx;	
+	u16	port3_wr_idx;
 
 
 	u8	snoop_port;
 	u8	snoop_mode;
-	u8	snoop_index;	//sw idx 
-	u8	*dma_virt;	
-	dma_addr_t dma_addr;	
+	u8	snoop_index;	//sw idx
+	u8	*dma_virt;
+	dma_addr_t dma_addr;
 	u16 dma_size;
-	struct tasklet_struct	snoop_tasklet;	
-        spinlock_t snoop_lock;	
+	struct tasklet_struct	snoop_tasklet;
+        spinlock_t snoop_lock;
 };
 
 /************************  LPC Snoop **************************************/
@@ -196,10 +196,10 @@ struct ast_snoop_dma_data {
 #define SNOOP_FIFO_SIZE	16
 
 struct ast_snoop_data {
-	//driver information 
-	struct platform_device *pdev;	
+	//driver information
+	struct platform_device *pdev;
 	struct miscdevice	miscdev;
-	u8				snoop_reg;				/* register info */	
+	u8				snoop_reg;				/* register info */
 	struct ast_lpc_data	*ast_lpc;
 	ast_ipmi_irq	 snoop_irq_hander;	/* buffer done callback */
 
@@ -211,11 +211,11 @@ struct ast_snoop_data {
 /************************  AST LPC  ****************************************/
 struct ast_lpc_data {
 	struct platform_device *pdev;
-	void __iomem			*reg_base;			/* virtual */	
-	int 					irq;					//LPC IRQ number 
+	void __iomem			*reg_base;			/* virtual */
+	int 					irq;					//LPC IRQ number
 	//Slave mode
 	struct ast_snoop_data 			*ast_snoop;
-	struct ast_snoop_dma_data 	*ast_snoop_dma;	
+	struct ast_snoop_dma_data 	*ast_snoop_dma;
 	struct ast_kcs_data 			*ast_kcs;
 	struct ast_bt_data 			*ast_bt;
 };
