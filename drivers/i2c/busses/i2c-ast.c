@@ -134,7 +134,12 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
 
   // hack: The calculated value for 1MHz does not match with measured value, so override
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
-    data = 0x77744302;
+  // hack: For AST2500 1MHz	
+	#if CONFIG_FBTTN
+	  data = 0x77799300;
+	#else
+      data = 0x77744302;
+    #endif
     return data;
   }
 
