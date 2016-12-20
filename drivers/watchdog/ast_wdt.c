@@ -309,7 +309,12 @@ static int wdt_set_heartbeat(int t)
 
   wdt_restart_new(WDT_TIMO2TICKS(t), WDT_CLK_SRC_EXT,
                   /* No Ext, No intr, Self clear, Full chip reset */
-                  FALSE, FALSE, TRUE, FALSE);
+#ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
+									TRUE,
+#else
+									FALSE,
+#endif
+									FALSE, TRUE, FALSE);
   return 0;
 }
 
@@ -512,7 +517,11 @@ extern void ast_wdt_reset_full(void)
 {
 	writel(0x10 , WDT_Reload);
 	writel(0x4755, WDT_Restart);
-	writel(WDT_CTRL_B_RESET_FULL|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE,
+	writel(WDT_CTRL_B_RESET_FULL|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE
+#ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
+      |WDT_CTRL_B_EXT
+#endif
+      ,
 	  WDT_Ctrl);
 }
 EXPORT_SYMBOL(ast_wdt_reset_full);
@@ -576,7 +585,12 @@ static int ast_wdt_probe(struct platform_device *pdev)
    /* interrupt the system while WDT timeout */
    wdt_restart_new(WDT_TIMO2TICKS(WDT_INITIAL_TIMO), WDT_CLK_SRC_EXT,
 		   /* No Ext, No intr, Self clear, Full chip reset */
-		   FALSE, FALSE, TRUE, FALSE);
+#ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
+		   TRUE,
+#else
+			 FALSE,
+#endif
+			 FALSE, TRUE, FALSE);
 
    /* enable it by default */
    if (!force_disable) {

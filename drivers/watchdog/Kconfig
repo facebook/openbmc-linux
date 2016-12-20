@@ -246,6 +246,13 @@ config AST_WATCHDOG_REARM_DUAL_BOOT
 	help
 	  Rearm dual boot watchdog or not during boot
 
+config AST_WATCHDOG_TRIGGER_GPIO
+	bool "Watchdog external signal"
+	default n
+	depends on AST_WATCHDOG
+	help
+		Enable the config so watchdog control register can enable wdt_ext
+
 # ARM26 Architecture
 
 # AVR32 Architecture
