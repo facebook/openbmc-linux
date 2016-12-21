@@ -298,8 +298,8 @@ ssize_t ast_kcs_write(struct file *file, const char __user *buf, size_t count, l
 			ast_kcs->KCSSendPktLen = count;
 			KCS_DBG("send idx %d : %x \n",ast_kcs->KCSSendPktIx, ast_kcs->pKCSSendPkt[ast_kcs->KCSSendPktIx]);
 			if(ast_kcs->KCSPhase == KCS_PHASE_READ) {
-				write_kcs_data(ast_kcs, ast_kcs->pKCSSendPkt[ast_kcs->KCSSendPktIx]);
 				ast_kcs->KCSSendPktIx++;
+        write_kcs_data(ast_kcs, ast_kcs->pKCSSendPkt[0]);
 			} else {
 				printk("KCS resp error \n");
 				return -EINVAL;
