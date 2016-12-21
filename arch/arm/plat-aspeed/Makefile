@@ -48,7 +48,7 @@ ifeq ($(CONFIG_FBTTN), y)
 endif
 
 ifeq ($(CONFIG_LIGHTNING), y)
-  obj-y += dev-uart.o  dev-i2c.o dev-vhub.o
+  obj-y += dev-uart.o  dev-i2c.o dev-vhub.o dev-spi-fb.o
   PLATFB = 1
 endif
 

@@ -93,6 +93,7 @@
 #define AST_FMC_CS4_BASE		               	  0x2a000000	/* CS4 */
 
 #define AST_SPI0_MEM					0x30000000
+#define AST_SPI0_CS0_BASE                               0x30000000      /* SPI 2 Flash CS 0 Memory */
 
 #define AST_LPC_PLUS_BRIDGE						0x70000000
 
