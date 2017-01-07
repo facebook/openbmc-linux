@@ -47,13 +47,13 @@
 #define PECI_CTRL_CONT_MODE				(1 << 16)
 #define PECI_CTRL_DBG_MODE				(2 << 16)
 #define PECI_CTRL_CLK_SOURCE			(0x1 << 11)	//0: 24Mhz, 1: MCLK
-#define PECI_CTRL_CLK_DIV_MASK			(0x3 << 8)	
-#define PECI_CTRL_CLK_DIV(x)			(x << 8)	
-#define PECI_CTRL_INVERT_OUT			(0x1 << 7)	
-#define PECI_CTRL_INVERT_IN				(0x1 << 6)	
-#define PECI_CTRL_BUS_CONTENT_EN		(0x1 << 5)	
-#define PECI_CTRL_PECI_EN				(0x1 << 4)	
-#define PECI_CTRL_PECI_CLK_EN			(0x1)	
+#define PECI_CTRL_CLK_DIV_MASK			(0x3 << 8)
+#define PECI_CTRL_CLK_DIV(x)			(x << 8)
+#define PECI_CTRL_INVERT_OUT			(0x1 << 7)
+#define PECI_CTRL_INVERT_IN				(0x1 << 6)
+#define PECI_CTRL_BUS_CONTENT_EN		(0x1 << 5)
+#define PECI_CTRL_PECI_EN				(0x1 << 4)
+#define PECI_CTRL_PECI_CLK_EN			(0x1)
 
 /* AST_PECI_TIMING - 0x04 : Timing Negotiation */
 #define PECI_TIMING_MESSAGE_GET(x)		((x & 0xff00) >> 8)
@@ -77,19 +77,19 @@
 
 
 /* AST_PECI_EXP_FCS	- 0x10 : Expected FCS Data Register  */
-#define PECI_PROGRAM_AW_FCS				(0xf << 24) 
-#define PECI_EXPECT_READ_FCS			(0xf << 16) 
-#define PECI_EXPECT_AW_FCS_AUTO			(0xf << 8) 
-#define PECI_EXPECT_WRITE_FCS			(0xf) 
+#define PECI_PROGRAM_AW_FCS				(0xf << 24)
+#define PECI_EXPECT_READ_FCS			(0xf << 16)
+#define PECI_EXPECT_AW_FCS_AUTO			(0xf << 8)
+#define PECI_EXPECT_WRITE_FCS			(0xf)
 
 /* AST_PECI_CAP_FCS	- 0x14 : Captured FCS Data Register */
-#define PECI_CAPTURE_READ_FCS(x)		((x & 0xff) >> 16) 
-#define PECI_CAPTURE_WRITE_FCS			(0xff) 
+#define PECI_CAPTURE_READ_FCS(x)		((x & 0xff) >> 16)
+#define PECI_CAPTURE_WRITE_FCS			(0xff)
 
 /* AST_PECI_INT_CTRL/ STS  - 0x18/0x1c  : Interrupt Register */
 #define PECI_INT_TIMING_RESULT_MASK		(0x3 << 30)
 #define PECI_INT_TIMEOUT				(0x1 << 4)
-#define PECI_INT_CONNECT				(0x1 << 3)
+#define PECI_INT_CONTENTION       (0x1 << 3)
 #define PECI_INT_W_FCS_BAD				(0x1 << 2)
 #define PECI_INT_W_FCS_ABORT			(0x1 << 1)
 #define PECI_INT_CMD_DONE				(0x1)

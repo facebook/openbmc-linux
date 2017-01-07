@@ -2,22 +2,22 @@
 * File Name     : ast_peci.c
 * Author         : Ryan Chen
 * Description   : AST PECI Controller
-* 
+*
 * Copyright (C) 2012-2020  ASPEED Technology Inc.
-* This program is free software; you can redistribute it and/or modify 
-* it under the terms of the GNU General Public License as published by the Free Software Foundation; 
-* either version 2 of the License, or (at your option) any later version. 
-* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY; 
-* without even the implied warranty of MERCHANTABILITY or 
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
-* You should have received a copy of the GNU General Public License 
-* along with this program; if not, write to the Free Software 
-* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by the Free Software Foundation;
+* either version 2 of the License, or (at your option) any later version.
+* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
+* without even the implied warranty of MERCHANTABILITY or
+* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 *
 *   Version      : 1.0
-*   History      : 
-*      1. 2013/01/30 Ryan Chen create this file 
-*    
+*   History      :
+*      1. 2013/01/30 Ryan Chen create this file
+*
 ********************************************************************************/
 
 #include <linux/module.h>
@@ -50,7 +50,7 @@
 /***********************************************************************/
 struct timing_negotiation {
 	u8		msg_timing;
-	u8		addr_timing;	
+	u8		addr_timing;
 };
 
 struct xfer_msg {
@@ -81,11 +81,11 @@ struct xfer_msg {
 static struct ast_peci_data {
 	struct device			*misc_dev;
 	void __iomem			*reg_base;			/* virtual */
-	int 					irq;				//PECI IRQ number 
-	int 				open_count;	
-	struct completion		xfer_complete;	
+	int 					irq;				//PECI IRQ number
+	int 				open_count;
+	struct completion		xfer_complete;
 	u32					sts;
-	struct mutex lock;	
+	struct mutex lock;
 } ast_peci;
 
 static inline void
@@ -124,20 +124,20 @@ static long ast_peci_ioctl(struct file *fp,
 	switch(cmd) {
 		case AST_PECI_IOCRTIMING:
 			tim_ng.msg_timing = PECI_TIMING_MESSAGE_GET(ast_peci_read(AST_PECI_TIMING));
-			tim_ng.addr_timing = PECI_TIMING_ADDRESS_GET(ast_peci_read(AST_PECI_TIMING)); 
+			tim_ng.addr_timing = PECI_TIMING_ADDRESS_GET(ast_peci_read(AST_PECI_TIMING));
 			if (copy_to_user(argp, &tim_ng, sizeof(struct timing_negotiation)))
 				ret = -EFAULT;
 			break;
-			
-		case AST_PECI_IOCWTIMING:	
+
+		case AST_PECI_IOCWTIMING:
 			if (copy_from_user(&tim_ng, argp, sizeof(struct timing_negotiation))) {
 				ret = -EFAULT;
 			} else {
-				ast_peci_write(PECI_TIMING_MESSAGE(tim_ng.msg_timing) | 
+				ast_peci_write(PECI_TIMING_MESSAGE(tim_ng.msg_timing) |
 							PECI_TIMING_ADDRESS(tim_ng.addr_timing), AST_PECI_TIMING);
 			}
 			break;
-			
+
 		case AST_PECI_IOCXFER:
 			//Check ctrl idle sts & bus state
 			while(ast_peci_read(AST_PECI_CMD) & (PECI_CMD_STS | PECI_CMD_PIN_MON)) {
@@ -162,16 +162,16 @@ static long ast_peci_ioctl(struct file *fp,
 #endif
 
 			if(msg.fcs_en)
-				peci_head = PECI_TAGET_ADDR(msg.client_addr) | 
-							PECI_WRITE_LEN(msg.tx_len) | 
+				peci_head = PECI_TAGET_ADDR(msg.client_addr) |
+							PECI_WRITE_LEN(msg.tx_len) |
 							PECI_READ_LEN(msg.rx_len) | PECI_AW_FCS_EN;
 			else
-				peci_head = PECI_TAGET_ADDR(msg.client_addr) | 
-							PECI_WRITE_LEN(msg.tx_len) | 
+				peci_head = PECI_TAGET_ADDR(msg.client_addr) |
+							PECI_WRITE_LEN(msg.tx_len) |
 							PECI_READ_LEN(msg.rx_len);
-				
-				
-			ast_peci_write(peci_head, AST_PECI_CMD_CTRL);		
+
+
+			ast_peci_write(peci_head, AST_PECI_CMD_CTRL);
 
 			for(i = 0; i < msg.tx_len; i++) {
 				if(i < 16) {
@@ -198,11 +198,11 @@ static long ast_peci_ioctl(struct file *fp,
 #endif
 			init_completion(&ast_peci.xfer_complete);
 			//Fire Command
-			ast_peci_write(PECI_CMD_FIRE, AST_PECI_CMD);	
-			
-			
+			ast_peci_write(PECI_CMD_FIRE, AST_PECI_CMD);
+
+
 			ret = wait_for_completion_interruptible_timeout(&ast_peci.xfer_complete, 30*HZ);
-			
+
 			if (ret == 0)
 				printk("peci controller timed out\n");
 
@@ -211,17 +211,17 @@ static long ast_peci_ioctl(struct file *fp,
 					switch(i%4) {
 						case 0:
 							rx_data = rx_buf0[i/4];
-							
-							msg.rx_buf[i] = rx_data & 0xff; 
+
+							msg.rx_buf[i] = rx_data & 0xff;
 							break;
 						case 1:
-							msg.rx_buf[i] = (rx_data & 0xff00) >> 8; 
+							msg.rx_buf[i] = (rx_data & 0xff00) >> 8;
 							break;
 						case 2:
-							msg.rx_buf[i] = (rx_data & 0xff0000) >> 16; 
+							msg.rx_buf[i] = (rx_data & 0xff0000) >> 16;
 							break;
 						case 3:
-							msg.rx_buf[i] = (rx_data & 0xff000000) >> 24; 
+							msg.rx_buf[i] = (rx_data & 0xff000000) >> 24;
 							break;
 
 					}
@@ -229,16 +229,16 @@ static long ast_peci_ioctl(struct file *fp,
 					switch(i%4) {
 						case 0:
 							rx_data = rx_buf1[i/4];
-							msg.rx_buf[i] = rx_data & 0xff; 
+							msg.rx_buf[i] = rx_data & 0xff;
 							break;
 						case 1:
-							msg.rx_buf[i] = (rx_data & 0xff00) >> 8; 
+							msg.rx_buf[i] = (rx_data & 0xff00) >> 8;
 							break;
 						case 2:
-							msg.rx_buf[i] = (rx_data & 0xff0000) >> 16; 
+							msg.rx_buf[i] = (rx_data & 0xff0000) >> 16;
 							break;
 						case 3:
-							msg.rx_buf[i] = (rx_data & 0xff000000) >> 24; 
+							msg.rx_buf[i] = (rx_data & 0xff000000) >> 24;
 							break;
 
 					}
@@ -249,27 +249,27 @@ static long ast_peci_ioctl(struct file *fp,
 			ast_peci_read(AST_PECI_R_DATA0);
 			ast_peci_read(AST_PECI_R_DATA1);
 			ast_peci_read(AST_PECI_R_DATA2);
-			ast_peci_read(AST_PECI_R_DATA3);			
+			ast_peci_read(AST_PECI_R_DATA3);
 			ast_peci_read(AST_PECI_R_DATA4);
 			ast_peci_read(AST_PECI_R_DATA5);
 			ast_peci_read(AST_PECI_R_DATA6);
-			ast_peci_read(AST_PECI_R_DATA7);			
+			ast_peci_read(AST_PECI_R_DATA7);
 
 			printk("rx_buf : ");
 			for(i = 0;i< msg.rx_len; i++)
 				printk("%x ",msg.rx_buf[i]);
 			printk("\n");
-#endif		
+#endif
 			msg.sts = ast_peci.sts;
 			msg.rx_fcs = PECI_CAPTURE_READ_FCS(ast_peci_read(AST_PECI_CAP_FCS));
 			if (copy_to_user(argp, &msg, sizeof(struct xfer_msg)))
 				ret = -EFAULT;
-			
+
 			break;
-		default:			
+		default:
 			printk("ast_peci_ioctl command fail\n");
 			ret = -ENOTTY;
-			break;			
+			break;
 	}
 
 out:
@@ -284,7 +284,7 @@ static int ast_peci_open(struct inode *inode, struct file *file)
 	/* Flush input queue on first open */
 	if (ast_peci.open_count)
 		return -1;
-	
+
 	ast_peci.open_count++;
 
 
@@ -295,52 +295,46 @@ static int ast_peci_release(struct inode *inode, struct file *file)
 {
 	PECI_DBG("ast_peci_release\n");
 	ast_peci.open_count--;
-	
-	return 0;	
+
+	return 0;
 }
 
 static irqreturn_t ast_peci_handler(int this_irq, void *dev_id)
 {
 	ast_peci.sts = (0x1f & ast_peci_read(AST_PECI_INT_STS));
-	
-	switch(ast_peci.sts) {
-		case PECI_INT_TIMEOUT:
-			printk("PECI_INT_TIMEOUT \n");
-			ast_peci_write(PECI_INT_TIMEOUT, AST_PECI_INT_STS);
-			break;
-		case PECI_INT_CONNECT:
-			printk("PECI_INT_CONNECT \n");
-			ast_peci_write(PECI_INT_CONNECT, AST_PECI_INT_STS);			
-			break;
-		case PECI_INT_W_FCS_BAD:
-			printk("PECI_INT_W_FCS_BAD \n");
-			ast_peci_write(PECI_INT_W_FCS_BAD, AST_PECI_INT_STS);						
-			break;
-		case PECI_INT_W_FCS_ABORT:
-			printk("PECI_INT_W_FCS_ABORT \n");
-			ast_peci_write(PECI_INT_W_FCS_ABORT, AST_PECI_INT_STS);									
-			break;
-		case PECI_INT_CMD_DONE:
-			printk("PECI_INT_CMD_DONE \n");
-			ast_peci_write(PECI_INT_CMD_DONE, AST_PECI_INT_STS);	
-			ast_peci_write(0, AST_PECI_CMD);
-			break;
-		default:
-			printk("no one handle .... \n");
-			break;
-		
-	}
+
+  if (ast_peci.sts & PECI_INT_TIMEOUT) {
+    printk("PECI_INT_TIMEOUT \n");
+    ast_peci_write(PECI_INT_TIMEOUT, AST_PECI_INT_STS);
+  }
+  if (ast_peci.sts & PECI_INT_CONTENTION) {
+    printk("PECI_INT_CONTENTION \n");
+    ast_peci_write(PECI_INT_CONTENTION, AST_PECI_INT_STS);
+  }
+  if (ast_peci.sts & PECI_INT_W_FCS_BAD) {
+    printk("PECI_INT_W_FCS_BAD \n");
+    ast_peci_write(PECI_INT_W_FCS_BAD, AST_PECI_INT_STS);
+  }
+  if (ast_peci.sts & PECI_INT_W_FCS_ABORT) {
+    printk("PECI_INT_W_FCS_ABORT \n");
+    ast_peci_write(PECI_INT_W_FCS_ABORT, AST_PECI_INT_STS);
+  }
+  if (ast_peci.sts & PECI_INT_CMD_DONE) {
+    //printk("PECI_INT_CMD_DONE \n");
+    ast_peci_write(PECI_INT_CMD_DONE, AST_PECI_INT_STS);
+    ast_peci_write(0, AST_PECI_CMD);
+  }
 
 	complete(&ast_peci.xfer_complete);
-	
+
 	return IRQ_HANDLED;
 
 }
 
 static void ast_peci_ctrl_init(void)
 {
-	ast_peci_write(PECI_CTRL_SAMPLING(8) | 
-					PECI_CTRL_PECI_CLK_EN, AST_PECI_CTRL);	
+	ast_peci_write(PECI_CTRL_SAMPLING(8) |
+					PECI_CTRL_PECI_CLK_EN, AST_PECI_CTRL);
 
 	//PECI Timing Setting : should 4 times of peci clk period 64 = 16 * 4 ??
 	ast_peci_write(PECI_TIMING_MESSAGE(64) | PECI_TIMING_ADDRESS(64), AST_PECI_TIMING);
@@ -352,25 +346,25 @@ static void ast_peci_ctrl_init(void)
 
 	//PECI Spec wide speed rangs [2kbps~2Mbps]
 	//Sampling 8/16, READ mode : Point Sampling , CLK source : 24Mhz , DIV by 8 : 3 --> CLK is 3Mhz
-	//PECI CTRL Enable 
-	ast_peci_write(PECI_CTRL_SAMPLING(8) | PECI_CTRL_CLK_DIV(3) | 
-					PECI_CTRL_PECI_EN | 
-					PECI_CTRL_PECI_CLK_EN, AST_PECI_CTRL);	
+	//PECI CTRL Enable
+	ast_peci_write(PECI_CTRL_SAMPLING(8) | PECI_CTRL_CLK_DIV(3) |
+					PECI_CTRL_PECI_EN |
+					PECI_CTRL_PECI_CLK_EN, AST_PECI_CTRL);
 
-	//Issue Fix for interrupt accur 
-	
+	//Issue Fix for interrupt accur
+
 	//Clear Interrupt
-	ast_peci_write(PECI_INT_TIMEOUT | PECI_INT_CONNECT | 
+	ast_peci_write(PECI_INT_TIMEOUT | PECI_INT_CONTENTION |
 					PECI_INT_W_FCS_BAD | PECI_INT_W_FCS_ABORT |
 					PECI_INT_CMD_DONE, AST_PECI_INT_STS);
 
 
-	//PECI Negotiation Selection , interrupt enable 
-	//Set nego mode :  1st bit of addr negotiation 
-	ast_peci_write(PECI_INT_TIMEOUT | PECI_INT_CONNECT | 
+	//PECI Negotiation Selection , interrupt enable
+	//Set nego mode :  1st bit of addr negotiation
+	ast_peci_write(PECI_INT_TIMEOUT | PECI_INT_CONTENTION |
 					PECI_INT_W_FCS_BAD | PECI_INT_W_FCS_ABORT |
 					PECI_INT_CMD_DONE, AST_PECI_INT_CTRL);
-	
+
 }
 
 static const struct file_operations ast_peci_fops = {
@@ -392,10 +386,10 @@ static int ast_peci_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret=0;
 
-	PECI_DBG("ast_peci_probe\n");	
+	PECI_DBG("ast_peci_probe\n");
 
 	//SCU PECI CTRL Reset
-	ast_scu_init_peci();	
+	ast_scu_init_peci();
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (NULL == res) {
@@ -425,20 +419,20 @@ static int ast_peci_probe(struct platform_device *pdev)
 
 	ret = request_irq(ast_peci.irq, ast_peci_handler, IRQF_SHARED,
 			  "ast-peci", &ast_peci);
-	
+
 	if (ret) {
 		printk(KERN_INFO "PECI: Failed request irq %d\n", ast_peci.irq);
 		goto out_region;
 	}
-	
+
 	ret = misc_register(&ast_peci_misc);
-	if (ret){		
+	if (ret){
 		printk(KERN_ERR "PECI : failed to request interrupt\n");
 		goto out_irq;
 	}
 
 	ast_peci_ctrl_init();
-	
+
 	printk(KERN_INFO "ast_peci: driver successfully loaded.\n");
 
 	return 0;
@@ -469,18 +463,18 @@ static int ast_peci_remove(struct platform_device *pdev)
 
 	release_mem_region(res->start, res->end - res->start + 1);
 
-	return 0;	
+	return 0;
 }
 
 #ifdef CONFIG_PM
-static int 
+static int
 ast_peci_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	printk("ast_peci_suspend : TODO \n");
 	return 0;
 }
 
-static int 
+static int
 ast_peci_resume(struct platform_device *pdev)
 {
 	ast_peci_ctrl_init();

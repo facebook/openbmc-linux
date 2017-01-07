@@ -108,7 +108,9 @@ init_fnc_t __initdata *init_all_device[] = {
 	ast_add_device_lpc,
 	//ast_add_device_espi,
 	//ast_add_device_sgpio,
-	//ast_add_device_peci,
+#if defined(CONFIG_FBTP)
+  ast_add_device_peci,
+#endif
 	ast_add_device_jtag,
 	ast_add_device_sdhci,
 	ast_add_device_gmac,
