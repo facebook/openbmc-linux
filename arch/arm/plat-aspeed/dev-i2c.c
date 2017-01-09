@@ -818,14 +818,6 @@ static struct i2c_board_info __initdata ast_i2c_board_info_3[] = {
 
 //Under I2C Dev 4
 static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
-	// PEB TEMP SENSOR (0x9A)
-	{
-    	I2C_BOARD_INFO("tmp75", 0x4d),
-	},
-	// PEB TEMP SENSOR (0x94)
-	{
-		I2C_BOARD_INFO("tmp75", 0x4a),
-	},
 	// PEB FRUID (0xA0)
 	{
 		I2C_BOARD_INFO("24c64", 0x50),
