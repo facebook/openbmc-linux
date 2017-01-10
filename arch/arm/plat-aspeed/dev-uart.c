@@ -384,6 +384,8 @@ void __init ast_add_device_uart(void)
   ast_scu_multi_func_uart(2);
   ast_scu_multi_func_uart(3);
   ast_scu_multi_func_uart(4);
+#elif defined(CONFIG_LIGHTNING)
+
 #else
 	ast_scu_multi_func_uart(1);
 	ast_scu_multi_func_uart(3);
