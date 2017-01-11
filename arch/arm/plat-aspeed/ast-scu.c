@@ -1474,10 +1474,13 @@ ast_scu_multi_func_eth(u8 num)
 				AST_SCU_FUN_PIN_CTRL1);
 
 #endif
+
+#if !defined(CONFIG_FBTP) // On FBTP, need these pins as default GPIOs
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL3) |
 						SCU_FUN_PIN_MAC0_MDIO |
 						SCU_FUN_PIN_MAC0_MDC,
 				AST_SCU_FUN_PIN_CTRL3);
+#endif
 
 			break;
 		case 1:
