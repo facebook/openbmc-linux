@@ -391,11 +391,11 @@ ncsi_rx:
       if (length <= 128 && tbuf[12] == 0x88 && tbuf[13] == 0xF8) {
         memcpy (&lp->NCSI_Respond, (unsigned char *)phys_to_virt(cur_desc->RXBUF_BADR), length);
       } else {
-          printk("NCSI_RX: Skip len: %d, proto: %x:%x\n", length, tbuf[12], tbuf[13]);
+          //printk("NCSI_RX: Skip len: %d, proto: %x:%x\n", length, tbuf[12], tbuf[13]);
           lp->rx_descs[lp->rx_idx].RXPKT_RDY = RX_OWNBY_FTGMAC100;
           lp->rx_idx = (lp->rx_idx+1)%RXDES_NUM;
           // Check next descriptor for response packet
-          if (count++ <= RXDES_NUM) {
+          if (count++ <= 500000) {
             goto ncsi_rx;
           }
       }
@@ -1462,7 +1462,7 @@ static void ftgmac100_enable( struct net_device *dev )
 //Enable AEN
 					//Enable_AEN(dev);
 //Get Parameters
-					Get_Parameters(dev);
+					//Get_Parameters(dev);
 //Enable TX
 					Enable_Network_TX(dev);
 //Enable Channel
