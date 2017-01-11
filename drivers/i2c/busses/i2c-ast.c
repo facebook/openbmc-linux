@@ -258,7 +258,7 @@ static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 	switch(i2c_dev->slave_event) {
 		case I2C_SLAVE_EVENT_START_WRITE:
 			for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
-				if((i2c_dev->slave_rx_msg[i].flags == 0) && (i2c_dev->slave_rx_msg[i].addr != BUFF_ONGOING)) {
+				if (i2c_dev->slave_rx_msg[i].flags == 0) {  // only one transaction can be on I2C bus.
 					i2c_dev->slave_rx_msg[i].addr = BUFF_ONGOING;
 					break;
 				}
@@ -557,33 +557,19 @@ static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
 {
 	int timeout = 10; //TODO number
   volatile u8 mode = 0;
-//	printk("ast_i2c_wait_bus_not_busy \n");
+	unsigned long flags;
 
-  // Wait for slave transfer to finish
-  mode = i2c_dev->slave_operation;
-  while (mode == 1) {
-    if (timeout <= 0) {
-      break;
-    }
-    mode = i2c_dev->slave_operation;
-    timeout--;
-    msleep(1);
-  }
-
-  if (timeout <= 0) {
-    //TODO: sometimes the slave operation flag is not reset properly so go ahead with checking bus busy signal
-    dev_err(i2c_dev->dev, "slave operation set, check busy status line\n");
-  }
-
-  // Wait for Bus to go IDLE
   timeout = 10;
-	while (ast_i2c_read(i2c_dev,I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS) {
-		if(timeout<=0) {
+	while (timeout > 0) {
+		spin_lock_irqsave(&i2c_dev->slave_rx_lock, flags);
+		if (!(ast_i2c_read(i2c_dev, I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS)) {
+			i2c_dev->slave_operation = 0;  // the slave transaction does not exist since bus is IDLE
+			spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
 			break;
-    }
-
-		timeout--;
-		msleep(1);
+		}
+		spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
+		if ((--timeout) > 0)
+			msleep(1);
 	}
 
   if (timeout <=0) {
@@ -598,8 +584,6 @@ static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
     return 0;
   }
 
-  // TODO: hack to reset slave operation flag manually
-  i2c_dev->slave_operation = 0;
   return 0;
 }
 
@@ -866,16 +850,6 @@ static void ast_i2c_do_pool_xfer(struct ast_i2c_dev *i2c_dev)
 					tx_buf[i/4] |= (i2c_dev->master_msgs->buf[i2c_dev->master_xfer_cnt + i] << ((i%4)*8)) ;
 				}
 
-				if (i2c_dev->xfer_last == 1) {
-					dev_dbg(i2c_dev->dev, "last stop \n");
-					cmd |= AST_I2CD_M_STOP_CMD;
-					ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) &
-										~AST_I2CD_TX_ACK_INTR_EN, I2C_INTR_CTRL_REG);
-
-				} else {
-					ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
-										AST_I2CD_TX_ACK_INTR_EN, I2C_INTR_CTRL_REG);
-				}
 				ast_i2c_write(i2c_dev,
 							AST_I2CD_TX_DATA_BUF_END_SET((i2c_dev->master_xfer_len - 1)) |
 							AST_I2CD_BUF_BASE_ADDR_SET(i2c_dev->req_page->page_addr_point),
@@ -1038,15 +1012,7 @@ static void ast_i2c_do_byte_xfer(struct ast_i2c_dev *i2c_dev)
 				//Tx data
 				dev_dbg(i2c_dev->dev, "(-->) xfer byte data index[%02x]:%02x  \n",i2c_dev->master_xfer_cnt, *(xfer_buf + i2c_dev->master_xfer_cnt));
 				ast_i2c_write(i2c_dev, *(xfer_buf + i2c_dev->master_xfer_cnt), I2C_BYTE_BUF_REG);
-				if((i2c_dev->xfer_last == 1) && (i2c_dev->master_xfer_cnt + 1 == i2c_dev->master_msgs->len)) {
-					ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) &
-										~AST_I2CD_TX_ACK_INTR_EN, I2C_INTR_CTRL_REG);
-					ast_i2c_write(i2c_dev, AST_I2CD_M_TX_CMD | AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
-				} else {
-					ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
-										AST_I2CD_TX_ACK_INTR_EN, I2C_INTR_CTRL_REG);
-					ast_i2c_write(i2c_dev, AST_I2CD_M_TX_CMD, I2C_CMD_REG);
-				}
+				ast_i2c_write(i2c_dev, AST_I2CD_M_TX_CMD, I2C_CMD_REG);
 			}
 
 		} else {
@@ -1304,6 +1270,9 @@ next_xfer:
 			printk("rx buf i,[%x]\n",i,i2c_dev->master_msgs->buf[i]);
 		printk(" ===== \n");
 #endif
+    // STOP of master write
+		if ((i2c_dev->xfer_last == 1) && !(i2c_dev->master_msgs->flags & I2C_M_RD))
+			ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
 		i2c_dev->cmd_err = 0;
 
 done_out:
@@ -1319,7 +1288,14 @@ static void ast_i2c_slave_addr_match(struct ast_i2c_dev *i2c_dev)
 {
 	u8 match;
   unsigned long flags;
+	// cancel master xfer since slave transaction cuts in ---
+	u32  cmd32;
 
+	if ((cmd32 = ast_i2c_read(i2c_dev, I2C_CMD_REG)) & 0x03) {
+		ast_i2c_write(i2c_dev, cmd32 & ~0x43, I2C_CMD_REG);
+		i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
+		complete(&i2c_dev->cmd_complete);
+	}
 
 	i2c_dev->slave_operation = 1;
 	i2c_dev->slave_xfer_cnt = 0;
@@ -1409,6 +1385,14 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 		i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ABNORMAL;
 		complete(&i2c_dev->cmd_complete);
 
+		// clear TX_ACK and TX_NAK ---
+		if (sts & AST_I2CD_INTR_STS_TX_ACK) {
+			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_ACK, I2C_INTR_STS_REG);
+		}
+		else if (sts & AST_I2CD_INTR_STS_TX_NAK) {
+			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK, I2C_INTR_STS_REG);
+		}
+
     return IRQ_HANDLED;
 	}
 
@@ -1421,6 +1405,19 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 
     ast_i2c_bus_reset(i2c_dev);
     return IRQ_HANDLED;
+	}
+
+	// handle STOP for slave transaction here to reduce the complex cases ---
+	if (AST_I2CD_INTR_STS_NORMAL_STOP & sts) {
+		if (i2c_dev->slave_operation == 1) {
+			i2c_dev->slave_event = I2C_SLAVE_EVENT_STOP;
+			ast_i2c_slave_xfer_done(i2c_dev);
+			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
+			sts &= (~AST_I2CD_INTR_STS_NORMAL_STOP);
+
+			if (!sts)
+				return IRQ_HANDLED;
+		}
 	}
 
 	switch(sts) {
@@ -1531,6 +1528,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK, I2C_INTR_STS_REG);
 			} else {
 				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_TX_NAK = %x\n",sts);
+				ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);  // send STOP when TX_NAK
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK, I2C_INTR_STS_REG);
 				if (i2c_dev->master_msgs
 				    && i2c_dev->master_msgs->flags & I2C_M_IGNORE_NAK) {
@@ -1580,7 +1578,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
 			break;
 		case AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH | AST_I2CD_INTR_STS_ARBIT_LOSS:
-			dev_err(i2c_dev->dev, "M clear isr: sts = %x\n",sts);
+			dev_dbg(i2c_dev->dev, "M clear isr: sts = %x\n",sts);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
       ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
@@ -1604,6 +1602,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			break;
 
 		case AST_I2CD_INTR_STS_NORMAL_STOP:
+		case AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH:                              // handle SLAVE_MATCH at next time
 			if(i2c_dev->slave_operation == 1) {
 				i2c_dev->slave_event = I2C_SLAVE_EVENT_STOP;
 				ast_i2c_slave_xfer_done(i2c_dev);
@@ -1636,32 +1635,10 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				ast_i2c_master_xfer_done(i2c_dev);
       }
 			break;
-		case AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH:
-			if(i2c_dev->slave_operation == 0) {
-				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP = %x\n",sts);
-				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
-				//take care
-				ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
-									AST_I2CD_RX_DOWN_INTR_EN, I2C_INTR_CTRL_REG);
-				ast_i2c_master_xfer_done(i2c_dev);
-
-				// Handle the new slave match interrupt
-				ast_i2c_slave_addr_match(i2c_dev);
-				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
-			} else {
-				dev_err(i2c_dev->dev, "S clear isr: AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP |"
-                              "AST_I2CD_INTR_STS_SLAVE_MATCH = %x\n",sts);
-				i2c_dev->slave_event = I2C_SLAVE_EVENT_STOP;
-				ast_i2c_slave_xfer_done(i2c_dev);
-
-				// Handle the new slave match interrupt
-				ast_i2c_slave_addr_match(i2c_dev);
-				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_NORMAL_STOP |
-                                AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
-      }
-			break;
 		case AST_I2CD_INTR_STS_ARBIT_LOSS:
-			dev_err(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_ARBIT_LOSS = %x\n",sts);
+		case AST_I2CD_INTR_STS_ARBIT_LOSS | AST_I2CD_INTR_STS_SLAVE_MATCH:
+      // handle SLAVE_MATCH at next time
+			dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_ARBIT_LOSS = %x\n",sts);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
 			complete(&i2c_dev->cmd_complete);
@@ -1743,6 +1720,11 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 	unsigned long flags;
 
 	spin_lock_irqsave(&i2c_dev->master_lock, flags);
+	// cancel master xfer ---
+	if (i2c_dev->slave_operation == 1) {
+		spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
+		return -1;
+	}
 
 	//request: update master_xfer_mode based on master_dma selection
 	if(i2c_dev->ast_i2c_data->master_dma == BYTE_MODE) {
@@ -1827,14 +1809,6 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 
 	}
 stop:
-	if(i2c_dev->cmd_err & AST_I2CD_INTR_STS_NORMAL_STOP)
-		goto out;
-	init_completion(&i2c_dev->cmd_complete);
-  i2c_dev->cmd_err = 0;
-	ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
-	wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
-											   i2c_dev->adap.timeout*HZ);
-
 out:
 	//Free ..
 	if(i2c_dev->master_xfer_mode == BUFF_XFER) {
@@ -1867,7 +1841,7 @@ static int ast_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	for (i = adap->retries; i >= 0; i--) {
 
 		ret = ast_i2c_do_msgs_xfer(i2c_dev, msgs, num);
-		if (ret != -EAGAIN)
+		if ((i <= 0) || (ret != -EAGAIN))  // reduce unnecessary delay
 			goto out;
 		dev_dbg(&i2c_dev->adap.dev, "Retrying transmission [%d]\n",i);
 		udelay(100);
