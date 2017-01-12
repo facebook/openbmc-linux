@@ -561,13 +561,20 @@ static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
 
   timeout = 10;
 	while (timeout > 0) {
-		spin_lock_irqsave(&i2c_dev->slave_rx_lock, flags);
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR
+    spin_lock_irqsave(&i2c_dev->slave_rx_lock, flags);
 		if (!(ast_i2c_read(i2c_dev, I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS)) {
 			i2c_dev->slave_operation = 0;  // the slave transaction does not exist since bus is IDLE
 			spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
 			break;
 		}
 		spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
+#else
+		if (!(ast_i2c_read(i2c_dev, I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS)) {
+			i2c_dev->slave_operation = 0;  // the slave transaction does not exist since bus is IDLE
+			break;
+		}
+#endif
 		if ((--timeout) > 0)
 			msleep(1);
 	}
