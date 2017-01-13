@@ -170,7 +170,6 @@ static struct mtd_partition ast_rom_partitions[] = {
 		.name       = "rom",               /* ROM (SPL), recovery U-boot */
 		.offset     = 0,                   /* From 0 */
 		.size       = MTDPART_SIZ_FULL,    /* Full size */
-		.mask_flags = MTD_WRITEABLE,
 	},
 };
 
@@ -193,12 +192,12 @@ static struct mtd_partition ast_data_partitions[] = {
 		.offset     = MTDPART_OFS_APPEND,  /* From 896K */
 		.size       = 0x1B20000,           /* Size 27.125M */
 	}, {
-		.name       = "data0",
+		.name       = "data1",
 		.offset     = MTDPART_OFS_APPEND,
 		.size       = MTDPART_SIZ_FULL,
 	},
 	{
-		.name       = "flash0",
+		.name       = "flash1",
 		.offset     = 0,                   /* From 0 */
 		.size       = MTDPART_SIZ_FULL,    /* full size */
 	},

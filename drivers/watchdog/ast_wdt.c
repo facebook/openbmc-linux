@@ -117,6 +117,13 @@ typedef unsigned char bool_T;
 #define WDT_DUAL_BOOT_TIMO (WDT_INITIAL_TIMO - 5)
 #define WDT_TIMO2TICKS(t) (TICKS_PER_uSEC * 1000000 * (t))
 
+/* The external reset is enabled (TRUE) based on a board configuration. */
+#ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
+#define WDT_EXTRST 1
+#else
+#define WDT_EXTRST 0
+#endif
+
 static int heartbeat = WDT_TIMO;
 module_param(heartbeat, int, 0);
 MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds. (0<heartbeat<65536, default=" __MODULE_STRING(WDT_TIMO) ")");
@@ -308,8 +315,8 @@ static int wdt_set_heartbeat(int t)
   heartbeat=t;
 
   wdt_restart_new(WDT_TIMO2TICKS(t), WDT_CLK_SRC_EXT,
-                  /* No Ext, No intr, Self clear, Full chip reset */
-                  FALSE, FALSE, TRUE, FALSE);
+                  /* Optional Ext, No intr, Self clear, Full chip reset */
+                  WDT_EXTRST, FALSE, TRUE, FALSE);
   return 0;
 }
 
@@ -511,7 +518,13 @@ extern void ast_wdt_reset_full(void)
 {
 	AST_WRITE_REG(WDT_Reload, 0x10);
 	AST_WRITE_REG(WDT_Restart, 0x4755);
-	AST_WRITE_REG(WDT_Ctrl, WDT_CTRL_B_RESET_FULL|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE);
+
+	unsigned int val;
+	val = WDT_CTRL_B_RESET_FULL|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE;
+#ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
+	val |= WDT_CTRL_B_EXT;
+#endif
+	AST_WRITE_REG(WDT_Ctrl, val);
 }
 EXPORT_SYMBOL(ast_wdt_reset_full);
 
@@ -573,8 +586,8 @@ static int ast_wdt_probe(struct platform_device *pdev)
 
    /* interrupt the system while WDT timeout */
    wdt_restart_new(WDT_TIMO2TICKS(WDT_INITIAL_TIMO), WDT_CLK_SRC_EXT,
-		   /* No Ext, No intr, Self clear, Full chip reset */
-		   FALSE, FALSE, TRUE, FALSE);
+		   /* Optional Ext, No intr, Self clear, Full chip reset */
+		   WDT_EXTRST, FALSE, TRUE, FALSE);
 
    /* enable it by default */
    if (!force_disable) {

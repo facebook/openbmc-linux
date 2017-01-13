@@ -371,9 +371,16 @@ config COH901327_WATCHDOG
 config AST_WATCHDOG
 	tristate "ASPEED watchdog"
 	depends on PLAT_ASPEED
-	select WATCHDOG_CORE 
+	select WATCHDOG_CORE
 	help
 	  Watchdog timer for ASPEED chips.
+
+config AST_WATCHDOG_TRIGGER_GPIO
+	bool "Watchdog external signal"
+	default n
+	depends on AST_WATCHDOG
+	help
+	  Trigger the WDT_EXT GPIO during watchdog reset and reboot.
 
 config TWL4030_WATCHDOG
 	tristate "TWL4030 Watchdog"
