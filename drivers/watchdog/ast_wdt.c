@@ -510,7 +510,13 @@ extern void ast_wdt_reset_soc(void)
 {
 	AST_WRITE_REG(WDT_Reload, 0x10);
 	AST_WRITE_REG(WDT_Restart, 0x4755);
-	AST_WRITE_REG(WDT_Ctrl, WDT_CTRL_B_RESET_SOC|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE);
+
+	unsigned int val;
+	val = WDT_CTRL_B_RESET_SOC|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE;
+#ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
+	val |= WDT_CTRL_B_EXT;
+#endif
+	AST_WRITE_REG(WDT_Ctrl, val);
 }
 EXPORT_SYMBOL(ast_wdt_reset_soc);
 
