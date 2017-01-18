@@ -183,7 +183,7 @@ struct ast_snoop_dma_data {
 
 	u8	snoop_port;
 	u8	snoop_mode;
-	u8	snoop_index;	//sw idx
+	u16	snoop_index;	//sw idx
 	u8	*dma_virt;
 	dma_addr_t dma_addr;
 	u16 dma_size;

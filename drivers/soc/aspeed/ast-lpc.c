@@ -1,26 +1,26 @@
 /********************************************************************************
-* File Name     : arch/arm/mach-aspeed/ast-lpc.c 
+* File Name     : arch/arm/mach-aspeed/ast-lpc.c
 * Author         : Ryan Chen
 * Description   : AST LPC
-* 
+*
 * Copyright (C) 2012-2020  ASPEED Technology Inc.
-* This program is free software; you can redistribute it and/or modify 
-* it under the terms of the GNU General Public License as published by the Free Software Foundation; 
-* either version 2 of the License, or (at your option) any later version. 
-* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY; 
-* without even the implied warranty of MERCHANTABILITY or 
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
-* You should have received a copy of the GNU General Public License 
-* along with this program; if not, write to the Free Software 
-* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by the Free Software Foundation;
+* either version 2 of the License, or (at your option) any later version.
+* This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
+* without even the implied warranty of MERCHANTABILITY or
+* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-*   History      : 
+*   History      :
 *    1. 2013/05/15 Ryan Chen Create
-* 
+*
 *Check Host is in Continuous mode
 *Check under Host : SIRQ_CNTL
    (Serial IRQ Mode Select (SIRQMD) �X R/W.
-   0 =  The serial IRQ machine will be in quiet mode. 
+   0 =  The serial IRQ machine will be in quiet mode.
    1 =  The serial IRQ machine will be in continuous mode.)
 *Checked under BMC: SIRQCR0 0x70[7] = 0/1 (Quiet/Continuous mode)
 
@@ -61,7 +61,7 @@ In ICH7 or newer, choose any 2 of GENx_DEC, set 00040081h & 007C0C81h
 #define LPC_DBUG(fmt, args...)
 #endif
 
-static inline u32 
+static inline u32
 ast_lpc_read(struct ast_lpc_data *ast_lpc, u32 reg)
 {
 #if 0
@@ -75,7 +75,7 @@ ast_lpc_read(struct ast_lpc_data *ast_lpc, u32 reg)
 }
 
 static inline void
-ast_lpc_write(struct ast_lpc_data *ast_lpc, u32 val, u32 reg) 
+ast_lpc_write(struct ast_lpc_data *ast_lpc, u32 val, u32 reg)
 {
 //	LPC_DBUG("ast_lpc_write : reg = 0x%08x, val = 0x%08x\n", reg, val);
 	writel(val, ast_lpc->reg_base + reg);
@@ -118,42 +118,42 @@ struct ast_kcs_data *register_ipmi_kcs_drv(u8 kcs_no)
 			ast_lpc->ast_kcs[0].kcs_reg = 1;
 			ast_lpc->ast_kcs[0].ast_lpc = ast_lpc;
 			ast_lpc->ast_kcs[0].regspacings = AST_IPMI_KCS0_REGSPACINGS;	//fix
-			ast_lpc->ast_kcs[0].kcs_irq_hander = NULL;			
+			ast_lpc->ast_kcs[0].kcs_irq_hander = NULL;
 			ast_lpc->ast_kcs[0].str = ast_lpc->reg_base + AST_LPC_STR1;
 			ast_lpc->ast_kcs[0].idr = ast_lpc->reg_base + AST_LPC_IDR1;
-			ast_lpc->ast_kcs[0].odr = ast_lpc->reg_base + AST_LPC_ODR1;	
+			ast_lpc->ast_kcs[0].odr = ast_lpc->reg_base + AST_LPC_ODR1;
 			ast_set_ipmi_kcs_addr(ast_lpc, 0, 0xCA0);
 			break;
 		case 1:
-			ast_lpc->ast_kcs[1].kcs_reg = 1;			
+			ast_lpc->ast_kcs[1].kcs_reg = 1;
 			ast_lpc->ast_kcs[1].ast_lpc = ast_lpc;
-			ast_lpc->ast_kcs[1].regspacings = AST_IPMI_KCS1_REGSPACINGS;	//fix			
+			ast_lpc->ast_kcs[1].regspacings = AST_IPMI_KCS1_REGSPACINGS;	//fix
 			ast_lpc->ast_kcs[1].kcs_irq_hander = NULL;
 			ast_lpc->ast_kcs[1].str = ast_lpc->reg_base + AST_LPC_STR2;
 			ast_lpc->ast_kcs[1].idr = ast_lpc->reg_base + AST_LPC_IDR2;
-			ast_lpc->ast_kcs[1].odr = ast_lpc->reg_base + AST_LPC_ODR2;			
+			ast_lpc->ast_kcs[1].odr = ast_lpc->reg_base + AST_LPC_ODR2;
 			ast_set_ipmi_kcs_addr(ast_lpc, 1, 0xCA8);
 			break;
 		case 2:
-			ast_lpc->ast_kcs[2].kcs_reg = 1;			
-			ast_lpc->ast_kcs[2].ast_lpc = ast_lpc;	
-			ast_lpc->ast_kcs[2].regspacings = AST_IPMI_KCS2_REGSPACINGS;	//fix		
+			ast_lpc->ast_kcs[2].kcs_reg = 1;
+			ast_lpc->ast_kcs[2].ast_lpc = ast_lpc;
+			ast_lpc->ast_kcs[2].regspacings = AST_IPMI_KCS2_REGSPACINGS;	//fix
 			ast_lpc->ast_kcs[2].kcs_irq_hander = NULL;
 			ast_lpc->ast_kcs[2].str = ast_lpc->reg_base + AST_LPC_STR3;
 			ast_lpc->ast_kcs[2].idr = ast_lpc->reg_base + AST_LPC_IDR3;
-			ast_lpc->ast_kcs[2].odr = ast_lpc->reg_base + AST_LPC_ODR3;			
+			ast_lpc->ast_kcs[2].odr = ast_lpc->reg_base + AST_LPC_ODR3;
 			ast_set_ipmi_kcs_addr(ast_lpc, 2, 0xCA2);
 			break;
 		case 3:
-			ast_lpc->ast_kcs[3].kcs_reg = 1;			
-			ast_lpc->ast_kcs[3].ast_lpc = ast_lpc;	
-			ast_lpc->ast_kcs[3].regspacings = AST_IPMI_KCS3_REGSPACINGS;	//can change any					
+			ast_lpc->ast_kcs[3].kcs_reg = 1;
+			ast_lpc->ast_kcs[3].ast_lpc = ast_lpc;
+			ast_lpc->ast_kcs[3].regspacings = AST_IPMI_KCS3_REGSPACINGS;	//can change any
 			ast_lpc->ast_kcs[3].kcs_irq_hander = NULL;
 			ast_lpc->ast_kcs[3].str = ast_lpc->reg_base + AST_LPC_STR4;
 			ast_lpc->ast_kcs[3].idr = ast_lpc->reg_base + AST_LPC_IDR4;
 			ast_lpc->ast_kcs[3].odr = ast_lpc->reg_base + AST_LPC_ODR4;
 			ast_set_ipmi_kcs_addr(ast_lpc, 3, 0xCB2);
-			break;			
+			break;
 	}
 
 	return &(ast_lpc->ast_kcs[kcs_no]);
@@ -172,11 +172,11 @@ void request_ipmi_kcs_irq(u8 kcs_no, ast_ipmi_irq handler)
 			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) | LPC_IBFIF2, AST_LPC_HICR2);
 			break;
 		case 2:
-			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR3) | LPC_IBFIF3, AST_LPC_HICR2);				
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR3) | LPC_IBFIF3, AST_LPC_HICR2);
 			break;
 		case 3:
 			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICRB) | LPC_KCS4_RCV_INTR, AST_LPC_HICRB);
-			break;			
+			break;
 	}
 }
 EXPORT_SYMBOL(request_ipmi_kcs_irq);
@@ -194,7 +194,7 @@ u16 ast_get_ipmi_kcs_addr(struct ast_lpc_data *ast_lpc, u8 kcs_ch)
 			tmp = (ast_lpc_read(ast_lpc, AST_LPC_LADR12H) << 8) | ast_lpc_read(ast_lpc, AST_LPC_LADR12L);
 			break;
 		case 2:
-			tmp = (ast_lpc_read(ast_lpc, AST_LPC_LADR3H) << 8) | ast_lpc_read(ast_lpc, AST_LPC_LADR3L);			
+			tmp = (ast_lpc_read(ast_lpc, AST_LPC_LADR3H) << 8) | ast_lpc_read(ast_lpc, AST_LPC_LADR3L);
 			break;
 		case 3:
 			tmp = ast_lpc_read(ast_lpc, AST_LPC_LADR4) & 0xffff;
@@ -217,7 +217,7 @@ void ast_set_ipmi_kcs_addr(struct ast_lpc_data *ast_lpc, u8 kcs_ch, u16 kcs_addr
 			ast_lpc_write(ast_lpc, kcs_addr & 0xff, AST_LPC_LADR12L);
 			break;
 		case 1:	//0xca2, 0xca6
-			/* channel address select for channel 1  */		
+			/* channel address select for channel 1  */
 			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) | LPC_HICS_LADR12AS, AST_LPC_HICR4);
 			ast_lpc_write(ast_lpc, kcs_addr >> 8, AST_LPC_LADR12H);
 			ast_lpc_write(ast_lpc, kcs_addr & 0xff, AST_LPC_LADR12L);
@@ -230,7 +230,7 @@ void ast_set_ipmi_kcs_addr(struct ast_lpc_data *ast_lpc, u8 kcs_ch, u16 kcs_addr
 			ast_lpc_write(ast_lpc, ((kcs_addr + 1) << 16) | kcs_addr, AST_LPC_LADR4);
 			break;
 		case 4:	//bt +1
-		
+
 			break;
 		default:
 			break;
@@ -270,7 +270,7 @@ u8 ast_get_ipmi_kcs_en(struct ast_lpc_data *ast_lpc, u8 kcs_ch)
 			printk("Error Ch no !!\n");
 			break;
 	}
-		
+
 	return tmp;
 
 }
@@ -281,46 +281,46 @@ void ast_set_ipmi_kcs_en(struct ast_lpc_data *ast_lpc, u8 kcs_ch, u8 enable)
 	if(enable) {
 		switch(kcs_ch) {
 			case 0: //kcs1
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC1_EN, AST_LPC_HICR0);					
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC1_EN, AST_LPC_HICR0);
 				break;
 			case 1:	//kcs2
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC2_EN, AST_LPC_HICR0);					
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC2_EN, AST_LPC_HICR0);
 				break;
 			case 2: //kcs3	--> fix 0xca2 / 0xca3
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) | LPC_LPC3_EN, AST_LPC_HICR0);
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) | LPC_HICS_KCSENBL, AST_LPC_HICR4);
 				break;
-			case 3: //kcs4	
+			case 3: //kcs4
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICRB) | LPC_KCS4_EN, AST_LPC_HICRB);
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICRB) | LPC_KCS4_RCV_INTR, AST_LPC_HICRB);	
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICRB) | LPC_KCS4_RCV_INTR, AST_LPC_HICRB);
 				break;
 		}
 	} else {
 		switch(kcs_ch) {
 			case 0:	//kcs 1
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) & ~LPC_LPC1_EN, AST_LPC_HICR0);
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) & ~LPC_IBFIF1, AST_LPC_HICR2);					
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) & ~LPC_IBFIF1, AST_LPC_HICR2);
 				break;
 			case 1:	//kcs 2
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) & ~LPC_LPC2_EN, AST_LPC_HICR0);					
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) & ~LPC_IBFIF2, AST_LPC_HICR2);								
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR0) & ~LPC_LPC2_EN, AST_LPC_HICR0);
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) & ~LPC_IBFIF2, AST_LPC_HICR2);
 				break;
 			case 2:	//kcs 3
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) & ~LPC_HICS_KCSENBL, AST_LPC_HICR4);
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) & ~LPC_IBFIF2, AST_LPC_HICR2);	
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR2) & ~LPC_IBFIF2, AST_LPC_HICR2);
 				break;
 			case 3:	//kcs 4
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICRB) & ~LPC_KCS4_RCV_INTR, AST_LPC_HICRB);	
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICRB) & ~LPC_KCS4_RCV_INTR, AST_LPC_HICRB);
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICRB) & ~LPC_KCS4_EN, AST_LPC_HICRB);
 				break;
-		}	
+		}
 
-	}	
+	}
 }
 EXPORT_SYMBOL(ast_set_ipmi_kcs_en);
 
 /**************************   IPMI BT Function  **********************************************************/
-//Set default BT address BT0 : 
+//Set default BT address BT0 :
 struct ast_bt_data *register_ipmi_bt_drv(u8 bt_no)
 {
 	switch(bt_no) {
@@ -328,8 +328,8 @@ struct ast_bt_data *register_ipmi_bt_drv(u8 bt_no)
 			ast_lpc->ast_bt[0].bt_reg = 1;
 			ast_lpc->ast_bt[0].ast_lpc = ast_lpc;
 			ast_lpc->ast_bt[0].regspacings = AST_IPMI_KCS0_REGSPACINGS;	//fix
-			ast_lpc->ast_bt[0].bt_irq_hander = NULL;			
-			
+			ast_lpc->ast_bt[0].bt_irq_hander = NULL;
+
 			ast_lpc->ast_bt[0].str = ast_lpc->reg_base + AST_LPC_BTDTR;
 			ast_lpc->ast_bt[0].fifo = ast_lpc->reg_base + AST_LPC_BTR1;
 			ast_lpc->ast_bt[0].seq = 0;
@@ -342,9 +342,9 @@ struct ast_bt_data *register_ipmi_bt_drv(u8 bt_no)
 			ast_lpc->ast_bt[1].bt_reg = 1;
 			ast_lpc->ast_bt[1].ast_lpc = ast_lpc;
 			ast_lpc->ast_bt[1].regspacings = AST_IPMI_KCS0_REGSPACINGS;	//fix
-			ast_lpc->ast_bt[1].bt_irq_hander = NULL;			
+			ast_lpc->ast_bt[1].bt_irq_hander = NULL;
 
-			ast_lpc->ast_bt[1].isr = ast_lpc->reg_base + AST_LPC_IBTCR2;			
+			ast_lpc->ast_bt[1].isr = ast_lpc->reg_base + AST_LPC_IBTCR2;
 			ast_lpc->ast_bt[1].str = ast_lpc->reg_base + AST_LPC_IBTCR4;
 			ast_lpc->ast_bt[1].fifo = ast_lpc->reg_base + AST_LPC_IBTCR5;
 			ast_lpc->ast_bt[1].fifo_sts = ast_lpc->reg_base + AST_LPC_IBTCR3;
@@ -356,13 +356,13 @@ struct ast_bt_data *register_ipmi_bt_drv(u8 bt_no)
 			ast_set_ipmi_bt_addr(ast_lpc, 1, 0xca0);
 //			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) | LPC_iBT_ENABLE | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN, AST_LPC_IBTCR0); //Enable BT Interface
 			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN, AST_LPC_IBTCR0); //Enable BT Interface
-			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) | LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1); //Enable BT H2B interrupt Interrupt 
-#if 1			
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) | LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1); //Enable BT H2B interrupt Interrupt
+#if 1
 			if(ast_lpc_read(ast_lpc, AST_LPC_IBTCR4) & BT_B_BUSY) {
-				ast_lpc_write(ast_lpc, BT_B_BUSY, AST_LPC_IBTCR4); 
+				ast_lpc_write(ast_lpc, BT_B_BUSY, AST_LPC_IBTCR4);
 				printk("change to IDLE \n");
 			}
-#endif		
+#endif
 			break;
 	}
 
@@ -381,7 +381,7 @@ void request_ipmi_bt_irq(u8 bt_no, ast_ipmi_irq handler)
 		case 1:
 			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) | LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1);	//Enable BT H2B interrupt Interrupt
 			break;
-	
+
 	}
 }
 EXPORT_SYMBOL(request_ipmi_bt_irq);
@@ -390,7 +390,7 @@ u16 ast_get_ipmi_bt_irq(struct ast_lpc_data *ast_lpc, u8 bt_ch)
 {
 	u16 tmp = 0;
 	switch(bt_ch) {
-		case 0:	
+		case 0:
 			//TODO
 			tmp = 0;
 			break;
@@ -408,10 +408,10 @@ void ast_set_ipmi_bt_irq(struct ast_lpc_data *ast_lpc, u8 bt_ch, u16 bt_addr)
 {
 	LPC_DBUG("set ch %d, addr %x \n", bt_ch, bt_addr);
 	switch(bt_ch) {
-		case 0:	
+		case 0:
 			//TODO ~~
 			break;
-		case 1:	
+		case 1:
 			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) & ~LPC_iBT_IRQ_MASK) | LPC_iBT_SET_IRQ(bt_addr), AST_LPC_IBTCR0);
 			break;
 		default:
@@ -449,7 +449,7 @@ void ast_set_ipmi_bt_addr(struct ast_lpc_data *ast_lpc, u8 bt_ch, u16 bt_addr)
 		case 1:	//ibt [31:16] ex  == 0x00e4 --> BTCR : 0xE4 , BTDTR : 0xE4 + 1, BTIMSR : 0xE4 + 2
 			iBT_Ctrl = ast_lpc_read(ast_lpc, AST_LPC_IBTCR0);
 			iBT_Ctrl &= ~(LPC_iBT_ADDR_MASK | LPC_iBT_IRQ_TYPE_MASK);
-			//set Host SerIRQ interrupt type for iBT is 11: rising edge trig					
+			//set Host SerIRQ interrupt type for iBT is 11: rising edge trig
 			iBT_Ctrl |= (0x3 << 10) | LPC_iBT_SET_ADDR(bt_addr);
 			ast_lpc_write(ast_lpc, iBT_Ctrl, AST_LPC_IBTCR0);
 			break;
@@ -475,12 +475,12 @@ u8 ast_get_ipmi_bt_en(struct ast_lpc_data *ast_lpc, u8 bt_ch)
 			else
 				tmp = 0;
 			break;
-			
+
 		default:
 			printk("Error Ch no !!\n");
 			break;
 	}
-		
+
 	return tmp;
 
 }
@@ -495,14 +495,14 @@ void ast_set_ipmi_bt_en(struct ast_lpc_data *ast_lpc, u8 bt_ch, u8 enable)
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) | LPC_HICS_BTENBL, AST_LPC_HICR4);
 				//TODO .....
 				break;
-			case 1:	//ibt 
+			case 1:	//ibt
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) | LPC_iBT_ENABLE | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN, AST_LPC_IBTCR0);	//Enable BT Interface
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) | LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1);	//Enable BT H2B interrupt Interrupt				
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) | LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1);	//Enable BT H2B interrupt Interrupt
 				break;
 		}
 	} else {
 		switch(bt_ch) {
-			case 0:	//bt 
+			case 0:	//bt
 				//TODO
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR4) & ~LPC_HICS_BTENBL, AST_LPC_HICR4);
 				break;
@@ -510,9 +510,9 @@ void ast_set_ipmi_bt_en(struct ast_lpc_data *ast_lpc, u8 bt_ch, u8 enable)
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR1) & ~LPC_iBT_H2B_RISING_ISR, AST_LPC_IBTCR1);	//Enable BT H2B interrupt Interrupt
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_IBTCR0) & ~(LPC_iBT_ENABLE | LPC_iBT_ClrSvRdP_EN | LPC_iBT_ClrSvWrP_EN), AST_LPC_IBTCR0);	//Enable BT Interface
 				break;
-		}	
+		}
 
-	}	
+	}
 }
 
 EXPORT_SYMBOL(ast_set_ipmi_bt_en);
@@ -523,12 +523,12 @@ struct ast_snoop_data *register_snoop_drv(u8 snoop_no)
 		case 0:
 			ast_lpc->ast_snoop[0].snoop_reg = 1;
 			ast_lpc->ast_snoop[0].ast_lpc = ast_lpc;
-			ast_lpc->ast_snoop[0].snoop_irq_hander = NULL;			
+			ast_lpc->ast_snoop[0].snoop_irq_hander = NULL;
 			break;
 		case 1:
-			ast_lpc->ast_snoop[0].snoop_reg = 1;
-			ast_lpc->ast_snoop[0].ast_lpc = ast_lpc;
-			ast_lpc->ast_snoop[0].snoop_irq_hander = NULL;			
+			ast_lpc->ast_snoop[1].snoop_reg = 1;
+			ast_lpc->ast_snoop[1].ast_lpc = ast_lpc;
+			ast_lpc->ast_snoop[1].snoop_irq_hander = NULL;
 			break;
 	}
 	return &(ast_lpc->ast_snoop[snoop_no]);
@@ -541,12 +541,12 @@ void request_snoop_irq(u8 snoop_no, ast_ipmi_irq handler)
 
 	switch(snoop_no) {
 		case 0:
-			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP0INT_EN, AST_LPC_HICR5); 				
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP0INT_EN, AST_LPC_HICR5);
 			break;
 		case 1:
-			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP1INT_EN, AST_LPC_HICR5); 				
+			ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP1INT_EN, AST_LPC_HICR5);
 			break;
-	
+
 	}
 }
 EXPORT_SYMBOL(request_snoop_irq);
@@ -567,7 +567,7 @@ void ast_set_lpc2gpio(struct ast_lpc_data *ast_lpc, u8 snoop_ch, u16 sel80hgio)
 {
 	switch(snoop_ch) {
 		case 0:
-			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_HICR5) & (~(0x1f << 24))) | (sel80hgio << 24), 
+			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_HICR5) & (~(0x1f << 24))) | (sel80hgio << 24),
 					AST_LPC_HICR5);
 			break;
 	}
@@ -594,10 +594,10 @@ void ast_set_lpc2gpio_en(struct ast_lpc_data *ast_lpc, u8 snoop_ch, u8 enable)
 	switch(snoop_ch) {
 		case 0:
 			if(enable)
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_ENSIOGIO | LPC_HICR5_EN80HGIO | LPC_HICR5_ENINVGIO, 
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_ENSIOGIO | LPC_HICR5_EN80HGIO | LPC_HICR5_ENINVGIO,
 						AST_LPC_HICR5);
 			else
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) & ~(LPC_HICR5_ENSIOGIO | LPC_HICR5_EN80HGIO | LPC_HICR5_ENINVGIO), 
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) & ~(LPC_HICR5_ENSIOGIO | LPC_HICR5_EN80HGIO | LPC_HICR5_ENINVGIO),
 						AST_LPC_HICR5);
 			break;
 		default:
@@ -610,18 +610,18 @@ EXPORT_SYMBOL(ast_set_lpc2gpio_en);
 u8 ast_get_snoop_data(struct ast_lpc_data *ast_lpc, u8 snoop_ch)
 {
 	u8 tmp;
-	
+
 	LPC_DBUG("Get CH%d data %d:[%x]",snoop_ch,ast_lpc->ast_snoop[snoop_ch].read_idx,ast_lpc->ast_snoop[snoop_ch].fifo[ast_lpc->ast_snoop[snoop_ch].read_idx]);
 //	if(!((ast_lpc->ast_snoop[snoop_ch].read_idx + 1) >= ast_lpc->ast_snoop[snoop_ch].write_idx)) {
-	if(ast_lpc->ast_snoop[snoop_ch].write_idx > (ast_lpc->ast_snoop[snoop_ch].read_idx)) {
-		tmp = ast_lpc->ast_snoop[snoop_ch].fifo[ast_lpc->ast_snoop[snoop_ch].read_idx];		
+	if(ast_lpc->ast_snoop[snoop_ch].write_idx != (ast_lpc->ast_snoop[snoop_ch].read_idx)) {
+		tmp = ast_lpc->ast_snoop[snoop_ch].fifo[ast_lpc->ast_snoop[snoop_ch].read_idx];
 		ast_lpc->ast_snoop[snoop_ch].read_idx ++;
 		ast_lpc->ast_snoop[snoop_ch].read_idx %= SNOOP_FIFO_SIZE;
 	} else {
 		if(ast_lpc->ast_snoop[snoop_ch].read_idx == 0)
-			tmp = ast_lpc->ast_snoop[snoop_ch].fifo[SNOOP_FIFO_SIZE - 1];	
+			tmp = ast_lpc->ast_snoop[snoop_ch].fifo[SNOOP_FIFO_SIZE - 1];
 		else
-			tmp = ast_lpc->ast_snoop[snoop_ch].fifo[ast_lpc->ast_snoop[snoop_ch].read_idx -1];	
+			tmp = ast_lpc->ast_snoop[snoop_ch].fifo[ast_lpc->ast_snoop[snoop_ch].read_idx -1];
 	}
 	//tmp = GET_LPC_SNPD0(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
 	//tmp = GET_LPC_SNPD1(ast_lpc_read(ast_lpc, AST_LPC_SNPWDR));
@@ -651,12 +651,12 @@ void ast_set_snoop_port(struct ast_lpc_data *ast_lpc, u8 snoop_ch, u16 snoop_por
 {
 	switch(snoop_ch) {
 		case 0:
-			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_SNPWADR) & ~LPC_SNOOP_ADDR0_MASK) | snoop_port, 
+			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_SNPWADR) & ~LPC_SNOOP_ADDR0_MASK) | snoop_port,
 					AST_LPC_SNPWADR);
 			break;
 
 		case 1:
-			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_SNPWADR) & ~LPC_SNOOP_ADDR1_MASK) | (snoop_port << 16), 
+			ast_lpc_write(ast_lpc, (ast_lpc_read(ast_lpc, AST_LPC_SNPWADR) & ~LPC_SNOOP_ADDR1_MASK) | (snoop_port << 16),
 					AST_LPC_SNPWADR);
 			break;
 		default:
@@ -671,20 +671,20 @@ void ast_set_snoop_en(struct ast_lpc_data *ast_lpc, u8 snoop_ch, u8 enable)
 	switch(snoop_ch) {
 		case 0:
 			if(enable)
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP0W_EN, AST_LPC_HICR5);								
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP0W_EN, AST_LPC_HICR5);
 			else
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) & ~LPC_HICR5_SNP0W_EN, AST_LPC_HICR5);
 			break;
 		case 1:
 			if(enable)
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP1W_EN, AST_LPC_HICR5);								
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_SNP1W_EN, AST_LPC_HICR5);
 			else
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) & ~LPC_HICR5_SNP1W_EN, AST_LPC_HICR5);
 			break;
 		case 2:
 			if(enable)
-				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) | LPC_POST_CODE_EN, AST_LPC_PCCR0);	
-			else 
+				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) | LPC_POST_CODE_EN, AST_LPC_PCCR0);
+			else
 				ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) & ~LPC_POST_CODE_EN, AST_LPC_PCCR0);
 		default:
 			printk("Error Ch no !!\n");
@@ -713,13 +713,13 @@ u8 ast_get_snoop_en(struct ast_lpc_data *ast_lpc, u8 snoop_ch)
 		case 2:
 			if(ast_lpc_read(ast_lpc, AST_LPC_PCCR0) & LPC_POST_CODE_EN)
 				tmp = 1;
-			else 
+			else
 				tmp = 0;
 		default:
 			printk("Error Ch no !!\n");
 			break;
 	}
-		
+
 	return tmp;
 
 }
@@ -729,7 +729,7 @@ extern struct ast_snoop_dma_data *register_snoop_dma_drv(void)
 {
 	ast_lpc->ast_snoop_dma->snoop_dma_reg = 1;
 	ast_lpc->ast_snoop_dma->ast_lpc = ast_lpc;
-	ast_lpc->ast_snoop_dma->snoop_irq_hander = NULL;			
+	ast_lpc->ast_snoop_dma->snoop_irq_hander = NULL;
 
 	return ast_lpc->ast_snoop_dma;
 }
@@ -761,9 +761,9 @@ static irqreturn_t ast_lpc_isr (int this_irq, void *dev_id)
 	if(ast_lpc_read(ast_lpc, AST_LPC_HICR2) & LPC_ABRT) {
 		printk("LPC_ABRT TODO ~~\n");
 	}
-#endif 
+#endif
 
-	//SNOOP 
+	//SNOOP
 #ifdef CONFIG_AST_SNOOP
 	if(ast_lpc_read(ast_lpc, AST_LPC_HICR6) & LPC_HICR6_STR_SNP0W) {
 		ast_lpc->ast_snoop[0].fifo[ast_lpc->ast_snoop[0].write_idx] =
@@ -792,7 +792,7 @@ static irqreturn_t ast_lpc_isr (int this_irq, void *dev_id)
 		ast_lpc->ast_snoop[1].snoop_irq_hander(&ast_lpc->ast_snoop[1]);
 		ast_lpc_write(ast_lpc, LPC_HICR6_STR_SNP1W,  AST_LPC_HICR6);
 	}
-#endif 
+#endif
 
 #ifdef CONFIG_AST_SNOOP_DMA
 	if(ast_lpc_read(ast_lpc, AST_LPC_PCCR2) & LPC_POST_CODE_STS) {
@@ -801,7 +801,7 @@ static irqreturn_t ast_lpc_isr (int this_irq, void *dev_id)
 #endif
 
 #ifdef CONFIG_AST_IPMI_KCS
-	//kcs 1: 
+	//kcs 1:
 	if(ast_lpc_read(ast_lpc, AST_LPC_STR1) & LPC_STR_IBF) {
 		ast_lpc->ast_kcs[0].kcs_irq_hander(&ast_lpc->ast_kcs[0]);
 	}
@@ -827,12 +827,12 @@ static irqreturn_t ast_lpc_isr (int this_irq, void *dev_id)
 	//ibt 1
 	if(ast_lpc_read(ast_lpc, AST_LPC_IBTCR2) & LPC_iBT_H2B_RISING_ISR) {
 		ast_lpc->ast_bt[1].bt_irq_hander(&ast_lpc->ast_bt[1]);
-	}	
+	}
 #endif
 	return IRQ_HANDLED;
-}		
+}
 /************************************************** SYS FS **************************************************************/
-/* SERIRQ generate 
+/* SERIRQ generate
 SBIOS Programming:
 SIORD_70[3:0]=Ah (for SERIRQ#10)
 SIORD_30[4]=1b (for enabling)
@@ -846,12 +846,12 @@ BMC Programming:
 static ssize_t store_sio_irq(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	u32 val;	
+	u32 val;
 	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
 	val = simple_strtoul(buf, NULL, 10);
 
-	if(val) 
+	if(val)
 		ast_lpc_write(ast_lpc, val, AST_LPC_HISR0);
 	else
 		ast_lpc_write(ast_lpc, 0, AST_LPC_HISR0);
@@ -859,17 +859,17 @@ static ssize_t store_sio_irq(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(sio_irq, S_IWUSR, NULL, store_sio_irq); 
+static DEVICE_ATTR(sio_irq, S_IWUSR, NULL, store_sio_irq);
 
 static ssize_t store_lpc2ahb_en(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	u32 val;	
+	u32 val;
 	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
 	val = simple_strtoul(buf, NULL, 10);
 
-	if(val) 
+	if(val)
 		ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_ENL2H, AST_LPC_HICR5);
 	else
 		ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) & ~LPC_HICR5_ENL2H, AST_LPC_HICR5);
@@ -890,17 +890,17 @@ static ssize_t show_lpc2ahb_en(struct device *dev,
 		return sprintf(buf, "0: Disable\n");
 }
 
-static DEVICE_ATTR(lpc2ahb_en, S_IRUGO | S_IWUSR, show_lpc2ahb_en, store_lpc2ahb_en); 
+static DEVICE_ATTR(lpc2ahb_en, S_IRUGO | S_IWUSR, show_lpc2ahb_en, store_lpc2ahb_en);
 
 static ssize_t store_fwcycle_en(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	u32 val;	
+	u32 val;
 	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
 	val = simple_strtoul(buf, NULL, 10);
 
-	if(val) 
+	if(val)
 		ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) | LPC_HICR5_ENFWH, AST_LPC_HICR5);
 	else
 		ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_HICR5) & ~LPC_HICR5_ENFWH, AST_LPC_HICR5);
@@ -919,7 +919,7 @@ static ssize_t show_fwcycle_en(struct device *dev,
 		return sprintf(buf, "0: Disable\n");
 }
 
-static DEVICE_ATTR(fwcycle_en, S_IRUGO | S_IWUSR, show_fwcycle_en, store_fwcycle_en); 
+static DEVICE_ATTR(fwcycle_en, S_IRUGO | S_IWUSR, show_fwcycle_en, store_fwcycle_en);
 
 static ssize_t show_fwcycle_addr(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -932,22 +932,22 @@ static ssize_t show_fwcycle_addr(struct device *dev,
 static ssize_t store_fwcycle_addr(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	u32 val;	
+	u32 val;
 	struct ast_lpc_data *ast_lpc = dev_get_drvdata(dev);
 
-	val = StrToHex(buf);		
+	val = StrToHex(buf);
 
 	ast_lpc_write(ast_lpc, val, AST_LPC_HICR7);
 	return count;
 }
 
-static DEVICE_ATTR(fwcycle_addr, S_IRUGO | S_IWUSR, show_fwcycle_addr, store_fwcycle_addr); 
+static DEVICE_ATTR(fwcycle_addr, S_IRUGO | S_IWUSR, show_fwcycle_addr, store_fwcycle_addr);
 
 static struct attribute *ast_lpc_attributes[] = {
 	&dev_attr_fwcycle_en.attr,
 	&dev_attr_fwcycle_addr.attr,
-	&dev_attr_lpc2ahb_en.attr,	
-	&dev_attr_sio_irq.attr,		
+	&dev_attr_lpc2ahb_en.attr,
+	&dev_attr_sio_irq.attr,
 	NULL
 };
 
@@ -984,12 +984,12 @@ ast_get_route_selio(struct ast_lpc_data *ast_lpc, u8 io_ch, char *sysfsbuf)
 			printk("Error Ch no !!\n");
 			break;
 	}
-		
+
 	return tmp;
 
 }
 
-static int 
+static int
 ast_get_route_seldw(struct ast_lpc_data *ast_lpc, u8 io_ch, char *sysfsbuf)
 {
 	u8 tmp = 0;
@@ -1013,7 +1013,7 @@ ast_get_route_seldw(struct ast_lpc_data *ast_lpc, u8 io_ch, char *sysfsbuf)
 			printk("Error Ch no !!\n");
 			break;
 	}
-		
+
 	return tmp;
 
 }
@@ -1023,30 +1023,30 @@ ast_set_route_selio(struct ast_lpc_data *ast_lpc, u8 io_ch, u8 value)
 {
 	switch(io_ch) {
 		case 0:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL5IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 	
+			ast_lpc_write(ast_lpc, SET_LPC_SEL5IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
 			break;
 		case 1:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL1IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 				
+			ast_lpc_write(ast_lpc, SET_LPC_SEL1IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
 			break;
 		case 2:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL2IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 							
+			ast_lpc_write(ast_lpc, SET_LPC_SEL2IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
 			break;
 		case 3:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL3IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 							
+			ast_lpc_write(ast_lpc, SET_LPC_SEL3IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
 			break;
 		case 4:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL4IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 							
+			ast_lpc_write(ast_lpc, SET_LPC_SEL4IO(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
 			break;
 		case 6:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL6IO(ast_lpc_read(ast_lpc, AST_LPC_HICR9), value), 
-						AST_LPC_HICR9); 							
+			ast_lpc_write(ast_lpc, SET_LPC_SEL6IO(ast_lpc_read(ast_lpc, AST_LPC_HICR9), value),
+						AST_LPC_HICR9);
 			break;
-			
+
 		default:
 			printk("Error Ch no !!\n");
 			break;
@@ -1059,25 +1059,25 @@ ast_set_route_seldw(struct ast_lpc_data *ast_lpc, u8 io_ch, u8 value)
 {
 	switch(io_ch) {
 		case 0:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL5DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 	
+			ast_lpc_write(ast_lpc, SET_LPC_SEL5DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
 			break;
 		case 1:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL1DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 				
+			ast_lpc_write(ast_lpc, SET_LPC_SEL1DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
 			break;
 		case 2:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL2DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 				
+			ast_lpc_write(ast_lpc, SET_LPC_SEL2DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
 			break;
 		case 3:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL3DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 				
+			ast_lpc_write(ast_lpc, SET_LPC_SEL3DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
 			break;
 		case 4:
-			ast_lpc_write(ast_lpc, SET_LPC_SEL4DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value), 
-						AST_LPC_HICRA); 	
-			
+			ast_lpc_write(ast_lpc, SET_LPC_SEL4DW(ast_lpc_read(ast_lpc, AST_LPC_HICRA), value),
+						AST_LPC_HICRA);
+
 			break;
 		default:
 			printk("Error Ch no !!\n");
@@ -1085,7 +1085,7 @@ ast_set_route_seldw(struct ast_lpc_data *ast_lpc, u8 io_ch, u8 value)
 	}
 }
 
-static ssize_t 
+static ssize_t
 ast_store_route(struct device *dev, struct device_attribute *attr, const char *sysfsbuf, size_t count)
 {
 	u32 input_val;
@@ -1096,10 +1096,10 @@ ast_store_route(struct device *dev, struct device_attribute *attr, const char *s
 
 	//sensor_attr->index : ch#
 	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
+	switch(sensor_attr->nr)
 	{
 		case 0: //selio
-			ast_set_route_selio(ast_lpc, sensor_attr->index, input_val);	
+			ast_set_route_selio(ast_lpc, sensor_attr->index, input_val);
 			break;
 		case 1: //seldw
 			ast_set_route_seldw(ast_lpc, sensor_attr->index, input_val);
@@ -1112,7 +1112,7 @@ ast_store_route(struct device *dev, struct device_attribute *attr, const char *s
 	return count;
 }
 
-static ssize_t 
+static ssize_t
 ast_show_route(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 {
 
@@ -1121,14 +1121,14 @@ ast_show_route(struct device *dev, struct device_attribute *attr, char *sysfsbuf
 
 	//sensor_attr->index : ch#
 	//sensor_attr->nr : attr#
-	switch(sensor_attr->nr) 
+	switch(sensor_attr->nr)
 	{
-		case 0: //selio 
+		case 0: //selio
 			return ast_get_route_selio(ast_lpc, sensor_attr->index, sysfsbuf);
 			break;
 		case 1: //seldw
 			return ast_get_route_seldw(ast_lpc, sensor_attr->index, sysfsbuf);
-			break;			
+			break;
 		default:
 			return -EINVAL;
 			break;
@@ -1164,7 +1164,7 @@ static const struct attribute_group route_attribute_groups[] = {
 	{ .attrs = route3_attributes },
 	{ .attrs = route4_attributes },
 	{ .attrs = route5_attributes },
-	{ .attrs = route6_attributes },	
+	{ .attrs = route6_attributes },
 };
 
 /**************************   LPC  route Sys fs   End **********************************************************/
@@ -1174,7 +1174,7 @@ static int ast_lpc_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret = 0;
 	int i = 0;
-	LPC_DBUG("\n");	
+	LPC_DBUG("\n");
 
 	ast_lpc = kzalloc(sizeof(struct ast_lpc_data), GFP_KERNEL);
 	if (ast_lpc == NULL) {
@@ -1220,7 +1220,7 @@ static int ast_lpc_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_AST_LPC_MASTER
 	printk("LPC Scan Device... \n");
-#ifdef CONFIG_ARCH_AST1070			
+#ifdef CONFIG_ARCH_AST1070
 	for(i=0;i<ast_lpc->bus_info->scan_node;i++) {
 		ast1070_scu_init(i ,AST_LPC_BRIDGE + i*0x10000);
 		printk("C%d-[%x] ", i, ast1070_revision_id_info(i));
@@ -1231,7 +1231,7 @@ static int ast_lpc_probe(struct platform_device *pdev)
 		ast_add_device_cuart(i,AST_LPC_BRIDGE + i*0x10000);
 		ast_add_device_ci2c(i,AST_LPC_BRIDGE + i*0x10000);
 	}
-#endif			
+#endif
 	printk("\n");
 	platform_set_drvdata(pdev, ast_lpc);
 #else
@@ -1256,7 +1256,7 @@ static int ast_lpc_probe(struct platform_device *pdev)
 #ifdef CONFIG_AST_SNOOP_DMA
 	ast_lpc->ast_snoop_dma = kzalloc(sizeof(struct ast_snoop_dma_data), GFP_KERNEL);
 #endif
-	
+
 #ifdef CONFIG_AST_IPMI_KCS
 	ast_lpc->ast_kcs = kzalloc(sizeof(struct ast_kcs_data) * AST_KCS_NUM, GFP_KERNEL);
 #endif
@@ -1266,7 +1266,7 @@ static int ast_lpc_probe(struct platform_device *pdev)
 #endif
 
 #endif
-	
+
 	return 0;
 
 err_free_mem:

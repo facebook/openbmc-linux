@@ -41,6 +41,14 @@ config AST_LPC_SNOOP
 	depends on AST_LPC_SLAVE
 	bool "AST LPC SNOOP"
 
+config AST_SNOOP
+  depends on AST_LPC_SNOOP
+  bool "AST SNOOP"
+
+config AST_SNOOP_DMA
+  depends on AST_LPC_SNOOP
+  bool "AST SNOOP DMA"
+
 config AST_IPMI_KCS
 	depends on AST_LPC_SLAVE
 	bool "AST IPMI KCS"

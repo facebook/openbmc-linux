@@ -10,4 +10,5 @@ obj-$(CONFIG_AST_JTAG)          += ast_jtag.o
 obj-$(CONFIG_AST_MCTP)          += ast_mctp.o
 obj-$(CONFIG_AST_XDMA)          += ast_xdma.o
 obj-$(CONFIG_AST_ESPI)          += ast_espi.o
-
+obj-$(CONFIG_AST_SNOOP)         += ast-snoop.o
+obj-$(CONFIG_AST_SNOOP_DMA)     += ast-snoop-dma.o
