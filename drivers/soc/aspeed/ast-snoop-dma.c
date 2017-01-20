@@ -33,7 +33,7 @@
 #include <plat/ast-lpc.h>
 #include <plat/regs-lpc.h>
 
-#define CONFIG_AST_SNOOP_DMA_DEBUG
+//#define CONFIG_AST_SNOOP_DMA_DEBUG
 
 #ifdef CONFIG_AST_SNOOP_DMA_DEBUG
 	#define SNOOP_DMA_DBG(fmt, args...) printk("%s(): " fmt, __FUNCTION__, ## args)
