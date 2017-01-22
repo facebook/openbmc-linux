@@ -204,6 +204,7 @@ static int fmc_spi_transfer(struct spi_device *spi, struct spi_message *msg)
 	dev_dbg(host->dev, "new message %p submitted for %s \n",
 					msg, dev_name(&spi->dev));
 
+	host->spi_dev = spi;
 	spin_lock_irqsave(&host->lock, flags);
 //	writel( (readl(host->spi_data->ctrl_reg) | SPI_CMD_USER_MODE) | SPI_CE_INACTIVE,host->spi_data->ctrl_reg);
 	fmc_spi_write(host, fmc_spi_read(host, 0x00) | SPI_CMD_USER_MODE, 0x00);
