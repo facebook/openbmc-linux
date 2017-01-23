@@ -1609,7 +1609,8 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			break;
 
 		case AST_I2CD_INTR_STS_NORMAL_STOP:
-		case AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH:                              // handle SLAVE_MATCH at next time
+		case AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH: // handle SLAVE_MATCH at next time
+		case AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH:
 			if(i2c_dev->slave_operation == 1) {
 				i2c_dev->slave_event = I2C_SLAVE_EVENT_STOP;
 				ast_i2c_slave_xfer_done(i2c_dev);
