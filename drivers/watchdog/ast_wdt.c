@@ -313,10 +313,15 @@ static int wdt_set_heartbeat(int t)
       return -EINVAL;
 
   heartbeat=t;
-
+  #ifdef CONFIG_FBTTN
   wdt_restart_new(WDT_TIMO2TICKS(t), WDT_CLK_SRC_EXT,
-                  /* Optional Ext, No intr, Self clear, Full chip reset */
-                  WDT_EXTRST, FALSE, TRUE, FALSE);
+                  /* No Ext, No intr, Self clear, Full chip reset */
+                  FALSE, FALSE, TRUE, TRUE);
+  #else
+  wdt_restart_new(WDT_TIMO2TICKS(t), WDT_CLK_SRC_EXT,
+                  /* No Ext, No intr, Self clear, Full chip reset */
+                  FALSE, FALSE, TRUE, FALSE);
+  #endif
   return 0;
 }
 
@@ -591,10 +596,15 @@ static int ast_wdt_probe(struct platform_device *pdev)
 #endif
 
    /* interrupt the system while WDT timeout */
+   #ifdef CONFIG_FBTTN
    wdt_restart_new(WDT_TIMO2TICKS(WDT_INITIAL_TIMO), WDT_CLK_SRC_EXT,
-		   /* Optional Ext, No intr, Self clear, Full chip reset */
-		   WDT_EXTRST, FALSE, TRUE, FALSE);
-
+		   /* No Ext, No intr, Self clear, Full chip reset */
+		   FALSE, FALSE, TRUE, TRUE);
+   #else
+   wdt_restart_new(WDT_TIMO2TICKS(WDT_INITIAL_TIMO), WDT_CLK_SRC_EXT,
+		   /* No Ext, No intr, Self clear, Full chip reset */
+		   FALSE, FALSE, TRUE, FALSE);
+   #endif
    /* enable it by default */
    if (!force_disable) {
      wdt_enable();
