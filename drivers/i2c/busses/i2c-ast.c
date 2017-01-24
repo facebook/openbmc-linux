@@ -50,7 +50,7 @@
 /***************************************************************************/
 
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
-#define I2C_S_BUF_SIZE 		256
+#define I2C_S_BUF_SIZE 		4096
 #define I2C_S_RX_BUF_NUM 		20
 #define BUFF_FULL		0xff00
 #define BUFF_ONGOING	1
