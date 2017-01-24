@@ -105,8 +105,6 @@ struct ast_i2c_dev {
 #endif
 };
 
-static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev);
-
 static inline void
 ast_i2c_write(struct ast_i2c_dev *i2c_dev, u32 val, u32 reg)
 {
@@ -132,10 +130,10 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
 	unsigned int clk, inc = 0, div, divider_ratio;
 	u32 SCL_Low, SCL_High, data;
 
-  // hack: The calculated value for 1MHz does not match with measured value, so override
+  // TODO: hack: The calculated value for 1MHz does not match with measured value, so override
+  // TODO: hack: For AST2500 1MHz
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
-  // hack: For AST2500 1MHz	
-	#if CONFIG_FBTTN
+	#ifdef CONFIG_FBTTN
 	  data = 0x77799300;
 	#else
       data = 0x77744302;
@@ -222,6 +220,13 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 		ast_i2c_write(i2c_dev, AST_NO_TIMEOUT_CTRL, I2C_AC_TIMING_REG2);
 	}
 #else
+	if(i2c_dev->ast_i2c_data->bus_clk/1000 > 400) {
+		printk("high speed mode enable clk [%dkhz]\n",i2c_dev->ast_i2c_data->bus_clk/1000);
+		ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG) |
+							AST_I2CD_M_SDA_DRIVE_1T_EN |
+							AST_I2CD_SDA_DRIVE_1T_EN
+							, I2C_FUN_CTRL_REG);
+	}
 	/* target apeed is xxKhz*/
 	ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
 	ast_i2c_write(i2c_dev, AST_NO_TIMEOUT_CTRL, I2C_AC_TIMING_REG2);
@@ -408,6 +413,7 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 	return ret;
 }
 #endif
+static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev);
 
 static u8
 ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
@@ -444,6 +450,19 @@ ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
   ast_i2c_write(i2c_dev, temp, I2C_FUN_CTRL_REG);
 }
 
+// TODO: This is a hack for I2C 1MHz BMC Kernel panic workaround
+static void ast_i2c_bus_recovery(struct ast_i2c_dev *i2c_dev,u32 reg){
+  u32 tmp_reg = 0;
+
+  tmp_reg = ast_i2c_read(i2c_dev, I2C_INTR_STS_REG);
+  if( (tmp_reg&reg) == reg ){
+	printk(KERN_ERR "[%s %d] RESET BUS bus %d size %x cmd %x\n", __func__, __LINE__, i2c_dev->bus_id,i2c_dev->slave_xfer_cnt, ast_i2c_read(i2c_dev,I2C_CMD_REG));
+    ast_i2c_bus_reset(i2c_dev);
+  }
+  else
+    return;
+}
+
 static u8
 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 {
@@ -467,7 +486,7 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 		//if SDA == 1 and SCL == 0, it means the master is locking the bus.
 		//Send a stop command to unlock the bus.
 		dev_err(i2c_dev->dev, "I2C's master is locking the bus, try to stop it.\n");
-//
+
 		init_completion(&i2c_dev->cmd_complete);
 		i2c_dev->cmd_err = 0;
 
@@ -1503,6 +1522,8 @@ next_xfer:
 		printk(" ** xfer error bus=%d addr=0x%x (%d vs. %d)\n",
 		       i2c_dev->bus_id, i2c_dev->master_msgs->addr,
 		       xfer_len, i2c_dev->master_xfer_len);
+		 //HACK: for BMC I2C timeout
+		 ast_i2c_bus_reset(i2c_dev);
 		//should goto stop....
 		i2c_dev->cmd_err = 1;
 		goto done_out;
@@ -1814,6 +1835,10 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				ast_i2c_slave_xfer_done(i2c_dev);
 				dev_dbg(i2c_dev->dev, "S clear isr: AST_I2CD_INTR_STS_RX_DOWN = %x\n",sts);
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN, I2C_INTR_STS_REG);
+					#ifdef CONFIG_FBTTN
+					//HACK: for i2c 1Mhz workaround
+                    ast_i2c_bus_recovery(i2c_dev,AST_I2CD_INTR_STS_RX_DOWN);
+                    #endif
 			} else {
 				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_RX_DOWN = %x\n",sts);
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN, I2C_INTR_STS_REG);
