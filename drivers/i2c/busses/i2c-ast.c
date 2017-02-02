@@ -1380,12 +1380,13 @@ static void ast_i2c_slave_xfer_done(struct ast_i2c_dev *i2c_dev)
     // TODO: hack to reset slave operation flag in case the stop is received
 		i2c_dev->slave_operation = 0;
   }
-
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR
   // Error handle: when slave_xfer_cnt out of I2C slave buffer maximum size, reset the current I2C bus
   if (i2c_dev->slave_xfer_cnt >= I2C_S_BUF_SIZE) {
     // Reset i2c controller
     ast_i2c_bus_reset(i2c_dev);
   }
+#endif
 }
 
 //TX/Rx Done
