@@ -192,7 +192,7 @@ static struct mtd_partition ast_data_partitions[] = {
 		.offset     = MTDPART_OFS_APPEND,  /* From 896K */
 		.size       = 0x1B20000,           /* Size 27.125M */
 	}, {
-		.name       = "data1",
+		.name       = "data0",
 		.offset     = MTDPART_OFS_APPEND,
 		.size       = MTDPART_SIZ_FULL,
 	},
