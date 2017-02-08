@@ -138,8 +138,9 @@ static ssize_t show_snoop_dma_data_history(struct device *dev,
   spin_lock(&ast_snoop_dma->snoop_lock);
 
   ptr = buf;
-  if (((ast_snoop_dma->port0_wr_idx - ast_snoop_dma->port0_rd_idx) % SNOOP_DMA_SIZE) > 256)
-    i = (ast_snoop_dma->port0_wr_idx - 256) % SNOOP_DMA_SIZE;
+  if (((ast_snoop_dma->port0_wr_idx - ast_snoop_dma->port0_rd_idx) &
+        (SNOOP_DMA_SIZE - 1)) > 256)
+    i = (ast_snoop_dma->port0_wr_idx - 256) & (SNOOP_DMA_SIZE - 1);
   else
     i = ast_snoop_dma->port0_rd_idx;
 
@@ -362,8 +363,8 @@ static void ast_snoop_dma_tasklet_func(unsigned long data)
 				ast_snoop_dma->port0_rd_idx++;
 			} else {
 				ast_snoop_dma->port0_data[ast_snoop_dma->port0_wr_idx++] = port_data;
-				SNOOP_DMA_DBG("%x \n", ast_snoop_dma->port0_data[ast_snoop_dma->port0_wr_idx]);
 			}
+      SNOOP_DMA_DBG("%x \n", ast_snoop_dma->port0_data[ast_snoop_dma->port0_wr_idx-1]);
 		}
 
 		ast_snoop_dma->port0_rd_idx %= SNOOP_DMA_SIZE;
