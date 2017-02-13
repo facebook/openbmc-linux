@@ -738,7 +738,6 @@ EXPORT_SYMBOL(register_snoop_dma_drv);
 void request_snoop_dma_irq(ast_ipmi_irq handler)
 {
 	ast_lpc->ast_snoop_dma->snoop_irq_hander = handler;
-	ast_lpc_write(ast_lpc, ast_lpc_read(ast_lpc, AST_LPC_PCCR0) | LPC_POST_DMA_INT_EN, AST_LPC_PCCR0);
 
 }
 EXPORT_SYMBOL(request_snoop_dma_irq);
@@ -796,7 +795,8 @@ static irqreturn_t ast_lpc_isr (int this_irq, void *dev_id)
 
 #ifdef CONFIG_AST_SNOOP_DMA
 	if(ast_lpc_read(ast_lpc, AST_LPC_PCCR2) & LPC_POST_CODE_STS) {
-		ast_lpc->ast_snoop_dma->snoop_irq_hander(ast_lpc->ast_snoop_dma);
+    if (ast_lpc->ast_snoop_dma->snoop_irq_hander)
+      ast_lpc->ast_snoop_dma->snoop_irq_hander(ast_lpc->ast_snoop_dma);
 	}
 #endif
 

@@ -184,7 +184,8 @@ static ssize_t store_snoop_dma_mode(struct device *dev,
 	SNOOP_DMA_DBG("mode %x \n", ast_snoop_dma->snoop_mode);
 
 	if(readl(ast_snoop_dma->pccr0) & LPC_POST_CODE_EN) {
-		writel(readl(ast_snoop_dma->pccr0) & ~(LPC_POST_CODE_EN | LPC_POST_DMA_MODE_EN), ast_snoop_dma->pccr0);
+		writel(readl(ast_snoop_dma->pccr0) & ~(LPC_POST_CODE_EN | LPC_POST_DMA_MODE_EN |
+      LPC_POST_DMA_INT_EN), ast_snoop_dma->pccr0);
 		writel(readl(ast_snoop_dma->pccr0) | LPC_RX_FIFO_CLR, ast_snoop_dma->pccr0);
 		ast_snoop_dma->snoop_mode = 0;
 		ast_snoop_dma->port0_rd_idx = 0;
@@ -221,7 +222,8 @@ static ssize_t store_snoop_dma_mode(struct device *dev,
 	}
 
 	if(enable)
-		writel(readl(ast_snoop_dma->pccr0) | (LPC_POST_CODE_EN | LPC_POST_DMA_MODE_EN), ast_snoop_dma->pccr0);
+		writel(readl(ast_snoop_dma->pccr0) | (LPC_POST_CODE_EN | LPC_POST_DMA_MODE_EN |
+      LPC_POST_DMA_INT_EN), ast_snoop_dma->pccr0);
 
 	return count;
 }
@@ -271,9 +273,11 @@ static ssize_t store_snoop_dma_en(struct device *dev,
 	val = simple_strtoul(buf, NULL, 10);
 	//use byte mode snoop
 	if(val) {
-		writel(readl(ast_snoop_dma->pccr0) | LPC_POST_CODE_EN,	ast_snoop_dma->pccr0);
+		writel(readl(ast_snoop_dma->pccr0) | (LPC_POST_CODE_EN | LPC_POST_DMA_MODE_EN |
+        LPC_POST_DMA_INT_EN),	ast_snoop_dma->pccr0);
 	} else {
-		writel(readl(ast_snoop_dma->pccr0) & ~LPC_POST_CODE_EN, ast_snoop_dma->pccr0);
+		writel(readl(ast_snoop_dma->pccr0) & ~(LPC_POST_CODE_EN | LPC_POST_DMA_MODE_EN |
+      LPC_POST_DMA_INT_EN), ast_snoop_dma->pccr0);
 	}
 	return count;
 }
@@ -481,7 +485,7 @@ static int ast_snoop_dma_probe(struct platform_device *pdev)
 //	writel((readl(ast_snoop_dma->pccr0) & ~LPC_POST_CODE_MODE_MASK) | LPC_POST_CODE_MODE(BYTE_MODE) |
 //			LPC_POST_DMA_MODE_EN |LPC_POST_DMA_INT_EN, ast_snoop_dma->pccr0);
 
-	writel(LPC_RX_FIFO_CLR | LPC_POST_DMA_MODE_EN |LPC_POST_DMA_INT_EN, ast_snoop_dma->pccr0);
+  writel(LPC_RX_FIFO_CLR, ast_snoop_dma->pccr0);
 
 
 	platform_set_drvdata(pdev, ast_snoop_dma);
