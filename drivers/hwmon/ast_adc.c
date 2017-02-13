@@ -411,9 +411,8 @@ ast_get_voltage(struct ast_adc_data *ast_adc, int idx) {
 	u32 voltage, tmp1, tmp2, tmp3;
 	tmp = ast_get_adc_value(ast_adc, idx);
 	// Voltage Sense Method
-	tmp1 = (vcc_ref[idx].r1 + vcc_ref[idx].r2)
-	  * tmp * 25;
-	tmp2 = vcc_ref[idx].r2 * 1024 / 100;
+	tmp1 = (vcc_ref[idx].r1 + vcc_ref[idx].r2) * tmp * 25 * 10;
+	tmp2 = vcc_ref[idx].r2 * 1024;
 	tmp3 = (vcc_ref[idx].r1 * vcc_ref[idx].v2)
 	  / vcc_ref[idx].r2;
 	voltage = (tmp1/tmp2) - tmp3;
@@ -430,9 +429,8 @@ ast_get_voltage(struct ast_adc_data *ast_adc, int idx) {
 	u32 voltage, tmp1, tmp2, tmp3;
 	tmp = ast_get_adc_value(ast_adc, idx);
 	// Voltage Sense Method
-	tmp1 = (vcc_ref[idx].r1 + vcc_ref[idx].r2)
-	  * (tmp + 1) * 18;
-	tmp2 = vcc_ref[idx].r2 * 1024 / 100;
+	tmp1 = (vcc_ref[idx].r1 + vcc_ref[idx].r2) * (tmp + 1) * 18 * 10;
+	tmp2 = vcc_ref[idx].r2 * 1024;
 	tmp3 = (vcc_ref[idx].r1 * vcc_ref[idx].v2)
 	  / vcc_ref[idx].r2;
 	voltage = (tmp1/tmp2) - tmp3;
@@ -477,9 +475,10 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 	{
 		case 0: //channel enable, disable
 			return sprintf(sysfsbuf, "%d : %s\n", ast_get_adc_en(ast_adc, sensor_attr->index),ast_get_adc_en(ast_adc,index) ? "Enable":"Disable");
-		case 1: //value
+		case 1:
+                        //value
 			voltage = ast_get_voltage(ast_adc, index);
-			return sprintf(sysfsbuf, "%d.%03d (V)\n", voltage / 1000, voltage % 1000);
+			return sprintf(sysfsbuf, "%d.%02d (V)\n", voltage / 100, voltage % 100);
 		case 2: //alarm
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_alarm(ast_adc, index));
 		case 3: //upper
