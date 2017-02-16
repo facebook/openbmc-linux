@@ -169,7 +169,28 @@ static struct mtd_partition ast_rom_partitions[] = {
 	{
 		.name       = "rom",               /* ROM (SPL), recovery U-boot */
 		.offset     = 0,                   /* From 0 */
+		.size       = 0x60000,             /* Size 384K */
+		.mask_flags = MTD_WRITEABLE,
+	}, {
+		.name       = "envro",             /* RO U-Boot NVRAM */
+		.offset     = MTDPART_OFS_APPEND,  /* From 384K */
+		.size       = 0x20000,             /* Size 128K, two sectors */
+	}, {
+		.name       = "u-bootro",          /* RO U-boot */
+		.offset     = MTDPART_OFS_APPEND,  /* From 512K */
+		.size       = 0x60000,             /* Size 384K */
+	}, {
+		.name       = "fitro",             /* RO kernel, rootfs */
+		.offset     = MTDPART_OFS_APPEND,  /* From 896K */
+		.size       = 0x1B20000,           /* Size 27.125M */
+	}, {
+		.name       = "dataro",            /* RO Data partition */
+		.offset     = MTDPART_OFS_APPEND,  /* From 0x1C00000 */
 		.size       = MTDPART_SIZ_FULL,    /* Full size */
+	}, {
+		.name       = "flash0",
+		.offset     = 0,                   /* RO From 0 */
+		.size       = MTDPART_SIZ_FULL,    /* full size */
 	},
 };
 
@@ -195,8 +216,7 @@ static struct mtd_partition ast_data_partitions[] = {
 		.name       = "data0",
 		.offset     = MTDPART_OFS_APPEND,
 		.size       = MTDPART_SIZ_FULL,
-	},
-	{
+	}, {
 		.name       = "flash1",
 		.offset     = 0,                   /* From 0 */
 		.size       = MTDPART_SIZ_FULL,    /* full size */
