@@ -86,7 +86,9 @@ static struct ast_peci_data {
 	struct completion		xfer_complete;
 	u32					sts;
 	struct mutex lock;
-} ast_peci;
+} ast_peci = {
+  .xfer_complete = COMPLETION_INITIALIZER(ast_peci.xfer_complete)
+};
 
 static inline void
 ast_peci_write(u32 val, u32 reg)
@@ -196,7 +198,7 @@ static long ast_peci_ioctl(struct file *fp,
 			ast_peci_read(AST_PECI_W_DATA6);
 			ast_peci_read(AST_PECI_W_DATA7);
 #endif
-			init_completion(&ast_peci.xfer_complete);
+			reinit_completion(&ast_peci.xfer_complete);
 			//Fire Command
 			ast_peci_write(PECI_CMD_FIRE, AST_PECI_CMD);
 

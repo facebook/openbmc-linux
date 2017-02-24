@@ -4027,7 +4027,7 @@ static void __exit serial8250_exit(void)
 #endif
 }
 
-module_init(serial8250_init);
+subsys_initcall_sync(serial8250_init);
 module_exit(serial8250_exit);
 
 EXPORT_SYMBOL(serial8250_suspend_port);
