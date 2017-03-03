@@ -140,6 +140,17 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
     #endif
     return data;
   }
+#if CONFIG_FBTP
+  if (i2c_dev->ast_i2c_data->bus_clk == 100000) {
+  // hack: For FBTP 100KHz
+    data = 0xFFFFE303;
+    return data;
+  } else if (i2c_dev->ast_i2c_data->bus_clk == 400000) {
+  // hack: For FBTP 400KHz
+    data = 0xFFF68302;
+    return data;
+  }
+#endif
 
 	clk = i2c_dev->ast_i2c_data->get_i2c_clock();
 //	printk("pclk = %d \n",clk);

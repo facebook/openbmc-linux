@@ -77,6 +77,19 @@ static struct ast_i2c_driver_data ast_i2c_data_1M = {
 	.get_i2c_clock = ast_get_pclk,
 };
 
+static struct ast_i2c_driver_data ast_i2c_data_400K = {
+	.bus_clk = 400000,		//bus clock 400KHz
+	.master_dma = MASTER_XFER_MODE,
+	.slave_dma = SLAVE_XFER_MODE,
+	.request_pool_buff_page = request_pool_buff_page,
+	.free_pool_buff_page = free_pool_buff_page,
+#ifdef CONFIG_AST_I2C_SLAVE_EEPROM
+	.slave_xfer = i2c_slave_xfer,
+	.slave_init = i2c_slave_init,
+#endif
+	.get_i2c_clock = ast_get_pclk,
+};
+
 static u64 ast_i2c_dma_mask = 0xffffffffUL;
 static struct resource ast_i2c_dev0_resources[] = {
 	[0] = {
@@ -211,6 +224,18 @@ struct platform_device ast_i2c_dev4_device = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
 		.platform_data = &ast_i2c_data,
+	},
+	.resource = ast_i2c_dev4_resources,
+	.num_resources = ARRAY_SIZE(ast_i2c_dev4_resources),
+};
+
+struct platform_device ast_i2c_dev4_device_400K = {
+	.name = "ast-i2c",
+	.id = 4,
+	.dev = {
+		.dma_mask = &ast_i2c_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+		.platform_data = &ast_i2c_data_400K,
 	},
 	.resource = ast_i2c_dev4_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev4_resources),
@@ -968,11 +993,13 @@ void __init ast_add_device_i2c(void)
 		return;
 	}
 
+        ast_i2c_data_400K.reg_gr = ast_i2c_data.reg_gr;// 400KHz reg_gr setting
+
 	platform_device_register(&ast_i2c_dev0_device);
 	platform_device_register(&ast_i2c_dev1_device);
 	platform_device_register(&ast_i2c_dev2_device);
 	platform_device_register(&ast_i2c_dev3_device);
-	platform_device_register(&ast_i2c_dev4_device);
+	platform_device_register(&ast_i2c_dev4_device_400K);
 	platform_device_register(&ast_i2c_dev5_device);
 	platform_device_register(&ast_i2c_dev6_device);
 	platform_device_register(&ast_i2c_dev7_device);
