@@ -36,6 +36,7 @@
 #include <mach/platform.h>
 #include <mach/hardware.h>
 #include <plat/ast-scu.h>
+#include <plat/regs-lpc.h>
 #include <plat/devs.h>
 #include <plat/regs-lpc.h>
 #include <asm/io.h>
@@ -225,7 +226,7 @@ static struct plat_serial8250_port ast_uart_data[] = {
 	},
 #endif
 #endif
-	{ },
+	{},
 
 };
 
@@ -379,18 +380,28 @@ void __init ast_add_device_uart(void)
 	ast_scu_multi_func_uart(2);
 	ast_scu_multi_func_uart(3);
 #elif defined(CONFIG_FBTTN)
-        /* We need to disable the reset source of UART1/2 from LPC control for slot serial. 
-           The default of UART1/2 is enable.
-           The default of UART3/4 is disable.       */
-    void __iomem *reg_base;
-    reg_base = ioremap(AST_LPC_BASE, SZ_256);
-    writel(readl(reg_base + AST_LPC_HICR9)
-          & ~(LPC_HICR9_SOURCE_UART1|LPC_HICR9_SOURCE_UART2
-          |LPC_HICR9_SOURCE_UART3|LPC_HICR9_SOURCE_UART4),
-          reg_base + AST_LPC_HICR9);
+  /* We need to disable the reset source of UART1/2 from LPC control for slot serial.
+    The default of UART1/2 is enable.
+    The default of UART3/4 is disable.       */
+  void __iomem *reg_base;
+  reg_base = ioremap(AST_LPC_BASE, SZ_256);
+  writel(readl(reg_base + AST_LPC_HICR9)
+         & ~(LPC_HICR9_SOURCE_UART1|LPC_HICR9_SOURCE_UART2
+         |LPC_HICR9_SOURCE_UART3|LPC_HICR9_SOURCE_UART4),
+         reg_base + AST_LPC_HICR9);
 	ast_scu_multi_func_uart(1);
 	ast_scu_multi_func_uart(2);
 #elif defined(CONFIG_FBY2)
+  /* We need to disable the reset source of UART1/2 from LPC control for slot serial.
+     The default of UART1/2 is enable.
+     The default of UART3/4 is disable.       */
+  void __iomem *reg_base;
+  reg_base = ioremap(AST_LPC_BASE, SZ_256);
+  writel(readl(reg_base + AST_LPC_HICR9)
+         & ~(LPC_HICR9_SOURCE_UART1|LPC_HICR9_SOURCE_UART2
+         |LPC_HICR9_SOURCE_UART3|LPC_HICR9_SOURCE_UART4),
+         reg_base + AST_LPC_HICR9);
+
   ast_scu_multi_func_uart(1);
   ast_scu_multi_func_uart(2);
   ast_scu_multi_func_uart(3);
