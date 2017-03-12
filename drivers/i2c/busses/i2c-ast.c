@@ -103,6 +103,8 @@ struct ast_i2c_dev {
   struct i2c_msg		slave_tx_msg;
   spinlock_t	slave_rx_lock;
 #endif
+	u32					func_ctrl_reg;
+	u8					master_xfer_first;
 };
 
 static inline void
@@ -268,8 +270,11 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 				AST_I2CD_TX_ACK_INTR_EN,
 				I2C_INTR_CTRL_REG);
 
-				// Initialize completion structure
-				init_completion(&i2c_dev->cmd_complete);
+	// Initialize completion structure
+	init_completion(&i2c_dev->cmd_complete);
+
+	// Initialize the pointer of I2C function control register 
+	i2c_dev->func_ctrl_reg = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);	
 }
 
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
@@ -456,9 +461,9 @@ ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
   }
 
   // Reset i2c controller
-  ast_i2c_write(i2c_dev, temp & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN), I2C_FUN_CTRL_REG);
+  ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN), I2C_FUN_CTRL_REG);
 
-  ast_i2c_write(i2c_dev, temp, I2C_FUN_CTRL_REG);
+  ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 }
 
 // TODO: This is a hack for I2C 1MHz BMC Kernel panic workaround
@@ -789,6 +794,7 @@ static void ast_i2c_do_dec_dma_xfer(struct ast_i2c_dev *i2c_dev)
 static void ast_i2c_do_inc_dma_xfer(struct ast_i2c_dev *i2c_dev)
 {
 	u32 cmd = 0;
+	int timeout = 0;
 	int i;
 
 	i2c_dev->master_xfer_mode = INC_DMA_XFER;
@@ -866,9 +872,29 @@ static void ast_i2c_do_inc_dma_xfer(struct ast_i2c_dev *i2c_dev)
 				ast_i2c_write(i2c_dev, i2c_dev->dma_addr, I2C_DMA_BASE_REG);
 				ast_i2c_write(i2c_dev, (i2c_dev->master_xfer_len), I2C_DMA_LEN_REG);
 			}
-			ast_i2c_write(i2c_dev, cmd, I2C_CMD_REG);
-			dev_dbg(i2c_dev->dev, "txfer size %d , cmd = %x \n",i2c_dev->master_xfer_len, cmd);
 
+			i2c_dev->func_ctrl_reg = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
+			timeout = 50;
+			if (i2c_dev->master_xfer_first == 0) {
+				// Wait for Bus to go IDLE
+				while (ast_i2c_read(i2c_dev,I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS) {
+					if (timeout <= 0) {
+						break;
+					}
+					timeout--;
+					schedule_timeout_interruptible(1);
+				}
+			}
+
+			if (timeout <= 0) {
+				dev_err(i2c_dev->dev, "bus busy, reset this bus. cmd 0x%x\n", ast_i2c_read(i2c_dev,I2C_CMD_REG));
+				ast_i2c_bus_reset(i2c_dev);
+			} else {
+				// disable slave mode
+				ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG) & ~AST_I2CD_SLAVE_EN, I2C_FUN_CTRL_REG);
+				ast_i2c_write(i2c_dev, cmd, I2C_CMD_REG);
+				dev_dbg(i2c_dev->dev, "txfer size %d , cmd = %x \n",i2c_dev->master_xfer_len, cmd);
+			}
 		} else if (i2c_dev->master_xfer_cnt < i2c_dev->master_msgs->len) {
 			//Next send
 			if(i2c_dev->master_msgs->flags & I2C_M_RD) {
@@ -1387,6 +1413,7 @@ static void ast_i2c_master_xfer_done(struct ast_i2c_dev *i2c_dev)
 	int i;
 	u8 *pool_buf;
 	unsigned long flags;
+	u8 do_master_flag = 0;
 
 	spin_lock_irqsave(&i2c_dev->master_lock, flags);
 
@@ -1524,7 +1551,9 @@ next_xfer:
 
 	if(i2c_dev->master_xfer_cnt != i2c_dev->master_msgs->len) {
 		dev_dbg(i2c_dev->dev,"do next cnt \n");
+		i2c_dev->master_xfer_first = 0;
 		i2c_dev->do_master_xfer(i2c_dev);
+		do_master_flag = 1;
 	} else {
 #if 0
 		int i;
@@ -1544,6 +1573,10 @@ done_out:
 	}
 
 unlock_out:
+	if (do_master_flag == 0) {
+		// Restore function control register
+		ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
+	}
 	spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
 }
 
@@ -1653,7 +1686,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 		else if (sts & AST_I2CD_INTR_STS_TX_NAK) {
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK, I2C_INTR_STS_REG);
 		}
-
+		ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
     return IRQ_HANDLED;
 	}
 
@@ -1802,6 +1835,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 					i2c_dev->cmd_err |= AST_I2CD_INTR_STS_TX_NAK;
 				}
 				complete(&i2c_dev->cmd_complete);
+				ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 			}
 			break;
 
@@ -1818,6 +1852,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				dev_dbg(i2c_dev->dev, "M TX NAK | NORMAL STOP \n");
 				i2c_dev->cmd_err |= AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP;
 				complete(&i2c_dev->cmd_complete);
+				ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 			}
 			break;
 
@@ -1846,6 +1881,8 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			dev_dbg(i2c_dev->dev, "M clear isr: sts = %x\n",sts);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
+			ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
+
       ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
                 AST_I2CD_RX_DOWN_INTR_EN, I2C_INTR_CTRL_REG);
 			complete(&i2c_dev->cmd_complete);
@@ -1912,6 +1949,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
 			complete(&i2c_dev->cmd_complete);
+			ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 			break;
  		case AST_I2CD_INTR_STS_GCALL_ADDR:
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_GCALL_ADDR;
@@ -1978,7 +2016,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 
       //TODO: Clearing this interrupt for now, but needs to cleanup this ISR function
       ast_i2c_write(i2c_dev, sts, I2C_INTR_STS_REG);
-
+      ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 			return IRQ_HANDLED;
 	}
 
@@ -2024,6 +2062,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 
 //	printk("start xfer ret = %d \n",ret);
 
+	i2c_dev->master_xfer_first = 0;
 	for (i=0; i < num; i++) {
 		i2c_dev->blk_r_flag = 0;
 		i2c_dev->master_msgs = &msgs[i];
@@ -2042,6 +2081,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 			i2c_dev->master_xfer_cnt = -1;
 
 		i2c_dev->do_master_xfer(i2c_dev);
+		i2c_dev->master_xfer_first = 1;
 
 		spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
 
