@@ -335,8 +335,8 @@ static irqreturn_t ast_peci_handler(int this_irq, void *dev_id)
 
 static void ast_peci_ctrl_init(void)
 {
-	ast_peci_write(PECI_CTRL_SAMPLING(8) |
-					PECI_CTRL_PECI_CLK_EN, AST_PECI_CTRL);
+  ast_peci_write(PECI_CTRL_CLK_DIV(3) | PECI_CTRL_PECI_CLK_EN, AST_PECI_CTRL);
+  udelay(1000);
 
 	//PECI Timing Setting : should 4 times of peci clk period 64 = 16 * 4 ??
 	ast_peci_write(PECI_TIMING_MESSAGE(64) | PECI_TIMING_ADDRESS(64), AST_PECI_TIMING);
@@ -345,14 +345,6 @@ static void ast_peci_ctrl_init(void)
 	//PECI Programmable AWFCS
 	//ast_peci_write(ast_peci, PECI_PROGRAM_AW_FCS, AST_PECI_EXP_FCS);
 
-
-	//PECI Spec wide speed rangs [2kbps~2Mbps]
-	//Sampling 8/16, READ mode : Point Sampling , CLK source : 24Mhz , DIV by 8 : 3 --> CLK is 3Mhz
-	//PECI CTRL Enable
-	ast_peci_write(PECI_CTRL_SAMPLING(8) | PECI_CTRL_CLK_DIV(3) |
-					PECI_CTRL_PECI_EN |
-					PECI_CTRL_PECI_CLK_EN, AST_PECI_CTRL);
-
 	//Issue Fix for interrupt accur
 
 	//Clear Interrupt
@@ -360,12 +352,19 @@ static void ast_peci_ctrl_init(void)
 					PECI_INT_W_FCS_BAD | PECI_INT_W_FCS_ABORT |
 					PECI_INT_CMD_DONE, AST_PECI_INT_STS);
 
-
 	//PECI Negotiation Selection , interrupt enable
 	//Set nego mode :  1st bit of addr negotiation
 	ast_peci_write(PECI_INT_TIMEOUT | PECI_INT_CONTENTION |
 					PECI_INT_W_FCS_BAD | PECI_INT_W_FCS_ABORT |
 					PECI_INT_CMD_DONE, AST_PECI_INT_CTRL);
+
+	//PECI Spec wide speed rangs [2kbps~2Mbps]
+	//Sampling 8/16, READ mode : Point Sampling , CLK source : 24Mhz , DIV by 8 : 3 --> CLK is 3Mhz
+	//PECI CTRL Enable
+
+	ast_peci_write(PECI_CTRL_SAMPLING(8) | PECI_CTRL_CLK_DIV(3) |
+					PECI_CTRL_PECI_EN |
+					PECI_CTRL_PECI_CLK_EN, AST_PECI_CTRL);
 
 }
 
