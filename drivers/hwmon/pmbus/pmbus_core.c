@@ -28,6 +28,7 @@
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
 #include <linux/jiffies.h>
+#include <linux/delay.h>
 #include <linux/i2c/pmbus.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
@@ -108,6 +109,8 @@ struct pmbus_data {
 	bool valid;
 	unsigned long last_updated;	/* in jiffies */
 
+	ktime_t access;
+
 	/*
 	 * A single status register covers multiple attributes,
 	 * so we keep them all together.
@@ -117,6 +120,35 @@ struct pmbus_data {
 
 	u8 currpage;
 };
+
+/* Some chips need a delay between accesses */
+void pmbus_wait(struct i2c_client *client)
+{
+	struct pmbus_data *data = i2c_get_clientdata(client);
+	const struct pmbus_driver_info *info = data->info;
+
+	if (info->delay) {
+		s64 delta = ktime_us_delta(ktime_get(), data->access);
+		if (delta < info->delay)
+			/*
+			 * Note that udelay is busy waiting.  msleep is
+			 * quite a bit slower (it actually takes a
+			 * minimum of 20ms), but doesn't busy wait.  Hmmm.
+			 */
+			udelay(info->delay - delta);
+	}
+}
+EXPORT_SYMBOL_GPL(pmbus_wait);
+
+void pmbus_update_wait(struct i2c_client *client)
+{
+	struct pmbus_data *data = i2c_get_clientdata(client);
+	const struct pmbus_driver_info *info = data->info;
+
+	if (info->delay)
+		data->access = ktime_get();
+}
+EXPORT_SYMBOL_GPL(pmbus_update_wait);
 
 void pmbus_clear_cache(struct i2c_client *client)
 {
@@ -133,8 +165,12 @@ int pmbus_set_page(struct i2c_client *client, u8 page)
 	int newpage;
 
 	if (page != data->currpage) {
+		pmbus_wait(client);
 		rv = i2c_smbus_write_byte_data(client, PMBUS_PAGE, page);
+		pmbus_update_wait(client);
+		pmbus_wait(client);
 		newpage = i2c_smbus_read_byte_data(client, PMBUS_PAGE);
+		pmbus_update_wait(client);
 		if (newpage != page)
 			rv = -EIO;
 		else
@@ -154,7 +190,10 @@ int pmbus_write_byte(struct i2c_client *client, int page, u8 value)
 			return rv;
 	}
 
-	return i2c_smbus_write_byte(client, value);
+	pmbus_wait(client);
+	rv = i2c_smbus_write_byte(client, value);
+	pmbus_update_wait(client);
+	return rv;
 }
 EXPORT_SYMBOL_GPL(pmbus_write_byte);
 
@@ -184,7 +223,10 @@ int pmbus_write_word_data(struct i2c_client *client, u8 page, u8 reg, u16 word)
 	if (rv < 0)
 		return rv;
 
-	return i2c_smbus_write_word_data(client, reg, word);
+	pmbus_wait(client);
+	rv = i2c_smbus_write_word_data(client, reg, word);
+	pmbus_update_wait(client);
+	return rv;
 }
 EXPORT_SYMBOL_GPL(pmbus_write_word_data);
 
@@ -217,7 +259,10 @@ int pmbus_read_word_data(struct i2c_client *client, u8 page, u8 reg)
 	if (rv < 0)
 		return rv;
 
-	return i2c_smbus_read_word_data(client, reg);
+	pmbus_wait(client);
+	rv = i2c_smbus_read_word_data(client, reg);
+	pmbus_update_wait(client);
+	return rv;
 }
 EXPORT_SYMBOL_GPL(pmbus_read_word_data);
 
@@ -251,7 +296,10 @@ int pmbus_read_byte_data(struct i2c_client *client, int page, u8 reg)
 			return rv;
 	}
 
-	return i2c_smbus_read_byte_data(client, reg);
+  pmbus_wait(client);
+	rv = i2c_smbus_read_byte_data(client, reg);
+	pmbus_update_wait(client);
+	return rv;
 }
 EXPORT_SYMBOL_GPL(pmbus_read_byte_data);
 
@@ -263,7 +311,10 @@ int pmbus_write_byte_data(struct i2c_client *client, int page, u8 reg, u8 value)
 	if (rv < 0)
 		return rv;
 
-	return i2c_smbus_write_byte_data(client, reg, value);
+  pmbus_wait(client);
+	rv = i2c_smbus_write_byte_data(client, reg, value);
+	pmbus_update_wait(client);
+	return rv;
 }
 EXPORT_SYMBOL_GPL(pmbus_write_byte_data);
 
@@ -749,6 +800,8 @@ static ssize_t pmbus_show_boolean(struct device *dev,
 	val = pmbus_get_boolean(data, boolean, attr->index);
 	if (val < 0)
 		return val;
+	if (val == 0xff)
+		return 0;
 	return snprintf(buf, PAGE_SIZE, "%d\n", val);
 }
 
@@ -760,6 +813,8 @@ static ssize_t pmbus_show_sensor(struct device *dev,
 
 	if (sensor->data < 0)
 		return sensor->data;
+	if (sensor->data == 0xffff)
+		return 0;
 
 	return snprintf(buf, PAGE_SIZE, "%ld\n", pmbus_reg2data(data, sensor));
 }
@@ -919,7 +974,11 @@ static int pmbus_add_label(struct pmbus_data *data,
 
 	a = &label->attribute;
 
-	snprintf(label->name, sizeof(label->name), "%s%d_label", name, seq);
+	if (seq == -1)
+		snprintf(label->name, sizeof(label->name), "%s_label", name);
+	else
+		snprintf(label->name, sizeof(label->name), "%s%d_label",
+			 name, seq);
 	if (!index)
 		strncpy(label->label, lstring, sizeof(label->label) - 1);
 	else
@@ -1638,6 +1697,74 @@ static int pmbus_add_fan_attributes(struct i2c_client *client,
 	return 0;
 }
 
+static const u32 pmbus_mfr_registers[] = {
+	PMBUS_MFR_ID,
+	PMBUS_MFR_MODEL,
+	PMBUS_MFR_REVISION,
+	/*
+	 * PMBUS_MFR_LOCATION is not implemented according to spec
+	 * in the pfe1100;  rather than showing up as a block read,
+	 * it's a word read.  Even worse, our block read implementation
+	 * will get the first byte, 'A', and stomp all over our buffer,
+	 * rather than politely declining to read 65 bytes, as it should.
+	 *
+	 * Clearly, we should fix the implementation rather than hack it
+	 * in here, but we want to get this out the door.  With more
+	 * experience, hopefully we can come up with a more general
+	 * implmentation of the MFR register reads.
+	 */
+	PMBUS_MFR_DATE,
+	PMBUS_MFR_SERIAL,
+};
+
+static const char *pmbus_mfr_names[] = {
+	"mfr_id",
+	"mfr_model",
+	"mfr_revision",
+	/* "mfr_location", as mentioned above, is not readable */
+	"mfr_date",
+	"mfr_serial",
+};
+
+/* MFR info */
+static int pmbus_add_mfr_attributes(struct i2c_client *client,
+				    struct pmbus_data *data)
+{
+	int f;
+	char buf[I2C_SMBUS_BLOCK_MAX + 1];
+
+	if ((data->info->func[0] & PMBUS_HAVE_MFRDATA) == 0 ||
+	    !i2c_check_functionality(client->adapter,
+				     I2C_FUNC_SMBUS_READ_BLOCK_DATA))
+		return 0;
+
+	for (f = 0; f < ARRAY_SIZE(pmbus_mfr_registers); f++) {
+		int ret;
+
+		pmbus_wait(client);
+		ret = i2c_smbus_read_block_data(client, pmbus_mfr_registers[f],
+						buf);
+		pmbus_update_wait(client);
+		if (ret <= 0)
+			continue;
+
+		buf[ret] = 0;
+		if (!(data->flags & PMBUS_SKIP_STATUS_CHECK)) {
+			ret = pmbus_check_status_cml(client);
+			pmbus_clear_fault_page(client, -1);
+			if (ret < 0)
+				continue;
+		}
+
+		/* Note that the label code truncates to PMBUS_NAME_SIZE */
+
+		ret = pmbus_add_label(data, pmbus_mfr_names[f], -1, buf, 0);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
 static int pmbus_find_attributes(struct i2c_client *client,
 				 struct pmbus_data *data)
 {
@@ -1669,6 +1796,12 @@ static int pmbus_find_attributes(struct i2c_client *client,
 
 	/* Fans */
 	ret = pmbus_add_fan_attributes(client, data);
+	if (ret)
+		return ret;
+
+	/* Manufacturer strings */
+	// MFR data uses sm bus read block that is crashing.
+	// ret = pmbus_add_mfr_attributes(client, data);
 	return ret;
 }
 
@@ -1724,12 +1857,16 @@ static int pmbus_init_common(struct i2c_client *client, struct pmbus_data *data,
 	 * to use PMBUS_STATUS_WORD instead if that is the case.
 	 * Bail out if both registers are not supported.
 	 */
-	data->status_register = PMBUS_STATUS_BYTE;
-	ret = i2c_smbus_read_byte_data(client, PMBUS_STATUS_BYTE);
-	if (ret < 0 || ret == 0xff) {
-		data->status_register = PMBUS_STATUS_WORD;
-		ret = i2c_smbus_read_word_data(client, PMBUS_STATUS_WORD);
-		if (ret < 0 || ret == 0xffff) {
+	data->status_register = PMBUS_STATUS_WORD;
+	pmbus_wait(client);
+	ret = i2c_smbus_read_word_data(client, PMBUS_STATUS_WORD);
+	pmbus_update_wait(client);
+	if (ret < 0 || ret == 0xffff) {
+		data->status_register = PMBUS_STATUS_BYTE;
+    pmbus_wait(client);
+		ret = i2c_smbus_read_byte_data(client, PMBUS_STATUS_BYTE);
+    pmbus_update_wait(client);
+		if (ret < 0 || ret == 0xff) {
 			dev_err(dev, "PMBus status register not found\n");
 			return -ENODEV;
 		}
@@ -1885,8 +2022,10 @@ int pmbus_do_probe(struct i2c_client *client, const struct i2c_device_id *id,
 	}
 
 	data->groups[0] = &data->group;
+
 	data->hwmon_dev = hwmon_device_register_with_groups(dev, client->name,
 							    data, data->groups);
+
 	if (IS_ERR(data->hwmon_dev)) {
 		ret = PTR_ERR(data->hwmon_dev);
 		dev_err(dev, "Failed to register hwmon device\n");
@@ -1894,6 +2033,7 @@ int pmbus_do_probe(struct i2c_client *client, const struct i2c_device_id *id,
 	}
 
 	ret = pmbus_regulator_register(data);
+
 	if (ret)
 		goto out_unregister;
 
@@ -1911,6 +2051,7 @@ int pmbus_do_remove(struct i2c_client *client)
 {
 	struct pmbus_data *data = i2c_get_clientdata(client);
 	hwmon_device_unregister(data->hwmon_dev);
+
 	kfree(data->group.attrs);
 	return 0;
 }

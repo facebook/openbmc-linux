@@ -339,12 +339,14 @@ enum pmbus_sensor_classes {
 #define PMBUS_HAVE_STATUS_FAN34 BIT(17)
 #define PMBUS_HAVE_VMON   BIT(18)
 #define PMBUS_HAVE_STATUS_VMON  BIT(19)
+#define PMBUS_HAVE_MFRDATA  BIT(20)
 
 enum pmbus_data_format { linear = 0, direct, vid };
 enum vrm_version { vr11 = 0, vr12 };
 
 struct pmbus_driver_info {
 	int pages;    /* Total number of pages */
+	ushort delay;
 	enum pmbus_data_format format[PSC_NUM_CLASSES];
 	enum vrm_version vrm_version;
 	/*
@@ -402,7 +404,8 @@ extern const struct regulator_ops pmbus_regulator_ops;
 }
 
 /* Function declarations */
-
+void pmbus_wait(struct i2c_client *client);
+void pmbus_update_wait(struct i2c_client *client);
 void pmbus_clear_cache(struct i2c_client *client);
 int pmbus_set_page(struct i2c_client *client, u8 page);
 int pmbus_read_word_data(struct i2c_client *client, u8 page, u8 reg);
