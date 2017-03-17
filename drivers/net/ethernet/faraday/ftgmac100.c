@@ -2319,7 +2319,11 @@ static int ftgmac100_poll(struct napi_struct *napi, int budget)
 	}
 
 	if (status & (FTGMAC100_INT_NO_RXBUF | FTGMAC100_INT_RPKT_LOST |
-		      FTGMAC100_INT_AHB_ERR | FTGMAC100_INT_PHYSTS_CHG)) {
+		      FTGMAC100_INT_AHB_ERR
+#if !defined(CONFIG_FTGMAC100_NCSI)
+					 | FTGMAC100_INT_PHYSTS_CHG
+#endif
+		 )) {
 		if (net_ratelimit())
 			netdev_info(netdev, "[ISR] = 0x%x: %s%s%s\n", status,
 			status & FTGMAC100_INT_NO_RXBUF ? "NO_RXBUF " : "",
