@@ -53,7 +53,7 @@ ifeq ($(CONFIG_LIGHTNING), y)
 endif
 
 ifeq ($(CONFIG_FBY2),y)
-  obj-y += dev-uart.o dev-i2c-fby2.o dev-i2c-common.o dev-spi-fb.o dev-vhub.o
+  obj-y += dev-uart.o dev-i2c-fby2.o dev-spi-fb.o dev-vhub.o
   PLATFB = 1
 endif
 

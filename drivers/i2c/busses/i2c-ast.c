@@ -59,7 +59,7 @@
 #define AST_LOCKUP_DETECTED (0x1 << 15)
 
 // Enable SCL/SDA pull LOW detection for Yosemite platform
-#ifdef CONFIG_YOSEMITE
+#ifdef CONFIG_YOSEMITE || CONFIG_FBY2
 #define AST_I2C_LOW_TIMEOUT 0x07
 #else
 #define AST_I2C_LOW_TIMEOUT 0x00
@@ -135,11 +135,11 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
   // TODO: hack: The calculated value for 1MHz does not match with measured value, so override
   // TODO: hack: For AST2500 1MHz
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
-	#ifdef CONFIG_FBTTN
+#ifdef CONFIG_FBTTN || CONFIG_FBY2
 	  data = 0x77799300;
-	#else
-      data = 0x77744302;
-    #endif
+#else
+    data = 0x77744302;
+#endif
     return data;
   }
 #if CONFIG_FBTP
@@ -273,8 +273,8 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 	// Initialize completion structure
 	init_completion(&i2c_dev->cmd_complete);
 
-	// Initialize the pointer of I2C function control register 
-	i2c_dev->func_ctrl_reg = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);	
+	// Initialize the pointer of I2C function control register
+	i2c_dev->func_ctrl_reg = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
 }
 
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
