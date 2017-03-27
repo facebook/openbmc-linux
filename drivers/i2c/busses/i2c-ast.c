@@ -132,24 +132,37 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
 	unsigned int clk, inc = 0, div, divider_ratio;
 	u32 SCL_Low, SCL_High, data;
 
+#ifdef CONFIG_FBTTN
   // TODO: hack: The calculated value for 1MHz does not match with measured value, so override
   // TODO: hack: For AST2500 1MHz
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
-#ifdef CONFIG_FBTTN || CONFIG_FBY2
-	  data = 0x77799300;
-#else
-    data = 0x77744302;
-#endif
+    data = 0x77799300;
     return data;
   }
-#if CONFIG_FBTP
-  if (i2c_dev->ast_i2c_data->bus_clk == 100000) {
-  // hack: For FBTP 100KHz
-    data = 0xFFFFE303;
+#endif
+
+#ifdef CONFIG_FBY2
+  if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
+    data = 0x77799300;
     return data;
   } else if (i2c_dev->ast_i2c_data->bus_clk == 400000) {
-  // hack: For FBTP 400KHz
     data = 0xFFF68302;
+    return data;
+  }
+#endif
+
+#ifdef CONFIG_FBTP
+  if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
+    // hack: For FBTP 1MHz
+    data = 0x77744302;
+    return data;
+  } else if (i2c_dev->ast_i2c_data->bus_clk == 400000) {
+    // hack: For FBTP 400KHz
+    data = 0xFFF68302;
+    return data;
+  } else if (i2c_dev->ast_i2c_data->bus_clk == 100000) {
+    // hack: For FBTP 100KHz
+    data = 0xFFFFE303;
     return data;
   }
 #endif
