@@ -331,6 +331,8 @@ static irqreturn_t ast_peci_handler(int this_irq, void *dev_id)
 
 static void ast_peci_ctrl_init(void)
 {
+	ast_peci_write(PECI_CTRL_CLK_DIV(3) | PECI_CTRL_PECI_CLK_EN, AST_PECI_CTRL);
+	udelay(1000);
 	//PECI Timing Setting : should 4 times of peci clk period 64 = 16 * 4 ??
 	ast_peci_write(PECI_TIMING_MESSAGE(64) | PECI_TIMING_ADDRESS(64), AST_PECI_TIMING);
 
@@ -407,6 +409,7 @@ static int ast_peci_probe(struct platform_device *pdev)
 		goto out_region;
 	}
 
+	init_completion(&ast_peci.xfer_complete);
 	ret = request_irq(ast_peci.irq, ast_peci_handler, IRQF_SHARED,
 			  "ast-peci", &ast_peci);
 	
