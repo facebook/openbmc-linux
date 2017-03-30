@@ -516,29 +516,6 @@ static struct i2c_board_info ast_i2c_board_info_0[] __initdata = {
 
 static struct i2c_board_info ast_i2c_board_info_1[] __initdata = {
         // To BIC server board 0x40
-        // To Glacier Point
-        // EEPROM, 0xA2
-        {
-            I2C_BOARD_INFO("24c128" , 0x51),
-        },
-        // Inlet Temp Sensor (0x9A)
-        {
-            I2C_BOARD_INFO("tmp75", 0x4d),
-        },
-        // Outlet Temp Sensor (0x9B)
-        {
-            I2C_BOARD_INFO("tmp75", 0x4e),
-        },
-        //
-        {
-            I2C_BOARD_INFO("pca9551", 0x71),
-        },
-        {
-            I2C_BOARD_INFO("pca9551", 0x20),
-        },
-        {
-            I2C_BOARD_INFO("ina230" , 0x40),
-        },
 };
 
 static struct i2c_board_info ast_i2c_board_info_2[] __initdata = {
@@ -555,29 +532,6 @@ static struct i2c_board_info ast_i2c_board_info_4[] __initdata = {
 
 static struct i2c_board_info ast_i2c_board_info_5[] __initdata = {
         // To BIC server board 0x40
-				// To Glacier Point
-        // EEPROM, 0xA2
-        {
-            I2C_BOARD_INFO("24c128" , 0x51),
-        },
-        // Inlet Temp Sensor (0x9A)
-        {
-            I2C_BOARD_INFO("tmp75", 0x4d),
-        },
-        // Outlet Temp Sensor (0x9B)
-        {
-            I2C_BOARD_INFO("tmp75", 0x4e),
-        },
-        //
-        {
-            I2C_BOARD_INFO("pca9551", 0x71),
-        },
-        {
-            I2C_BOARD_INFO("pca9551", 0x20),
-        },
-        {
-            I2C_BOARD_INFO("ina230" , 0x40),
-        },
 };
 
 static struct i2c_board_info ast_i2c_board_info_6[] __initdata = {
