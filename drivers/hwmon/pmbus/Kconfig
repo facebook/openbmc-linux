@@ -27,7 +27,7 @@ config SENSORS_PMBUS
 
 config SENSORS_PFE3000
 	tristate "Power One PFE3000"
-	default y
+	default n
 	help
 		If you say yes here you get hardware monitoring support for
 		Power One PFE3000 devices.
