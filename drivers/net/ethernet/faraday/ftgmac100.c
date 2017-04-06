@@ -1292,6 +1292,7 @@ void ncsi_start(struct net_device *dev) {
 #if defined(CONFIG_FBY2)
         Get_MAC_Address_mlx(dev);
         Set_MAC_Affinity_mlx(dev);
+        Clear_Initial_State(dev, i);
 #else
         if (priv->mezz_type == 0x01) {
           Get_MAC_Address_mlx(dev);
