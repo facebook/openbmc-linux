@@ -334,18 +334,13 @@ config USB_GOKU
 	   dynamically linked module called "goku_udc" and to force all
 	   gadget drivers to also be dynamically linked.
 
-config USB_GADGET_ASPEED_AST
-        boolean "ASPEED AST Virtual Hub"
-        	select USB_GADGET_DUALSPEED
-        depends on ARCH_ASPEED
-        help
-        USB device controller for ASPEED AST
+config USB_GADGET_AST
+  tristate "ASPEED USB Gadget Driver based on virtual hub controller"
+  depends on ARCH_ASPEED
+  help
+      The USB gadget driver on Aspeed BMC chip.
 
-config USB_ASPEED_AST
-  	tristate
-  	depends on USB_GADGET_ASPEED_AST
-  	default USB_GADGET
-  	select USB_GADGET_SELECTED
+      This function is implemented using the virtual hub controller.
 
 config USB_EG20T
 	tristate "Intel QUARK X1000/EG20T PCH/LAPIS Semiconductor IOH(ML7213/ML7831) UDC"

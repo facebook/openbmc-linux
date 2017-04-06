@@ -13,7 +13,7 @@ config AST_VIDEO
 	tristate "ASPEED Video Engine driver"
 	default n
 	help
-	  Driver for AST Video Engine 
+	  Driver for AST Video Engine
 
 # Support LPC
 menuconfig AST_LPC
@@ -57,7 +57,7 @@ config AST_IPMI_BT
 	depends on AST_LPC_SLAVE
 	bool "AST IPMI BT"
 
-endif 
+endif
 
 config AST_ESPI
 	bool "AST eSPI"
@@ -68,7 +68,7 @@ config COLDFIRE_ESPI
 	bool "Coldfire ESPI"
 
 endif
-	
+
 config ADC_CAT9883
 	tristate "CAT 9883 ADC driver"
 	default n
@@ -116,13 +116,5 @@ config AST_RFX
 	help
 	  Driver for RFX
 
-config AST_VHUB
-	tristate "ASPEED VHUB Driver"
-	depends on !(USB)
-	default n
-	help 
-	  Driver for VHUB
-
 endif	# CONFIG_AST_MISC
 endif	# CONFIG_AST
-

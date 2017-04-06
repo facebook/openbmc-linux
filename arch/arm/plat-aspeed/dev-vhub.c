@@ -36,7 +36,7 @@
 /* --------------------------------------------------------------------
  *  VHUB
  * -------------------------------------------------------------------- */
-#if defined(CONFIG_AST_VHUB)
+#if defined(CONFIG_USB_GADGET_AST) || defined(CONFIG_USB_GADGET_AST_MODULE)
 static struct resource ast_vhub_resource[] = {
 	[0] = {
 		.start = AST_VHUB_BASE,

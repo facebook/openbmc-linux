@@ -48,9 +48,7 @@
 #include <asm/bitops.h>    
 #include <asm/atomic.h>    
 
-#include "ast-vhub.h"       
-
-
+#include "ast-udc.h"
 
 #define NUM_ENDPOINTS 14
 #define AST_UDC_EP0_MAXPACKET 64
@@ -260,7 +258,7 @@ static void ep0_next_stage(int has_data_phase, u8 data_dir) {
     break;
   }
 
-#if VERBOSE
+#ifdef VERBOSE
   ep_vdebug("EP0 stage is changed from %d (%s) to %d (%s)\n",
             prev_stage, ast_udc_dir2str(prev_dir),
             udc.ep0_stage, ast_udc_dir2str(udc.ep0_dir));
