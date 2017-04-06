@@ -151,9 +151,7 @@ init_fnc_t __initdata *init_all_device[] = {
 	ast_add_device_lpc,
 	//ast_add_device_espi,
 	//ast_add_device_sgpio,
-#if defined(CONFIG_FBTP)
-  ast_add_device_peci,
-#endif
+	ast_add_device_peci,
 	ast_add_device_jtag,
 	ast_add_device_sdhci,
 	ast_add_device_gmac,
@@ -171,9 +169,7 @@ init_fnc_t __initdata *init_all_device[] = {
 	//ast_add_device_rfx,
 	//ast_add_device_h264,
 	//ast_add_device_formatter,
-#if defined(CONFIG_LIGHTNING)
 	ast_add_device_vhub,
-#endif
 	ast_add_device_udc20,
 	//ast_add_device_crypto,
 	NULL,

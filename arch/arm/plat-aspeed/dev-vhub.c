@@ -7,11 +7,11 @@
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by the Free Software Foundation;
 * either version 2 of the License, or (at your option) any later version.
-* 
+*
 * This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
 * without even the implied warranty of MERCHANTABILITY or
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-* 
+*
 * You should have received a copy of the GNU General Public License
 * along with this program; if not, write to the Free Software
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
@@ -36,19 +36,14 @@
 /* --------------------------------------------------------------------
  *  VHUB
  * -------------------------------------------------------------------- */
-//#if defined(CONFIG_AST_VHUB)
+#if defined(CONFIG_AST_VHUB)
 static struct resource ast_vhub_resource[] = {
 	[0] = {
-#if defined(CONFIG_LIGHTNING)
-                .start = AST_USB20_BASE,
-                .end = AST_USB20_BASE + SZ_1K,
-#else
-                .start = AST_VHUB_BASE,
-                .end = AST_VHUB_BASE + SZ_1K,
-#endif
-                .flags = IORESOURCE_MEM,
-        },
-        [1] = {
+		.start = AST_VHUB_BASE,
+		.end = AST_VHUB_BASE + SZ_1K,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
 		.start = IRQ_VHUB,
 		.end = IRQ_VHUB,
 		.flags = IORESOURCE_IRQ,
@@ -75,6 +70,6 @@ void __init ast_add_device_vhub(void)
 
 	platform_device_register(&ast_vhub_device);
 }
-//#else
-//void __init ast_add_device_vhub(void) {}
-//#endif
+#else
+void __init ast_add_device_vhub(void) {}
+#endif

@@ -28,37 +28,39 @@ obj-y                   += dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o dev-peci.o
 
 PLATFB := 0
 ifeq ($(CONFIG_CMM),y)
-  obj-y += dev-uart.o dev-i2c-cmm.o dev-i2c-common.o dev-spi-fb.o
+  obj-y += dev-uart.o dev-i2c-cmm.o dev-i2c-common.o
   PLATFB = 1
 endif
 
 ifeq ($(CONFIG_WEDGE), y)
-  obj-y += dev-uart.o dev-i2c-wedge.o dev-i2c-common.o dev-spi-fb.o
+  obj-y += dev-uart.o dev-i2c-wedge.o dev-i2c-common.o
   PLATFB = 1
 endif
 
 ifeq ($(CONFIG_FBTP), y)
-  obj-y += dev-uart-fbtp.o dev-i2c.o dev-spi-fb.o
+  obj-y += dev-uart-fbtp.o dev-i2c.o
   PLATFB = 1
 endif
 
 ifeq ($(CONFIG_FBTTN), y)
-  obj-y += dev-uart.o dev-i2c.o dev-vhub.o dev-spi-fb.o
+  obj-y += dev-uart.o dev-i2c.o
   PLATFB = 1
 endif
 
 ifeq ($(CONFIG_LIGHTNING), y)
-  obj-y += dev-uart.o  dev-i2c.o dev-vhub.o dev-spi-fb.o
+  obj-y += dev-uart.o  dev-i2c.o
   PLATFB = 1
 endif
 
 ifeq ($(CONFIG_FBY2),y)
-  obj-y += dev-uart.o dev-i2c-fby2.o dev-spi-fb.o dev-vhub.o
+  obj-y += dev-uart.o dev-i2c-fby2.o
   PLATFB = 1
 endif
 
 ifneq ($(PLATFB), 1)
   obj-y += dev-uart.o dev-spi.o dev-i2c.o
+else
+  obj-y += dev-spi-fb.o
 endif
 
 #dev
@@ -73,6 +75,6 @@ obj-y                   += dev-pwm-fan.o dev-adc.o
 obj-y			+= dev-fb.o dev-video.o dev-h264.o dev-formatter.o dev-rfx.o
 
 obj-y			+= dev-rng.o
-#obj-m                  :=
-#obj-n                  :=
-#obj-                   :=
+
+# USB Virtual Hub
+obj-y			+= dev-vhub.o
