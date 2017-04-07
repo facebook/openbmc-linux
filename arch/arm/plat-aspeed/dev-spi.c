@@ -297,28 +297,32 @@ static struct mtd_partition ast_spi_flash_partitions[] = {
 };
 #else
 static struct mtd_partition ast_spi_flash_partitions[] = {
-		{
-			.name	= "u-boot",
-			.offset = 0, /* From 0 */
-			.size	= 0x60000, /* Size 384K */
-			.mask_flags	= MTD_WRITEABLE,
-                }, {
-                        .name   = "env",
-                        .offset = 0x60000, /* From 384K */
-                        .size   = 0x20000, /* Size 128K, two sectors */
-		}, {
-		        .name   = "kernel",
-			.offset = 0x80000,  /* From 512K */
-            		.size   = 0x200000, /* Size 2M */
-        }, {
-            		.name   = "rootfs",
-			.offset = 0x300000, /* From 3M */
-            		.size   = 0xC00000, /* Size 12M */
-		}, {
-			.name	= "data0",
-			.offset = MTDPART_OFS_APPEND,
-			.size	= MTDPART_SIZ_FULL,
-        },
+	{
+		.name	= "u-boot",
+		.offset = 0, /* From 0 */
+		.size	= 0x60000, /* Size 384K */
+		.mask_flags	= MTD_WRITEABLE,
+	}, {
+		.name	= "env",
+		.offset = 0x60000, /* From 384K */
+		.size	= 0x20000, /* Size 128K, two sectors */
+	}, {
+		.name	= "kernel",
+		.offset = 0x80000,  /* From 512K */
+		.size	= 0x280000, /* Size 2.5M */
+	}, {
+		.name	= "rootfs",
+		.offset = 0x300000, /* From 3M */
+		.size	= 0xC00000, /* Size 12M */
+	}, {
+		.name	= "data0",
+		.offset = MTDPART_OFS_APPEND,
+		.size	= MTDPART_SIZ_FULL,
+	}, {
+		.name	= "flash0", /* Full flash */
+		.offset = 0,
+		.size	= MTDPART_SIZ_FULL,
+	},
 };
 #endif
 
