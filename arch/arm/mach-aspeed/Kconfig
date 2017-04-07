@@ -206,6 +206,9 @@ config WEDGE
 config WEDGE100
         bool "Facebook Wedge100"
 
+config GALAXY100
+        bool "Facebook GALAXY100 (Backpack) LC/FC"
+
 config YOSEMITE
         bool "Facebook Yosemite"
 

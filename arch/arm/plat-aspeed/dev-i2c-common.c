@@ -464,3 +464,8 @@ void __init ast_add_device_i2c_common(void)
 void __init ast_add_device_i2c_common(void) {}
 
 #endif
+
+void __init __attribute__((weak)) ast_add_device_i2c(void)
+{
+	ast_add_device_i2c_common();
+}

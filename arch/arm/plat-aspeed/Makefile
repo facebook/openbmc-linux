@@ -28,12 +28,22 @@ obj-y                   += dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o dev-peci.o
 
 PLATFB := 0
 ifeq ($(CONFIG_CMM),y)
-  obj-y += dev-uart.o dev-i2c-cmm.o dev-i2c-common.o
+  obj-y += dev-uart.o dev-i2c-cmm.o
   PLATFB = 1
 endif
 
 ifeq ($(CONFIG_WEDGE), y)
-  obj-y += dev-uart.o dev-i2c-wedge.o dev-i2c-common.o
+  obj-y += dev-uart.o
+  PLATFB = 1
+endif
+
+ifeq ($(CONFIG_WEDGE100), y)
+  obj-y += dev-uart.o
+  PLATFB = 1
+endif
+
+ifeq ($(CONFIG_GALAXY100), y)
+  obj-y += dev-uart.o
   PLATFB = 1
 endif
 
@@ -57,10 +67,10 @@ ifeq ($(CONFIG_FBY2),y)
   PLATFB = 1
 endif
 
-ifneq ($(PLATFB), 1)
-  obj-y += dev-uart.o dev-spi.o dev-i2c.o
+ifeq ($(PLATFB), 1)
+  obj-y += dev-spi-fb.o dev-i2c-common.o
 else
-  obj-y += dev-spi-fb.o
+  obj-y += dev-uart.o dev-spi.o dev-i2c.o
 endif
 
 #dev
@@ -69,7 +79,7 @@ obj-y			+= dev-udc11.o dev-hid.o dev-udc20.o
 obj-y			+= dev-eth.o
 
 #hwmon
-obj-y                   += dev-pwm-fan.o dev-adc.o
+obj-y			+= dev-pwm-fan.o dev-adc.o
 
 #video
 obj-y			+= dev-fb.o dev-video.o dev-h264.o dev-formatter.o dev-rfx.o
