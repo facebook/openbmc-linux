@@ -369,6 +369,8 @@ static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 				if(i2c_dev->slave_rx_msg[i].addr == BUFF_ONGOING) {
 					i2c_dev->slave_rx_msg[i].flags = BUFF_FULL;
 					i2c_dev->slave_rx_msg[i].addr = 0;
+					i2c_dev->adap.data_ready = 1;
+					wake_up_interruptible(&i2c_dev->adap.wq);
 					break;
 				}
 			}

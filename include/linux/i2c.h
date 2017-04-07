@@ -399,9 +399,9 @@ struct i2c_algorithm {
 	   processed, or a negative value on error */
 	int (*master_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs,
 			   int num);
-#ifdef CONFIG_AST_I2C_SLAVE_RDWR	
+#ifdef CONFIG_AST_I2C_SLAVE_RDWR
 	int (*slave_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs);
-#endif	
+#endif
 	int (*smbus_xfer) (struct i2c_adapter *adap, u16 addr,
 			   unsigned short flags, char read_write,
 			   u8 command, int size, union i2c_smbus_data *data);
@@ -522,6 +522,9 @@ struct i2c_adapter {
 
 	struct i2c_bus_recovery_info *bus_recovery_info;
 	const struct i2c_adapter_quirks *quirks;
+
+  uint8_t data_ready;
+  wait_queue_head_t wq;
 };
 #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
 
