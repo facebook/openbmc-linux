@@ -55,7 +55,7 @@ static struct resource ast_i2c_dev0_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev0_device = {
+static struct platform_device ast_i2c_dev0_device = {
 	.name = "ast-i2c",
 	.id = 0,
 	.dev = {
@@ -80,7 +80,7 @@ static struct resource ast_i2c_dev1_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev1_device = {
+static struct platform_device ast_i2c_dev1_device = {
 	.name = "ast-i2c",
 	.id = 1,
 	.dev = {
@@ -105,7 +105,7 @@ static struct resource ast_i2c_dev2_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev2_device = {
+static struct platform_device ast_i2c_dev2_device = {
 	.name = "ast-i2c",
 	.id = 2,
 	.dev = {
@@ -130,7 +130,7 @@ static struct resource ast_i2c_dev3_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev3_device = {
+static struct platform_device ast_i2c_dev3_device = {
 	.name = "ast-i2c",
 	.id = 3,
 	.dev = {
@@ -156,7 +156,7 @@ static struct resource ast_i2c_dev4_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev4_device = {
+static struct platform_device ast_i2c_dev4_device = {
 	.name = "ast-i2c",
 	.id = 4,
 	.dev = {
@@ -183,7 +183,7 @@ static struct resource ast_i2c_dev5_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev5_device = {
+static struct platform_device ast_i2c_dev5_device = {
 	.name = "ast-i2c",
 	.id = 5,
 	.dev = {
@@ -210,7 +210,7 @@ static struct resource ast_i2c_dev6_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev6_device = {
+static struct platform_device ast_i2c_dev6_device = {
 	.name = "ast-i2c",
 	.id = 6,
 	.dev = {
@@ -237,7 +237,7 @@ static struct resource ast_i2c_dev7_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev7_device = {
+static struct platform_device ast_i2c_dev7_device = {
 	.name = "ast-i2c",
 	.id = 7,
 	.dev = {
@@ -264,7 +264,7 @@ static struct resource ast_i2c_dev8_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev8_device = {
+static struct platform_device ast_i2c_dev8_device = {
 	.name = "ast-i2c",
 	.id = 8,
 	.dev = {
@@ -291,7 +291,7 @@ static struct resource ast_i2c_dev9_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev9_device = {
+static struct platform_device ast_i2c_dev9_device = {
 	.name = "ast-i2c",
 	.id = 9,
 	.dev = {
@@ -318,7 +318,7 @@ static struct resource ast_i2c_dev10_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev10_device = {
+static struct platform_device ast_i2c_dev10_device = {
 	.name = "ast-i2c",
 	.id = 10,
 	.dev = {
@@ -345,7 +345,7 @@ static struct resource ast_i2c_dev11_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev11_device = {
+static struct platform_device ast_i2c_dev11_device = {
 	.name = "ast-i2c",
 	.id = 11,
 	.dev = {
@@ -372,7 +372,7 @@ static struct resource ast_i2c_dev12_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev12_device = {
+static struct platform_device ast_i2c_dev12_device = {
 	.name = "ast-i2c",
 	.id = 12,
 	.dev = {
@@ -399,7 +399,7 @@ static struct resource ast_i2c_dev13_resources[] = {
 	},
 };
 
-struct platform_device ast_i2c_dev13_device = {
+static struct platform_device ast_i2c_dev13_device = {
 	.name = "ast-i2c",
 	.id = 13,
 	.dev = {
