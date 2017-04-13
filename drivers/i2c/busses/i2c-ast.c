@@ -412,9 +412,12 @@ static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev) {
     i2c_dev->cmd_err = 0;
 
     ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
-
+#if defined(CONFIG_YOSEMITE)
+    r = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout * HZ);
+#else
     r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
                                                   i2c_dev->adap.timeout * HZ);
+#endif
     if (i2c_dev->cmd_err && i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
       dev_err(
           i2c_dev->dev,
@@ -455,8 +458,11 @@ static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev) {
       i2c_dev->cmd_err = 0;
       ast_i2c_write(i2c_dev, AST_I2CD_BUS_RECOVER_CMD_EN, I2C_CMD_REG);
 
-      r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
-                                                    i2c_dev->adap.timeout * HZ);
+#if defined(CONFIG_YOSEMITE)
+      r = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout * HZ);
+#else
+      r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout * HZ);
+#endif
       if (i2c_dev->cmd_err != 0 &&
           i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
         dev_err(i2c_dev->dev, "I2C(%d) bus hang! Slave dead: Recovery failed "
@@ -1777,10 +1783,12 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 		i2c_dev->do_master_xfer(i2c_dev);
 
 		spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
-
-		ret = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
-													   i2c_dev->adap.timeout*HZ);
-
+#if defined(CONFIG_YOSEMITE)
+		ret = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout*HZ);
+#else
+    ret = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
+                                                                    i2c_dev->adap.timeout*HZ);
+#endif
 		spin_lock_irqsave(&i2c_dev->master_lock, flags);
 		i2c_dev->master_msgs = NULL;
 
