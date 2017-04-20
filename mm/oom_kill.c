@@ -750,6 +750,8 @@ static void __out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 		oom_kill_process(current, gfp_mask, order, 0, totalpages, NULL,
 				 nodemask,
 				 "Out of memory (oom_kill_allocating_task)");
+		printk(KERN_CRIT "Out of memory (oom_kill_allocating_task): Kill process %d (%s) score %d or sacrifice child\n",
+			 task_pid_nr(current), current->comm, 0);
 		goto out;
 	}
 
@@ -764,6 +766,8 @@ static void __out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 				 nodemask, "Out of memory");
 		killed = 1;
 	}
+	printk(KERN_CRIT "Out of memory: Kill process %d (%s) score %d or sacrifice child\n",
+			 task_pid_nr(p), p->comm, points);
 out:
 	/*
 	 * Give the killed threads a good chance of exiting before trying to

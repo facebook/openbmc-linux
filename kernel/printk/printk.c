@@ -3044,6 +3044,12 @@ void dump_stack_print_info(const char *log_lvl)
 		       log_lvl, dump_stack_arch_desc_str);
 
 	print_worker_info(log_lvl, current);
+
+	printk(KERN_CRIT "BMC call trace: CPU: %d PID: %d Comm: %.20s %s %s %.*s. Hardware name: %s\n",
+	       raw_smp_processor_id(), current->pid, current->comm,
+	       print_tainted(), init_utsname()->release,
+	       (int)strcspn(init_utsname()->version, " "),
+	       init_utsname()->version, dump_stack_arch_desc_str);
 }
 
 /**
