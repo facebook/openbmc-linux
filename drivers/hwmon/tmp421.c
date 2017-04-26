@@ -103,21 +103,38 @@ static struct tmp421_data *tmp421_update_device(struct device *dev)
 	struct tmp421_data *data = dev_get_drvdata(dev);
 	struct i2c_client *client = data->client;
 	int i;
+	s32 ret;
+	char err;
 
 	mutex_lock(&data->update_lock);
 
 	if (time_after(jiffies, data->last_updated + 2 * HZ) || !data->valid) {
-		data->config = i2c_smbus_read_byte_data(client,
-			TMP421_CONFIG_REG_1);
+		err = 0;
+
+		if ((ret = i2c_smbus_read_byte_data(client,
+			TMP421_CONFIG_REG_1)) < 0) {
+		  err = 1;
+		} else {
+		  data->config = ret;
+		}
 
 		for (i = 0; i < data->channels; i++) {
-			data->temp[i] = i2c_smbus_read_byte_data(client,
-				TMP421_TEMP_MSB[i]) << 8;
-			data->temp[i] |= i2c_smbus_read_byte_data(client,
-				TMP421_TEMP_LSB[i]);
+			if ((ret = i2c_smbus_read_byte_data(client,
+				TMP421_TEMP_MSB[i])) < 0) {
+				err = 1;
+				continue;
+			}
+			data->temp[i] = ret << 8;
+
+			if ((ret = i2c_smbus_read_byte_data(client,
+				TMP421_TEMP_LSB[i])) < 0) {
+				err = 1;
+				continue;
+			}
+			data->temp[i] |= ret;
 		}
 		data->last_updated = jiffies;
-		data->valid = 1;
+		data->valid = !err;
 	}
 
 	mutex_unlock(&data->update_lock);
