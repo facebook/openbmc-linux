@@ -133,8 +133,14 @@ static struct tmp421_data *tmp421_update_device(struct device *dev)
 			}
 			data->temp[i] |= ret;
 		}
-		data->last_updated = jiffies;
-		data->valid = !err;
+		// If error occrred set the data as invalid
+		// Update the last_updated if no error
+		if (err) {
+			data->valid = 0;
+		} else {
+			data->last_updated = jiffies;
+			data->valid = 1;
+		}
 	}
 
 	mutex_unlock(&data->update_lock);
@@ -148,6 +154,9 @@ static ssize_t show_temp_value(struct device *dev,
 	int index = to_sensor_dev_attr(devattr)->index;
 	struct tmp421_data *data = tmp421_update_device(dev);
 	int temp;
+
+	if (!data->valid)
+	  return sprintf(buf, "Not available\n");
 
 	mutex_lock(&data->update_lock);
 	if (data->config & TMP421_CONFIG_RANGE)
@@ -169,7 +178,7 @@ static ssize_t show_fault(struct device *dev,
 	 * The OPEN bit signals a fault. This is bit 0 of the temperature
 	 * register (low byte).
 	 */
-	if (data->temp[index] & 0x01)
+	if (data->temp[index] & 0x01 || !data->valid)
 		return sprintf(buf, "1\n");
 	else
 		return sprintf(buf, "0\n");
