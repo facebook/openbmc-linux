@@ -114,6 +114,8 @@ struct uart_8250_port {
 	unsigned char		lsr_saved_flags;
 #define MSR_SAVE_FLAGS UART_MSR_ANY_DELTA
 	unsigned char		msr_saved_flags;
+	unsigned int        rs485_tx_in_progress;
+	unsigned int        rs485_sw_hack;
 
 	struct uart_8250_dma	*dma;
 	const struct uart_8250_ops *ops;

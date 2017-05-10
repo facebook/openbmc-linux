@@ -484,6 +484,8 @@ static void io_serial_out(struct uart_port *p, int offset, int value)
 
 static int serial8250_default_handle_irq(struct uart_port *port);
 static int exar_handle_irq(struct uart_port *port);
+static void serial8250_rs485_set_rts(struct uart_8250_port* port);
+static void wait_for_xmitr(struct uart_8250_port *up, int bits);
 
 static void set_io_from_upio(struct uart_port *p)
 {
@@ -1360,6 +1362,11 @@ static void autoconfig_irq(struct uart_8250_port *up)
 
 static inline void __stop_tx(struct uart_8250_port *p)
 {
+	if (p->rs485_sw_hack && p->rs485_tx_in_progress) {
+		wait_for_xmitr(p, BOTH_EMPTY);
+		serial8250_rs485_set_rts(p);
+		p->rs485_tx_in_progress = 0;
+	}
 	if (p->ier & UART_IER_THRI) {
 		p->ier &= ~UART_IER_THRI;
 		serial_out(p, UART_IER, p->ier);
@@ -1394,6 +1401,11 @@ static void serial8250_start_tx(struct uart_port *port)
 		return;
 
 	if (!(up->ier & UART_IER_THRI)) {
+		if (up->rs485_sw_hack) {
+			up->rs485_tx_in_progress = 1;
+			serial8250_rs485_set_rts(up);
+		}
+
 		up->ier |= UART_IER_THRI;
 		serial_port_out(port, UART_IER, up->ier);
 
@@ -3169,6 +3181,10 @@ static void serial8250_init_port(struct uart_8250_port *up)
 	up->cur_iotype = 0xFF;
 }
 
+static int serial8250_config_rs485(
+		struct uart_port* port,
+		struct serial_rs485* rs485);
+
 static void serial8250_set_defaults(struct uart_8250_port *up)
 {
 	struct uart_port *port = &up->port;
@@ -3192,6 +3208,10 @@ static void serial8250_set_defaults(struct uart_8250_port *up)
 			up->dma->tx_dma = serial8250_tx_dma;
 		if (!up->dma->rx_dma)
 			up->dma->rx_dma = serial8250_rx_dma;
+	}
+
+	if(!port->rs485_config) {
+		port->rs485_config = serial8250_config_rs485;
 	}
 }
 
@@ -3817,6 +3837,38 @@ static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *
 	return NULL;
 }
 
+static int serial8250_config_rs485(
+	struct uart_port* port,
+	struct serial_rs485* rs485)
+{
+	struct uart_8250_port *up = up_to_u8250p(port);
+	port->rs485 = *rs485;
+	if (rs485->flags & SER_RS485_ENABLED) {
+		up->rs485_sw_hack = 1;
+	} else {
+		up->rs485_sw_hack = 0;
+	}
+	return 0;
+}
+
+static void serial8250_rs485_set_rts(struct uart_8250_port* port) {
+	unsigned char mcr = serial_port_in(&port->port, UART_MCR);
+	if (port->rs485_tx_in_progress) {
+		if (port->port.rs485.flags & SER_RS485_RTS_ON_SEND) {
+			mcr |= UART_MCR_RTS;
+		} else {
+			mcr &= ~UART_MCR_RTS;
+		}
+	} else {
+		if (port->port.rs485.flags & SER_RS485_RTS_ON_SEND) {
+			mcr &= ~UART_MCR_RTS;
+		} else {
+			mcr |= UART_MCR_RTS;
+		}
+	}
+	serial_port_out(&port->port, UART_MCR, mcr);
+}
+
 /**
  *	serial8250_register_8250_port - register a serial port
  *	@up: serial port template
@@ -3906,6 +3958,9 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 			uart->dl_read = up->dl_read;
 		if (up->dl_write)
 			uart->dl_write = up->dl_write;
+
+		uart->rs485_tx_in_progress = up->rs485_tx_in_progress;
+		uart->rs485_sw_hack = 0;
 
 		if (serial8250_isa_config != NULL)
 			serial8250_isa_config(0, &uart->port,
