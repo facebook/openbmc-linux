@@ -305,6 +305,7 @@ ssize_t ast_kcs_write(struct file *file, const char __user *buf, size_t count, l
 				return -EINVAL;
 			}
 		} else {
+			ast_kcs->KCSError = KCS_UNSPECIFIED_ERROR;
 			ast_kcs->KCSSendWait = 0;
 			/* Send the first byte */
 			ast_kcs->KCSSendPktIx = 0;
@@ -342,8 +343,10 @@ static void ast_ipmi_kcs_rx(struct ast_kcs_data *ast_kcs)
 			ast_kcs->pKCSRcvPkt[ast_kcs->KCSRcvPktIx] = read_kcs_data(ast_kcs);
 			KCS_DBG("rx data = [%x] \n", ast_kcs->pKCSRcvPkt[ast_kcs->KCSRcvPktIx]);
 			ast_kcs->KCSRcvPktIx++;
-			if(ast_kcs->KCSRcvPktIx > 272)
+			if(ast_kcs->KCSRcvPktIx > 272) {
 				printk("ERROR ---> TODO ... \n");
+				ast_kcs->KCSRcvPktIx--;
+			}
 			break;
 
 		case KCS_PHASE_WRITE_END :
@@ -413,8 +416,9 @@ static void ast_ipmi_kcs_rx(struct ast_kcs_data *ast_kcs)
 			/* Read the Dummy byte  */
 			read_kcs_data(ast_kcs);
 			/* Write the error code to Data out register */
-			printk("TODO ...... \n");
-			write_kcs_data(ast_kcs, KCS_ABORTED_BY_COMMAND);
+			write_kcs_data(ast_kcs, ast_kcs->KCSError);
+			/* Set to default error */
+			ast_kcs->KCSError = KCS_ABORTED_BY_COMMAND;
 
 			//SA Set OBF Byte
 
@@ -447,26 +451,35 @@ static void ast_ipmi_kcs_cmd_dat(struct ast_kcs_data *ast_kcs)
 {
 	u8 cmd;
 
-	if((ast_kcs->KCSPhase == KCS_PHASE_IDLE) || (ast_kcs->KCSPhase == KCS_PHASE_WRITE)) {
-		/* Set the status to WRITE_STATE */
-		write_kcs_status(ast_kcs, IPMI_KCS_WRITE_STATE);
-	} else if(ast_kcs->KCSPhase == KCS_PHASE_READ) {
-		//recovery
-		cmd = read_kcs_cmd(ast_kcs);
-//		printk("Err STAT %d, cmd %x \n", ast_kcs->KCSPhase, cmd);
-		write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
-		ast_kcs->KCSPktRdy = 0;
-		ast_kcs->KCSPhase = KCS_PHASE_IDLE;
-		write_kcs_status(ast_kcs, IPMI_KCS_IDLE_STATE);
-		return;
-	} else {
-		printk("Err STAT %x \n", ast_kcs->KCSPhase );
-		ast_kcs->KCSPktRdy = 0;
-		write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
-	}
+	/* Set the status to WRITE_STATE */
+	write_kcs_status(ast_kcs, IPMI_KCS_WRITE_STATE);
 
 	/* Read the command */
 	cmd = read_kcs_cmd(ast_kcs);
+
+	if (cmd == KCS_GET_STATUS_ABORT) {
+		/* Keep the status to WRITE_STATE */
+		/* Set the abort phase to be error1 */
+		ast_kcs->KCSPhase = KCS_PHASE_ERROR1;
+		ast_kcs->KCSPktRdy = 0;
+		ast_kcs->KCSSendWait = 0;
+		/* Send the dummy byte  */
+		write_kcs_data(ast_kcs, 0);
+		return;
+	}
+
+	if((ast_kcs->KCSPhase != KCS_PHASE_IDLE) && (ast_kcs->KCSPhase != KCS_PHASE_WRITE)) {
+		/* Set the error code if cmd when phase read, keep it if phase errors*/
+		if(ast_kcs->KCSPhase == KCS_PHASE_READ)
+			ast_kcs->KCSError = KCS_ILLEGAL_CONTROL_CODE;
+		ast_kcs->KCSPhase = KCS_PHASE_ERROR;
+		ast_kcs->KCSPktRdy = 0;
+		ast_kcs->KCSSendWait = 0;
+		write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
+//		printk("Err STAT %d, cmd %x \n", ast_kcs->KCSPhase, cmd);
+		return;
+	}
+
 	switch (cmd) {
 		case KCS_WRITE_START:
 			KCS_DBG("KCS_WRITE_START \n");
@@ -481,23 +494,15 @@ static void ast_ipmi_kcs_cmd_dat(struct ast_kcs_data *ast_kcs)
 			ast_kcs->KCSPhase = KCS_PHASE_WRITE_END;
 //			mod_timer(&ast_kcs->kcs_timer, jiffies + 5 * HZ);
 			break;
-	        case KCS_GET_STATUS_ABORT:
-			/* Set the error code */
-			KCS_DBG("KCS_GET_STATUS_ABORT TODO ...\n");
-//			ast_kcs->KCSError = KCS_ABORTED_BY_COMMAND;
-
-			/* Set the phase to write end */
-			/* Set the abort phase to be error1 */
-			ast_kcs->KCSPhase = KCS_PHASE_ERROR1;
-			/* Send the dummy byte  */
-			write_kcs_data(ast_kcs, 0);
-			break;
 		default:
 			KCS_DBG("undefine cmd %x \n", cmd);
 			/* Invalid command code - Set an error state */
-			write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
+			ast_kcs->KCSError = KCS_ILLEGAL_CONTROL_CODE;
 			/* Set the phase to error phase */
 			ast_kcs->KCSPhase = KCS_PHASE_ERROR;
+			ast_kcs->KCSPktRdy = 0;
+			ast_kcs->KCSSendWait = 0;
+			write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
 			break;
 	}
 }
@@ -505,14 +510,10 @@ static void ast_ipmi_kcs_cmd_dat(struct ast_kcs_data *ast_kcs)
 static void ast_ipmi_kcs_handle(void *data)
 {
 	struct ast_kcs_data *ast_kcs = (struct ast_kcs_data *)data;
-	u32 str= read_kcs_status(ast_kcs) & (KCS_CMD_DAT | KCS_IBF | KCS_OBF);
+	u32 str= read_kcs_status(ast_kcs) & (KCS_CMD_DAT | KCS_IBF);
 	switch(str) {
 		case (KCS_CMD_DAT | KCS_IBF):
 			KCS_DBG("%d-LPC_STR_CMD_DAT | LPC_STR_IBF \n", ast_kcs->pdev->id);
-			ast_ipmi_kcs_cmd_dat(ast_kcs);
-			break;
-		case KCS_OBF:
-			KCS_DBG("%d-LPC_STR_OBF ~~~~TOTO \n", ast_kcs->pdev->id);
 			ast_ipmi_kcs_cmd_dat(ast_kcs);
 			break;
 		case KCS_IBF:
@@ -530,9 +531,11 @@ static void ast_kcs_timeout(unsigned long data)
 {
 	struct ast_kcs_data *ast_kcs = (struct ast_kcs_data *) data;
 	printk("kcs_timout \n");
-	write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
-	ast_kcs->KCSPktRdy = 0;
+	ast_kcs->KCSError = KCS_UNSPECIFIED_ERROR;
 	ast_kcs->KCSPhase = KCS_PHASE_ERROR;
+	ast_kcs->KCSPktRdy = 0;
+	ast_kcs->KCSSendWait = 0;
+	write_kcs_status(ast_kcs, IPMI_KCS_ERROR_STATE);
 
 }
 
@@ -549,6 +552,7 @@ static int ast_kcs_probe(struct platform_device *pdev)
 	ast_kcs->KCSPktRdy = 0;
 	ast_kcs->pKCSSendPkt = ast_kcs->pKCSRcvPkt + AST_IPMI_PKT_SIZE;
 	ast_kcs->KCSPhase = KCS_PHASE_IDLE;
+	ast_kcs->KCSError = KCS_ABORTED_BY_COMMAND;
 
 #if 0
 	init_timer(&(ast_kcs->kcs_timer));

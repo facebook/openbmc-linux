@@ -130,6 +130,7 @@ struct ast_kcs_data {
 
 	//-> phase state
 	enum kcs_states		KCSPhase;
+	u8  KCSError;
 	//RX
 	u32	KCSRcvPktIx;
 	u8	*pKCSRcvPkt;
