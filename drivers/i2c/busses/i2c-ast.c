@@ -1686,8 +1686,10 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 	}
 
 	if(AST_I2CD_INTR_STS_ABNORMAL & sts) {
-    // TODO: observed abnormal interrupt happening when the bus is stressed with traffic
-    dev_dbg(i2c_dev->dev, "abnormal interrupt happens with status: %x, slave mode: %d\n", sts, i2c_dev->slave_operation);
+    if (!(i2c_dev->func_ctrl_reg & AST_I2CD_SLAVE_EN)) {
+      // TODO: observed abnormal interrupt happening when the bus is stressed with traffic
+      dev_dbg(i2c_dev->dev, "abnormal interrupt happens with status: %x, slave mode: %d\n", sts, i2c_dev->slave_operation);
+    }
     // Need to clear the interrupt
     ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ABNORMAL, I2C_INTR_STS_REG);
 
@@ -2284,9 +2286,9 @@ static int ast_i2c_probe(struct platform_device *pdev)
  	/* Initialize the I2C adapter */
 	i2c_dev->adap.owner   = THIS_MODULE;
 //TODO
-	i2c_dev->adap.retries = 0;
+	// i2c_dev->adap.retries = 0;
 
-//	i2c_dev->adap.retries = 3;
+	i2c_dev->adap.retries = 3;
 
 	i2c_dev->adap.timeout = 5;
 
