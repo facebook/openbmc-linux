@@ -755,9 +755,6 @@ static struct i2c_board_info ast_i2c_board_info_3[] __initdata = {
 static struct i2c_board_info ast_i2c_board_info_4[] __initdata = {
   // Mezz C connector -> OCP MEZZ
   {
-		I2C_BOARD_INFO("tmp75", 0x1f),
-	},
-	{
 		I2C_BOARD_INFO("24c64", 0x51),
   },
 };
