@@ -1687,7 +1687,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 
 	if(AST_I2CD_INTR_STS_ABNORMAL & sts) {
     // TODO: observed abnormal interrupt happening when the bus is stressed with traffic
-    dev_err(i2c_dev->dev, "abnormal interrupt happens with status: %x, slave mode: %d\n", sts, i2c_dev->slave_operation);
+    dev_dbg(i2c_dev->dev, "abnormal interrupt happens with status: %x, slave mode: %d\n", sts, i2c_dev->slave_operation);
     // Need to clear the interrupt
     ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ABNORMAL, I2C_INTR_STS_REG);
 
