@@ -70,6 +70,7 @@ typedef unsigned char bool_T;
 #else
 #define WDT_BASE_VA		IO_ADDRESS((AST_WDT_BASE))
 #define WDT2_BASE_VA		IO_ADDRESS((AST_WDT_BASE + 20))
+#define SCU_BASE_VA		IO_ADDRESS((AST_SCU_BASE))
 #endif
 
 #define WDT_CntSts              (WDT_BASE_VA+0x00)
@@ -79,6 +80,7 @@ typedef unsigned char bool_T;
 #define WDT_TimeOut             (WDT_BASE_VA+0x10)
 #define WDT_Clr                 (WDT_BASE_VA+0x14)
 #define WDT_RstWd               (WDT_BASE_VA+0x18)
+#define SCU_EnableExtrst        (SCU_BASE_VA+0xA8)
 
 #define WDT2_CntSts             (WDT2_BASE_VA+0x00)
 #define WDT2_Reload             (WDT2_BASE_VA+0x04)
@@ -519,6 +521,7 @@ extern void ast_wdt_reset_soc(void)
 	unsigned int val;
 	val = WDT_CTRL_B_RESET_SOC|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE;
 #ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
+	AST_WRITE_REG(SCU_EnableExtrst, AST_READ_REG(SCU_EnableExtrst) | 0x4);
 	val |= WDT_CTRL_B_EXT;
 #endif
 	AST_WRITE_REG(WDT_Ctrl, val);
@@ -533,6 +536,7 @@ extern void ast_wdt_reset_full(void)
 	unsigned int val;
 	val = WDT_CTRL_B_RESET_FULL|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE;
 #ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
+	AST_WRITE_REG(SCU_EnableExtrst, AST_READ_REG(SCU_EnableExtrst) | 0x4);
 	val |= WDT_CTRL_B_EXT;
 #endif
 	AST_WRITE_REG(WDT_Ctrl, val);
