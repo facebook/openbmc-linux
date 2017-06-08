@@ -232,7 +232,7 @@ void wdt_set_timeout_action(bool_T bResetOut, bool_T bIntrSys,
 		/* reset WDT_CTrl[6..5] = 01, full chip */
 		regVal &= ~WDT_CTRL_B_RESET_MASK;
     /* For Yosemite, need to do SoC level reset only */
-#if !defined(CONFIG_YOSEMITE) && !defined(CONFIG_FBTP)
+#if !defined(CONFIG_YOSEMITE) && !defined(CONFIG_FBTP) && !defined(CONFIG_FBY2)
 		regVal |= WDT_CTRL_B_RESET_FULL;
 #endif
 	}
