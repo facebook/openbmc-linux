@@ -44,6 +44,10 @@
 #define MAX_PKT_SIZE		1518
 #define RX_BUF_SIZE		PAGE_SIZE	/* must be smaller than 0x3fff */
 
+
+#define noNCSI_DEBUG   /* for debug printf messages */
+
+
 /******************************************************************************
  * private data
  *****************************************************************************/
@@ -224,7 +228,7 @@ ncsi_rx:
 		ftgmac100_rx_pointer_advance(lp);
 		return;
 	} else {
-#if 0
+#ifdef NCSI_DEBUG
 		printk("NCSI_RX: Skip len: %d, proto: %x:%x\n",
 				length, tbuf[12], tbuf[13]);
 #endif
@@ -263,7 +267,7 @@ void DeSelect_Package(struct net_device *dev, int Package_ID)
 		(lp->NCSI_Respond.Command != (DESELECT_PACKAGE | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-#if 0
+#ifdef NCSI_DEBUG
 			printk("Retry: Command = %x, Response_Code = %x\n",
 				lp->NCSI_Request.Command,
 				lp->NCSI_Respond.Response_Code);
@@ -296,7 +300,7 @@ int Select_Package(struct net_device *dev, int Package_ID)
 		(lp->NCSI_Respond.Command != (SELECT_PACKAGE | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-#if 0
+#ifdef NCSI_DEBUG
 			printk("Retry: Command = %x, Response_Code = %x\n",
 				lp->NCSI_Request.Command,
 				lp->NCSI_Respond.Response_Code);
@@ -345,7 +349,7 @@ void DeSelect_Active_Package(struct net_device *dev)
 		(lp->NCSI_Respond.Command != (DESELECT_PACKAGE | 0x80))
 		|| (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED))
 		&& (lp->Retry != RETRY_COUNT)) {
-#if 0
+#ifdef NCSI_DEBUG
 			printk("Retry: Command = %x, Response_Code = %x\n",
 				lp->NCSI_Request.Command,
 				lp->NCSI_Respond.Response_Code);
@@ -390,7 +394,7 @@ int Select_Active_Package(struct net_device *dev)
 		(lp->NCSI_Respond.Command != (SELECT_PACKAGE | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-#if 0
+#ifdef NCSI_DEBUG
 			printk("Retry: Command = %x, Response_Code = %x\n",
 					lp->NCSI_Request.Command,
 					lp->NCSI_Respond.Response_Code);
@@ -418,38 +422,40 @@ int Clear_Initial_State(struct net_device *dev, int Channel_ID)
   unsigned long Combined_Channel_ID, Found = 0;
   struct sk_buff * skb;
 
-    do {
-  skb = dev_alloc_skb (TX_BUF_SIZE + 16);
-  memset(skb->data, 0, TX_BUF_SIZE + 16);
+  do {
+    skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+    memset(skb->data, 0, TX_BUF_SIZE + 16);
 //TX
-  lp->InstanceID++;
-  lp->NCSI_Request.IID = lp->InstanceID;
-  lp->NCSI_Request.Command = CLEAR_INITIAL_STATE;
-  Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + Channel_ID; //Internal Channel ID = 0
-  lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
-  lp->NCSI_Request.Payload_Length = 0;
-  memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
-  copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
-  skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
-  ftgmac100_wait_to_send_packet (skb, dev);
+    lp->InstanceID++;
+    lp->NCSI_Request.IID = lp->InstanceID;
+    lp->NCSI_Request.Command = CLEAR_INITIAL_STATE;
+    Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + Channel_ID; //Internal Channel ID = 0
+    lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+    lp->NCSI_Request.Payload_Length = 0;
+    memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+    copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+    skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+    ftgmac100_wait_to_send_packet (skb, dev);
 
 //RX
-  NCSI_Rx(dev);
-  if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (CLEAR_INITIAL_STATE | 0x80)) || (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) && (lp->Retry != RETRY_COUNT)) {
-    //printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-    //printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
-    lp->Retry++;
-    lp->InstanceID--;
-    Found = 0;
-  }
-  else {
-    lp->Retry = 0;
-    Found = 1;
-  }
-    } while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
-    lp->Retry = 0;
+    NCSI_Rx(dev);
+    if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (CLEAR_INITIAL_STATE | 0x80)) || (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) && (lp->Retry != RETRY_COUNT)) {
+#ifdef NCSI_DEBUG
+      printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+      printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
+      lp->Retry++;
+      lp->InstanceID--;
+      Found = 0;
+    }
+    else {
+      lp->Retry = 0;
+      Found = 1;
+    }
+  } while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+  lp->Retry = 0;
 
-    return Found;
+  return Found;
 }
 
 void Get_Version_ID (struct net_device * dev)
@@ -481,9 +487,9 @@ void Get_Version_ID (struct net_device * dev)
 			(lp->NCSI_Respond.Command != (GET_VERSION_ID | 0x80)) ||
 			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 			(lp->Retry != RETRY_COUNT)) {
-#if 0
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+      printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+      printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
 #endif
 			lp->Retry++;
 			lp->InstanceID--;
@@ -529,8 +535,10 @@ void Get_Capabilities (struct net_device * dev)
 		(lp->NCSI_Respond.Command != (GET_CAPABILITIES | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -576,8 +584,10 @@ void Enable_AEN (struct net_device * dev)
 			(lp->NCSI_Respond.Command != (AEN_ENABLE | 0x80)) ||
 			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 			(lp->Retry != RETRY_COUNT)) {
-		  //printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-		  //printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+		  printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+		  printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;    lp->InstanceID--;
 		}
 		else {
@@ -626,8 +636,10 @@ void Get_MAC_Address_mlx(struct net_device * dev)
 			(lp->NCSI_Respond.Command != (0x50 | 0x80)) ||
 			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 			(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -655,47 +667,49 @@ void Get_MAC_Address_bcm(struct net_device * dev)
   unsigned long Combined_Channel_ID, i;
   struct sk_buff * skb;
 
-    do {
-  skb = dev_alloc_skb (TX_BUF_SIZE + 16);
-  memset(skb->data, 0, TX_BUF_SIZE + 16);
+  do {
+    skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+    memset(skb->data, 0, TX_BUF_SIZE + 16);
 //TX
-  lp->InstanceID++;
-  lp->NCSI_Request.IID = lp->InstanceID;
-  lp->NCSI_Request.Command = 0x50;
-  Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
-  lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
-  lp->NCSI_Request.Payload_Length = (12 << 8);
-  memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
-  lp->NCSI_Request.Payload_Length = 12;
-  lp->Payload_Data[0] = 0x00;
-  lp->Payload_Data[1] = 0x00;
-  lp->Payload_Data[2] = 0x11;
-  lp->Payload_Data[3] = 0x3D;
+    lp->InstanceID++;
+    lp->NCSI_Request.IID = lp->InstanceID;
+    lp->NCSI_Request.Command = 0x50;
+    Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+    lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+    lp->NCSI_Request.Payload_Length = (12 << 8);
+    memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+    lp->NCSI_Request.Payload_Length = 12;
+    lp->Payload_Data[0] = 0x00;
+    lp->Payload_Data[1] = 0x00;
+    lp->Payload_Data[2] = 0x11;
+    lp->Payload_Data[3] = 0x3D;
 
-  lp->Payload_Data[4] = 0x00;
-  lp->Payload_Data[5] = 0x01;
-  lp->Payload_Data[6] = 0x00;
-  lp->Payload_Data[7] = 0x00;
+    lp->Payload_Data[4] = 0x00;
+    lp->Payload_Data[5] = 0x01;
+    lp->Payload_Data[6] = 0x00;
+    lp->Payload_Data[7] = 0x00;
 
-  //copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
-  memcpy ((unsigned char *)(skb->data + 30), &lp->Payload_Data, lp->NCSI_Request.Payload_Length);
-  //skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
-  skb->len =  30 + lp->NCSI_Request.Payload_Length;
-  ftgmac100_wait_to_send_packet (skb, dev);
+    //copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+    memcpy ((unsigned char *)(skb->data + 30), &lp->Payload_Data, lp->NCSI_Request.Payload_Length);
+    //skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+    skb->len =  30 + lp->NCSI_Request.Payload_Length;
+    ftgmac100_wait_to_send_packet (skb, dev);
 
 //RX
-  NCSI_Rx(dev);
-  if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (0x50 | 0x80)) || (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) && (lp->Retry != RETRY_COUNT)) {
-    //printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-    //printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
-    lp->Retry++;
-    lp->InstanceID--;
-  }
-  else {
-    lp->Retry = 0;
-  }
-    } while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
-    lp->Retry = 0;
+    NCSI_Rx(dev);
+    if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (0x50 | 0x80)) || (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) && (lp->Retry != RETRY_COUNT)) {
+#ifdef NCSI_DEBUG
+      printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+      printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
+      lp->Retry++;
+      lp->InstanceID--;
+    }
+    else {
+      lp->Retry = 0;
+    }
+  } while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+  lp->Retry = 0;
 
   // Update MAC Address
   printk("NCSI: MAC  ");
@@ -759,8 +773,10 @@ void Set_MAC_Affinity_mlx(struct net_device *dev)
 			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 			(lp->Retry != RETRY_COUNT)) {
 
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -807,8 +823,10 @@ void Enable_Set_MAC_Address (struct net_device * dev)
 		(lp->NCSI_Respond.Command != (SET_MAC_ADDRESS | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -850,8 +868,10 @@ void Enable_Broadcast_Filter (struct net_device * dev)
 		(lp->NCSI_Respond.Command != (ENABLE_BROADCAST_FILTERING | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -890,8 +910,10 @@ void Disable_Multicast_Filter (struct net_device *dev)
 		(lp->NCSI_Respond.Command != (DISABLE_GLOBAL_MULTICAST_FILTERING | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) && (lp->Retry != RETRY_COUNT)) {
 
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+      printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+      printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;    lp->InstanceID--;
 		}
 		else {
@@ -928,8 +950,10 @@ void Disable_VLAN (struct net_device * dev)
 		(lp->NCSI_Respond.Command != (DISABLE_VLAN | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;    lp->InstanceID--;
 		}
 		else {
@@ -967,17 +991,17 @@ void Get_Parameters (struct net_device * dev)
 		(lp->NCSI_Respond.Command != (GET_PARAMETERS | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-#if 0
-			printk ("Retry: Command = %x, Response_Code = %x,
-				Resonpd.Command = %x, IID = %x,
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x, \
+				Resonpd.Command = %x, IID = %x, \
 				lp->InstanceID = %x\n",
 				lp->NCSI_Request.Command,
 				lp->NCSI_Respond.Response_Code,
 				lp->NCSI_Respond.Command, lp->NCSI_Respond.IID,
 				lp->InstanceID);
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
 #endif
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -1021,8 +1045,10 @@ void Enable_Network_TX (struct net_device * dev)
 		(lp->NCSI_Respond.Command != (ENABLE_CHANNEL_NETWORK_TX | 0x80))
 		|(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -1062,8 +1088,10 @@ void Disable_Network_TX (struct net_device * dev)
 		(lp->NCSI_Respond.Command != (DISABLE_CHANNEL_NETWORK_TX | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		} else {
@@ -1101,8 +1129,10 @@ void Enable_Channel (struct net_device *dev)
 		(lp->NCSI_Respond.Command != (ENABLE_CHANNEL | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -1146,8 +1176,10 @@ void Disable_Channel (struct net_device *dev)
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
 
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -1186,8 +1218,10 @@ int Get_Link_Status (struct net_device *dev)
 		(lp->NCSI_Respond.Command != (GET_LINK_STATUS | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -1237,8 +1271,10 @@ void Set_Link (struct net_device *dev)
 		(lp->NCSI_Respond.Command != (SET_LINK | 0x80)) ||
 		(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 		(lp->Retry != RETRY_COUNT)) {
-			//printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
-			//printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
 			lp->Retry++;
 			lp->InstanceID--;
 		}
@@ -1289,7 +1325,7 @@ void ncsi_start(struct net_device *dev) {
         //TODO: This is an issue in  Get_Version_ID that always returns
         //mezz_type to be -1, so it only calls Get_MAC_Address_bcm.
         //It may need to work with Mlx to find a solution.
-#if defined(CONFIG_FBY2)
+#if defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)
         Get_MAC_Address_mlx(dev);
         Set_MAC_Affinity_mlx(dev);
         Clear_Initial_State(dev, i);
@@ -2397,7 +2433,7 @@ static int ftgmac100_open(struct net_device *netdev)
 	ftgmac100_start_hw(priv, 100);
 #elif defined(CONFIG_FBTTN)
 	ftgmac100_start_hw(priv, 100);
-#elif defined(CONFIG_FBY2)
+#elif defined(CONFIG_FBY2)  || defined(CONFIG_YOSEMITE)
   ftgmac100_start_hw(priv, 100);
 #else
 	ftgmac100_start_hw(priv, 10);

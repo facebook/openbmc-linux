@@ -42,7 +42,7 @@
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || \
 	defined(CONFIG_CMM) || defined(CONFIG_FBTP) || \
-	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2)
+	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)
 #define DRVNAME "ftgmac100"
 #else
 #define DRVNAME "ast_gmac"
@@ -224,4 +224,3 @@ void __init ast_add_device_gmac(void)
 #else
 void __init ast_add_device_gmac(void) {}
 #endif
-
