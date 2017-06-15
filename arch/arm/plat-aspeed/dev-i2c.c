@@ -822,7 +822,94 @@ static struct i2c_board_info ast_i2c_board_info_13[] __initdata = {
 
 };
 //end for FBTTN
-#elif defined(CONFIG_LIGHTNING) 
+#elif defined(CONFIG_YOSEMITE)
+
+//Under I2C Dev 0
+static struct i2c_board_info __initdata ast_i2c_board_info_0[] = {
+  // Slot#0 NIC sideband
+};
+
+//Under I2C Dev 1
+static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
+  // Slot#0 IPMB interface
+};
+
+//Under I2C Dev 2
+static struct i2c_board_info __initdata ast_i2c_board_info_2[] = {
+  // Slot#1 NIC sideband
+};
+
+
+//Under I2C Dev 3
+static struct i2c_board_info __initdata ast_i2c_board_info_3[] = {
+  // Slot#1 IPMB interface
+};
+
+//Under I2C Dev 4
+static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
+  // Slot#2 NIC sideband
+};
+
+//Under I2C Dev 5
+static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
+  // Slot#2 IPMB interface
+};
+
+//Under I2C Dev 6
+static struct i2c_board_info __initdata ast_i2c_board_info_6[] = {
+  // Slot#3 NIC sideband
+};
+
+//Under I2C Dev 7
+static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
+  // Slot#3 IPMB interface
+};
+
+//Under I2C Dev 8
+static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
+  // FRUID
+  {
+    I2C_BOARD_INFO("24c64", 0x51),
+  },
+};
+
+//Under I2C Dev 9
+static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
+  // Inlet and Outlet temp. sensors
+  {
+    I2C_BOARD_INFO("tmp75", 0x4e),
+  },
+  {
+    I2C_BOARD_INFO("tmp75", 0x4f),
+  },
+};
+
+//Under I2C Dev 10
+static struct i2c_board_info __initdata ast_i2c_board_info_10[] = {
+  // Hotswap Sensor
+  {
+    I2C_BOARD_INFO("adm1278", 0x40),
+  },
+};
+
+//Under I2C Dev 11
+static struct i2c_board_info __initdata ast_i2c_board_info_11[] = {
+  // Mezz Card LAN_SMB bus (PHY, Temp. Sensor)
+  {
+    //I2C_BOARD_INFO("tmp75", 0x1f),
+  },
+};
+
+//Under I2C Dev 12
+static struct i2c_board_info __initdata ast_i2c_board_info_12[] = {
+  // Mezz Card Mezz_SMB bus (FRUID, GPIO expander, QSFP+)
+  {
+    I2C_BOARD_INFO("24c64", 0x51),
+  },
+};
+
+/* end of CONFIG_YOSEMITE */
+#elif defined(CONFIG_LIGHTNING)
 //FBLTN start
 static struct i2c_board_info __initdata ast_i2c_board_info_0[] = {
 };
@@ -848,7 +935,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
 	{
 		I2C_BOARD_INFO("pcf8563", 0x51),
 	},
-  
+
 };
 
 //Under I2C Dev 5
@@ -1119,7 +1206,7 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev11_device);
 	platform_device_register(&ast_i2c_dev12_device);
 	platform_device_register(&ast_i2c_dev13_device);
- 
+
 	i2c_register_board_info(0, ast_i2c_board_info_0,
 			ARRAY_SIZE(ast_i2c_board_info_0));
 	i2c_register_board_info(1, ast_i2c_board_info_1,
