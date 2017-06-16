@@ -119,13 +119,6 @@ typedef unsigned char bool_T;
 #define WDT_DUAL_BOOT_TIMO (WDT_INITIAL_TIMO - 5)
 #define WDT_TIMO2TICKS(t) (TICKS_PER_uSEC * 1000000 * (t))
 
-/* The external reset is enabled (TRUE) based on a board configuration. */
-#ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
-#define WDT_EXTRST 1
-#else
-#define WDT_EXTRST 0
-#endif
-
 static int heartbeat = WDT_TIMO;
 module_param(heartbeat, int, 0);
 MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds. (0<heartbeat<65536, default=" __MODULE_STRING(WDT_TIMO) ")");
@@ -522,6 +515,7 @@ extern void ast_wdt_reset_soc(void)
 	val = WDT_CTRL_B_RESET_SOC|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE;
 #ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
 	AST_WRITE_REG(SCU_EnableExtrst, AST_READ_REG(SCU_EnableExtrst) | 0x4);
+	AST_WRITE_REG(WDT_RstWd, 0xA50000FF);
 	val |= WDT_CTRL_B_EXT;
 #endif
 	AST_WRITE_REG(WDT_Ctrl, val);
@@ -537,6 +531,7 @@ extern void ast_wdt_reset_full(void)
 	val = WDT_CTRL_B_RESET_FULL|WDT_CTRL_B_CLEAR_AFTER|WDT_CTRL_B_ENABLE;
 #ifdef CONFIG_AST_WATCHDOG_TRIGGER_GPIO
 	AST_WRITE_REG(SCU_EnableExtrst, AST_READ_REG(SCU_EnableExtrst) | 0x4);
+	AST_WRITE_REG(WDT_RstWd, 0xA50000FF);
 	val |= WDT_CTRL_B_EXT;
 #endif
 	AST_WRITE_REG(WDT_Ctrl, val);
