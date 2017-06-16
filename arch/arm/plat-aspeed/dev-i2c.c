@@ -1180,6 +1180,61 @@ void __init ast_add_device_i2c(void)
 	i2c_register_board_info(13, ast_i2c_board_info_13,
 			ARRAY_SIZE(ast_i2c_board_info_13));
 }
+#elif defined(CONFIG_YOSEMITE)
+void __init ast_add_device_i2c(void)
+{
+	/* I2C Multi-Pin */
+	ast_scu_multi_func_i2c();
+
+	ast_i2c_data.reg_gr = ioremap(AST_I2C_BASE, 4*SZ_16);
+	if (!ast_i2c_data.reg_gr) {
+		printk(KERN_ERR "ast_add_device_i2c ERROR \n");
+		return;
+	}
+
+	platform_device_register(&ast_i2c_dev0_device);
+	platform_device_register(&ast_i2c_dev1_device);
+	platform_device_register(&ast_i2c_dev2_device);
+	platform_device_register(&ast_i2c_dev3_device);
+	platform_device_register(&ast_i2c_dev4_device);
+	platform_device_register(&ast_i2c_dev5_device);
+	platform_device_register(&ast_i2c_dev6_device);
+	platform_device_register(&ast_i2c_dev7_device);
+	platform_device_register(&ast_i2c_dev8_device);
+	platform_device_register(&ast_i2c_dev9_device);
+	platform_device_register(&ast_i2c_dev10_device);
+	platform_device_register(&ast_i2c_dev11_device);
+	platform_device_register(&ast_i2c_dev12_device);
+	platform_device_register(&ast_i2c_dev13_device);
+
+	i2c_register_board_info(0, ast_i2c_board_info_0,
+			ARRAY_SIZE(ast_i2c_board_info_0));
+	i2c_register_board_info(1, ast_i2c_board_info_1,
+			ARRAY_SIZE(ast_i2c_board_info_1));
+	i2c_register_board_info(2, ast_i2c_board_info_2,
+			ARRAY_SIZE(ast_i2c_board_info_2));
+	i2c_register_board_info(3, ast_i2c_board_info_3,
+			ARRAY_SIZE(ast_i2c_board_info_3));
+	i2c_register_board_info(4, ast_i2c_board_info_4,
+			ARRAY_SIZE(ast_i2c_board_info_4));
+	i2c_register_board_info(5, ast_i2c_board_info_5,
+			ARRAY_SIZE(ast_i2c_board_info_5));
+	i2c_register_board_info(6, ast_i2c_board_info_6,
+			ARRAY_SIZE(ast_i2c_board_info_6));
+	i2c_register_board_info(7, ast_i2c_board_info_7,
+			ARRAY_SIZE(ast_i2c_board_info_7));
+	i2c_register_board_info(8, ast_i2c_board_info_8,
+			ARRAY_SIZE(ast_i2c_board_info_8));
+	i2c_register_board_info(9, ast_i2c_board_info_9,
+			ARRAY_SIZE(ast_i2c_board_info_9));
+	i2c_register_board_info(10, ast_i2c_board_info_10,
+			ARRAY_SIZE(ast_i2c_board_info_10));
+	i2c_register_board_info(11, ast_i2c_board_info_11,
+			ARRAY_SIZE(ast_i2c_board_info_11));
+	i2c_register_board_info(12, ast_i2c_board_info_12,
+			ARRAY_SIZE(ast_i2c_board_info_12));
+}
+
 #elif defined(CONFIG_LIGHTNING)
 void __init ast_add_device_i2c(void)
 {
