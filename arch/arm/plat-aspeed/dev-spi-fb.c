@@ -225,7 +225,11 @@ static struct mtd_partition ast_data_partitions[] = {
 
 static struct mtd_partition ast_spi_flash1_partitions[] = {
     {
+#if defined(CONFIG_FBTP)
         .name       = "bios0",
+#elif defined(CONFIG_LIGHTNING)
+        .name       = "flash1",
+#endif
         .offset     = 0,                  /* From 0 */
         .size       = MTDPART_SIZ_FULL,   /* full size */
     },
@@ -286,14 +290,20 @@ static struct spi_board_info ast_fmc_devices[] = {
 
 };
 
-#if defined(CONFIG_FBTP)
+#if defined(CONFIG_FBTP)  || defined(CONFIG_LIGHTNING)
 static struct spi_board_info ast_spi0_devices[] = {
     {
         .modalias           = "m25p80",
         .platform_data      = &ast_spi_flash1_data,
+#if defined(CONFIG_FBTP)
         .chip_select        = 0,
         .max_speed_hz       = 50 * 1000 * 1000,
         .bus_num            = 1,
+#elif defined(CONFIG_LIGHTNING)
+        .chip_select        = 1,
+        .max_speed_hz       = 50 * 1000 * 1000,
+        .bus_num            = 0,
+#endif
         .mode               = SPI_MODE_0,
     },
 };
@@ -303,7 +313,7 @@ void __init ast_add_device_spi(void)
 {
 	platform_device_register(&ast_fmc_device);
 	spi_register_board_info(ast_fmc_devices, ARRAY_SIZE(ast_fmc_devices));
-#if defined(CONFIG_FBTP)
+#if defined(CONFIG_FBTP) || defined(CONFIG_LIGHTNING)
 	platform_device_register(&ast_spi0_device);
 	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
 #endif
