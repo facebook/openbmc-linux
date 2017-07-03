@@ -33,6 +33,13 @@
 #include <linux/platform_device.h>
 #include <net/ip.h>
 
+#include <linux/fs.h>
+#include <linux/file.h>
+#include <linux/types.h>
+#include <linux/unistd.h>
+#include <linux/syscalls.h>
+#include <linux/stat.h>
+#include <asm/uaccess.h>
 #include "ftgmac100.h"
 
 #define DRV_NAME	"ftgmac100"
@@ -44,7 +51,7 @@
 #define MAX_PKT_SIZE		1518
 #define RX_BUF_SIZE		PAGE_SIZE	/* must be smaller than 0x3fff */
 
-
+#define NCSI_DATA_PAYLOAD 64 /* for getting the size of the nc-si control data packet */
 #define noNCSI_DEBUG   /* for debug printf messages */
 
 
@@ -458,6 +465,51 @@ int Clear_Initial_State(struct net_device *dev, int Channel_ID)
   return Found;
 }
 
+int store_nic_fw_ver(unsigned char *data, int len)
+{
+  struct file *filp = NULL;
+  char path[32]={0};
+  int ret = 0;
+  mm_segment_t fs;
+
+  fs = get_fs();
+  set_fs(KERNEL_DS);
+
+  sprintf(path, "/tmp/cache_store");  
+  ret = sys_mkdir(path, 0755);
+  if ( ret < 0 )
+  {
+    printk("[%s] cannot create the dir to store the nic f/w version\n", __func__);
+  }
+  else
+  {
+    strcat(path, "/nic_fw_ver"); 
+    filp = filp_open(path, O_RDWR|O_CREAT|O_TRUNC, 0666);
+    if ( NULL == filp )
+    {
+      printk("[%s]Cannot open the file to write the nic f/w version\n");
+    }
+  
+    if ( IS_ERR(filp) )
+    {
+      printk("[%s]Cannot use ERR filp pointer to write the file\n",__func__);  
+    }
+    else 
+    {
+      vfs_write(filp, (char *)data, sizeof(char)*len, &filp->f_pos);
+    }
+  }
+
+  set_fs( fs );
+
+  if ( NULL != filp )
+  {
+    filp_close(filp, NULL);
+  }
+  
+  return ret;
+}
+
 void Get_Version_ID (struct net_device * dev)
 {
 	struct ftgmac100 *lp = netdev_priv(dev);
@@ -499,6 +551,12 @@ void Get_Version_ID (struct net_device * dev)
 		}
 	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
 	lp->Retry = 0;
+ 
+        if ( store_nic_fw_ver(lp->NCSI_Respond.Payload_Data, NCSI_DATA_PAYLOAD) )
+        {
+          printk("[%s]Cannot store the nic fw file correctly\n", __func__);
+        }
+ 
   // Set mezz type based on IANA ID
   if (lp->NCSI_Respond.Payload_Data[32] == 0x00 && lp->NCSI_Respond.Payload_Data[33] == 0x00 &&
     lp->NCSI_Respond.Payload_Data[34] == 0x81 && lp->NCSI_Respond.Payload_Data[35] == 0x19) {
