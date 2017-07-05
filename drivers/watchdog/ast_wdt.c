@@ -518,6 +518,7 @@ extern void ast_wdt_reset_soc(void)
 	AST_WRITE_REG(WDT_RstWd, 0xA50000FF);
 	val |= WDT_CTRL_B_EXT;
 #endif
+        printk("%s(): Prepare to write WDT_Ctrl(WDT0C) with 0x%X\n", __func__, val);
 	AST_WRITE_REG(WDT_Ctrl, val);
 }
 EXPORT_SYMBOL(ast_wdt_reset_soc);
