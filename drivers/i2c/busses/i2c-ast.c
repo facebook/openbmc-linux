@@ -202,9 +202,12 @@ static void ast_slave_mode_enable(struct ast_i2c_dev *i2c_dev, struct i2c_msg *m
 {
 	if(msgs->buf[0] == 1) {
 		ast_i2c_write(i2c_dev, msgs->addr, I2C_DEV_ADDR_REG);
+		i2c_dev->func_ctrl_reg |= AST_I2CD_SLAVE_EN;
 		ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG) | AST_I2CD_SLAVE_EN, I2C_FUN_CTRL_REG);
-	} else
+	} else {
+		i2c_dev->func_ctrl_reg &= ~AST_I2CD_SLAVE_EN;
 		ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG) & ~AST_I2CD_SLAVE_EN, I2C_FUN_CTRL_REG);
+	}
 }
 
 #endif
@@ -283,14 +286,14 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 				AST_I2CD_TX_ACK_INTR_EN,
 				I2C_INTR_CTRL_REG);
 
-	//Enable I2C bus 12 SCL Low timeout to 21.2-31.6 ms for NIC Card Temp 
+	//Enable I2C bus 12 SCL Low timeout to 21.2-31.6 ms for NIC Card Temp
 	#ifdef CONFIG_FBTTN
 		if (i2c_dev->bus_id == 12) {
 			//Enable bus auto-release when SCL low, SDA low, or slave mode inactive timeout
 			ast_i2c_write(i2c_dev, (ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG) | (0x1 << 17)), I2C_FUN_CTRL_REG);
 			//Set Timeout base clock divisor to 0x10: Divided by 262144
 			ast_i2c_write(i2c_dev,
-						((ast_i2c_read(i2c_dev, I2C_AC_TIMING_REG1) | 
+						((ast_i2c_read(i2c_dev, I2C_AC_TIMING_REG1) |
 						(AST_I2CD_CLK_TO_BASE_DIV << 1)) &
 						~AST_I2CD_CLK_TO_BASE_DIV),
 						I2C_AC_TIMING_REG1);
