@@ -143,7 +143,7 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
 
 #ifdef CONFIG_FBY2
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
-    data = 0x77799300;
+    data = 0xFFF5E700;
     return data;
   } else if (i2c_dev->ast_i2c_data->bus_clk == 400000) {
     data = 0xFFF68302;
@@ -249,6 +249,7 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 		ast_i2c_write(i2c_dev, AST_NO_TIMEOUT_CTRL, I2C_AC_TIMING_REG2);
 	}
 #else
+#ifndef CONFIG_FBY2
 	if(i2c_dev->ast_i2c_data->bus_clk/1000 > 400) {
 		printk("high speed mode enable clk [%dkhz]\n",i2c_dev->ast_i2c_data->bus_clk/1000);
 		ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG) |
@@ -256,6 +257,7 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 							AST_I2CD_SDA_DRIVE_1T_EN
 							, I2C_FUN_CTRL_REG);
 	}
+#endif
 	/* target apeed is xxKhz*/
 	ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
 	ast_i2c_write(i2c_dev, AST_NO_TIMEOUT_CTRL, I2C_AC_TIMING_REG2);
