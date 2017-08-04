@@ -90,6 +90,23 @@ ast_gpio_write(struct ast_gpio_bank *ast_gpio , u32 val, u32 offset)
 
 /***************************************************************************************/
 static int
+ast_gpio_dir_get(struct gpio_chip *chip, unsigned offset)
+{
+	struct ast_gpio_bank *ast_gpio = container_of(chip, struct ast_gpio_bank, chip);
+	unsigned long flags;
+	u32 v;
+	int ret;
+
+	GPIODBUG("dir_get %s[%d] \n", chip->label, offset);
+
+	v = ast_gpio_read(ast_gpio, ast_gpio->dir_offset);
+	v &= (GPIO_OUTPUT_MODE << (offset + (ast_gpio->index * 8)));
+	ret = (v) ? 0 : 1;
+
+	return ret;
+}
+
+static int
 ast_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
 {
 	struct ast_gpio_bank *ast_gpio = container_of(chip, struct ast_gpio_bank, chip);
@@ -210,6 +227,7 @@ ast_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
 		.cmd_source_offset = cmd_s,					\
 		.chip = {                            							\
 	        .label                  = name,  							\
+	        .get_direction          = ast_gpio_dir_get,                 \
 	        .direction_input        = ast_gpio_direction_input,         \
 	        .direction_output       = ast_gpio_direction_output,        \
 	        .get            = ast_gpio_get,  \
