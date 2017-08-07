@@ -1377,17 +1377,20 @@ void ncsi_start(struct net_device *dev) {
 					priv->NCSI_Cap.Package_ID,
 					priv->NCSI_Cap.Channel_ID);
 				Clear_Initial_State(dev, i);
-        mdelay(500);
-				Get_Version_ID(dev);
-        mdelay(500);
         //TODO: This is an issue in  Get_Version_ID that always returns
         //mezz_type to be -1, so it only calls Get_MAC_Address_bcm.
         //It may need to work with Mlx to find a solution.
-#if defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)
+#if defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)      //For multi-host NIC initialization 
         Get_MAC_Address_mlx(dev);
         Set_MAC_Affinity_mlx(dev);
         Clear_Initial_State(dev, i);
-#else
+        mdelay(500);
+        Get_Version_ID(dev);
+        mdelay(500);
+#else                                             //For single host NIC initialization
+        mdelay(500);
+        Get_Version_ID(dev);
+        mdelay(500);
         if (priv->mezz_type == 0x01) {
           Get_MAC_Address_mlx(dev);
           Set_MAC_Affinity_mlx(dev);
