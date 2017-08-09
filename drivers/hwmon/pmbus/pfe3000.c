@@ -36,6 +36,7 @@
 enum chips { PFE3000_12_069RA };
 struct pfe3000_data {
 	int id;
+	int shutdown_state;
 	struct pmbus_driver_info info;
 };
 
@@ -46,12 +47,16 @@ struct pfe3000_data {
  * it is necessary for future debugging.
  */
 
-#define PFE3000_WAIT_TIME		5000	/* uS	*/
+#define PFE3000_WAIT_TIME       5000	/* uS	*/
+#define PFE3000_PAGE0           0
+#define PFE3000_OP_REG_ADDR     PMBUS_OPERATION
+#define PFE3000_OP_SHUTDOWN_CMD 0x0
+#define PFE3000_OP_POWERON_CMD  PB_OPERATION_CONTROL_ON
+#define PFE3000_OP_ARG_SHUTDOWN 1
 
 static ushort delay = PFE3000_WAIT_TIME;
 module_param(delay, ushort, 0644);
 MODULE_PARM_DESC(delay, "Delay between chip accesses in uS");
-
 
 static const struct i2c_device_id pfe3000_id[] = {
 	{"pfe3000dc", PFE3000_12_069RA },
@@ -166,14 +171,147 @@ static int pfe3000_write_byte(struct i2c_client *client, int page, u8 value)
 	}
 }
 
+static int pfe3000_write_byte_data(struct i2c_client *client, int page,
+																		int reg, u8 value)
+{
+	const struct pmbus_driver_info *info = pmbus_get_driver_info(client);
+	struct pfe3000_data *data = to_pfe3000_data(info);
+	int ret;
+
+	if (data->id != PFE3000_12_069RA && page > 0)
+		return -ENXIO;
+
+	switch (value) {
+		case PMBUS_PAGE:
+		case PMBUS_OPERATION:
+		case PMBUS_CLEAR_FAULTS:
+			ret = pmbus_write_byte_data(client, page, reg, value);
+			return ret;
+		default:
+			return -ENXIO;
+	}
+}
+
+
 static struct pmbus_platform_data platform_data = {
 	.flags = PMBUS_SKIP_STATUS_CHECK
 };
 
+static ssize_t pfe3000_shutdown_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	const struct pmbus_driver_info *info = pmbus_get_driver_info(client);
+	struct pfe3000_data *data = to_pfe3000_data(info);
+	int len = 0;
+	u8 read_val = 0;
+
+	// Update shutdown state before printing out
+	read_val = pfe3000_read_byte_data(client, PFE3000_PAGE0,
+														        PFE3000_OP_REG_ADDR);
+	// Only if the read was successful, update the status
+	if (read_val >= 0)
+	{
+		if (read_val == PFE3000_OP_SHUTDOWN_CMD)
+			data->shutdown_state = 1;
+		else
+			data->shutdown_state = 0;
+
+	}
+
+  len = sprintf(buf, "%d\n\nSet to 1 for shutdown PFE3000 PSU\n",
+		              data->shutdown_state);
+  return len;
+}
+
+static int pfe3000_shutdown_store(struct device *dev,
+        struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	const struct pmbus_driver_info *info = pmbus_get_driver_info(client);
+	struct pfe3000_data *data = to_pfe3000_data(info);
+
+	u8 write_value = 0;
+	long shutdown = 0;
+	int rc = 0;
+
+	if (buf == NULL) {
+		return -ENXIO;
+	}
+
+	rc = kstrtol(buf, 10, &shutdown);
+	if (rc != 0)	{
+		// Parsing was not successful. But will return as "count" bytes processed
+		// without doing anything, in order to give the control back to
+		// the caller / shell
+		return count;
+	}
+
+	// We will shutdown PFE3000 only if the user input is exactly "1"
+	if (shutdown == (long)PFE3000_OP_ARG_SHUTDOWN) {
+		write_value = PFE3000_OP_SHUTDOWN_CMD;
+	} else {
+		write_value = PFE3000_OP_POWERON_CMD;
+	}
+
+	rc = pfe3000_write_byte_data(client, PFE3000_PAGE0,
+																 PFE3000_OP_REG_ADDR, write_value);
+
+  // Write successful. Update driver state
+	if (rc == 0) {
+		if (write_value == PFE3000_OP_SHUTDOWN_CMD)
+			data->shutdown_state = 1;
+		else
+			data->shutdown_state = 0;
+	}
+
+	// No matter successful or failure, we processed all input characters
+	// So, return the number of input chars processed to finish the sysfs
+	// access.
+	return count;
+}
+
+static DEVICE_ATTR(shutdown, S_IRUGO | S_IWUSR,
+									 pfe3000_shutdown_show,
+                   pfe3000_shutdown_store);
+
+static struct attribute *shutdown_attrs[] = {
+									     &dev_attr_shutdown.attr,
+									     NULL
+									 };
+static struct attribute_group control_attr_group = {
+									     .name = "control",
+									     .attrs = shutdown_attrs,
+									 };
+
+static int pfe3000_register_shutdown(struct i2c_client *client,
+			const struct i2c_device_id *id)
+{
+  return sysfs_create_group(&client->dev.kobj,
+												 		&control_attr_group);
+}
+
+static void pfe3000_remove_shutdown(struct i2c_client *client)
+{
+	sysfs_remove_group(&client->dev.kobj,
+										 &control_attr_group);
+	return;
+}
+
+static int pfe3000_remove(struct i2c_client *client)
+{
+	// First, remove sysfs stub for shutdown control
+	pfe3000_remove_shutdown(client);
+	// Finally, remove what pmbus_core has added
+	return pmbus_do_remove(client);
+}
+
 static int pfe3000_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
-	int ret;
+	int ret = 0;
+	int pmbus_ret;
+	int addon_ret;
 	int kind;
 	struct device *dev = &client->dev;
 	struct pfe3000_data *data;
@@ -212,6 +350,7 @@ static int pfe3000_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	data->id = kind;
+	data->shutdown_state = 0;
 
 	info = &data->info;
 	info->pages = 2;
@@ -272,7 +411,28 @@ static int pfe3000_probe(struct i2c_client *client,
 	info->write_word_data = pfe3000_write_word_data;
 	info->write_byte = pfe3000_write_byte;
 
-	return pmbus_do_probe(client, id, info);
+	// Register the device through pmbus core routine
+	pmbus_ret = pmbus_do_probe(client, id, info);
+	// On top of this, install sysfs for shutdown control
+	addon_ret = pfe3000_register_shutdown(client, id);
+
+	if ((pmbus_ret == 0) && (addon_ret == 0)) {
+		ret = 0;
+	} else {
+		// Something went wrong.
+		if (pmbus_ret == 0)
+		{
+			// Rollback pmbus dev register before bail out
+			pmbus_do_remove(client);
+			// Return the errorcode of shutdown addon installation
+			ret = addon_ret;
+		} else {
+			// Return the errorcode of pmbus device registration
+			ret = pmbus_ret;
+		}
+	}
+
+	return ret;
 }
 
 static struct i2c_driver pfe3000_driver = {
@@ -280,7 +440,7 @@ static struct i2c_driver pfe3000_driver = {
 		   .name = "pfe3000",
 		   },
 	.probe = pfe3000_probe,
-	.remove = pmbus_do_remove,
+	.remove = pfe3000_remove,
 	.id_table = pfe3000_id,
 };
 
