@@ -401,11 +401,7 @@ void __init ast_add_device_uart(void)
          & ~(LPC_HICR9_SOURCE_UART1|LPC_HICR9_SOURCE_UART2
          |LPC_HICR9_SOURCE_UART3|LPC_HICR9_SOURCE_UART4),
          reg_base + AST_LPC_HICR9);
-
-  ast_scu_multi_func_uart(1);
-  ast_scu_multi_func_uart(2);
-  ast_scu_multi_func_uart(3);
-  ast_scu_multi_func_uart(4);
+  iounmap(reg_base);
 #elif defined(CONFIG_LIGHTNING)
 
 #else
