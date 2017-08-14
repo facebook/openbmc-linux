@@ -141,6 +141,14 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
   }
 #endif
 
+#ifdef CONFIG_YOSEMITE
+  if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
+    data = 0x77744302;
+    return data;
+  } 
+#endif
+
+
 #ifdef CONFIG_FBY2
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
     data = 0xFFF5E700;

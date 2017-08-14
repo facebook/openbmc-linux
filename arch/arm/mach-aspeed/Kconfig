@@ -210,6 +210,9 @@ config GALAXY100
         bool "Facebook GALAXY100 (Backpack) LC/FC"
 
 config YOSEMITE
+        select USB_ARCH_HAS_EHCI
+        select AST_UART_SDMA
+        select EGFX_IRQ
         bool "Facebook Yosemite"
 
 config FBPLATFORM1
