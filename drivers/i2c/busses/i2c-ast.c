@@ -240,6 +240,7 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 
 	/* Set AC Timing */
 #if defined(CONFIG_ARCH_AST2400)
+#ifndef CONFIG_YOSEMITE
 	if(i2c_dev->ast_i2c_data->bus_clk/1000 > 400) {
 		printk("high speed mode enable clk [%dkhz]\n",i2c_dev->ast_i2c_data->bus_clk/1000);
 		ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG) |
@@ -251,7 +252,9 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 		/* Set AC Timing */
 		ast_i2c_write(i2c_dev, 0x3, I2C_AC_TIMING_REG2);
 		ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
-	}else {
+	} else
+#endif
+	{
 		/* target apeed is xxKhz*/
 		ast_i2c_write(i2c_dev, select_i2c_clock(i2c_dev), I2C_AC_TIMING_REG1);
 		ast_i2c_write(i2c_dev, AST_NO_TIMEOUT_CTRL, I2C_AC_TIMING_REG2);

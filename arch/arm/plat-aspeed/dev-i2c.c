@@ -141,6 +141,18 @@ struct platform_device ast_i2c_dev1_device = {
 	.num_resources = ARRAY_SIZE(ast_i2c_dev1_resources),
 };
 
+struct platform_device ast_i2c_dev1_device_1M = {
+	.name = "ast-i2c",
+	.id = 1,
+	.dev = {
+		.dma_mask = &ast_i2c_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+		.platform_data = &ast_i2c_data_1M,
+	},
+	.resource = ast_i2c_dev1_resources,
+	.num_resources = ARRAY_SIZE(ast_i2c_dev1_resources),
+};
+
 static struct resource ast_i2c_dev2_resources[] = {
 	[0] = {
 		.start = AST_I2C_DEV2_BASE,
@@ -267,6 +279,18 @@ struct platform_device ast_i2c_dev5_device = {
 	.resource = ast_i2c_dev5_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev5_resources),
 };
+
+struct platform_device ast_i2c_dev5_device_1M = {
+	.name = "ast-i2c",
+	.id = 5,
+	.dev = {
+		.dma_mask = &ast_i2c_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+		.platform_data = &ast_i2c_data_1M,
+	},
+	.resource = ast_i2c_dev5_resources,
+	.num_resources = ARRAY_SIZE(ast_i2c_dev5_resources),
+};
 #endif
 
 #if defined(AST_I2C_DEV6_BASE)
@@ -317,6 +341,18 @@ struct platform_device ast_i2c_dev7_device = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
 		.platform_data = &ast_i2c_data,
+	},
+	.resource = ast_i2c_dev7_resources,
+	.num_resources = ARRAY_SIZE(ast_i2c_dev7_resources),
+};
+
+struct platform_device ast_i2c_dev7_device_1M = {
+	.name = "ast-i2c",
+	.id = 7,
+	.dev = {
+		.dma_mask = &ast_i2c_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+		.platform_data = &ast_i2c_data_1M,
 	},
 	.resource = ast_i2c_dev7_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev7_resources),
@@ -825,48 +861,48 @@ static struct i2c_board_info ast_i2c_board_info_13[] __initdata = {
 #elif defined(CONFIG_YOSEMITE)
 
 //Under I2C Dev 0
-static struct i2c_board_info __initdata ast_i2c_board_info_0[] = {
+static struct i2c_board_info ast_i2c_board_info_0[] __initdata = {
   // Slot#0 NIC sideband
 };
 
 //Under I2C Dev 1
-static struct i2c_board_info __initdata ast_i2c_board_info_1[] = {
+static struct i2c_board_info ast_i2c_board_info_1[] __initdata = {
   // Slot#0 IPMB interface
 };
 
 //Under I2C Dev 2
-static struct i2c_board_info __initdata ast_i2c_board_info_2[] = {
+static struct i2c_board_info ast_i2c_board_info_2[] __initdata = {
   // Slot#1 NIC sideband
 };
 
 
 //Under I2C Dev 3
-static struct i2c_board_info __initdata ast_i2c_board_info_3[] = {
+static struct i2c_board_info ast_i2c_board_info_3[] __initdata = {
   // Slot#1 IPMB interface
 };
 
 //Under I2C Dev 4
-static struct i2c_board_info __initdata ast_i2c_board_info_4[] = {
+static struct i2c_board_info ast_i2c_board_info_4[] __initdata = {
   // Slot#2 NIC sideband
 };
 
 //Under I2C Dev 5
-static struct i2c_board_info __initdata ast_i2c_board_info_5[] = {
+static struct i2c_board_info ast_i2c_board_info_5[] __initdata = {
   // Slot#2 IPMB interface
 };
 
 //Under I2C Dev 6
-static struct i2c_board_info __initdata ast_i2c_board_info_6[] = {
+static struct i2c_board_info ast_i2c_board_info_6[] __initdata = {
   // Slot#3 NIC sideband
 };
 
 //Under I2C Dev 7
-static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
+static struct i2c_board_info ast_i2c_board_info_7[] __initdata = {
   // Slot#3 IPMB interface
 };
 
 //Under I2C Dev 8
-static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
+static struct i2c_board_info ast_i2c_board_info_8[] __initdata = {
   // FRUID
   {
     I2C_BOARD_INFO("24c64", 0x51),
@@ -874,7 +910,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_8[] = {
 };
 
 //Under I2C Dev 9
-static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
+static struct i2c_board_info ast_i2c_board_info_9[] __initdata = {
   // Inlet and Outlet temp. sensors
   {
     I2C_BOARD_INFO("tmp75", 0x4e),
@@ -885,7 +921,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_9[] = {
 };
 
 //Under I2C Dev 10
-static struct i2c_board_info __initdata ast_i2c_board_info_10[] = {
+static struct i2c_board_info ast_i2c_board_info_10[] __initdata = {
   // Hotswap Sensor
   {
     I2C_BOARD_INFO("adm1278", 0x40),
@@ -893,7 +929,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_10[] = {
 };
 
 //Under I2C Dev 11
-static struct i2c_board_info __initdata ast_i2c_board_info_11[] = {
+static struct i2c_board_info ast_i2c_board_info_11[] __initdata = {
   // Mezz Card LAN_SMB bus (PHY, Temp. Sensor)
   {
     //I2C_BOARD_INFO("tmp75", 0x1f),
@@ -901,7 +937,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_11[] = {
 };
 
 //Under I2C Dev 12
-static struct i2c_board_info __initdata ast_i2c_board_info_12[] = {
+static struct i2c_board_info ast_i2c_board_info_12[] __initdata = {
   // Mezz Card Mezz_SMB bus (FRUID, GPIO expander, QSFP+)
   {
     I2C_BOARD_INFO("24c64", 0x51),
@@ -1192,14 +1228,16 @@ void __init ast_add_device_i2c(void)
 		return;
 	}
 
+  ast_i2c_data_1M.reg_gr = ast_i2c_data.reg_gr;// 1MHz reg_gr setting
+
 	platform_device_register(&ast_i2c_dev0_device);
-	platform_device_register(&ast_i2c_dev1_device);
+	platform_device_register(&ast_i2c_dev1_device_1M);
 	platform_device_register(&ast_i2c_dev2_device);
-	platform_device_register(&ast_i2c_dev3_device);
+	platform_device_register(&ast_i2c_dev3_device_1M);
 	platform_device_register(&ast_i2c_dev4_device);
-	platform_device_register(&ast_i2c_dev5_device);
+	platform_device_register(&ast_i2c_dev5_device_1M);
 	platform_device_register(&ast_i2c_dev6_device);
-	platform_device_register(&ast_i2c_dev7_device);
+	platform_device_register(&ast_i2c_dev7_device_1M);
 	platform_device_register(&ast_i2c_dev8_device);
 	platform_device_register(&ast_i2c_dev9_device);
 	platform_device_register(&ast_i2c_dev10_device);
@@ -1208,31 +1246,31 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev13_device);
 
 	i2c_register_board_info(0, ast_i2c_board_info_0,
-			ARRAY_SIZE(ast_i2c_board_info_0));
+		              ARRAY_SIZE(ast_i2c_board_info_0));
 	i2c_register_board_info(1, ast_i2c_board_info_1,
-			ARRAY_SIZE(ast_i2c_board_info_1));
+                  ARRAY_SIZE(ast_i2c_board_info_1));
 	i2c_register_board_info(2, ast_i2c_board_info_2,
-			ARRAY_SIZE(ast_i2c_board_info_2));
+                  ARRAY_SIZE(ast_i2c_board_info_2));
 	i2c_register_board_info(3, ast_i2c_board_info_3,
-			ARRAY_SIZE(ast_i2c_board_info_3));
+                  ARRAY_SIZE(ast_i2c_board_info_3));
 	i2c_register_board_info(4, ast_i2c_board_info_4,
-			ARRAY_SIZE(ast_i2c_board_info_4));
+                  ARRAY_SIZE(ast_i2c_board_info_4));
 	i2c_register_board_info(5, ast_i2c_board_info_5,
-			ARRAY_SIZE(ast_i2c_board_info_5));
+                  ARRAY_SIZE(ast_i2c_board_info_5));
 	i2c_register_board_info(6, ast_i2c_board_info_6,
-			ARRAY_SIZE(ast_i2c_board_info_6));
+                  ARRAY_SIZE(ast_i2c_board_info_6));
 	i2c_register_board_info(7, ast_i2c_board_info_7,
-			ARRAY_SIZE(ast_i2c_board_info_7));
+                  ARRAY_SIZE(ast_i2c_board_info_7));
 	i2c_register_board_info(8, ast_i2c_board_info_8,
-			ARRAY_SIZE(ast_i2c_board_info_8));
+		              ARRAY_SIZE(ast_i2c_board_info_8));
 	i2c_register_board_info(9, ast_i2c_board_info_9,
-			ARRAY_SIZE(ast_i2c_board_info_9));
+                  ARRAY_SIZE(ast_i2c_board_info_9));
 	i2c_register_board_info(10, ast_i2c_board_info_10,
-			ARRAY_SIZE(ast_i2c_board_info_10));
+                  ARRAY_SIZE(ast_i2c_board_info_10));
 	i2c_register_board_info(11, ast_i2c_board_info_11,
-			ARRAY_SIZE(ast_i2c_board_info_11));
+                  ARRAY_SIZE(ast_i2c_board_info_11));
 	i2c_register_board_info(12, ast_i2c_board_info_12,
-			ARRAY_SIZE(ast_i2c_board_info_12));
+                  ARRAY_SIZE(ast_i2c_board_info_12));
 }
 
 #elif defined(CONFIG_LIGHTNING)
