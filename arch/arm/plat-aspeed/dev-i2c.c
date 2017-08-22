@@ -913,10 +913,10 @@ static struct i2c_board_info ast_i2c_board_info_8[] __initdata = {
 static struct i2c_board_info ast_i2c_board_info_9[] __initdata = {
   // Inlet and Outlet temp. sensors
   {
-    I2C_BOARD_INFO("tmp75", 0x4e),
+    I2C_BOARD_INFO("tmp421", 0x4e),
   },
   {
-    I2C_BOARD_INFO("tmp75", 0x4f),
+    I2C_BOARD_INFO("tmp421", 0x4f),
   },
 };
 
