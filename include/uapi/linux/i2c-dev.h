@@ -56,6 +56,7 @@
 
 #define I2C_SMBUS	0x0720	/* SMBus transfer */
 
+#define I2C_BUS_STATUS  0x0799	/* Get Bus Status */
 
 /* This is the structure as used in the I2C_SMBUS ioctl call */
 struct i2c_smbus_ioctl_data {

@@ -107,6 +107,19 @@ struct ast_i2c_dev {
 	u8					master_xfer_first;
 };
 
+enum {
+  BUS_LOCK_RECOVER_ERROR = 0,
+  BUS_LOCK_RECOVER_TIMEOUT,
+  BUS_LOCK_RECOVER_SUCCESS,
+  BUS_LOCK_PRESERVE,
+  SLAVE_DEAD_RECOVER_ERROR,
+  SLAVE_DEAD_RECOVER_TIMEOUT,
+  SLAVE_DEAD_RECOVER_SUCCESS,
+  SLAVE_DEAD_PRESERVE,
+  UNDEFINED_CASE,
+};
+
+
 static inline void
 ast_i2c_write(struct ast_i2c_dev *i2c_dev, u32 val, u32 reg)
 {
@@ -563,14 +576,17 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 		if(i2c_dev->cmd_err &&
 		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
 			dev_err(i2c_dev->dev, "recovery error \n");
+ 			i2c_dev->adap.bus_status |= 0x1 << BUS_LOCK_RECOVER_ERROR;
 			return -1;
 		}
 
 		if (r == 0) {
 			 dev_err(i2c_dev->dev, "recovery timed out\n");
+			 i2c_dev->adap.bus_status |= 0x1 << BUS_LOCK_RECOVER_TIMEOUT;
 			 return -1;
 		} else {
 			dev_err(i2c_dev->dev, "Recovery successfully\n");
+			i2c_dev->adap.bus_status |= 0x1 << BUS_LOCK_RECOVER_SUCCESS;
 			return 0;
 		}
 
@@ -592,19 +608,23 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 			if (i2c_dev->cmd_err != 0 &&
 			   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
 				dev_err(i2c_dev->dev, "ERROR!! Failed to do recovery command(0x%08x)\n", i2c_dev->cmd_err);
+				i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_ERROR;
 				return -1;
 			}
 			//Check 0x14's SDA and SCL status
 			sts = ast_i2c_read(i2c_dev,I2C_CMD_REG);
 			if (sts & AST_I2CD_SDA_LINE_STS) //Recover OK
+				i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_SUCCESS;
 				break;
 		}
 		if (i == 10) {
 			dev_err(i2c_dev->dev, "ERROR!! recover failed\n");
+			i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_ERROR;
 			return -1;
 		}
 	} else {
 		dev_err(i2c_dev->dev, "Don't know how to handle this case?!\n");
+		i2c_dev->adap.bus_status |= 0x1 << UNDEFINED_CASE;
 		return -1;
 	}
   dev_err(i2c_dev->dev, "Recovery successfully\n");

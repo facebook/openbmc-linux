@@ -523,6 +523,7 @@ struct i2c_adapter {
 	struct i2c_bus_recovery_info *bus_recovery_info;
 	const struct i2c_adapter_quirks *quirks;
 
+	int bus_status;
   uint8_t data_ready;
   wait_queue_head_t wq;
 };
