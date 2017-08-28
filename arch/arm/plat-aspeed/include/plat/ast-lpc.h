@@ -92,7 +92,7 @@ struct ast_bt_data {
 
 
 /************************  IPMI KCS ****************************************/
-#define AST_KCS_NUM	4
+#define AST_KCS_NUM	5
 
 #if defined(AST_SOC_G5) || defined(AST_SOC_G4)
 #define AST_IPMI_KCS0_REGSPACINGS			4	//any
