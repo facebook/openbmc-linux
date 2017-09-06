@@ -12,7 +12,6 @@
  *  History:
  *    2012.07.26: Initial version [Ryan Chen]
  */
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/i2c.h>
@@ -658,8 +657,8 @@ static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
     }
 #endif
     if ((--timeout) > 0)
-		  msleep(1);
-	}
+      msleep(10);
+    }
 
   if (timeout <=0) {
     //ast_i2c_bus_error_recover(i2c_dev);
@@ -849,6 +848,7 @@ static void ast_i2c_do_dec_dma_xfer(struct ast_i2c_dev *i2c_dev)
 
 			 dev_dbg(i2c_dev->dev, "ast_i2c_do_byte_xfer complete \n");
 			 i2c_dev->cmd_err = 0;
+			 i2c_dev->master_xfer_first = 0;
 			 complete(&i2c_dev->cmd_complete);
 		}
 
@@ -860,7 +860,6 @@ static void ast_i2c_do_dec_dma_xfer(struct ast_i2c_dev *i2c_dev)
 static void ast_i2c_do_inc_dma_xfer(struct ast_i2c_dev *i2c_dev)
 {
 	u32 cmd = 0;
-	int timeout = 0;
 	int i;
 
 	i2c_dev->master_xfer_mode = INC_DMA_XFER;
@@ -940,27 +939,12 @@ static void ast_i2c_do_inc_dma_xfer(struct ast_i2c_dev *i2c_dev)
 			}
 
 			i2c_dev->func_ctrl_reg = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
-			timeout = 50;
-			if (i2c_dev->master_xfer_first == 0) {
-				// Wait for Bus to go IDLE
-				while (ast_i2c_read(i2c_dev,I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS) {
-					if (timeout <= 0) {
-						break;
-					}
-					timeout--;
-					schedule_timeout_interruptible(1);
-				}
-			}
-
-			if (timeout <= 0) {
-				dev_err(i2c_dev->dev, "bus busy, reset this bus. cmd 0x%x\n", ast_i2c_read(i2c_dev,I2C_CMD_REG));
-				ast_i2c_bus_reset(i2c_dev);
-			} else {
+			if (!(ast_i2c_read(i2c_dev,I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS)) {
 				// disable slave mode
 				ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG) & ~AST_I2CD_SLAVE_EN, I2C_FUN_CTRL_REG);
-				ast_i2c_write(i2c_dev, cmd, I2C_CMD_REG);
-				dev_dbg(i2c_dev->dev, "txfer size %d , cmd = %x \n",i2c_dev->master_xfer_len, cmd);
 			}
+			ast_i2c_write(i2c_dev, cmd, I2C_CMD_REG);
+			dev_dbg(i2c_dev->dev, "txfer size %d , cmd = %x \n",i2c_dev->master_xfer_len, cmd);
 		} else if (i2c_dev->master_xfer_cnt < i2c_dev->master_msgs->len) {
 			//Next send
 			if(i2c_dev->master_msgs->flags & I2C_M_RD) {
@@ -1039,6 +1023,7 @@ static void ast_i2c_do_inc_dma_xfer(struct ast_i2c_dev *i2c_dev)
 
 			 dev_dbg(i2c_dev->dev, "ast_i2c_do_byte_xfer complete \n");
 			 i2c_dev->cmd_err = 0;
+			 i2c_dev->master_xfer_first = 0;
 			 complete(&i2c_dev->cmd_complete);
 		}
 
@@ -1224,6 +1209,7 @@ static void ast_i2c_do_pool_xfer(struct ast_i2c_dev *i2c_dev)
 
 			dev_dbg(i2c_dev->dev, "ast_i2c_do_byte_xfer complete \n");
 			i2c_dev->cmd_err = 0;
+			i2c_dev->master_xfer_first = 0;
 			complete(&i2c_dev->cmd_complete);
 		}
 
@@ -1309,6 +1295,7 @@ static void ast_i2c_do_byte_xfer(struct ast_i2c_dev *i2c_dev)
 
 			dev_dbg(i2c_dev->dev, "ast_i2c_do_byte_xfer complete \n");
 			i2c_dev->cmd_err = 0;
+			i2c_dev->master_xfer_first = 0;
 			complete(&i2c_dev->cmd_complete);
 
 		}
@@ -1635,6 +1622,7 @@ next_xfer:
 
 done_out:
 		dev_dbg(i2c_dev->dev,"msgs complete \n");
+		i2c_dev->master_xfer_first = 0;
 		complete(&i2c_dev->cmd_complete);
 	}
 
@@ -1652,10 +1640,14 @@ static void ast_i2c_slave_addr_match(struct ast_i2c_dev *i2c_dev)
 	// cancel master xfer since slave transaction cuts in ---
 	u32  cmd32;
 
-	if ((cmd32 = ast_i2c_read(i2c_dev, I2C_CMD_REG)) & 0x03) {
-		ast_i2c_write(i2c_dev, cmd32 & ~0x43, I2C_CMD_REG);
+	if (i2c_dev->master_xfer_first == 1) {
+		if ((cmd32 = ast_i2c_read(i2c_dev, I2C_CMD_REG)) & 0x03) {
+			ast_i2c_write(i2c_dev, cmd32 & ~0x143, I2C_CMD_REG);
+		}
 		i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
+		i2c_dev->master_xfer_first = 0;
 		complete(&i2c_dev->cmd_complete);
+		ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 	}
 
 	i2c_dev->slave_operation = 1;
@@ -1737,14 +1729,15 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 	}
 
 	if(AST_I2CD_INTR_STS_ABNORMAL & sts) {
-    if (!(i2c_dev->func_ctrl_reg & AST_I2CD_SLAVE_EN)) {
-      // TODO: observed abnormal interrupt happening when the bus is stressed with traffic
-      dev_dbg(i2c_dev->dev, "abnormal interrupt happens with status: %x, slave mode: %d\n", sts, i2c_dev->slave_operation);
-    }
-    // Need to clear the interrupt
-    ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ABNORMAL, I2C_INTR_STS_REG);
+		if (!(i2c_dev->func_ctrl_reg & AST_I2CD_SLAVE_EN)) {
+			// TODO: observed abnormal interrupt happening when the bus is stressed with traffic
+			dev_dbg(i2c_dev->dev, "abnormal interrupt happens with status: %x, slave mode: %d\n", sts, i2c_dev->slave_operation);
+		}
+		// Need to clear the interrupt
+		ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ABNORMAL, I2C_INTR_STS_REG);
 
 		i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ABNORMAL;
+		i2c_dev->master_xfer_first = 0;
 		complete(&i2c_dev->cmd_complete);
 
 		// clear TX_ACK and TX_NAK ---
@@ -1755,7 +1748,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK, I2C_INTR_STS_REG);
 		}
 		ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
-    return IRQ_HANDLED;
+		return IRQ_HANDLED;
 	}
 
 	if(AST_I2CD_INTR_STS_SCL_TO & sts) {
@@ -1902,6 +1895,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 					dev_dbg(i2c_dev->dev, "NAK error\n");
 					i2c_dev->cmd_err |= AST_I2CD_INTR_STS_TX_NAK;
 				}
+				i2c_dev->master_xfer_first = 0;
 				complete(&i2c_dev->cmd_complete);
 				ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 			}
@@ -1919,6 +1913,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
 				dev_dbg(i2c_dev->dev, "M TX NAK | NORMAL STOP \n");
 				i2c_dev->cmd_err |= AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP;
+				i2c_dev->master_xfer_first = 0;
 				complete(&i2c_dev->cmd_complete);
 				ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 			}
@@ -1953,6 +1948,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 
       ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
                 AST_I2CD_RX_DOWN_INTR_EN, I2C_INTR_CTRL_REG);
+			i2c_dev->master_xfer_first = 0;
 			complete(&i2c_dev->cmd_complete);
 
 			ast_i2c_slave_addr_match(i2c_dev);
@@ -1988,6 +1984,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_NORMAL_STOP = %x\n",sts);
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
 				i2c_dev->cmd_err |= AST_I2CD_INTR_STS_NORMAL_STOP;
+				i2c_dev->master_xfer_first = 0;
 				complete(&i2c_dev->cmd_complete);
 			}
 			break;
@@ -2016,6 +2013,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_ARBIT_LOSS = %x\n",sts);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
+			i2c_dev->master_xfer_first = 0;
 			complete(&i2c_dev->cmd_complete);
 			ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 			break;
@@ -2164,6 +2162,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 //			printk("sts [%x], isr sts [%x] \n",i2c_dev->state, ast_i2c_read(i2c_dev,I2C_INTR_STS_REG));
 			ast_i2c_bus_reset(i2c_dev);
 			ret = -ETIMEDOUT;
+			i2c_dev->master_xfer_first = 0;
 			spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
 			goto stop;
 		}
@@ -2177,11 +2176,13 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
         ast_i2c_bus_reset(i2c_dev);
 			}
 			ret = -EAGAIN;
+			i2c_dev->master_xfer_first = 0;
 			spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
 			goto stop;
 		}
 	}
 
+	i2c_dev->master_xfer_first = 0;
 	spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
 
 	if(i2c_dev->cmd_err == 0 ||
