@@ -503,7 +503,7 @@ ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
   // Note: On Yosemite, this function is also called when i2c clock is detected
   // interrupt context. Since the bus_error_recover() sleeps, the logic can not
   // Bus recover
-  if ((temp & AST_I2CD_MASTER_EN) && !(temp & AST_I2CD_SLAVE_EN)) {
+  if ((i2c_dev->func_ctrl_reg & AST_I2CD_MASTER_EN) && !(i2c_dev->func_ctrl_reg & AST_I2CD_SLAVE_EN)) {
     // Seen occurances on pfe1100 that some times the recovery fails,
     // but a subsequent 'controller timed out' recovers it.
     // So not handling the return code here.
@@ -570,8 +570,7 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 
 		ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
 
-		r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
-													   i2c_dev->adap.timeout*HZ);
+		r = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout*HZ);
 
 		if(i2c_dev->cmd_err &&
 		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
@@ -600,11 +599,10 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 			ast_i2c_dev_init(i2c_dev);
 			//Do the recovery command BIT11
 			init_completion(&i2c_dev->cmd_complete);
-      i2c_dev->cmd_err = 0;
+			i2c_dev->cmd_err = 0;
 			ast_i2c_write(i2c_dev, AST_I2CD_BUS_RECOVER_CMD_EN, I2C_CMD_REG);
 
-			r = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
-														   i2c_dev->adap.timeout*HZ);
+			r = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout*HZ);
 			if (i2c_dev->cmd_err != 0 &&
 			   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
 				dev_err(i2c_dev->dev, "ERROR!! Failed to do recovery command(0x%08x)\n", i2c_dev->cmd_err);
@@ -646,12 +644,13 @@ static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
 #ifdef CONFIG_AST_I2C_SLAVE_RDWR
     unsigned long flags;
     spin_lock_irqsave(&i2c_dev->slave_rx_lock, flags);
-		if (!(ast_i2c_read(i2c_dev, I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS)) {
-			i2c_dev->slave_operation = 0;  // the slave transaction does not exist since bus is IDLE
-			spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
+    if (!(ast_i2c_read(i2c_dev, I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS) &&
+        !(ast_i2c_read(i2c_dev, I2C_INTR_STS_REG) & (AST_I2CD_INTR_STS_RX_DOWN|AST_I2CD_INTR_STS_NORMAL_STOP))) {
+      i2c_dev->slave_operation = 0;  // the slave transaction does not exist since bus is IDLE
+      spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
       break;
     }
-		spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
+    spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
 #else
 		if (!(ast_i2c_read(i2c_dev, I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS)) {
 			i2c_dev->slave_operation = 0;  // the slave transaction does not exist since bus is IDLE
@@ -2154,8 +2153,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev, struct i2c_msg *msg
 
 		spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
 
-		ret = wait_for_completion_interruptible_timeout(&i2c_dev->cmd_complete,
-													   i2c_dev->adap.timeout*HZ);
+		ret = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout*HZ);
 
 		spin_lock_irqsave(&i2c_dev->master_lock, flags);
 		i2c_dev->master_msgs = NULL;
