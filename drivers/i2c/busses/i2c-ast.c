@@ -157,7 +157,7 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
     data = 0x77744302;
     return data;
-  } 
+  }
 #endif
 
 
@@ -1810,74 +1810,6 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 					complete(&i2c_dev->cmd_complete);
 				}
 			break;
-		case AST_I2CD_INTR_STS_TX_ACK | AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH :
-				if((i2c_dev->xfer_last == 1) && (i2c_dev->slave_operation == 0)) {
-					dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_TX_ACK | AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH= %x\n",sts);
-					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_ACK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
-					//take care
-					ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
-										AST_I2CD_TX_ACK_INTR_EN, I2C_INTR_CTRL_REG);
-					ast_i2c_master_xfer_done(i2c_dev);
-
-          // Handle the new slave match interrupt
-    			ast_i2c_slave_addr_match(i2c_dev);
-					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
-				} else {
-					uint32_t new_val;
-					dev_err(i2c_dev->dev, "Slave  TX_ACK | NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH;  xfer_last %d\n", i2c_dev->xfer_last);
-					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_ACK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
-					new_val = ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
-						        	AST_I2CD_NORMAL_STOP_INTR_EN |
-								      AST_I2CD_TX_ACK_INTR_EN;
-					ast_i2c_write(i2c_dev, new_val, I2C_INTR_CTRL_REG);
-					//take care
-					i2c_dev->cmd_err |= AST_LOCKUP_DETECTED;
-					complete(&i2c_dev->cmd_complete);
-
-          // stop previous slave transaction
-          i2c_dev->slave_event = I2C_SLAVE_EVENT_STOP;
-          ast_i2c_slave_xfer_done(i2c_dev);
-
-          // Handle the new slave match interrupt
-    			ast_i2c_slave_addr_match(i2c_dev);
-					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
-				}
-			break;
-
-		case AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH :
-				if((i2c_dev->xfer_last == 1) && (i2c_dev->slave_operation == 0)) {
-					dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_TX_ACK | AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH= %x\n",sts);
-					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
-					//take care
-					ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
-										AST_I2CD_TX_ACK_INTR_EN, I2C_INTR_CTRL_REG);
-					ast_i2c_master_xfer_done(i2c_dev);
-
-					// Handle the new slave match interrupt
-					ast_i2c_slave_addr_match(i2c_dev);
-					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
-				} else {
-					uint32_t new_val;
-					dev_err(i2c_dev->dev, "Slave  TX_NAK | NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH;  xfer_last %d\n", i2c_dev->xfer_last);
-					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
-					new_val = ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
-						        	AST_I2CD_NORMAL_STOP_INTR_EN |
-								AST_I2CD_TX_ACK_INTR_EN;
-					ast_i2c_write(i2c_dev, new_val, I2C_INTR_CTRL_REG);
-					//take care
-					i2c_dev->cmd_err |= AST_LOCKUP_DETECTED;
-					complete(&i2c_dev->cmd_complete);
-
-          // stop previous slave transaction
-          i2c_dev->slave_event = I2C_SLAVE_EVENT_STOP;
-          ast_i2c_slave_xfer_done(i2c_dev);
-
-          // Handle the new slave match interrupt
-    			ast_i2c_slave_addr_match(i2c_dev);
-					ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
-				}
-			break;
-
 		case AST_I2CD_INTR_STS_TX_NAK:
 			if(i2c_dev->slave_operation == 1) {
 				i2c_dev->slave_event = I2C_SLAVE_EVENT_NACK;
@@ -1904,7 +1836,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 		case AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP:
 			if(i2c_dev->slave_operation == 1) {
 				printk("SLAVE TODO .... \n");
-        i2c_dev->slave_operation = 0;
+				i2c_dev->slave_operation = 0;
 				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP, I2C_INTR_STS_REG);
 				i2c_dev->cmd_err |= AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_NORMAL_STOP;
 				complete(&i2c_dev->cmd_complete);
@@ -1918,40 +1850,9 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 			}
 			break;
-
-		//Issue : Workaround for I2C slave mode
-		case AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_SLAVE_MATCH:
-			if(i2c_dev->slave_operation == 1) {
-				dev_err(i2c_dev->dev, "i2cdriver: TX_NAK and Slave match sts = %x\n",sts);
-				ast_i2c_slave_addr_match(i2c_dev);
-				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK | AST_I2CD_INTR_STS_SLAVE_MATCH , I2C_INTR_STS_REG);
-			} else {
-				printk("ERROR !!!!\n");
-				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_TX_NAK, I2C_INTR_STS_REG);
-				i2c_dev->cmd_err |= AST_I2CD_INTR_STS_TX_NAK;
-				complete(&i2c_dev->cmd_complete);
-
-				ast_i2c_slave_addr_match(i2c_dev);
-				ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SLAVE_MATCH , I2C_INTR_STS_REG);
-			}
-			break;
 		case AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH:
 			ast_i2c_slave_addr_match(i2c_dev);
 			dev_dbg(i2c_dev->dev, "S clear isr: AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH = %x\n",sts);
-			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
-			break;
-		case AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH | AST_I2CD_INTR_STS_ARBIT_LOSS:
-			dev_dbg(i2c_dev->dev, "M clear isr: sts = %x\n",sts);
-			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
-			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
-			ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
-
-      ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
-                AST_I2CD_RX_DOWN_INTR_EN, I2C_INTR_CTRL_REG);
-			i2c_dev->master_xfer_first = 0;
-			complete(&i2c_dev->cmd_complete);
-
-			ast_i2c_slave_addr_match(i2c_dev);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH, I2C_INTR_STS_REG);
 			break;
 		case AST_I2CD_INTR_STS_RX_DOWN:
@@ -1970,7 +1871,6 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				ast_i2c_master_xfer_done(i2c_dev);
 			}
 			break;
-
 		case AST_I2CD_INTR_STS_NORMAL_STOP:
 		case AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_SLAVE_MATCH: // handle SLAVE_MATCH at next time
 		case AST_I2CD_INTR_STS_NORMAL_STOP | AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH:
@@ -2005,11 +1905,11 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 				ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_INTR_CTRL_REG) |
 									AST_I2CD_RX_DOWN_INTR_EN, I2C_INTR_CTRL_REG);
 				ast_i2c_master_xfer_done(i2c_dev);
-      }
+			}
 			break;
 		case AST_I2CD_INTR_STS_ARBIT_LOSS:
-		case AST_I2CD_INTR_STS_ARBIT_LOSS | AST_I2CD_INTR_STS_SLAVE_MATCH:
-      // handle SLAVE_MATCH at next time
+		case AST_I2CD_INTR_STS_ARBIT_LOSS | AST_I2CD_INTR_STS_SLAVE_MATCH: // handle SLAVE_MATCH at next time
+		case AST_I2CD_INTR_STS_ARBIT_LOSS | AST_I2CD_INTR_STS_RX_DOWN | AST_I2CD_INTR_STS_SLAVE_MATCH:
 			dev_dbg(i2c_dev->dev, "M clear isr: AST_I2CD_INTR_STS_ARBIT_LOSS = %x\n",sts);
 			ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_ARBIT_LOSS, I2C_INTR_STS_REG);
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_ARBIT_LOSS;
@@ -2020,13 +1920,11 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
  		case AST_I2CD_INTR_STS_GCALL_ADDR:
 			i2c_dev->cmd_err |= AST_I2CD_INTR_STS_GCALL_ADDR;
 			complete(&i2c_dev->cmd_complete);
-
 			break;
 		case AST_I2CD_INTR_STS_SMBUS_DEF_ADDR:
 			break;
 		case AST_I2CD_INTR_STS_SMBUS_DEV_ALT:
 			break;
-
 		case AST_I2CD_INTR_STS_SMBUS_ARP_ADDR:
 			break;
 		case AST_I2CD_INTR_STS_SDA_DL_TO:
@@ -2040,8 +1938,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 			complete(&i2c_dev->cmd_complete);
 			break;
 		default:
-				printk("GR %p : Status : %x, bus_id %d\n",i2c_dev->ast_i2c_data->reg_gr,
-            sts, i2c_dev->bus_id);
+			printk("GR %p : Status : %x, bus_id %d\n",i2c_dev->ast_i2c_data->reg_gr, sts, i2c_dev->bus_id);
 
       // Handle Arbitration Loss
       if (sts & AST_I2CD_INTR_STS_ARBIT_LOSS) {
