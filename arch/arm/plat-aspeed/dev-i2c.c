@@ -754,7 +754,7 @@ static struct i2c_board_info ast_i2c_board_info_12[] __initdata = {
 };
 #elif  CONFIG_FBTTN
 //FBTTN start
-static struct i2c_board_info ast_i2c_board_info_0[] __initdata = {
+static struct i2c_board_info ast_i2c_board_info_0_t5[] __initdata = {
   //HSC    , ADM1278   0x20
   //EEPROM , 24LC64    0xa0
   //Temp Sensor, TMP75 0x94
@@ -776,8 +776,23 @@ static struct i2c_board_info ast_i2c_board_info_0[] __initdata = {
 
 };
 
+static struct i2c_board_info ast_i2c_board_info_0_t7[] __initdata = {
+  //HSC    , ADM1278   0x20
+  //EEPROM , 24LC64    0xa0
+  //Temp Sensor, TMP75 0x94
+  {
+		I2C_BOARD_INFO("adm1278", 0x10),
+	},
+  {
+		I2C_BOARD_INFO("24c64", 0x50),
+	},
+  {
+		I2C_BOARD_INFO("tmp75", 0x4a),
+	},
+};
+
 static struct i2c_board_info ast_i2c_board_info_1[] __initdata = {
-  // IOC, Type7 0x0a
+  // IOC, Type7 (t7) 0x0a
 };
 
 static struct i2c_board_info ast_i2c_board_info_2[] __initdata = {
@@ -1161,6 +1176,8 @@ void __init ast_add_device_i2c(void)
 #elif CONFIG_FBTTN
 void __init ast_add_device_i2c(void)
 {
+	int sys_type = 0;
+
 	/* I2C Multi-Pin */
 	ast_scu_multi_func_i2c();
 
@@ -1187,8 +1204,20 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev12_device);
 	platform_device_register(&ast_i2c_dev13_device);
 
-	i2c_register_board_info(0, ast_i2c_board_info_0,
-			ARRAY_SIZE(ast_i2c_board_info_0));
+	//System Type GPIOJ4~GPIOJ7, 0001 = M.2-based IOM (Type 5), 0010 = IOC-based IOM (Type 7)
+	sys_type = (gpio_get_value(76) << 3) + (gpio_get_value(77) << 2) 
+			   + (gpio_get_value(78) << 1) + gpio_get_value(79);
+
+	if(sys_type == 2) {
+	//If sys_type(79) is 2, means System is Type 7
+		i2c_register_board_info(0, ast_i2c_board_info_0_t7,
+			ARRAY_SIZE(ast_i2c_board_info_0_t7));
+	}
+	else {
+		i2c_register_board_info(0, ast_i2c_board_info_0_t5,
+			ARRAY_SIZE(ast_i2c_board_info_0_t5));
+	}
+
 	i2c_register_board_info(1, ast_i2c_board_info_1,
 			ARRAY_SIZE(ast_i2c_board_info_1));
 	i2c_register_board_info(2, ast_i2c_board_info_2,
