@@ -495,20 +495,19 @@ ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
 {
   u32 temp;
   u32 ctrl_reg1, cmd_reg1;
-  temp = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
+  
+  ctrl_reg1 = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
+  cmd_reg1 = ast_i2c_read(i2c_dev, I2C_CMD_REG);
 
   // MASTER mode only - bus recover + reset
   // MASTER & SLAVE mode - only reset
   // Note: On Yosemite, this function is also called when i2c clock is detected
   // interrupt context. Since the bus_error_recover() sleeps, the logic can not
   // Bus recover
-  if ((i2c_dev->func_ctrl_reg & AST_I2CD_MASTER_EN) && !(i2c_dev->func_ctrl_reg & AST_I2CD_SLAVE_EN)) {
+  if ((ctrl_reg1 & AST_I2CD_MASTER_EN) && !(ctrl_reg1 & AST_I2CD_SLAVE_EN)) {
     // Seen occurances on pfe1100 that some times the recovery fails,
     // but a subsequent 'controller timed out' recovers it.
     // So not handling the return code here.
-    ctrl_reg1 = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
-    cmd_reg1 = ast_i2c_read(i2c_dev, I2C_CMD_REG);
-
     ast_i2c_bus_error_recover(i2c_dev);
 
     dev_err(
@@ -523,6 +522,13 @@ ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
   ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg & ~(AST_I2CD_SLAVE_EN | AST_I2CD_MASTER_EN), I2C_FUN_CTRL_REG);
 
   ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
+
+  dev_err(
+        i2c_dev->dev,
+        "I2C(%d) reset completed (ctrl,cmd): before(%x,%x) after(%x,%x)\n",
+        i2c_dev->bus_id, ctrl_reg1, cmd_reg1,
+        ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+        ast_i2c_read(i2c_dev, I2C_CMD_REG));
 }
 
 // TODO: This is a hack for I2C 1MHz BMC Kernel panic workaround
@@ -546,6 +552,7 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 	u32 sts;
 	int r;
 	u32 i = 0;
+	u32 tmp_func_ctrl_reg = 0;
 
 	//Check 0x14's SDA and SCL status
 	sts = ast_i2c_read(i2c_dev,I2C_CMD_REG);
@@ -593,6 +600,13 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 		//else if SDA == 0, the device is dead. We need to reset the bus
 		//And do the recovery command.
 		dev_err(i2c_dev->dev, "I2C's slave is dead, try to recover it\n");
+
+		// In this case, I2C Slave mode cannot be enabled automaitcallly.
+		// Due to the I2C bus will be Master mode only after ast_i2c_dev_init(),
+		// so store the original function control register.
+		// If the bus recover completed, we will restore the register value.
+		tmp_func_ctrl_reg = i2c_dev->func_ctrl_reg;
+
 		//Let's retry 10 times
 		for (i = 0; i < 10; i++) {
 			ast_i2c_dev_init(i2c_dev);
@@ -604,17 +618,21 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 			r = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout*HZ);
 			if (i2c_dev->cmd_err != 0 &&
 			   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
+				i2c_dev->func_ctrl_reg = tmp_func_ctrl_reg;
 				dev_err(i2c_dev->dev, "ERROR!! Failed to do recovery command(0x%08x)\n", i2c_dev->cmd_err);
 				i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_ERROR;
 				return -1;
 			}
 			//Check 0x14's SDA and SCL status
 			sts = ast_i2c_read(i2c_dev,I2C_CMD_REG);
-			if (sts & AST_I2CD_SDA_LINE_STS) //Recover OK
+			if (sts & AST_I2CD_SDA_LINE_STS) {  //Recover OK
+				i2c_dev->func_ctrl_reg = tmp_func_ctrl_reg;
 				i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_SUCCESS;
 				break;
+			}
 		}
 		if (i == 10) {
+			i2c_dev->func_ctrl_reg = tmp_func_ctrl_reg;
 			dev_err(i2c_dev->dev, "ERROR!! recover failed\n");
 			i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_ERROR;
 			return -1;
@@ -939,10 +957,8 @@ static void ast_i2c_do_inc_dma_xfer(struct ast_i2c_dev *i2c_dev)
 			}
 
 			i2c_dev->func_ctrl_reg = ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG);
-			if (!(ast_i2c_read(i2c_dev,I2C_CMD_REG) & AST_I2CD_BUS_BUSY_STS)) {
-				// disable slave mode
-				ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG) & ~AST_I2CD_SLAVE_EN, I2C_FUN_CTRL_REG);
-			}
+			// disable slave mode
+			ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev,I2C_FUN_CTRL_REG) & ~AST_I2CD_SLAVE_EN, I2C_FUN_CTRL_REG);
 			ast_i2c_write(i2c_dev, cmd, I2C_CMD_REG);
 			dev_dbg(i2c_dev->dev, "txfer size %d , cmd = %x \n",i2c_dev->master_xfer_len, cmd);
 		} else if (i2c_dev->master_xfer_cnt < i2c_dev->master_msgs->len) {
@@ -1454,6 +1470,7 @@ static void ast_i2c_slave_xfer_done(struct ast_i2c_dev *i2c_dev)
   // Error handle: when slave_xfer_cnt out of I2C slave buffer maximum size, reset the current I2C bus
   if (i2c_dev->slave_xfer_cnt >= I2C_S_BUF_SIZE) {
     // Reset i2c controller
+    dev_err(i2c_dev->dev, "slave_xfer_cnt exceed to I2C_S_BUF_SIZE(4096)\n");
     ast_i2c_bus_reset(i2c_dev);
   }
 #endif
