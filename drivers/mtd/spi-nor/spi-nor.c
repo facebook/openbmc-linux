@@ -1031,8 +1031,8 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 			 * marked read-only, and we don't want to lose that
 			 * information, even if it's not 100% accurate.
 			 */
-			dev_warn(dev, "found %s, expected %s\n",
-				 jid->name, id->name);
+			dev_warn(dev, "found %s\n",
+				 jid->name);
 			id = jid;
 			info = (void *)jid->driver_data;
 		}
