@@ -365,6 +365,11 @@ static int adm1275_probe(struct i2c_client *client,
 		| I2C_FUNC_SMBUS_BLOCK_DATA))
 		return -ENODEV;
 
+	// workaround: External reset or WDT reset BMC may cause an incomplete I2C transaction. It looks
+	// sometimes adm1278 stays in abnormal state and replies strange data when the 1st read. To avoid
+	// the probe fail, add a dummy read in the beginning of probe.
+	i2c_smbus_read_byte_data(client, PMBUS_REVISION);
+
 	ret = i2c_smbus_read_block_data(client, PMBUS_MFR_ID, block_buffer);
 	if (ret < 0) {
 		dev_err(&client->dev, "Failed to read Manufacturer ID\n");
@@ -615,3 +620,4 @@ module_i2c_driver(adm1275_driver);
 MODULE_AUTHOR("Guenter Roeck");
 MODULE_DESCRIPTION("PMBus driver for Analog Devices ADM1275 and compatibles");
 MODULE_LICENSE("GPL");
+
