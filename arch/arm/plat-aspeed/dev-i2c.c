@@ -633,7 +633,9 @@ static struct i2c_board_info ast_i2c_board_info_6[] __initdata = {
 
 	// U8D7, CPLD:
 	// 0x80: Programming, 0x82: I2C dev1, 0x84: I2C dev2, 0x86: I2C master rst#
-
+  {
+    I2C_BOARD_INFO("slb9645tt", 0x20),
+  },
 
 	// J8E1, TPM, 0xDC
 
