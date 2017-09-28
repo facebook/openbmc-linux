@@ -872,8 +872,12 @@ static struct i2c_board_info ast_i2c_board_info_12[] __initdata = {
 };
 
 static struct i2c_board_info ast_i2c_board_info_13[] __initdata = {
-
+  // TPM
+  {
+    I2C_BOARD_INFO("slb9645tt", 0x20),
+  },
 };
+
 //end for FBTTN
 #elif defined(CONFIG_YOSEMITE)
 
@@ -1207,7 +1211,7 @@ void __init ast_add_device_i2c(void)
 	platform_device_register(&ast_i2c_dev13_device);
 
 	//System Type GPIOJ4~GPIOJ7, 0001 = M.2-based IOM (Type 5), 0010 = IOC-based IOM (Type 7)
-	sys_type = (gpio_get_value(76) << 3) + (gpio_get_value(77) << 2) 
+	sys_type = (gpio_get_value(76) << 3) + (gpio_get_value(77) << 2)
 			   + (gpio_get_value(78) << 1) + gpio_get_value(79);
 
 	if(sys_type == 2) {
