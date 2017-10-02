@@ -96,7 +96,10 @@ struct ftgmac100 {
 	unsigned char Payload_Data[64];
 	unsigned char Payload_Pad[4];
 	unsigned long Payload_Checksum;
-  unsigned int mezz_type;
+  int mezz_type;
+    #define MEZZ_UNKNOWN    -1
+    #define MEZZ_MLX        0x01
+    #define MEZZ_BCM        0x02
 #endif
 };
 
@@ -294,7 +297,7 @@ void DeSelect_Package(struct net_device *dev, int Package_ID)
 int Select_Package(struct net_device *dev, int Package_ID)
 {
 	struct ftgmac100 *lp = netdev_priv(dev);
-	unsigned long Combined_Channel_ID, Found = 0;
+	int Found = 0;
 	struct sk_buff *skb;
 
 	do {
@@ -475,7 +478,7 @@ int store_nic_fw_ver(unsigned char *data, int len)
   fs = get_fs();
   set_fs(KERNEL_DS);
 
-  sprintf(path, "/tmp/cache_store");  
+  sprintf(path, "/tmp/cache_store");
   ret = sys_mkdir(path, 0755);
   if ( ret < 0 )
   {
@@ -483,18 +486,18 @@ int store_nic_fw_ver(unsigned char *data, int len)
   }
   else
   {
-    strcat(path, "/nic_fw_ver"); 
+    strcat(path, "/nic_fw_ver");
     filp = filp_open(path, O_RDWR|O_CREAT|O_TRUNC, 0666);
     if ( NULL == filp )
     {
-      printk("[%s]Cannot open the file to write the nic f/w version\n");
+      printk("[%s]Cannot open the file to write the nic f/w version\n",__func__);
     }
-  
+
     if ( IS_ERR(filp) )
     {
-      printk("[%s]Cannot use ERR filp pointer to write the file\n",__func__);  
+      printk("[%s]Cannot use ERR filp pointer to write the file\n",__func__);
     }
-    else 
+    else
     {
       vfs_write(filp, (char *)data, sizeof(char)*len, &filp->f_pos);
     }
@@ -506,7 +509,7 @@ int store_nic_fw_ver(unsigned char *data, int len)
   {
     filp_close(filp, NULL);
   }
-  
+
   return ret;
 }
 
@@ -551,18 +554,26 @@ void Get_Version_ID (struct net_device * dev)
 		}
 	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
 	lp->Retry = 0;
- 
-        if ( store_nic_fw_ver(lp->NCSI_Respond.Payload_Data, NCSI_DATA_PAYLOAD) )
-        {
-          printk("[%s]Cannot store the nic fw file correctly\n", __func__);
-        }
- 
+
+	if ( store_nic_fw_ver(lp->NCSI_Respond.Payload_Data, NCSI_DATA_PAYLOAD) )
+	{
+	  printk("[%s]Cannot store the nic fw file correctly\n", __func__);
+	}
+
   // Set mezz type based on IANA ID
+	// MLX IANA = 00 00 81 19
+	// Broadcom IANA = 00 00 11 3D
   if (lp->NCSI_Respond.Payload_Data[32] == 0x00 && lp->NCSI_Respond.Payload_Data[33] == 0x00 &&
     lp->NCSI_Respond.Payload_Data[34] == 0x81 && lp->NCSI_Respond.Payload_Data[35] == 0x19) {
-    lp->mezz_type = 0x01;
+    lp->mezz_type = MEZZ_MLX;
+    printk("NCSI: Mezz Vendor = Mellanox\n");
+  } else if (lp->NCSI_Respond.Payload_Data[32] == 0x00 && lp->NCSI_Respond.Payload_Data[33] == 0x00 &&
+    lp->NCSI_Respond.Payload_Data[34] == 0x11 && lp->NCSI_Respond.Payload_Data[35] == 0x3D) {
+    lp->mezz_type = MEZZ_BCM;
+    printk("NCSI: Mezz Vendor = Broadcom\n");
   } else {
-    lp->mezz_type = -1;
+    lp->mezz_type = MEZZ_UNKNOWN;
+    printk("NCSI error: Unknown Mezz Vendor!\n");
   }
 }
 
@@ -719,6 +730,9 @@ void Get_MAC_Address_mlx(struct net_device * dev)
 	ftgmac100_set_mac(lp, dev->dev_addr);
 }
 
+
+#define BCM_MAC_ADDR_OFFSET   32
+
 void Get_MAC_Address_bcm(struct net_device * dev)
 {
   struct ftgmac100 *lp = netdev_priv(dev);
@@ -772,17 +786,106 @@ void Get_MAC_Address_bcm(struct net_device * dev)
   // Update MAC Address
   printk("NCSI: MAC  ");
   for (i = 0; i < 6; i++)
-    printk("%02X:", lp->NCSI_Respond.Payload_Data[32+i]);
+    printk("%02X:", lp->NCSI_Respond.Payload_Data[BCM_MAC_ADDR_OFFSET+i]);
   printk("\n");
 
   // Increase mac address by 1 for BMC's address
   lp->NCSI_Respond.Payload_Data[37] = lp->NCSI_Respond.Payload_Data[37] + 1;;
-  memcpy(lp->NCSI_Request.SA, &lp->NCSI_Respond.Payload_Data[32], 6);
-  memcpy(dev->dev_addr, &lp->NCSI_Respond.Payload_Data[32], 6);
+  memcpy(lp->NCSI_Request.SA, &lp->NCSI_Respond.Payload_Data[BCM_MAC_ADDR_OFFSET], 6);
+  memcpy(dev->dev_addr, &lp->NCSI_Respond.Payload_Data[BCM_MAC_ADDR_OFFSET], 6);
 
   /* Update the MAC address */
   ftgmac100_set_mac(lp, dev->dev_addr);
 }
+
+
+#define ETH_HDR_LEN        14
+#define NCSI_HDR_LEN       16
+#define OEM_HDR_LEN_BCM    12
+
+#define BCM_C16_ADDR_CNT_OFFSET   8
+#define BCM_C16_MAC_ADDR_OFFSET   12
+int Get_MAC_Address_Bcm_c16 (struct net_device * dev)
+{
+  struct ftgmac100 *lp = netdev_priv(dev);
+  unsigned long Combined_Channel_ID, i;
+  struct sk_buff * skb;
+  unsigned int oem_payload_len = 4;
+  unsigned int oem_cmd_len = OEM_HDR_LEN_BCM + oem_payload_len;
+
+  unsigned char addr_cnt;
+  unsigned char mac_addr[6];
+
+do {
+  skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+  memset(skb->data, 0, TX_BUF_SIZE + 16);
+//TX
+  lp->InstanceID++;
+  lp->NCSI_Request.IID = lp->InstanceID;
+  lp->NCSI_Request.Command = 0x50;
+  Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+  lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+  lp->NCSI_Request.Payload_Length = (oem_cmd_len << 8);
+  memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, (ETH_HDR_LEN+NCSI_HDR_LEN));
+  lp->NCSI_Request.Payload_Length = oem_cmd_len;
+  lp->Payload_Data[0] = 0x00;
+  lp->Payload_Data[1] = 0x00;
+  lp->Payload_Data[2] = 0x11;
+  lp->Payload_Data[3] = 0x3D;
+
+  lp->Payload_Data[4] = 0x00;
+  lp->Payload_Data[5] = 0x16;
+  lp->Payload_Data[6] = 0x00;
+  lp->Payload_Data[7] = oem_payload_len;
+
+  //copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+	memcpy ((unsigned char *)(skb->data + 30), &lp->Payload_Data, lp->NCSI_Request.Payload_Length);
+  //skb->len = (ETH_HDR_LEN+NCSI_HDR_LEN) + lp->NCSI_Request.Payload_Length + 4;
+	skb->len = (ETH_HDR_LEN+NCSI_HDR_LEN) + lp->NCSI_Request.Payload_Length ;
+  ftgmac100_wait_to_send_packet (skb, dev);
+
+//RX
+  NCSI_Rx(dev);
+  if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (0x50 | 0x80)))
+       && (lp->Retry < RETRY_COUNT)) {
+    printk ("Retry: Command = %x, Response_Code = %x\n",
+            lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+    printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID,
+            lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+    lp->Retry++;
+    lp->InstanceID--;
+  }
+  else {
+    break;
+  }
+} while ((lp->Retry > 0) && (lp->Retry <= RETRY_COUNT));
+
+  if (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED || lp->Retry >= RETRY_COUNT) {
+    printk("Bcm NCSI: GetMCAddr rsp 0x%x, rsn 0x%x, rtry %d\n",
+            lp->NCSI_Respond.Response_Code, lp->NCSI_Respond.Reason_Code, lp->Retry);
+    lp->Retry = 0;
+    return -1;
+  }
+
+  addr_cnt = lp->NCSI_Respond.Payload_Data[BCM_C16_ADDR_CNT_OFFSET];
+  printk("Bcm NCSI: MCAddrCnt: %d, Addr1: ", addr_cnt);
+  // Need to reverse the order as byte 5 comes first
+  for (i = 0; i < 6; i++) {
+    mac_addr[i] = lp->NCSI_Respond.Payload_Data[BCM_C16_MAC_ADDR_OFFSET+(6-1-i)];
+    printk("%02X:", mac_addr[i]);
+  }
+  printk("\n");
+
+  memcpy(lp->NCSI_Request.SA, mac_addr, 6);
+  memcpy(dev->dev_addr, mac_addr, 6);
+
+  /* Update the MAC address */
+  ftgmac100_set_mac(lp, dev->dev_addr);
+  lp->Retry = 0;
+  return 0;
+}
+
+
 
 void Set_MAC_Affinity_mlx(struct net_device *dev)
 {
@@ -1380,18 +1483,27 @@ void ncsi_start(struct net_device *dev) {
         //TODO: This is an issue in  Get_Version_ID that always returns
         //mezz_type to be -1, so it only calls Get_MAC_Address_bcm.
         //It may need to work with Mlx to find a solution.
-#if defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)      //For multi-host NIC initialization 
+#if defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)      //For multi-host NIC initialization
+        // Try Mlx first
         Get_MAC_Address_mlx(dev);
         Set_MAC_Affinity_mlx(dev);
         Clear_Initial_State(dev, i);
         mdelay(500);
         Get_Version_ID(dev);
         mdelay(500);
+
+        // Then try Bcm
+        if (priv->mezz_type == MEZZ_BCM) {
+          if (Get_MAC_Address_Bcm_c16(dev) != 0) {
+            Get_MAC_Address_bcm(dev);   // legacy cmd
+          }
+          mdelay(500);
+        }
 #else                                             //For single host NIC initialization
         mdelay(500);
         Get_Version_ID(dev);
         mdelay(500);
-        if (priv->mezz_type == 0x01) {
+        if (priv->mezz_type == MEZZ_MLX) {
           Get_MAC_Address_mlx(dev);
           Set_MAC_Affinity_mlx(dev);
         } else {
