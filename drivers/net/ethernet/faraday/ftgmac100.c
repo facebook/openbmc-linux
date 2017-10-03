@@ -31,6 +31,7 @@
 #include <linux/netdevice.h>
 #include <linux/phy.h>
 #include <linux/platform_device.h>
+#include <linux/mutex.h>
 #include <net/ip.h>
 
 #include <linux/fs.h>
@@ -91,15 +92,16 @@ struct ftgmac100 {
 	NCSI_Command_Packet NCSI_Request;
 	NCSI_Response_Packet NCSI_Respond;
 	NCSI_Capability NCSI_Cap;
-	unsigned int  InstanceID;
+	unsigned char InstanceID;
 	unsigned int  Retry;
 	unsigned char Payload_Data[64];
 	unsigned char Payload_Pad[4];
 	unsigned long Payload_Checksum;
   int mezz_type;
-    #define MEZZ_UNKNOWN    -1
-    #define MEZZ_MLX        0x01
-    #define MEZZ_BCM        0x02
+		#define MEZZ_UNKNOWN    -1
+		#define MEZZ_MLX        0x01
+		#define MEZZ_BCM        0x02
+	struct completion ncsi_complete;
 #endif
 };
 
@@ -107,6 +109,44 @@ static int ftgmac100_alloc_rx_page(struct ftgmac100 *priv,
                                    int rxdes_idx,  gfp_t gfp);
 
 #ifdef CONFIG_FTGMAC100_NCSI
+
+#define NCSI_HDR_LEN 16
+#define ETH_P_NCSI 0x88F8
+
+struct mutex ncsi_mutex;
+
+static u8 m_ncsi_pack_added = 0;
+
+static int Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev);
+
+static struct packet_type ptype_ncsi = {
+ .type = __constant_htons(ETH_P_NCSI),
+ .func = Rx_NCSI,
+};
+
+static int
+Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev)
+{
+ struct ftgmac100 *lp = netdev_priv(dev);
+ NCSI_Response_Packet *resp;
+ u16 resp_len;
+
+ if (!(skb = skb_share_check(skb, GFP_ATOMIC)))
+   return NET_RX_DROP;
+
+ resp = (NCSI_Response_Packet *)skb_mac_header(skb);
+ resp_len = ETH_HLEN + NCSI_HDR_LEN + be16_to_cpu(resp->Payload_Length);
+ if ((resp_len > sizeof(NCSI_Response_Packet)) || (resp_len > (skb->tail - (u8 *)resp))) {
+   kfree_skb(skb);
+   return NET_RX_DROP;
+ }
+
+ memcpy(&lp->NCSI_Respond, resp, resp_len);
+ complete(&lp->ncsi_complete);
+
+ kfree_skb(skb);
+ return NET_RX_SUCCESS;
+}
 
 #define TX_BUF_SIZE 1536
 /******************************************************************************
@@ -884,6 +924,121 @@ do {
   lp->Retry = 0;
   return 0;
 }
+
+
+static void send_ncsi_cmd(struct net_device * dev,
+	                                  unsigned char cmd, unsigned char length, unsigned char *buf)
+{
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID, i;
+	struct sk_buff * skb;
+
+  /* ensure only 1 instance is accessing global NCSI structure */
+  mutex_lock(&ncsi_mutex);
+
+	do {
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		//TX
+		lp->InstanceID++;
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = cmd;
+		Combined_Channel_ID =
+		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (length << 8);
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
+		lp->NCSI_Request.Payload_Length = length;
+
+		for (i=0; i<length; ++i)
+			lp->Payload_Data[i] = buf[i];
+
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+    init_completion(&lp->ncsi_complete);
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+		//RX
+    wait_for_completion_timeout(&lp->ncsi_complete, HZ/10);
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+			(lp->NCSI_Respond.Command != (cmd | 0x80)) ||
+			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
+			(lp->Retry != RETRY_COUNT)) {
+#ifdef NCSI_DEBUG
+			printk ("Retry: Command = %x, Response_Code = %x\n", lp->NCSI_Request.Command, lp->NCSI_Respond.Response_Code);
+			printk ("IID: %x:%x, Command: %x:%x\n", lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+#endif
+			lp->Retry++;
+			lp->InstanceID--;
+		}
+		else {
+			lp->Retry = 0;
+		}
+	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
+	lp->Retry = 0;
+
+
+  mutex_unlock(&ncsi_mutex);
+
+//#ifdef NCSI_DEBUG
+  printk("cmd response detail:\n");
+  for (i=0; i<be16_to_cpu(lp->NCSI_Respond.Payload_Length); ++i) {
+    printk("0x%x ", lp->NCSI_Respond.Payload_Data[i]);
+  }
+  printk("\n\n");
+//#endif
+}
+
+/**
+ *  Set function to write firmware to device's persistent memory
+ */
+static ssize_t send_ncsi_cmd_handler(struct device *dev,
+                struct device_attribute *attr, const char *buf, size_t count)
+{
+  unsigned char data[128]={0};
+  struct net_device *netdev = to_net_dev(dev);
+	int i;
+	int num_data = 0;
+
+
+  int nums_now, bytes_now;
+  int bytes_consumed = 0, nums_read = 0;
+
+#ifdef NCSI_DEBUG
+  printk("    data received at kernel, byte count=%d\n", count);
+#endif
+
+  while ( ( nums_now =
+          sscanf( buf + bytes_consumed, "%d%n", &(data[nums_read]), &bytes_now )
+          ) > 0 ) {
+      bytes_consumed += bytes_now;
+      nums_read += nums_now;
+  }
+	num_data = nums_read;
+
+#ifdef NCSI_DEBUG
+  printk("    cmd 0x%x, data=", data[0]);
+  for (i=1; i<num_data; ++i)
+      printk("0x%x ", data[i]);
+  printk("\n");
+#endif
+
+	// data[0] cmd,  data[1..n] payload
+	unsigned char cmd  = data[0];
+	unsigned char len = num_data -1;
+
+  send_ncsi_cmd(netdev, cmd, len, &(data[1]));
+
+  return count;
+}
+
+
+/**
+ * cmd_payload attribute to be exported per ast_gmac.0 interface through sysfs
+ * (/sys/devices/platform/ftgmac100.0/net/eth0/cmd_payload).
+ */
+static DEVICE_ATTR(cmd_payload, S_IWUSR | S_IWGRP,
+                   NULL, send_ncsi_cmd_handler);
 
 
 
@@ -2583,7 +2738,7 @@ static int ftgmac100_open(struct net_device *netdev)
 	}
 
 	err = request_irq(priv->irq,
-			ftgmac100_interrupt, 0, netdev->name, netdev);
+							ftgmac100_interrupt, 0, netdev->name, netdev);
 	if (err) {
 		netdev_err(netdev, "failed to request irq %d\n", priv->irq);
 		goto err_irq;
@@ -2607,17 +2762,21 @@ static int ftgmac100_open(struct net_device *netdev)
 #elif defined(CONFIG_FBTTN)
 	ftgmac100_start_hw(priv, 100);
 #elif defined(CONFIG_FBY2)  || defined(CONFIG_YOSEMITE)
-  ftgmac100_start_hw(priv, 100);
+ ftgmac100_start_hw(priv, 100);
 #else
 	ftgmac100_start_hw(priv, 10);
 #endif
 
 #ifdef CONFIG_FTGMAC100_NCSI
   ncsi_start(netdev);
+
+  if (!m_ncsi_pack_added) {
+		m_ncsi_pack_added = 1;
+		dev_add_pack(&ptype_ncsi);
+  }
 #else
 	phy_start(priv->phydev);
 #endif
-
 
 	napi_enable(&priv->napi);
 	netif_start_queue(netdev);
@@ -2628,6 +2787,7 @@ static int ftgmac100_open(struct net_device *netdev)
 #else
 	iowrite32(INT_MASK_ALL_ENABLED, priv->base + FTGMAC100_OFFSET_IER);
 #endif
+
 	return 0;
 
 err_hw:
@@ -2868,6 +3028,14 @@ static int ftgmac100_probe(struct platform_device *pdev)
 			    netdev->dev_addr);
 	}
 
+#ifdef CONFIG_FTGMAC100_NCSI
+ if (device_create_file(&netdev->dev, &dev_attr_cmd_payload))
+   printk("error: cannot register cmd_payload attribute.\n");
+	else
+   printk("dev_attr_cmd_payload registered\n");
+
+  mutex_init(&ncsi_mutex);
+#endif
 	return 0;
 
 err_register_netdev:
@@ -2893,6 +3061,15 @@ static int __exit ftgmac100_remove(struct platform_device *pdev)
 	struct ftgmac100 *priv;
 
 	netdev = platform_get_drvdata(pdev);
+
+#ifdef CONFIG_FTGMAC100_NCSI
+ device_remove_file(&netdev->dev, &dev_attr_cmd_payload);
+ if (m_ncsi_pack_added) {
+   m_ncsi_pack_added = 0;
+   dev_remove_pack(&ptype_ncsi);
+ }
+#endif
+
 	priv = netdev_priv(netdev);
 
 	unregister_netdev(netdev);
