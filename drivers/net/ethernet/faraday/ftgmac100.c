@@ -3095,7 +3095,7 @@ static struct platform_driver ftgmac100_driver = {
 };
 
 module_platform_driver(ftgmac100_driver);
-
+  
 MODULE_AUTHOR("Po-Yu Chuang <ratbert@faraday-tech.com>");
 MODULE_DESCRIPTION("FTGMAC100 driver");
 MODULE_LICENSE("GPL");
