@@ -42,6 +42,8 @@
 #include <linux/stat.h>
 #include <asm/uaccess.h>
 #include "ftgmac100.h"
+#include <linux/time.h>
+// #define TIME_POWERUP_PREP
 
 #define DRV_NAME	"ftgmac100"
 #define DRV_VERSION	"0.7"
@@ -97,10 +99,11 @@ struct ftgmac100 {
 	unsigned char Payload_Data[64];
 	unsigned char Payload_Pad[4];
 	unsigned long Payload_Checksum;
-  int mezz_type;
+	int mezz_type;
 		#define MEZZ_UNKNOWN    -1
 		#define MEZZ_MLX        0x01
 		#define MEZZ_BCM        0x02
+	unsigned int  powerup_prep_host_id;
 	struct completion ncsi_complete;
 #endif
 };
@@ -926,6 +929,169 @@ do {
 }
 
 
+#define BCM_RETRY_MAX	2
+int Prepare_for_Host_Powerup_Bcm (struct net_device * dev, int host_id)
+{
+	int ret = 0;
+	struct ftgmac100 *lp = netdev_priv(dev);
+	unsigned long Combined_Channel_ID;
+	struct sk_buff * skb;
+	unsigned char oem_cmd_type = 0x1A;
+	unsigned int oem_payload_len = 4;
+	unsigned int oem_cmd_len = OEM_HDR_LEN_BCM + oem_payload_len;
+
+	unsigned long loop_cnt=0;
+#ifdef TIME_POWERUP_PREP
+	struct timeval t_start, t_end;
+	long usec_elapsed;
+#endif
+
+  /* ensure only 1 instance is accessing global NCSI structure */
+  mutex_lock(&ncsi_mutex);
+
+
+	lp->Retry = 0;
+	do {
+		lp->InstanceID = (lp->InstanceID+1) & 0xff;
+
+		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
+		memset(skb->data, 0, TX_BUF_SIZE + 16);
+//TX
+		lp->NCSI_Request.IID = lp->InstanceID;
+		lp->NCSI_Request.Command = 0x50;
+		Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
+		lp->NCSI_Request.Payload_Length = (oem_cmd_len << 8);
+		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, (ETH_HDR_LEN+NCSI_HDR_LEN));
+		lp->NCSI_Request.Payload_Length = oem_cmd_len;
+
+		// memset(lp->Payload_Data, 0, 64);
+		// memset(&lp->NCSI_Respond, 0, sizeof(NCSI_Response_Packet));
+		lp->Payload_Data[0] = 0x00;   // 0~3: IANA
+		lp->Payload_Data[1] = 0x00;
+		lp->Payload_Data[2] = 0x11;
+		lp->Payload_Data[3] = 0x3D;
+
+		lp->Payload_Data[4] = 0x00;   // OEM Playload Version
+		lp->Payload_Data[5] = oem_cmd_type;   // OEM Command Type
+		lp->Payload_Data[6] = 0x00;   // 6~7: OEM Payload Length
+		lp->Payload_Data[7] = oem_payload_len;
+
+		lp->Payload_Data[14] = 0x00;  // 14~15: HOST ID
+		lp->Payload_Data[15] = (unsigned char)host_id;
+
+		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
+		skb->len = (ETH_HDR_LEN+NCSI_HDR_LEN) + lp->NCSI_Request.Payload_Length + 4;
+		init_completion(&lp->ncsi_complete);
+		ftgmac100_wait_to_send_packet (skb, dev);
+
+#ifdef TIME_POWERUP_PREP
+		do_gettimeofday(&t_start);   // Start the timer
+#endif
+
+//RX
+		wait_for_completion_timeout(&lp->ncsi_complete, HZ/2);
+		// NCSI_Rx(dev);
+#ifdef TIME_POWERUP_PREP
+		do_gettimeofday(&t_end);     // Stop the timer
+		usec_elapsed = (t_end.tv_sec - t_start.tv_sec) * 1000000 +
+					(t_end.tv_usec - t_start.tv_usec);
+		// printk("Time elapsed: %ld us, loop_cnt: %lu/%u, rsp 0x%x, [IID: 0x%x:0x%x], [tx%d:rx%d]\n",
+		// 	 usec_elapsed, loop_cnt, NCSI_LOOP, lp->NCSI_Respond.Command,
+		// 	 lp->InstanceID, lp->NCSI_Respond.IID, lp->tx_pointer, lp->rx_pointer);
+		printk("Time elapsed: %ld us, rsp 0x%x, [IID: 0x%x:0x%x]\n",
+			 usec_elapsed, lp->NCSI_Respond.Command, lp->InstanceID, lp->NCSI_Respond.IID);
+#endif
+		if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (0x50 | 0x80))) &&
+			(lp->Retry <= BCM_RETRY_MAX)) {
+			if (lp->Retry < BCM_RETRY_MAX) {
+				printk ("Retry [%d]: Command = 0x%x (0x%x), Response_Code = 0x%x, Reason_Code = 0x%x\n", lp->Retry,
+					lp->NCSI_Request.Command, oem_cmd_type, lp->NCSI_Respond.Response_Code, lp->NCSI_Respond.Reason_Code);
+				printk ("IID: 0x%x:0x%x, Command: 0x%x:0x%x\n",
+					lp->InstanceID, lp->NCSI_Respond.IID, lp->NCSI_Request.Command, lp->NCSI_Respond.Command);
+				lp->InstanceID--;
+			}
+			lp->Retry++;
+		} else {
+			break;
+		}
+	} while ((lp->Retry > 0) && (lp->Retry <= BCM_RETRY_MAX));
+
+  mutex_unlock(&ncsi_mutex);
+
+	printk("Bcm NCSI: powerup prep for slot%d ", host_id);
+	if (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED) {
+		printk("failed! (Resp code:0x%x, Reason code:0x%x)\n",
+		lp->NCSI_Respond.Response_Code, lp->NCSI_Respond.Reason_Code);
+		ret = lp->NCSI_Respond.Response_Code;
+	} else if (lp->Retry > BCM_RETRY_MAX) {
+		printk("timed out (%d)!\n", lp->Retry);
+		ret = -lp->Retry;
+	} else {
+		printk("succeeded.\n");
+		ret = 0;
+	}
+
+	lp->Retry = 0;
+
+	return ret;
+}
+
+
+/* sysfs hooks */
+#define HOST_ID_MIN   1
+#define HOST_ID_MAX   4
+/**
+ *  Set function to write firmware to device's persistent memory
+ */
+static ssize_t Perform_Nic_Powerup_Prep(struct device *dev,
+				struct device_attribute *attr, const char *buf, size_t count)
+{
+	int host_id;
+	struct net_device *netdev = to_net_dev(dev);
+	struct ftgmac100 *lp = netdev_priv(netdev);
+
+	// Check whether NCSI is ready and whether it's Broadcom NIC
+	if (lp->mezz_type != MEZZ_BCM) {
+		//printk("\nNIC Powerup Prep: Not a BCM NIC.\n");
+		return count;
+	}
+
+	sscanf(buf, "%d", &host_id);
+	if (host_id < HOST_ID_MIN || host_id > HOST_ID_MAX) {
+		printk("\nNIC Powerup Prep Err: invalid host id %d!\n", host_id);
+		return -1;
+	}
+	lp->powerup_prep_host_id = (unsigned int)host_id;
+	printk("\nNIC Powerup Prep for slot %d.\n", host_id);
+
+	// Send NC-SI cmd
+	if (Prepare_for_Host_Powerup_Bcm(netdev, host_id) != 0) {
+		return -1;
+	}
+
+	// clear the attribute?
+
+	return count;
+}
+
+static ssize_t Powerup_Prep_Show_Host_Id(struct device *dev,
+										 struct device_attribute *attr, char *buf)
+{
+	struct net_device *netdev = to_net_dev(dev);
+	struct ftgmac100 *lp = netdev_priv(netdev);
+	return sprintf(buf, "%u\n", lp->powerup_prep_host_id);
+}
+
+/**
+ * powerup_prep_host_id attribute to be exported per ast_gmac.0 interface through sysfs
+ * (/sys/devices/platform/ast_gmac.0/powerup_prep_host_id).
+ */
+static DEVICE_ATTR(powerup_prep_host_id, S_IRUGO | S_IWUSR | S_IWGRP,
+					Powerup_Prep_Show_Host_Id, Perform_Nic_Powerup_Prep);
+
+
+
 static void send_ncsi_cmd(struct net_device * dev,
 	                                  unsigned char cmd, unsigned char length, unsigned char *buf)
 {
@@ -1607,6 +1773,7 @@ void ncsi_start(struct net_device *dev) {
 	unsigned long Package_Found = 0, Channel_Found = 0, Re_Send = 0, Link_Status;
 
 	int i = 0;
+	priv->mezz_type = MEZZ_UNKNOWN;
 	//NCSI Start
 	//DeSelect Package/ Select Package
 	NCSI_Struct_Initialize(dev);
@@ -3034,6 +3201,11 @@ static int ftgmac100_probe(struct platform_device *pdev)
 	else
    printk("dev_attr_cmd_payload registered\n");
 
+	if (device_create_file(&netdev->dev, &dev_attr_powerup_prep_host_id))
+		printk("error: cannot register powerup_prep_host_id attribute.\n");
+	else
+		printk("dev_attr_powerup_prep_host_id registered\n");
+
   mutex_init(&ncsi_mutex);
 #endif
 	return 0;
@@ -3063,11 +3235,12 @@ static int __exit ftgmac100_remove(struct platform_device *pdev)
 	netdev = platform_get_drvdata(pdev);
 
 #ifdef CONFIG_FTGMAC100_NCSI
- device_remove_file(&netdev->dev, &dev_attr_cmd_payload);
- if (m_ncsi_pack_added) {
-   m_ncsi_pack_added = 0;
-   dev_remove_pack(&ptype_ncsi);
- }
+	device_remove_file(&netdev->dev, &dev_attr_cmd_payload);
+	device_remove_file(&netdev->dev, &dev_attr_powerup_prep_host_id);
+	if (m_ncsi_pack_added) {
+		m_ncsi_pack_added = 0;
+		dev_remove_pack(&ptype_ncsi);
+	}
 #endif
 
 	priv = netdev_priv(netdev);
@@ -3095,7 +3268,7 @@ static struct platform_driver ftgmac100_driver = {
 };
 
 module_platform_driver(ftgmac100_driver);
-  
+
 MODULE_AUTHOR("Po-Yu Chuang <ratbert@faraday-tech.com>");
 MODULE_DESCRIPTION("FTGMAC100 driver");
 MODULE_LICENSE("GPL");
