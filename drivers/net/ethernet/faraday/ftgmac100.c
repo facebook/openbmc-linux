@@ -932,7 +932,7 @@ do {
 #define BCM_RETRY_MAX	2
 int Prepare_for_Host_Powerup_Bcm (struct net_device * dev, int host_id)
 {
-	int ret = 0;
+	int ret = 0, tmo;
 	struct ftgmac100 *lp = netdev_priv(dev);
 	unsigned long Combined_Channel_ID;
 	struct sk_buff * skb;
@@ -990,7 +990,7 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev, int host_id)
 #endif
 
 //RX
-		wait_for_completion_timeout(&lp->ncsi_complete, HZ/2);
+		tmo = wait_for_completion_timeout(&lp->ncsi_complete, HZ/2);
 		// NCSI_Rx(dev);
 #ifdef TIME_POWERUP_PREP
 		do_gettimeofday(&t_end);     // Stop the timer
@@ -1002,7 +1002,7 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev, int host_id)
 		printk("Time elapsed: %ld us, rsp 0x%x, [IID: 0x%x:0x%x]\n",
 			 usec_elapsed, lp->NCSI_Respond.Command, lp->InstanceID, lp->NCSI_Respond.IID);
 #endif
-		if (((lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (0x50 | 0x80))) &&
+		if ((!tmo || (lp->NCSI_Respond.IID != lp->InstanceID) || (lp->NCSI_Respond.Command != (0x50 | 0x80))) &&
 			(lp->Retry <= BCM_RETRY_MAX)) {
 			if (lp->Retry < BCM_RETRY_MAX) {
 				printk ("Retry [%d]: Command = 0x%x (0x%x), Response_Code = 0x%x, Reason_Code = 0x%x\n", lp->Retry,
@@ -1020,13 +1020,13 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev, int host_id)
   mutex_unlock(&ncsi_mutex);
 
 	printk("Bcm NCSI: powerup prep for slot%d ", host_id);
-	if (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED) {
+	if (!tmo) {
+		printk("timed out (%d)!\n", lp->Retry);
+		ret = -lp->Retry;
+	} else if (lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED) {
 		printk("failed! (Resp code:0x%x, Reason code:0x%x)\n",
 		lp->NCSI_Respond.Response_Code, lp->NCSI_Respond.Reason_Code);
 		ret = lp->NCSI_Respond.Response_Code;
-	} else if (lp->Retry > BCM_RETRY_MAX) {
-		printk("timed out (%d)!\n", lp->Retry);
-		ret = -lp->Retry;
 	} else {
 		printk("succeeded.\n");
 		ret = 0;
@@ -1098,6 +1098,7 @@ static void send_ncsi_cmd(struct net_device * dev,
 	struct ftgmac100 *lp = netdev_priv(dev);
 	unsigned long Combined_Channel_ID, i;
 	struct sk_buff * skb;
+	int tmo;
 
   /* ensure only 1 instance is accessing global NCSI structure */
   mutex_lock(&ncsi_mutex);
@@ -1121,12 +1122,13 @@ static void send_ncsi_cmd(struct net_device * dev,
 
 		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
 		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
-    init_completion(&lp->ncsi_complete);
+		init_completion(&lp->ncsi_complete);
 		ftgmac100_wait_to_send_packet (skb, dev);
 
 		//RX
-    wait_for_completion_timeout(&lp->ncsi_complete, HZ/10);
-		if (((lp->NCSI_Respond.IID != lp->InstanceID) ||
+		tmo = wait_for_completion_timeout(&lp->ncsi_complete, HZ/10);
+		if ((!tmo ||
+			(lp->NCSI_Respond.IID != lp->InstanceID) ||
 			(lp->NCSI_Respond.Command != (cmd | 0x80)) ||
 			(lp->NCSI_Respond.Response_Code != COMMAND_COMPLETED)) &&
 			(lp->Retry != RETRY_COUNT)) {
@@ -1147,11 +1149,18 @@ static void send_ncsi_cmd(struct net_device * dev,
   mutex_unlock(&ncsi_mutex);
 
 //#ifdef NCSI_DEBUG
-  printk("cmd response detail:\n");
-  for (i=0; i<be16_to_cpu(lp->NCSI_Respond.Payload_Length); ++i) {
-    printk("0x%x ", lp->NCSI_Respond.Payload_Data[i]);
-  }
-  printk("\n\n");
+	if (!tmo) {
+		printk("timed out!");
+	} else {
+		printk("cmd response detail:\n");
+		for (i=0; i<be16_to_cpu(lp->NCSI_Respond.Payload_Length); ++i) {
+			if (i && !(i%16))
+				printk("\n");
+
+			printk("0x%x ", ((u8 *)&lp->NCSI_Respond.Response_Code)[i]);
+		}
+	}
+	printk("\n\n");
 //#endif
 }
 
