@@ -550,6 +550,10 @@ static struct i2c_board_info ast_i2c_board_info_8[] __initdata = {
 };
 
 static struct i2c_board_info ast_i2c_board_info_9[] __initdata = {
+        // TPM (0x40)
+        {
+            I2C_BOARD_INFO("slb9645tt", 0x20),
+        },
         // INLET TEMP Sensor (0x9C)
         {
             I2C_BOARD_INFO("tmp421", 0x4e),
