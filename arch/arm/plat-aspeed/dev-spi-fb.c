@@ -220,6 +220,10 @@ static struct mtd_partition ast_data_partitions[] = {
 		.name       = "flash1",
 		.offset     = 0,                   /* From 0 */
 		.size       = MTDPART_SIZ_FULL,    /* full size */
+	}, {
+		.name       = "flash1rw",          /* Writable flash1 region */
+		.offset     = 0x10000,
+		.size       = MTDPART_SIZ_FULL,
 	},
 };
 
