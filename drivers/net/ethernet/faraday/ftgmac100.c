@@ -3124,7 +3124,11 @@ static int ftgmac100_probe(struct platform_device *pdev)
 
 	netdev->ethtool_ops = &ftgmac100_ethtool_ops;
 	netdev->netdev_ops = &ftgmac100_netdev_ops;
+
+  // AST2400 doesn't support HW checksum
+#ifndef CONFIG_ARCH_AST2400
 	netdev->features = NETIF_F_IP_CSUM | NETIF_F_GRO;
+#endif
 
 	platform_set_drvdata(pdev, netdev);
 
