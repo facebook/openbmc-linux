@@ -9,7 +9,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
+#include <linux/syscalls.h>
+#include <linux/file.h>
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/module.h>
@@ -989,6 +990,32 @@ static int spi_nor_check(struct spi_nor *nor)
 	return 0;
 }
 
+static int spi_nor_store_jid(const char *mtd_name, const u8 *jedec_id)
+{
+	int fd;
+	char path[32] = {0};
+	char id[8] = {0};
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+	sprintf(path, "/tmp/%s_vendor.dat", mtd_name);
+	fd = sys_open(path, O_WRONLY|O_CREAT, 0644);
+	sprintf(id, "%02X%02X%02X %02X%02X%02X",
+		jedec_id[0], jedec_id[1], jedec_id[2],
+		jedec_id[3], jedec_id[4], jedec_id[5]);
+
+	if (fd >= 0) {
+		sys_write(fd, id, strlen(id));
+
+		sys_close(fd);
+		set_fs(old_fs);
+		return 0;
+	} else {
+		set_fs(old_fs);
+		return -1;
+	}
+}
+
 int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 {
 	const struct spi_device_id	*id = NULL;
@@ -1203,6 +1230,11 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 				mtd->eraseregions[i].erasesize,
 				mtd->eraseregions[i].erasesize / 1024,
 				mtd->eraseregions[i].numblocks);
+
+	ret = spi_nor_store_jid(mtd->name, info->id);
+	if (ret < 0)
+		dev_err(dev, "store JEDEC ID failed\n");
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(spi_nor_scan);
