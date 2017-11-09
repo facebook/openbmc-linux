@@ -690,17 +690,11 @@ ast_set_tacho_source(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 tacho_ch, u8 t
 static u32
 ast_get_tacho_rpm(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 tacho_ch)
 {
-    u32 raw_data, rpm, tacho_clk_div, clk_source, timeout=0;
+    u32 raw_data, rpm, tacho_clk_div, clk_source, timeout=0, tries=0;
 	u8 tacho_source, pwm_type,tacho_type_en;
 
 	if(!(ast_get_tacho_en(ast_pwm_tacho,tacho_ch)))
 		return 0;
-
-	//write 0
-	ast_pwm_tacho_write(ast_pwm_tacho, 0, AST_PTCR_TRIGGER);
-
-	//write 1
-	ast_pwm_tacho_write(ast_pwm_tacho, 0x1 << tacho_ch, AST_PTCR_TRIGGER);
 
 	tacho_source = ast_get_tacho_source(ast_pwm_tacho, tacho_ch);
 	pwm_type = ast_get_pwm_type(ast_pwm_tacho, tacho_source);
@@ -712,14 +706,25 @@ ast_get_tacho_rpm(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 tacho_ch)
 	if(!tacho_type_en)
 		return 0;
 
-	//Wait ready
-	while(!(ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_RESULT) & (0x1 << RESULT_STATUS))) {
-		timeout++;
-		if(timeout > 25)
-			return 0;
-	};
+	do {
+		//write 0
+		ast_pwm_tacho_write(ast_pwm_tacho, 0, AST_PTCR_TRIGGER);
 
-	raw_data = ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_RESULT)& RESULT_VALUE_MASK;
+		//write 1
+		ast_pwm_tacho_write(ast_pwm_tacho, 0x1 << tacho_ch, AST_PTCR_TRIGGER);
+
+		//Wait ready
+		while (!((raw_data = ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_RESULT)) & (0x1 << RESULT_STATUS))) {
+			timeout++;
+			if(timeout > 25)
+				return 0;
+		};
+
+		raw_data &= RESULT_VALUE_MASK;
+	} while (!raw_data && ((++tries) < 2));
+	if (!raw_data)
+		return 0;
+
 	tacho_clk_div = ast_get_tacho_type_division(ast_pwm_tacho, pwm_type);
 
 //	printk("raw div = %d \n",tacho_clk_div);
