@@ -1092,7 +1092,7 @@ static DEVICE_ATTR(powerup_prep_host_id, S_IRUGO | S_IWUSR | S_IWGRP,
 
 
 
-static void send_ncsi_cmd(struct net_device * dev,
+static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
 	                                  unsigned char cmd, unsigned char length, unsigned char *buf)
 {
 	struct ftgmac100 *lp = netdev_priv(dev);
@@ -1111,7 +1111,7 @@ static void send_ncsi_cmd(struct net_device * dev,
 		lp->NCSI_Request.IID = lp->InstanceID;
 		lp->NCSI_Request.Command = cmd;
 		Combined_Channel_ID =
-		(lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
+		(lp->NCSI_Cap.Package_ID << 5) + channel_id;
 		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
 		lp->NCSI_Request.Payload_Length = (length << 8);
 		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
@@ -1148,7 +1148,6 @@ static void send_ncsi_cmd(struct net_device * dev,
 
   mutex_unlock(&ncsi_mutex);
 
-//#ifdef NCSI_DEBUG
 	if (!tmo) {
 		printk("timed out!");
 	} else {
@@ -1161,7 +1160,6 @@ static void send_ncsi_cmd(struct net_device * dev,
 		}
 	}
 	printk("\n\n");
-//#endif
 }
 
 /**
@@ -1191,18 +1189,17 @@ static ssize_t send_ncsi_cmd_handler(struct device *dev,
   }
 	num_data = nums_read;
 
-#ifdef NCSI_DEBUG
-  printk("    cmd 0x%x, data=", data[0]);
-  for (i=1; i<num_data; ++i)
+  printk("    channel_id=0x%x, cmd 0x%x\n    data=", data[0], data[1]);
+  for (i=2; i<num_data; ++i)
       printk("0x%x ", data[i]);
   printk("\n");
-#endif
 
-	// data[0] cmd,  data[1..n] payload
-	unsigned char cmd  = data[0];
-	unsigned char len = num_data -1;
+	// data[0] channel_id, data[1] cmd,  data[1..n] payload
+	unsigned char channel_id = data[0];
+	unsigned char cmd  = data[1];
+	unsigned char len = num_data -2;
 
-  send_ncsi_cmd(netdev, cmd, len, &(data[1]));
+  send_ncsi_cmd(netdev, channel_id, cmd, len, &(data[2]));
 
   return count;
 }
