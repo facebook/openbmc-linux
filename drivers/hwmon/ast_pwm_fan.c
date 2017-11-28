@@ -713,6 +713,11 @@ ast_get_tacho_rpm(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 tacho_ch)
 		//write 1
 		ast_pwm_tacho_write(ast_pwm_tacho, 0x1 << tacho_ch, AST_PTCR_TRIGGER);
 
+		//Wait for a while after specifying which channel will be used
+    //(which is done by the register write above), so that Aspeed SoC
+    //have enough time to configure its internal mux.
+    msleep(10);
+
 		//Wait ready
 		while (!((raw_data = ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_RESULT)) & (0x1 << RESULT_STATUS))) {
 			timeout++;
