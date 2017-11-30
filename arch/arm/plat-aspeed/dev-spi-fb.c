@@ -33,6 +33,8 @@
 #include <plat/ast-scu.h>
 #include <mach/ast_spi.h>
 
+static int dual_flash_enabled = 0;
+
 static u32 ast_spi_calculate_divisor(u32 max_speed_hz)
 {
 	/* [0] ->15 : HCLK , HCLK/16 */
@@ -267,8 +269,7 @@ static struct flash_platform_data ast_spi_flash1_data = {
     .parts      = ast_spi_flash1_partitions,
 };
 
-static struct spi_board_info ast_fmc_devices[] = {
-#ifdef CONFIG_AST_DUAL_FLASH
+static struct spi_board_info ast_dual_flash_fmc_devices[] = {
 	{
 		.modalias    		= "m25p80",
 		.platform_data  = &ast_data_platform_data,
@@ -277,21 +278,27 @@ static struct spi_board_info ast_fmc_devices[] = {
 		.bus_num    		= 0,
 		.mode 			    = SPI_MODE_0,
 	},
-#endif
 	{
 		.modalias    		= "m25p80",
 		/* There are two potential layouts depending ROM availability. */
-#ifdef CONFIG_AST_DUAL_FLASH
 		.platform_data  = &ast_rom_platform_data,
-#else
-		.platform_data  = &ast_legacy_platform_data,
-#endif
 		.chip_select    = 0,
 		.max_speed_hz   = 50 * 1000 * 1000,
 		.bus_num    		= 0,
 		.mode 			    = SPI_MODE_0,
 	},
 
+};
+
+static struct spi_board_info ast_single_flash_fmc_devices[] = {
+	{
+		.modalias    		= "m25p80",
+		.platform_data  = &ast_legacy_platform_data,
+		.chip_select    = 0,
+		.max_speed_hz   = 50 * 1000 * 1000,
+		.bus_num    		= 0,
+		.mode 			    = SPI_MODE_0,
+	},
 };
 
 #if defined(CONFIG_FBTP)  || defined(CONFIG_LIGHTNING)
@@ -313,10 +320,26 @@ static struct spi_board_info ast_spi0_devices[] = {
 };
 #endif
 
+static int __init dual_flash_enabled_handler(char *str)
+{
+  if (str[0] == '1') {
+    dual_flash_enabled = 1;
+  }
+  return 0;
+}
+early_param("dual_flash", dual_flash_enabled_handler);
+
 void __init ast_add_device_spi(void)
 {
 	platform_device_register(&ast_fmc_device);
-	spi_register_board_info(ast_fmc_devices, ARRAY_SIZE(ast_fmc_devices));
+
+  /* Use kernel configuration from u-boot to enable dual
+   * flash FMC configuration */
+  if (dual_flash_enabled) {
+    spi_register_board_info(ast_dual_flash_fmc_devices, 2);
+  } else {
+    spi_register_board_info(ast_single_flash_fmc_devices, 2);
+  }
 #if defined(CONFIG_FBTP) || defined(CONFIG_LIGHTNING)
 	platform_device_register(&ast_spi0_device);
 	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
