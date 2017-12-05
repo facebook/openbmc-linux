@@ -1840,6 +1840,9 @@ void composite_disconnect(struct usb_gadget *gadget)
 	/* REVISIT:  should we have config and device level
 	 * disconnect callbacks?
 	 */
+  if (!cdev)
+    return;
+
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (cdev->config)
 		reset_config(cdev);
