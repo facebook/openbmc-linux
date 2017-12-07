@@ -128,8 +128,13 @@ static struct platform_device ast_fmc_device = {
 };
 
 static struct platform_device ast_spi0_device = {
-        .name           = "fmc-spi",
-        .id             = 1,
+#if defined CONFIG_WEDGE100
+          .name           = "ast-spi",
+          .id             = 1,
+#else
+           .name           = "fmc-spi",
+           .id             = 1,
+#endif
         .dev = {
           .platform_data = &ast_spi0_driver_data,
        },
@@ -301,9 +306,15 @@ static struct spi_board_info ast_single_flash_fmc_devices[] = {
 	},
 };
 
-#if defined(CONFIG_FBTP)  || defined(CONFIG_LIGHTNING)
+#if defined(CONFIG_FBTP)  || defined(CONFIG_LIGHTNING) || defined (CONFIG_WEDGE100)
 static struct spi_board_info ast_spi0_devices[] = {
     {
+#if defined(CONFIG_WEDGE100)
+        .modalias           = "spidev",
+        .chip_select        = 0,
+        .max_speed_hz       = 33 * 1000 * 1000,
+        .bus_num            = 1,
+#else
         .modalias           = "m25p80",
         .platform_data      = &ast_spi_flash1_data,
 #if defined(CONFIG_FBTP)
@@ -314,6 +325,7 @@ static struct spi_board_info ast_spi0_devices[] = {
         .chip_select        = 1,
         .max_speed_hz       = 50 * 1000 * 1000,
         .bus_num            = 0,
+#endif
 #endif
         .mode               = SPI_MODE_0,
     },
@@ -340,7 +352,7 @@ void __init ast_add_device_spi(void)
   } else {
     spi_register_board_info(ast_single_flash_fmc_devices, 2);
   }
-#if defined(CONFIG_FBTP) || defined(CONFIG_LIGHTNING)
+#if defined(CONFIG_FBTP) || defined(CONFIG_LIGHTNING) || defined(CONFIG_WEDGE100)
 	platform_device_register(&ast_spi0_device);
 	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
 #endif
