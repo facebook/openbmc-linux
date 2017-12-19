@@ -767,6 +767,9 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 
 		if (ifp->flags & (IFA_F_TENTATIVE|IFA_F_OPTIMISTIC)) {
 			if (dad) {
+				if (!memcmp(eth_hdr(skb)->h_source, skb->dev->dev_addr, ETH_ALEN))
+					goto out;
+
 				/*
 				 * We are colliding with another node
 				 * who is doing DAD
