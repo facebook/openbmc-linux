@@ -171,7 +171,7 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
   }
 #endif
 
-#ifdef CONFIG_FBTP
+#if defined(CONFIG_FBTP) || defined(CONFIG_PWNEPTUNE)
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
     // hack: For FBTP 1MHz
     data = 0x77744302;
@@ -495,7 +495,7 @@ ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
 {
   u32 temp;
   u32 ctrl_reg1, cmd_reg1;
-  
+
   ctrl_reg1 = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
   cmd_reg1 = ast_i2c_read(i2c_dev, I2C_CMD_REG);
 

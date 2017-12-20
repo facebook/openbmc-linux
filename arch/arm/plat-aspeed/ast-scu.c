@@ -1454,11 +1454,18 @@ ast_scu_multi_func_eth(u8 num)
 extern void
 ast_scu_multi_func_eth(u8 num)
 {
-#if defined(CONFIG_FBTP) // On FBTP, need these pins as default GPIOs
+#if  defined(CONFIG_FBTP) // On FBTP, need these pins as default GPIOs
   return;
 #endif
+
 	switch(num) {
 		case 0:
+#if defined(CONFIG_PWNEPTUNE)
+				SCUMSG("MAC0 : RGMII \n");
+				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
+							SCU_FUN_PIN_MAC0_PHY_LINK,
+					AST_SCU_FUN_PIN_CTRL1);
+#else
 			if(ast_scu_read(AST_SCU_HW_STRAP1) & SCU_HW_STRAP_MAC0_RGMII) {
 				SCUMSG("MAC0 : RGMII \n");
 				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
@@ -1470,7 +1477,7 @@ ast_scu_multi_func_eth(u8 num)
 							~SCU_FUN_PIN_MAC0_PHY_LINK,
 					AST_SCU_FUN_PIN_CTRL1);
 			}
-
+#endif
 #ifdef AST_SOC_G5
 			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
 						SCU_FUN_PIN_MAC0_PHY_LINK,

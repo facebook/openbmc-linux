@@ -522,7 +522,7 @@ struct platform_device ast_i2c_dev13_device = {
 #endif
 
 /*--------- I2C Board devices ------------*/
-#ifdef CONFIG_FBTP
+#if defined(CONFIG_FBTP) || defined(CONFIG_PWNEPTUNE)
 static struct i2c_board_info ast_i2c_board_info_0[] __initdata = {
 	// SMBus for LAN
 
@@ -1122,7 +1122,7 @@ static struct i2c_board_info __initdata ast_i2c_board_info_7[] = {
 
 #endif
 /*-------------------------------------*/
-#ifdef CONFIG_FBTP
+#if defined(CONFIG_FBTP) || defined(CONFIG_PWNEPTUNE)
 void __init ast_add_device_i2c(void)
 {
 	/* I2C Multi-Pin */

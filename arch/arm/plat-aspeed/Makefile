@@ -72,6 +72,11 @@ ifeq ($(CONFIG_YOSEMITE), y)
   PLATFB = 1
 endif
 
+ifeq ($(CONFIG_PWNEPTUNE), y)
+  obj-y += dev-uart-fbtp.o dev-i2c.o
+  PLATFB = 1
+endif
+
 ifeq ($(PLATFB), 1)
   obj-y += dev-spi-fb.o dev-i2c-common.o
 else

@@ -252,6 +252,12 @@ config FBY2
  select EGFX_IRQ
     bool "Facebook FBY2"
 
+config PWNEPTUNE
+	select USB_ARCH_HAS_EHCI
+	select AST_UART_SDMA
+	select EGFX_IRQ
+    bool "Portwell Neptune"
+
 config AST_CONSOLE_UART_BASE
     hex "Console UART base address"
     default 0x1e783000 if CMM

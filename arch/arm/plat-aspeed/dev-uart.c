@@ -193,7 +193,7 @@ static struct plat_serial8250_port ast_uart_data[] = {
 		.flags	= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 	},
 /* Without this, tty offset might change for others */
-#if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP) ||  defined(CONFIG_FBY2)
+#if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP) ||  defined(CONFIG_FBY2) || defined(CONFIG_PWNEPTUNE)
 	{
 		.mapbase	= AST_UART2_BASE,
 		.irq		= IRQ_UART2,
@@ -387,7 +387,7 @@ void __init ast_add_device_uart(void)
          reg_base + AST_LPC_HICR9);
   iounmap(reg_base);
 
-#elif defined(CONFIG_FBTP)
+#elif defined(CONFIG_FBTP) || defined (CONFIG_PWNEPTUNE)
 	ast_scu_multi_func_uart(1);
 	ast_scu_multi_func_uart(2);
 	ast_scu_multi_func_uart(3);

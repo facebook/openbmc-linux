@@ -861,6 +861,7 @@ void Get_MAC_Address_bcm(struct net_device * dev)
 
   // Update MAC Address
   printk("NCSI: MAC  ");
+
   for (i = 0; i < 6; i++)
     printk("%02X:", lp->NCSI_Respond.Payload_Data[BCM_MAC_ADDR_OFFSET+i]);
   printk("\n");
@@ -1952,7 +1953,7 @@ Re_Get_Link_Status:
 				 FTGMAC100_INT_XPKT_ETH		| \
 				 FTGMAC100_INT_XPKT_LOST	| \
 				 FTGMAC100_INT_AHB_ERR		| \
-				 FTGMAC100_INT_PHYSTS_CHG	| \
+         FTGMAC100_INT_PHYSTS_CHG | \
 				 FTGMAC100_INT_RPKT_BUF		| \
 				 FTGMAC100_INT_NO_RXBUF)
 
@@ -2916,7 +2917,7 @@ static int ftgmac100_poll(struct napi_struct *napi, int budget)
 
 	if (status & (FTGMAC100_INT_NO_RXBUF | FTGMAC100_INT_RPKT_LOST |
 		      FTGMAC100_INT_AHB_ERR
-#if !defined(CONFIG_FTGMAC100_NCSI)
+#if  !defined(CONFIG_FTGMAC100_NCSI) && !defined(CONFIG_PWNEPTUNE)
 					 | FTGMAC100_INT_PHYSTS_CHG
 #endif
 		 )) {
@@ -2986,7 +2987,7 @@ static int ftgmac100_open(struct net_device *netdev)
 
 	ftgmac100_init_hw(priv);
 
-#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || defined(CONFIG_CMM)
+#if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || defined(CONFIG_CMM) || defined (CONFIG_PWNEPTUNE)
 	ftgmac100_start_hw(priv, 1000);
 #elif defined(CONFIG_FBTP)
 	ftgmac100_start_hw(priv, 100);

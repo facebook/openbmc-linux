@@ -41,7 +41,7 @@
 #endif
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || \
-	defined(CONFIG_CMM) || defined(CONFIG_FBTP) || \
+	defined(CONFIG_CMM) || defined(CONFIG_FBTP) || defined(CONFIG_PWNEPTUNE) || \
 	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)
 #define DRVNAME "ftgmac100"
 #else
@@ -154,7 +154,6 @@ void __init ast_add_device_gmac(void)
 	// the latest open source drivers do not, so we drop the first
 	// MAC specs.
 #if !defined(CONFIG_WEDGE) && !defined(CONFIG_WEDGE100) && !defined(CONFIG_CMM)
-
 	ast_eth0_data.DF_support = !isRevA0;
 
 	ast_scu_init_eth(0);
@@ -194,6 +193,8 @@ void __init ast_add_device_gmac(void)
 #endif
 #endif
 
+#if !defined(CONFIG_PWNEPTUNE)  // Neptune platform doesn't support MAC1 at the moment
+
 #ifdef AST_MAC1_BASE
 	ast_scu_init_eth(1);
 	ast_scu_multi_func_eth(1);
@@ -218,8 +219,8 @@ void __init ast_add_device_gmac(void)
 
 	platform_device_register(&ast_eth1_device);
 
-#endif
-
+#endif // #ifdef AST_MAC1_BASE
+#endif //  #if !defined(CONFIG_PWNEPTUNE)
 }
 #else
 void __init ast_add_device_gmac(void) {}
