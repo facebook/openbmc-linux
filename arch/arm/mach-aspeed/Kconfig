@@ -206,6 +206,9 @@ config WEDGE
 config WEDGE100
         bool "Facebook Wedge100"
 
+config MINIPACK
+        bool "Facebook Minipack"
+
 config GALAXY100
         bool "Facebook GALAXY100 (Backpack) LC/FC"
 
@@ -262,6 +265,7 @@ config AST_CONSOLE_UART_BASE
     hex "Console UART base address"
     default 0x1e783000 if CMM
     default 0x1e78e000 if WEDGE || WEDGE100
+    default 0x1e783000 if MINIPACK
     default 0x1e784000 if FBTP
     default 0x1e784000 if FBY2
     default 0x1e784000
