@@ -42,7 +42,8 @@
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || \
 	defined(CONFIG_CMM) || defined(CONFIG_FBTP) || defined(CONFIG_PWNEPTUNE) || \
-	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)
+	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || \
+	defined(CONFIG_YOSEMITE) || defined(CONFIG_MINIPACK)
 #define DRVNAME "ftgmac100"
 #else
 #define DRVNAME "ast_gmac"
@@ -153,7 +154,8 @@ void __init ast_add_device_gmac(void)
 	// MAC0.  Older drivers would drop interfaces without PHYs, but
 	// the latest open source drivers do not, so we drop the first
 	// MAC specs.
-#if !defined(CONFIG_WEDGE) && !defined(CONFIG_WEDGE100) && !defined(CONFIG_CMM)
+#if !defined(CONFIG_WEDGE) && !defined(CONFIG_WEDGE100) && \
+    !defined(CONFIG_CMM) && !defined(CONFIG_MINIPACK)
 	ast_eth0_data.DF_support = !isRevA0;
 
 	ast_scu_init_eth(0);
