@@ -202,6 +202,26 @@ static struct soc_id soc_map_table[] = {
 		.name = "AST2530-A1",
 		.rev_id = 0x04010403,
 	},
+	[27] = {
+		.name = "AST3200-A2",
+		.rev_id = 0x04032003,
+	},
+	[28] = {
+		.name = "AST2500-A2",
+		.rev_id = 0x04030303,
+	},
+	[29] = {
+		.name = "AST2510-A2",
+		.rev_id = 0x04030103,
+	},
+	[30] = {
+		.name = "AST2520-A2",
+		.rev_id = 0x04030203,
+	},
+	[31] = {
+		.name = "AST2530-A2",
+		.rev_id = 0x04030403,
+	},
 };
 //***********************************Initial control***********************************
 #ifdef SCU_RESET_VIDEO
