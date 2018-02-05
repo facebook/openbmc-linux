@@ -348,9 +348,9 @@ void __init ast_add_device_spi(void)
   /* Use kernel configuration from u-boot to enable dual
    * flash FMC configuration */
   if (dual_flash_enabled) {
-    spi_register_board_info(ast_dual_flash_fmc_devices, 2);
+    spi_register_board_info(ast_dual_flash_fmc_devices, ARRAY_SIZE(ast_dual_flash_fmc_devices));
   } else {
-    spi_register_board_info(ast_single_flash_fmc_devices, 2);
+    spi_register_board_info(ast_single_flash_fmc_devices, ARRAY_SIZE(ast_single_flash_fmc_devices));
   }
 #if defined(CONFIG_FBTP) || defined(CONFIG_LIGHTNING) || defined(CONFIG_WEDGE100) || defined(CONFIG_PWNEPTUNE)
 	platform_device_register(&ast_spi0_device);
