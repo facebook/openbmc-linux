@@ -1657,32 +1657,50 @@ ast_scu_multi_func_i2c(void)
 #else
        // In AST2400 and AST2500, i2c 10 - 13 pins are shared w/ SD/MMC.
 #ifdef CONFIG_MMC_AST
+       /* Minipack use i2c 10 - 13 pin as i2c function and SD2 function */
+#ifdef CONFIG_MINIPACK
+	ast_scu_write((ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
+                                        SCU_FUC_PIN_I2C3 |
+                                        SCU_FUC_PIN_I2C4 |
+                                        SCU_FUC_PIN_I2C5 |
+                                        SCU_FUC_PIN_I2C6 |
+                                        SCU_FUC_PIN_I2C7 |
+                                        SCU_FUC_PIN_I2C8 |
+                                        SCU_FUC_PIN_I2C9 |
+                                        SCU_FUC_PIN_I2C10 |
+                                        SCU_FUC_PIN_I2C11 |
+                                        SCU_FUC_PIN_I2C12 |
+                                        SCU_FUC_PIN_I2C13 |
+                                        SCU_FUC_PIN_I2C14) & ~(SCU_FUC_PIN_SD1),
+			AST_SCU_FUN_PIN_CTRL5);
+#else
        ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
-                       SCU_FUC_PIN_I2C3 |
-                       SCU_FUC_PIN_I2C4 |
-                       SCU_FUC_PIN_I2C5 |
-                       SCU_FUC_PIN_I2C6 |
-                       SCU_FUC_PIN_I2C7 |
-                       SCU_FUC_PIN_I2C8 |
-                       SCU_FUC_PIN_I2C9 |
-                       SCU_FUC_PIN_I2C14,
-               AST_SCU_FUN_PIN_CTRL5);
+					SCU_FUC_PIN_I2C3 |
+					SCU_FUC_PIN_I2C4 |
+					SCU_FUC_PIN_I2C5 |
+					SCU_FUC_PIN_I2C6 |
+					SCU_FUC_PIN_I2C7 |
+		                        SCU_FUC_PIN_I2C8 |
+					SCU_FUC_PIN_I2C9 |
+					SCU_FUC_PIN_I2C14,
+			AST_SCU_FUN_PIN_CTRL5);
+#endif
 #else
        ast_scu_write((ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
-			SCU_FUC_PIN_I2C3 |
-			SCU_FUC_PIN_I2C4 |
-			SCU_FUC_PIN_I2C5 |
-			SCU_FUC_PIN_I2C6 |
-			SCU_FUC_PIN_I2C7 |
-			SCU_FUC_PIN_I2C8 |
-			SCU_FUC_PIN_I2C9 |
-			SCU_FUC_PIN_I2C10 |
-			SCU_FUC_PIN_I2C11 |
-			SCU_FUC_PIN_I2C12 |
-			SCU_FUC_PIN_I2C13 |
-			SCU_FUC_PIN_I2C14) &
-			~(SCU_FUC_PIN_SD1 | SCU_FUC_PIN_SD2),
-		AST_SCU_FUN_PIN_CTRL5);
+					SCU_FUC_PIN_I2C3 |
+					SCU_FUC_PIN_I2C4 |
+					SCU_FUC_PIN_I2C5 |
+					SCU_FUC_PIN_I2C6 |
+					SCU_FUC_PIN_I2C7 |
+					SCU_FUC_PIN_I2C8 |
+					SCU_FUC_PIN_I2C9 |
+					SCU_FUC_PIN_I2C10 |
+					SCU_FUC_PIN_I2C11 |
+					SCU_FUC_PIN_I2C12 |
+					SCU_FUC_PIN_I2C13 |
+					SCU_FUC_PIN_I2C14) &
+					~(SCU_FUC_PIN_SD1 | SCU_FUC_PIN_SD2),
+			AST_SCU_FUN_PIN_CTRL5);
 
 #endif
 #endif

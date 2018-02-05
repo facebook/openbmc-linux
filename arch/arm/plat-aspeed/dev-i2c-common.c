@@ -433,7 +433,7 @@ void __init ast_add_device_i2c_common(void)
 	platform_device_register(&ast_i2c_dev7_device);
 	platform_device_register(&ast_i2c_dev8_device);
 
-#if !defined(CONFIG_MMC_AST)
+#if !defined(CONFIG_MMC_AST) || defined(CONFIG_MINIPACK)
 	/*
 	 * i2c buses 9, 10, 11, 12 share pins with eMMC.
 	 * not used in this board.

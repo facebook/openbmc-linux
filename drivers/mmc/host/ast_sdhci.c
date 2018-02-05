@@ -1633,7 +1633,7 @@ out:
  *                                                                           *
 \*****************************************************************************/
 
-#ifdef CONFIG_PM
+#if defined CONFIG_PM && !defined CONFIG_MINIPACK
 
 static int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
 {
@@ -2157,7 +2157,7 @@ static struct platform_driver ast_sdhci_driver = {
 	.driver.owner	= THIS_MODULE,
 	.probe		= sdhci_probe,
 	.remove		= sdhci_remove_host,
-#ifdef CONFIG_PM	
+#if defined CONFIG_PM && !defined CONFIG_MINIPACK
 	.resume		= sdhci_resume_host,
 	.suspend	= sdhci_suspend_host,
 #endif
