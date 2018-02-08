@@ -1402,6 +1402,22 @@ ast_set_pwm_duty_falling(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 pwm_ch, u8
 
 }
 
+/* NAME sysfs */
+static ssize_t
+show_name(struct device *dev, struct device_attribute *devattr,
+                             char *buf)
+{
+    return sprintf(buf, "ast_pwm\n");
+}
+static SENSOR_DEVICE_ATTR_2(name, S_IRUGO, show_name, NULL, 0, 0);
+static struct attribute *name_attributes[] = {
+    &sensor_dev_attr_name.dev_attr.attr,
+      NULL
+};
+static const struct attribute_group name_attribute_groups = {
+    .attrs = name_attributes,
+};
+
 /*PWM M/N/O Type sysfs*/
 /*
  * Macro defining SENSOR_DEVICE_ATTR for a pwm sysfs entries.
@@ -1956,6 +1972,50 @@ static const struct attribute_group tacho_attribute_groups[] = {
 	{ .attrs = tacho15_attributes },
 };
 
+#define sysfs_fan_speeds_num(index) \
+  static SENSOR_DEVICE_ATTR_2(fan##index##_input, S_IRUGO,  \
+        ast_show_tacho_speed, NULL, 2, index - 1); \
+static struct attribute *fan##index##_attributes[] = { \
+    &sensor_dev_attr_fan##index##_input.dev_attr.attr,  \
+    NULL \
+};
+
+sysfs_fan_speeds_num(1);
+sysfs_fan_speeds_num(2);
+sysfs_fan_speeds_num(3);
+sysfs_fan_speeds_num(4);
+sysfs_fan_speeds_num(5);
+sysfs_fan_speeds_num(6);
+sysfs_fan_speeds_num(7);
+sysfs_fan_speeds_num(8);
+sysfs_fan_speeds_num(9);
+sysfs_fan_speeds_num(10);
+sysfs_fan_speeds_num(11);
+sysfs_fan_speeds_num(12);
+sysfs_fan_speeds_num(13);
+sysfs_fan_speeds_num(14);
+sysfs_fan_speeds_num(15);
+sysfs_fan_speeds_num(16);
+
+static const struct attribute_group fan_attribute_groups[] = {
+    { .attrs = fan1_attributes },
+    { .attrs = fan2_attributes },
+    { .attrs = fan3_attributes },
+    { .attrs = fan4_attributes },
+    { .attrs = fan5_attributes },
+    { .attrs = fan6_attributes },
+    { .attrs = fan7_attributes },
+    { .attrs = fan8_attributes },
+    { .attrs = fan9_attributes },
+    { .attrs = fan10_attributes },
+    { .attrs = fan11_attributes },
+    { .attrs = fan12_attributes },
+    { .attrs = fan13_attributes },
+    { .attrs = fan14_attributes },
+    { .attrs = fan15_attributes },
+    { .attrs = fan16_attributes },
+};
+
 static int
 ast_pwm_tacho_probe(struct platform_device *pdev)
 {
@@ -2007,6 +2067,11 @@ ast_pwm_tacho_probe(struct platform_device *pdev)
 		goto out_region;
 	}
 
+  /* Register sysfs hooks */
+  err = sysfs_create_group(&pdev->dev.kobj, &name_attribute_groups);
+  if (err)
+    goto out_region;
+
 	/* Register sysfs hooks */
 	err = sysfs_create_group(&pdev->dev.kobj, &clk_attribute_groups);
 	if (err)
@@ -2043,11 +2108,21 @@ ast_pwm_tacho_probe(struct platform_device *pdev)
 			goto out_sysfs3;
 	}
 
+  for(i=0; i< TACHO_NUM; i++) {
+    err = sysfs_create_group(&pdev->dev.kobj, &fan_attribute_groups[i]);
+    if (err)
+      goto out_sysfs4;
+  }
+
 	ast_pwm_taco_init();
 
 	printk(KERN_INFO "ast_pwm_tacho: driver successfully loaded.\n");
 
 	return 0;
+
+out_sysfs4:
+	for(i=0; i< TACHO_NUM; i++)
+		sysfs_remove_group(&pdev->dev.kobj, &fan_attribute_groups[i]);
 
 out_sysfs3:
 	for(i=0; i< TACHO_NUM; i++)
@@ -2062,6 +2137,8 @@ out_sysfs1:
 		sysfs_remove_group(&pdev->dev.kobj, &pwm_attribute_groups[i]);
 out_sysfs0:
 	sysfs_remove_group(&pdev->dev.kobj, &clk_attribute_groups);
+out_sysfs00:
+  sysfs_remove_group(&pdev->dev.kobj, &name_attribute_groups);
 
 //out_irq:
 //	free_irq(ast_pwm_tacho->irq, NULL);
@@ -2094,6 +2171,8 @@ ast_pwm_tacho_remove(struct platform_device *pdev)
 		sysfs_remove_group(&pdev->dev.kobj, &pwm_attribute_groups[i]);
 
 	sysfs_remove_group(&pdev->dev.kobj, &clk_attribute_groups);
+
+  sysfs_remove_group(&pdev->dev.kobj, &name_attribute_groups);
 
 	platform_set_drvdata(pdev, NULL);
 //	free_irq(ast_pwm_tacho->irq, ast_pwm_tacho);
