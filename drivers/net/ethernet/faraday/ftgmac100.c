@@ -966,7 +966,8 @@ do {
 
 
 #define BCM_RETRY_MAX	2
-int Prepare_for_Host_Powerup_Bcm (struct net_device * dev, int host_id)
+int Prepare_for_Host_Powerup_Bcm (struct net_device * dev,
+                         unsigned int host_id, unsigned int reinit_type)
 {
 	int ret = 0, tmo;
 	struct ftgmac100 *lp = netdev_priv(dev);
@@ -1013,6 +1014,7 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev, int host_id)
 		lp->Payload_Data[6] = 0x00;   // 6~7: OEM Payload Length
 		lp->Payload_Data[7] = oem_payload_len;
 
+		lp->Payload_Data[13] = (unsigned char)reinit_type; // 13: ReInit Type
 		lp->Payload_Data[14] = 0x00;  // 14~15: HOST ID
 		lp->Payload_Data[15] = (unsigned char)host_id;
 
@@ -1076,13 +1078,16 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev, int host_id)
 /* sysfs hooks */
 #define HOST_ID_MIN   1
 #define HOST_ID_MAX   4
+
+#define REINIT_TYPE_FULL          0
+#define REINIT_TYPE_HOST_RESOURCE 1
 /**
  *  Set function to write firmware to device's persistent memory
  */
 static ssize_t Perform_Nic_Powerup_Prep(struct device *dev,
 				struct device_attribute *attr, const char *buf, size_t count)
 {
-	int host_id;
+	unsigned int combo_id, reinit_type, host_id;
 	struct net_device *netdev = to_net_dev(dev);
 	struct ftgmac100 *lp = netdev_priv(netdev);
 
@@ -1092,16 +1097,25 @@ static ssize_t Perform_Nic_Powerup_Prep(struct device *dev,
 		return count;
 	}
 
-	sscanf(buf, "%d", &host_id);
+	// This is a combo ID consists of the following fields:
+	// bit 11~8: reinit_type
+	// bit 7~0:  host_id
+	sscanf(buf, "%u", &combo_id);
+	host_id = combo_id & 0xFF;
+	reinit_type = (combo_id>>8) & 0xF;
 	if (host_id < HOST_ID_MIN || host_id > HOST_ID_MAX) {
 		printk("\nNIC Powerup Prep Err: invalid host id %d!\n", host_id);
 		return -1;
 	}
-	lp->powerup_prep_host_id = (unsigned int)host_id;
-	printk("\nNIC Powerup Prep for slot %d.\n", host_id);
+	if (reinit_type > REINIT_TYPE_HOST_RESOURCE) {
+		printk("\nNIC Powerup Prep Err: invalid reinit type %d!\n", reinit_type);
+		return -1;
+	}
+	lp->powerup_prep_host_id = combo_id;
+	printk("\nNIC Powerup Prep (type %u) for slot %u.\n", reinit_type, host_id);
 
 	// Send NC-SI cmd
-	if (Prepare_for_Host_Powerup_Bcm(netdev, host_id) != 0) {
+	if (Prepare_for_Host_Powerup_Bcm(netdev, host_id, reinit_type) != 0) {
 		return -1;
 	}
 
