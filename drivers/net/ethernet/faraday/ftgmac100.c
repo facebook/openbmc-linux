@@ -43,7 +43,11 @@
 #include <asm/uaccess.h>
 #include "ftgmac100.h"
 #include <linux/time.h>
+#include <linux/netlink.h>
+#include <linux/skbuff.h>
+
 // #define TIME_POWERUP_PREP
+
 
 #define DRV_NAME	"ftgmac100"
 #define DRV_VERSION	"0.7"
@@ -108,6 +112,29 @@ struct ftgmac100 {
 #endif
 };
 
+#ifdef CONFIG_FTGMAC100_NCSI
+
+#define NETLINK_USER 31
+
+#define MAX_PAYLOAD 128 /* maximum payload size*/
+typedef struct ncsi_nl_msg_t {
+  char dev_name[10];
+  unsigned char channel_id;
+  unsigned char cmd;
+  unsigned char payload_length;
+  unsigned char msg_payload[MAX_PAYLOAD];
+} NCSI_NL_MSG_T;
+
+
+#define MAX_RESPONSE_PAYLOAD 128 /* maximum payload size*/
+typedef struct ncsi_nl_response {
+  unsigned char payload_length;
+  unsigned char msg_payload[MAX_RESPONSE_PAYLOAD];
+} NCSI_NL_RSP_T;
+
+NCSI_NL_RSP_T ncsi_nl_rsp;
+#endif
+
 static int ftgmac100_alloc_rx_page(struct ftgmac100 *priv,
                                    int rxdes_idx,  gfp_t gfp);
 
@@ -117,6 +144,10 @@ static int ftgmac100_alloc_rx_page(struct ftgmac100 *priv,
 #define ETH_P_NCSI 0x88F8
 
 struct mutex ncsi_mutex;
+
+static struct sock *netlink_sk = NULL;
+static DEFINE_MUTEX(netlink_mutex);
+
 
 static int Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev);
 
@@ -977,8 +1008,8 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev,
 	unsigned int oem_payload_len = 4;
 	unsigned int oem_cmd_len = OEM_HDR_LEN_BCM + oem_payload_len;
 
-	unsigned long loop_cnt=0;
 #ifdef TIME_POWERUP_PREP
+	unsigned long loop_cnt=0;
 	struct timeval t_start, t_end;
 	long usec_elapsed;
 #endif
@@ -1142,7 +1173,8 @@ static DEVICE_ATTR(powerup_prep_host_id, S_IRUGO | S_IWUSR | S_IWGRP,
 
 
 static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
-	                                  unsigned char cmd, unsigned char length, unsigned char *buf)
+													unsigned char cmd, unsigned char length, unsigned char *buf,
+													unsigned char *res_length, unsigned char *res_buf)
 {
 	struct ftgmac100 *lp = netdev_priv(dev);
 	unsigned long Combined_Channel_ID, i;
@@ -1194,9 +1226,18 @@ static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
 	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
 	lp->Retry = 0;
 
+	if (tmo) {
+		*res_length = be16_to_cpu(lp->NCSI_Respond.Payload_Length);
+		memcpy(res_buf, (u8 *)&lp->NCSI_Respond.Response_Code, *res_length);
+	}
+	else {
+		*res_length = 4;
+		memset(res_buf, 0xff, *res_length);
+	}
 
   mutex_unlock(&ncsi_mutex);
 
+#ifdef NCSI_DEBUG
 	if (!tmo) {
 		printk("timed out!");
 	} else {
@@ -1209,57 +1250,125 @@ static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
 		}
 	}
 	printk("\n\n");
+#endif
 }
 
-/**
- *  Set function to write firmware to device's persistent memory
- */
-static ssize_t send_ncsi_cmd_handler(struct device *dev,
-                struct device_attribute *attr, const char *buf, size_t count)
+
+/* find the matching net device */
+static struct net_device* getdev(char *dev_name)
 {
-  unsigned char data[128]={0};
-  struct net_device *netdev = to_net_dev(dev);
-	int i;
-	int num_data = 0;
+  struct net_device *dev;
+
+  read_lock(&dev_base_lock);
+  dev = first_net_device(&init_net);
+  while (dev) {
+#ifdef NCSI_NL_DEBUG
+    printk(KERN_INFO "found [%s]\n", dev->name);
+#endif
+    if (strcmp(dev_name, dev->name) == 0)
+      break;
+    dev = next_net_device(dev);
+  }
+  read_unlock(&dev_base_lock);
+
+  return dev;
+}
 
 
-  int nums_now, bytes_now;
-  int bytes_consumed = 0, nums_read = 0;
 
-#ifdef NCSI_DEBUG
-  printk("    data received at kernel, byte count=%d\n", count);
+static void ncsi_recv_msg_cb(struct sk_buff *skb)
+{
+	struct nlmsghdr *nlh;
+	int pid;
+  struct net_device *dev;
+  NCSI_NL_MSG_T *buf;
+
+  /* for outgoing message response */
+	struct sk_buff *skb_out;
+	int msg_size;
+	unsigned char *msg;
+	int res;
+
+	nlh = (struct nlmsghdr*)skb->data;
+  buf = (NCSI_NL_MSG_T*)nlmsg_data(nlh);
+
+#ifdef NCSI_NL_DEBUG
+	int i = 0;
+  printk("%s    channel_id=0x%x, cmd 0x%x\n    data=",
+	        __FUNCTION__, buf->channel_id, buf->cmd);
+  for (i=0; i<buf->payload_length; ++i)
+      printk("0x%x ", buf->msg_payload[i]);
+  printk("\n");
 #endif
 
-  while ( ( nums_now =
-          sscanf( buf + bytes_consumed, "%d%n", &(data[nums_read]), &bytes_now )
-          ) > 0 ) {
-      bytes_consumed += bytes_now;
-      nums_read += nums_now;
+  /* find the matching net device for NC-SI cmd */
+  dev = getdev(buf->dev_name);
+  if (!dev) {
+    printk(KERN_ERR "%s: failed to find matching device\n", __FUNCTION__);
+    return;
   }
-	num_data = nums_read;
 
-  printk("    channel_id=0x%x, cmd 0x%x\n    data=", data[0], data[1]);
-  for (i=2; i<num_data; ++i)
-      printk("0x%x ", data[i]);
-  printk("\n");
+	send_ncsi_cmd(dev, buf->channel_id, buf->cmd, buf->payload_length,
+	             buf->msg_payload,
+							 &(ncsi_nl_rsp.payload_length), &(ncsi_nl_rsp.msg_payload[0]));
+	msg_size = sizeof(NCSI_NL_RSP_T);
+	msg = (unsigned char *)&ncsi_nl_rsp;
 
-	// data[0] channel_id, data[1] cmd,  data[1..n] payload
-	unsigned char channel_id = data[0];
-	unsigned char cmd  = data[1];
-	unsigned char len = num_data -2;
+  /* send the NC-Si response back via Netlink socket */
+	pid = nlh->nlmsg_pid; /*pid of sending process */
+	skb_out = nlmsg_new(msg_size,0);
+	if(!skb_out) {
+		printk(KERN_ERR "%s: Failed to allocate new skb\n", __FUNCTION__);
+		return;
+	}
 
-  send_ncsi_cmd(netdev, channel_id, cmd, len, &(data[2]));
+	nlh=nlmsg_put(skb_out,0,0,NLMSG_DONE,msg_size,0);
+	NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
+	memcpy(nlmsg_data(nlh), msg, msg_size);
 
-  return count;
+	res=nlmsg_unicast(skb->sk, skb_out, pid);
+	if(res<0)
+	{
+		printk(KERN_INFO "%s: Error while sending bak to user\n", __FUNCTION__);
+	}
+}
+
+/* call back function for netlink receive */
+static void ncsi_recv_nl_msg(struct sk_buff *skb)
+{
+	mutex_lock(&netlink_mutex);
+	ncsi_recv_msg_cb(skb);
+	mutex_unlock(&netlink_mutex);
 }
 
 
-/**
- * cmd_payload attribute to be exported per ast_gmac.0 interface through sysfs
- * (/sys/devices/platform/ftgmac100.0/net/eth0/cmd_payload).
- */
-static DEVICE_ATTR(cmd_payload, S_IWUSR | S_IWGRP,
-                   NULL, send_ncsi_cmd_handler);
+static int __init ncsi_nl_socket_init(void)
+{
+	struct netlink_kernel_cfg cfg = {
+		/*  call back function when netlink msg is received */
+		.input = ncsi_recv_nl_msg,
+	};
+
+	if (!netlink_sk) {
+		netlink_sk = netlink_kernel_create(&init_net, NETLINK_USER, &cfg);
+		if (!netlink_sk) {
+			printk("%s: Error creating netlink socket\n", __FUNCTION__);
+			return -10;
+		}
+		printk("%s: created netlink socket\n", __FUNCTION__);
+	}
+
+	return 0;
+}
+
+
+static void __exit ncsi_nl_socket_exit(void)
+{
+	if (netlink_sk) {
+		netlink_kernel_release(netlink_sk);
+		netlink_sk = NULL;
+	}
+}
 
 
 
@@ -2696,6 +2805,7 @@ err:
 	return -ENOMEM;
 }
 
+#ifndef CONFIG_FTGMAC100_NCSI
 /******************************************************************************
  * internal functions (mdio)
  *****************************************************************************/
@@ -2725,6 +2835,7 @@ static void ftgmac100_adjust_link(struct net_device *netdev)
 	/* re-enable interrupts */
 	iowrite32(ier, priv->base + FTGMAC100_OFFSET_IER);
 }
+
 
 static int ftgmac100_mii_probe(struct ftgmac100 *priv)
 {
@@ -2833,6 +2944,7 @@ static int ftgmac100_mdiobus_write(struct mii_bus *bus, int phy_addr,
 	netdev_err(netdev, "mdio write timed out\n");
 	return -EIO;
 }
+#endif // #ifndef CONFIG_FTGMAC100_NCSI
 
 /******************************************************************************
  * struct ethtool_ops functions
@@ -3171,7 +3283,9 @@ static int ftgmac100_probe(struct platform_device *pdev)
 	struct net_device *netdev;
 	struct ftgmac100 *priv;
 	int err;
+#ifndef CONFIG_FTGMAC100_NCSI
 	int i;
+#endif
 
 	if (!pdev)
 		return -ENODEV;
@@ -3280,28 +3394,26 @@ static int ftgmac100_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_FTGMAC100_NCSI
- if (device_create_file(&netdev->dev, &dev_attr_cmd_payload))
-   printk("error: cannot register cmd_payload attribute.\n");
-	else
-   printk("dev_attr_cmd_payload registered\n");
-
 	if (device_create_file(&netdev->dev, &dev_attr_powerup_prep_host_id))
 		printk("error: cannot register powerup_prep_host_id attribute.\n");
 	else
 		printk("dev_attr_powerup_prep_host_id registered\n");
 
+	ncsi_nl_socket_init();
   mutex_init(&ncsi_mutex);
 #endif
 	return 0;
 
 err_register_netdev:
 	phy_disconnect(priv->phydev);
+#ifndef CONFIG_FTGMAC100_NCSI
 err_mii_probe:
 	mdiobus_unregister(priv->mii_bus);
 err_register_mdiobus:
 	mdiobus_free(priv->mii_bus);
 err_alloc_mdiobus:
 	iounmap(priv->base);
+#endif // #ifndef CONFIG_FTGMAC100_NCSI
 err_ioremap:
 	release_resource(priv->res);
 err_req_mem:
@@ -3319,8 +3431,8 @@ static int __exit ftgmac100_remove(struct platform_device *pdev)
 	netdev = platform_get_drvdata(pdev);
 
 #ifdef CONFIG_FTGMAC100_NCSI
-	device_remove_file(&netdev->dev, &dev_attr_cmd_payload);
 	device_remove_file(&netdev->dev, &dev_attr_powerup_prep_host_id);
+	ncsi_nl_socket_exit();
 #endif
 
 	priv = netdev_priv(netdev);
