@@ -22,6 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
+#include <linux/spi/eeprom.h>
 #include <linux/spi/flash.h>
 #include <linux/spi/spi.h>
 #include <asm/io.h>
@@ -38,7 +39,7 @@ static int dual_flash_enabled = 0;
 static u32 ast_spi_calculate_divisor(u32 max_speed_hz)
 {
 	/* [0] ->15 : HCLK , HCLK/16 */
-	u32 SPI_DIV[16] = {16, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 0};
+	u32 SPI_DIV[16] = {15, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 0};
 	u32 i, hclk, spi_cdvr=0;
 
 	hclk = ast_get_ahbclk();
@@ -54,7 +55,7 @@ static u32 ast_spi_calculate_divisor(u32 max_speed_hz)
 
 /*
  * FMC: Firmware SPI Memory Controller
- * SPI0: SPI Flash Controller
+ * SPI0, SPI1: SPI Flash Controller
  */
 
 static struct ast_spi_driver_data ast_fmc_driver_data = {
@@ -66,6 +67,13 @@ static struct ast_spi_driver_data ast_spi0_driver_data = {
     .get_div = ast_spi_calculate_divisor,
     .num_chipselect = 1,
 };
+
+#if defined AST_SOC_G5
+static struct ast_spi_driver_data ast_spi1_driver_data = {
+    .get_div = ast_spi_calculate_divisor,
+    .num_chipselect = 2,
+};
+#endif
 
 static struct resource ast_fmc_resource[] = {
 	{
@@ -114,8 +122,37 @@ static struct resource ast_spi0_resource[] = {
      .start  = AST_SPI0_CS0_BASE,
      .end    = AST_SPI0_CS0_BASE + SZ_16,
      .flags  = IORESOURCE_BUS,
-  },
+	},
+#if defined CONFIG_AST_SPI0_CS1
+  {
+     .start  = AST_SPI0_CS1_BASE,
+     .end    = AST_SPI0_CS1_BASE + SZ_16,
+     .flags  = IORESOURCE_BUS,
+	},
+#endif
 };
+
+#if defined AST_SOC_G5
+static struct resource ast_spi1_resource[] = {
+  {
+     .start  = AST_SPI1_BASE,
+     .end    = AST_SPI1_BASE + SZ_16,
+     .flags  = IORESOURCE_MEM,
+  },
+  {
+     .start  = AST_SPI1_CS0_BASE,
+     .end    = AST_SPI1_CS0_BASE + SZ_16,
+     .flags  = IORESOURCE_BUS,
+  },
+#if defined CONFIG_AST_SPI1_CS1
+  {
+     .start  = AST_SPI1_CS1_BASE,
+     .end    = AST_SPI1_CS1_BASE + SZ_16,
+     .flags  = IORESOURCE_BUS,
+  },
+#endif
+};
+#endif
 
 static struct platform_device ast_fmc_device = {
 	.name           = "fmc-spi",
@@ -128,7 +165,7 @@ static struct platform_device ast_fmc_device = {
 };
 
 static struct platform_device ast_spi0_device = {
-#if defined CONFIG_WEDGE100
+#if defined CONFIG_WEDGE100 || defined CONFIG_MINIPACK
           .name           = "ast-spi",
           .id             = 1,
 #else
@@ -141,6 +178,19 @@ static struct platform_device ast_spi0_device = {
       .num_resources  = ARRAY_SIZE(ast_spi0_resource),
       .resource       = ast_spi0_resource,
 };
+
+#if defined AST_SOC_G5
+static struct platform_device ast_spi1_device = {
+  .name           = "ast-spi",
+  .id             = 2,
+
+  .dev = {
+    .platform_data = &ast_spi1_driver_data,
+  },
+  .num_resources  = ARRAY_SIZE(ast_spi1_resource),
+  .resource       = ast_spi1_resource,
+};
+#endif
 
 static struct mtd_partition ast_legacy_partitions[] = {
 	{
@@ -306,10 +356,20 @@ static struct spi_board_info ast_single_flash_fmc_devices[] = {
 	},
 };
 
-#if defined(CONFIG_FBTP)  || defined(CONFIG_LIGHTNING) || defined (CONFIG_WEDGE100) || defined (CONFIG_PWNEPTUNE)
+#ifdef CONFIG_MINIPACK
+static struct spi_eeprom m95m02 = {
+  .byte_len    = SZ_2M / 8,
+  .name        = "m95m02",
+  .page_size   = 256,
+  .flags       = EE_ADDR3,
+};
+#endif
+
+#if defined(CONFIG_FBTP)  || defined(CONFIG_LIGHTNING) || defined (CONFIG_WEDGE100) || defined (CONFIG_PWNEPTUNE) || \
+    defined(CONFIG_MINIPACK)
 static struct spi_board_info ast_spi0_devices[] = {
     {
-#if defined(CONFIG_WEDGE100)
+#if defined(CONFIG_WEDGE100) || defined(CONFIG_MINIPACK)
         .modalias           = "spidev",
         .chip_select        = 0,
         .max_speed_hz       = 33 * 1000 * 1000,
@@ -329,6 +389,28 @@ static struct spi_board_info ast_spi0_devices[] = {
 #endif
         .mode               = SPI_MODE_0,
     },
+};
+#endif
+
+#if defined AST_SOC_G5
+static struct spi_board_info ast_spi1_devices[] = {
+#if defined CONFIG_MINIPACK
+  {
+    .modalias           = "spidev",
+    .chip_select        = 0,
+    .max_speed_hz       = 33 * 1000 * 1000,
+    .bus_num            = 2,
+    .mode               = SPI_MODE_0,
+  },
+  {
+    .modalias           = "at25",
+    .platform_data      = &m95m02,
+    .chip_select        = 1,
+    .max_speed_hz       = 5 * 1000 * 1000,
+    .bus_num            = 2,
+    .mode               = SPI_MODE_0,
+  },
+#endif
 };
 #endif
 
@@ -355,5 +437,10 @@ void __init ast_add_device_spi(void)
 #if defined(CONFIG_FBTP) || defined(CONFIG_LIGHTNING) || defined(CONFIG_WEDGE100) || defined(CONFIG_PWNEPTUNE)
 	platform_device_register(&ast_spi0_device);
 	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
+#elif defined(CONFIG_MINIPACK)
+	platform_device_register(&ast_spi0_device);
+	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
+	platform_device_register(&ast_spi1_device);
+	spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
 #endif
 }

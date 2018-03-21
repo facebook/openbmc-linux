@@ -15,13 +15,19 @@
 
 /* Register offsets */
 #define AST_SPI_CONFIG			0x00
+#if defined AST_SOC_G5
+#define AST_SPI_CTRL_CS0		0x10
+#define AST_SPI_CTRL_CS1		0x14
+#define AST_SPI_TIMING			0x94
+#else
 #define AST_SPI_CTRL			0x04
 #define AST_SPI_MISC			0x10
 #define AST_SPI_TIMING			0x14
+#endif
 
 /* AST_SPI_CONFIG 0x00 : SPI Flash Configuration Register */
-#define SPI_CONF_CS1_WRITE		(0x17 << 1)
-#define SPI_CONF_CS0_WRITE		(0x16 << 1)
+#define SPI_CONF_CS1_WRITE		(1 << 17)
+#define SPI_CONF_CS0_WRITE		(1 << 16)
 
 
 #define SPI_CONF_CLKX2			(0x1 << 1)

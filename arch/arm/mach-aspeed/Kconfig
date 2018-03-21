@@ -189,6 +189,12 @@ config AST_CS4_NONE
 
 endchoice
 
+config AST_SPI0_CS1
+        bool "SPI0_CS1"
+
+config AST_SPI1_CS1
+        bool "SPI1_CS1"
+
 endmenu
 
 config AST_SCU_LOCK

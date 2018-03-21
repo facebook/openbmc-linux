@@ -46,7 +46,7 @@
 
 struct ast_spi_host {
 	void __iomem		*reg;			
-	void __iomem		*buff;			
+	u32		buff[5];
 	struct ast_spi_driver_data *spi_data;
 	struct spi_master *master;
 	struct spi_device *spi_dev;
@@ -78,7 +78,7 @@ ast_spi_read(struct ast_spi_host *spi, u32 reg)
 #define MODEBITS (SPI_CPOL | SPI_CPHA | SPI_CS_HIGH)
 
 static int
-ast_spi_setup(struct spi_device *spi)
+ast_g5_spi_setup(struct spi_device *spi)
 {
 	struct ast_spi_host *host = (struct ast_spi_host *)spi_master_get_devdata(spi->master);
 	unsigned int         bits = spi->bits_per_word;
@@ -87,16 +87,17 @@ ast_spi_setup(struct spi_device *spi)
 	u32 divisor;
 	
 	int err = 0;
+#if !defined AST_SOC_G5
 	return err;
+#else
 
-//	printk( "ast_spi_setup()!!!!------ , cs %d\n", spi->chip_select);
+//	printk( "ast_g5_spi_setup()!!!!------ , cs %d\n", spi->chip_select);
 	
 	host->spi_dev = spi;
 
-	spi_ctrl = ast_spi_read(host, AST_SPI_CTRL);
 	spi_conf = ast_spi_read(host, AST_SPI_CONFIG);
 		
-	if (spi->chip_select > spi->master->num_chipselect) {
+	if (spi->chip_select > spi->master->num_chipselect -1) {
 		dev_dbg(&spi->dev,
 				"setup: invalid chipselect %u (%u defined)\n",
 				spi->chip_select, spi->master->num_chipselect);
@@ -104,9 +105,11 @@ ast_spi_setup(struct spi_device *spi)
 	} else {
 		switch(spi->chip_select) {
 			case 0:
+				spi_ctrl = ast_spi_read(host, AST_SPI_CTRL_CS0);
 				spi_conf |= SPI_CONF_CS0_WRITE;
 				break;
 			case 1:
+				spi_ctrl = ast_spi_read(host, AST_SPI_CTRL_CS1);
 				spi_conf |= SPI_CONF_CS1_WRITE;
 				break;
 			default:
@@ -145,7 +148,10 @@ ast_spi_setup(struct spi_device *spi)
 	 * Pre-new_1 chips start out at half the peripheral
 	 * bus speed.
 	 */
-	 
+
+#if defined CONFIG_MINIPACK
+	/* We need to change max_speed_hz manually. */
+#else
 	if (spi->max_speed_hz) {
 		/* Set the SPI slaves select and characteristic control register */
 		divisor = host->spi_data->get_div(spi->max_speed_hz);
@@ -156,9 +162,11 @@ ast_spi_setup(struct spi_device *spi)
 
 //	printk("target %d , div = %d ----------------\n",spi->max_speed_hz, divisor);
 
-	//TODO MASK first
+	/* DO MASK first */
+	spi_ctrl &= ~SPI_CLK_DIV_MASK;
 	spi_ctrl |= (divisor << 8);
-	
+#endif
+
 	if (spi->chip_select > (spi->master->num_chipselect - 1)) {
 		dev_err(&spi->dev, "chipselect %d exceed the number of chipselect master supoort\n", spi->chip_select);
 		return -EINVAL;
@@ -187,10 +195,25 @@ ast_spi_setup(struct spi_device *spi)
 
 
 	/* Configure SPI controller */
-	ast_spi_write(host, spi_ctrl, AST_SPI_CTRL);
-	
+	switch (spi->chip_select)
+	{
+		case 0:
+			ast_spi_write(host, spi_ctrl, AST_SPI_CTRL_CS0);
+			break;
+		case 1:
+			ast_spi_write(host, spi_ctrl, AST_SPI_CTRL_CS1);
+			break;
+		default:
+			dev_dbg(&spi->dev,
+					"setup: invalid chipselect %u (%u defined)\n",
+					spi->chip_select, spi->master->num_chipselect);
+			return -EINVAL;
+			break;
+	}
+
 	dev_dbg(&spi->dev, "%s: mode %d, %u bpw, %d hz\n", __FUNCTION__, spi->mode, spi->bits_per_word, spi->max_speed_hz);
 	return err;
+#endif
 }
 
 static int ast_spi_transfer(struct spi_device *spi, struct spi_message *msg)
@@ -205,7 +228,25 @@ static int ast_spi_transfer(struct spi_device *spi, struct spi_message *msg)
 	spin_lock_irqsave(&host->lock, flags);
 
 //	writel( (readl(host->spi_data->ctrl_reg) | SPI_CMD_USER_MODE) | SPI_CE_INACTIVE,host->spi_data->ctrl_reg);
+#if defined AST_SOC_G5
+	switch (spi->chip_select)
+	{
+		case 0:
+			ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS0) & ~SPI_CE_INACTIVE, AST_SPI_CTRL_CS0);
+			break;
+		case 1:
+			ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS1) & ~SPI_CE_INACTIVE, AST_SPI_CTRL_CS1);
+			break;
+		default:
+			dev_dbg(&spi->dev,
+						"setup: invalid chipselect %u (%u defined)\n",
+						spi->chip_select, spi->master->num_chipselect);
+			return -EINVAL;
+			break;
+	}
+#else
 	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL) & ~SPI_CE_INACTIVE, AST_SPI_CTRL);
+#endif
 
 //	writel( ~SPI_CE_INACTIVE & readl(host->spi_data->ctrl_reg),host->spi_data->ctrl_reg);
 
@@ -230,13 +271,13 @@ static int ast_spi_transfer(struct spi_device *spi, struct spi_message *msg)
 			printk("\n");
 #endif
 			for(i=0;i<xfer->len;i++) {
-				writeb(tx_buf[i], host->buff);
+				writeb(tx_buf[i], host->buff[spi->chip_select]);
 			}
 		}
 		
 		if(xfer->rx_buf != 0) {
 			for(i=0;i<xfer->len;i++) {
-				rx_buf[i] = readb(host->buff);
+				rx_buf[i] = readb(host->buff[spi->chip_select]);
 		}
 #if 0			
 			printk("rx : ");
@@ -258,7 +299,25 @@ static int ast_spi_transfer(struct spi_device *spi, struct spi_message *msg)
 
 
 //	writel( SPI_CE_INACTIVE | readl(host->spi_data->ctrl_reg),host->spi_data->ctrl_reg);
+#if defined AST_SOC_G5
+	switch (spi->chip_select)
+	{
+		case 0:
+			ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS0) | SPI_CE_INACTIVE, AST_SPI_CTRL_CS0);
+			break;
+		case 1:
+			ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS1) | SPI_CE_INACTIVE, AST_SPI_CTRL_CS1);
+			break;
+		default:
+			dev_dbg(&spi->dev,
+						"setup: invalid chipselect %u (%u defined)\n",
+						spi->chip_select, spi->master->num_chipselect);
+			return -EINVAL;
+			break;
+	}
+#else
 	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL) | SPI_CE_INACTIVE, AST_SPI_CTRL);
+#endif
 
 	msg->status = 0;
 	msg->complete(msg->context);
@@ -286,6 +345,7 @@ static int ast_spi_probe(struct platform_device *pdev)
 	struct resource		*res0, *res1;
 	struct ast_spi_host *host;
 	struct spi_master *master;
+	int cs_num = 0;
 	int err, div;
 
 	dev_dbg(&pdev->dev, "ast_spi_probe() \n\n\n");
@@ -298,6 +358,9 @@ static int ast_spi_probe(struct platform_device *pdev)
 	}
 	host = spi_master_get_devdata(master);
 	memset(host, 0, sizeof(struct ast_spi_host));
+
+	/* Find and claim our resources */
+	host->spi_data = pdev->dev.platform_data;
 
 	res0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res0) {
@@ -320,27 +383,29 @@ static int ast_spi_probe(struct platform_device *pdev)
 
 	dev_dbg(&pdev->dev, "remap phy %x, virt %x \n",(u32)res0->start, (u32)host->reg);
 
-	res1 = platform_get_resource(pdev, IORESOURCE_BUS, 0);
-	if (!res1) {
-		dev_err(&pdev->dev, "cannot get IORESOURCE_IO 0\n");		
-		return -ENXIO;	
+	for(cs_num = 0; cs_num < host->spi_data->num_chipselect ; cs_num++) {
+		res1 = platform_get_resource(pdev, IORESOURCE_BUS, cs_num);
+		if (!res1) {
+			dev_err(&pdev->dev, "cannot get IORESOURCE_IO 0\n");
+			return -ENXIO;
+		}
+
+		if (!request_mem_region(res1->start, resource_size(res1), res1->name)) {
+			dev_err(&pdev->dev, "cannot reserved region\n");
+			err = -ENXIO;
+			goto err_no_io_res;
+		}
+
+		host->buff[cs_num] = (u32)ioremap(res1->start, resource_size(res1));
+
+		if (!host->buff[cs_num]) {
+			err = -EIO;
+			dev_err(&pdev->dev, "cannot map buff\n");
+			goto release_mem1;
+		}
+
+		dev_dbg(&pdev->dev, "remap io phy %x, virt %x \n",(u32)res1->start, (u32)host->buff[cs_num]);
 	}
-
-	if (!request_mem_region(res1->start, resource_size(res1), res1->name)) {
-		dev_err(&pdev->dev, "cannot reserved region\n");
-		err = -ENXIO;
-		goto err_no_io_res;
-	}
-
-	host->buff = ioremap(res1->start, resource_size(res1));
-
-	if (!host->buff) {
-		err = -EIO;
-		dev_err(&pdev->dev, "cannot map buff\n");		
-		goto release_mem1;
-	}
-
-	dev_dbg(&pdev->dev, "remap io phy %x, virt %x \n",(u32)res1->start, (u32)host->buff);	
 	
 	host->master = spi_master_get(master);
 	host->master->bus_num = pdev->id;
@@ -348,7 +413,7 @@ static int ast_spi_probe(struct platform_device *pdev)
 	host->dev = &pdev->dev;
 
 	/* Setup the state for bitbang driver */
-	host->master->setup = ast_spi_setup;
+	host->master->setup = ast_g5_spi_setup;
 	host->master->transfer = ast_spi_transfer;
 	host->master->cleanup = ast_spi_cleanup;
 
@@ -358,15 +423,23 @@ static int ast_spi_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, host);
 
-	div = host->spi_data->get_div(50000000);
 
+	div = host->spi_data->get_div(50000000);
+#if defined AST_SOC_G5
+	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS0) & ~SPI_CLK_DIV_MASK, AST_SPI_CTRL_CS0);
+	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS0) | SPI_CLK_DIV(div), AST_SPI_CTRL_CS0);
+	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS1) & ~SPI_CLK_DIV_MASK, AST_SPI_CTRL_CS1);
+	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS1) | SPI_CLK_DIV(div), AST_SPI_CTRL_CS1);
+	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS0) | SPI_CE_INACTIVE | SPI_CMD_USER_MODE, AST_SPI_CTRL_CS0);
+	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL_CS1) | SPI_CE_INACTIVE | SPI_CMD_USER_MODE, AST_SPI_CTRL_CS1);
+#else
 	ast_spi_write(host, ast_spi_read(host, AST_SPI_CONFIG) | SPI_CONF_WRITE_EN, AST_SPI_CONFIG);
 	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL) & ~SPI_CLK_DIV_MASK, AST_SPI_CTRL);	
 	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL) | SPI_CLK_DIV(div), AST_SPI_CTRL);		
 //	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL) | SPI_CE_INACTIVE | SPI_CMD_USER_MODE | SPI_LSB_FIRST_CTRL, AST_SPI_CTRL);
 	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL) | SPI_CE_INACTIVE | SPI_CMD_USER_MODE, AST_SPI_CTRL);
 //	ast_spi_write(host, ast_spi_read(host, AST_SPI_CTRL) | SPI_CE_INACTIVE, AST_SPI_CTRL);
-
+#endif
 	/* Register our spi controller */
 	err = spi_register_master(host->master);
 	if (err) {
@@ -380,6 +453,11 @@ static int ast_spi_probe(struct platform_device *pdev)
 
 err_register:
 	spi_master_put(host->master);
+	iounmap(host->reg);
+	for (cs_num = 0; cs_num < host->spi_data->num_chipselect; cs_num++)
+	{
+		iounmap((void *)host->buff[cs_num]);
+	}
 
 release_mem1:	
 	release_mem_region(res1->start, res1->end - res1->start + 1);	
