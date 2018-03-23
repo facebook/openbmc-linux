@@ -28,7 +28,7 @@ obj-y                   += dev-ehci.o dev-uhci.o dev-lpc.o dev-espi.o dev-peci.o
 
 PLATFB := 0
 ifeq ($(CONFIG_CMM),y)
-  obj-y += dev-uart.o dev-i2c-cmm.o
+  obj-y += dev-uart.o dev-i2c-setup-mux.o dev-i2c-cmm.o
   PLATFB = 1
 endif
 
@@ -43,7 +43,7 @@ ifeq ($(CONFIG_WEDGE100), y)
 endif
 
 ifeq ($(CONFIG_MINIPACK), y)
-  obj-y += dev-uart.o
+  obj-y += dev-uart.o dev-i2c-setup-mux.o dev-i2c-minipack.o
   PLATFB = 1
 endif
 

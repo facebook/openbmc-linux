@@ -1,7 +1,7 @@
 /*
- * dev-i2c-cmm.c - i2c device definition for CMM
+ * dev-i2c-minipack.c - i2c device definition for MINIPACK
  *
- * Copyright 2014-present Facebook. All Rights Reserved.
+ * Copyright 2018-present Facebook. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,36 +24,29 @@
 #include <plat/ast_i2c.h>
 
 pca954x_info_st dev_i2c_pca954x_info[] = {
-  {-1, 1, 0x77},		/* 0 */
-  {-1, 2, 0x71},		/* 1 */
-  {-1, 8, 0x77},		/* 2 */
-  { 0, 2, 0x70},		/* 3 */
-  { 0, 2, 0x73},
-  { 0, 3, 0x70},
-  { 0, 3, 0x73},
-  { 0, 4, 0x70},
-  { 0, 4, 0x73},
-  { 0, 5, 0x70},
-  { 0, 5, 0x73},
-  { 0, 0, 0x70},
-  { 0, 0, 0x73},
-  { 0, 1, 0x70},
-  { 0, 1, 0x73},
-  { 0, 6, 0x70},
-  { 0, 6, 0x73},
-  { 0, 7, 0x70},
-  { 0, 7, 0x73},		/* 18 */
-  { 2, 0, 0x70},		/* 19 */
-  { 2, 1, 0x70},		/* 20 */
-  { 2, 2, 0x70},		/* 21 */
-  { 2, 3, 0x70},		/* 22 */
+  {-1, 2, 0x70},    /* 0 */
+  {-1, 8, 0x70},    /* 1 */
+  {-1, 9, 0x70},    /* 2 */
+  {-1, 11, 0x70},   /* 3 */
+  { 1, 0, 0x71},
+  { 1, 1, 0x72},
+  { 1, 2, 0x76},
+  { 1, 3, 0x76},
+  { 3, 0, 0x73},
+  { 3, 1, 0x73},
+  { 3, 2, 0x73},
+  { 3, 3, 0x73},
+  { 3, 4, 0x73},
+  { 3, 5, 0x73},    /* 13 */
+  { 3, 6, 0x73},    /* 14 */
+  { 3, 7, 0x73},    /* 15 */
 };
 
 const int size_dev_i2c_pca954x_info =
     sizeof(dev_i2c_pca954x_info) / sizeof(dev_i2c_pca954x_info[0]);
 
 extern void dev_i2c_add_pca954x(pca954x_info_st [],
-                                 const int n_dev_i2c_pca954x_info);
+                                  const int n_dev_i2c_pca954x_info);
 
 void __init ast_add_device_i2c(void)
 {

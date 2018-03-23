@@ -87,6 +87,13 @@ typedef enum i2c_slave_event_e {
         I2C_SLAVE_EVENT_STOP
 } i2c_slave_event_t;
 
+typedef struct pca954x_info_st_ {
+	int cpi_mux_index;   /* -1 means directly connecting to SoC */
+	int cpi_chan;
+	int cpi_addr;
+	int cpi_bus_alloc;
+} pca954x_info_st;
+
 #define BYTE_MODE	0
 #define BUFF_MODE	1
 #define DEC_DMA_MODE	2
