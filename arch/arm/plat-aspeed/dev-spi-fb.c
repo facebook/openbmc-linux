@@ -75,6 +75,13 @@ static struct ast_spi_driver_data ast_spi1_driver_data = {
 };
 #endif
 
+#if defined (CONFIG_YAMP)
+static struct ast_spi_driver_data ast_yamp_spi1_driver_data = {
+    .get_div = ast_spi_calculate_divisor,
+    .num_chipselect = 1,
+};
+#endif
+
 static struct resource ast_fmc_resource[] = {
 	{
 		.start  = AST_FMC_BASE,
@@ -154,6 +161,21 @@ static struct resource ast_spi1_resource[] = {
 };
 #endif
 
+#if defined CONFIG_YAMP
+static struct resource ast_yamp_spi1_resource[] = {
+  {
+     .start  = AST_SPI1_BASE,
+     .end    = AST_SPI1_BASE + SZ_16,
+     .flags  = IORESOURCE_MEM,
+  },
+  {
+     .start  = AST_SPI1_CS0_BASE,
+     .end    = AST_SPI1_CS0_BASE + SZ_16,
+     .flags  = IORESOURCE_BUS,
+  },
+};
+#endif
+
 static struct platform_device ast_fmc_device = {
 	.name           = "fmc-spi",
 	.id             = 0,
@@ -190,6 +212,19 @@ static struct platform_device ast_spi1_device = {
   .num_resources  = ARRAY_SIZE(ast_spi1_resource),
   .resource       = ast_spi1_resource,
 };
+#endif
+
+#if defined(CONFIG_YAMP)
+static struct platform_device ast_yamp_spi1_device = {
+       .name           = "ast-spi",
+       .id             = 1,
+       .dev = {
+          .platform_data = &ast_yamp_spi1_driver_data,
+       },
+      .num_resources  = ARRAY_SIZE(ast_yamp_spi1_resource),
+      .resource       = ast_yamp_spi1_resource,
+};
+
 #endif
 
 static struct mtd_partition ast_legacy_partitions[] = {
@@ -414,6 +449,18 @@ static struct spi_board_info ast_spi1_devices[] = {
 };
 #endif
 
+#if defined (CONFIG_YAMP)
+static struct spi_board_info ast_yamp_spi1_devices[] = {
+    {
+        .modalias           = "spidev",         // Generic
+        .chip_select        = 0,                // Should be correct
+        .max_speed_hz       = 33 * 1000 * 1000, // Should be safe
+        .bus_num            = 2,                // According to the reference code, this should be 1. Are we sure?
+        .mode               = SPI_MODE_0,
+    },
+};
+#endif
+
 static int __init dual_flash_enabled_handler(char *str)
 {
   if (str[0] == '1') {
@@ -442,5 +489,8 @@ void __init ast_add_device_spi(void)
 	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
 	platform_device_register(&ast_spi1_device);
 	spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
+#elif defined(CONFIG_YAMP)
+  platform_device_register(&ast_yamp_spi1_device);
+  spi_register_board_info(ast_yamp_spi1_devices, ARRAY_SIZE(ast_yamp_spi1_devices));
 #endif
 }

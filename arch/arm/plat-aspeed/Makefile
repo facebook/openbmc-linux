@@ -42,6 +42,11 @@ ifeq ($(CONFIG_WEDGE100), y)
   PLATFB = 1
 endif
 
+ifeq ($(CONFIG_YAMP), y)
+  obj-y += dev-uart.o
+  PLATFB = 1
+endif
+
 ifeq ($(CONFIG_MINIPACK), y)
   obj-y += dev-uart.o dev-i2c-setup-mux.o dev-i2c-minipack.o
   PLATFB = 1

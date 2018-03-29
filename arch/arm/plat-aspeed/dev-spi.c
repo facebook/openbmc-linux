@@ -7,11 +7,11 @@
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by the Free Software Foundation;
 * either version 2 of the License, or (at your option) any later version.
-* 
+*
 * This program is distributed in the hope that it will be useful,  but WITHOUT ANY WARRANTY;
 * without even the implied warranty of MERCHANTABILITY or
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-* 
+*
 * You should have received a copy of the GNU General Public License
 * along with this program; if not, write to the Free Software
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
@@ -60,7 +60,7 @@ static u32 ast_spi_calculate_divisor(u32 max_speed_hz)
 			break;
 		}
 	}
-		
+
 //	printk("hclk is %d, divisor is %d, target :%d , cal speed %d\n", hclk, spi_cdvr, spi->max_speed_hz, hclk/i);
 	return spi_cdvr;
 }
@@ -82,12 +82,12 @@ static struct resource ast_fmc_spi_resource0[] = {
 		.start	= AST_FMC_CS0_BASE,
 		.end		= AST_FMC_CS0_BASE + SZ_16,
 		.flags	= IORESOURCE_BUS,
-	},	
+	},
 	{
 		.start	= AST_FMC_CS1_BASE,
 		.end		= AST_FMC_CS1_BASE + SZ_16,
 		.flags	= IORESOURCE_BUS,
-	},		
+	},
 	{
 		.start	= AST_FMC_CS2_BASE,
 		.end		= AST_FMC_CS2_BASE + SZ_16,
@@ -116,7 +116,7 @@ static struct platform_device ast_fmc0_spi_device = {
 			.platform_data = &fmc_spi_data,
 		},
         .num_resources  = ARRAY_SIZE(ast_fmc_spi_resource0),
-        .resource       = ast_fmc_spi_resource0,        
+        .resource       = ast_fmc_spi_resource0,
 };
 
 static struct ast_spi_driver_data fmc_spix_data = {
@@ -135,12 +135,12 @@ static struct resource ast_fmc_spi0_resource[] = {
 		.start	= AST_SPI0_CS0_BASE,
 		.end		= AST_SPI0_CS0_BASE + SZ_16,
 		.flags	= IORESOURCE_BUS,
-	},	
+	},
 	{
 		.start	= AST_SPI0_CS1_BASE,
 		.end		= AST_SPI0_CS1_BASE + SZ_16,
 		.flags	= IORESOURCE_BUS,
-	},		
+	},
 };
 
 static struct platform_device ast_fmc_spi0_device = {
@@ -150,9 +150,9 @@ static struct platform_device ast_fmc_spi0_device = {
 			.platform_data = &fmc_spix_data,
 		},
         .num_resources  = ARRAY_SIZE(ast_fmc_spi0_resource),
-        .resource       = ast_fmc_spi0_resource,        
+        .resource       = ast_fmc_spi0_resource,
 };
-#endif 
+#endif
 
 #ifdef AST_FMC_SPI1_BASE
 static struct resource ast_fmc_spi1_resource[] = {
@@ -165,12 +165,12 @@ static struct resource ast_fmc_spi1_resource[] = {
 		.start	= AST_SPI1_CS0_BASE,
 		.end		= AST_SPI1_CS0_BASE + SZ_16,
 		.flags	= IORESOURCE_BUS,
-	},	
+	},
 	{
 		.start	= AST_SPI1_CS1_BASE,
 		.end		= AST_SPI1_CS1_BASE + SZ_16,
 		.flags	= IORESOURCE_BUS,
-	},		
+	},
 };
 
 static struct platform_device ast_fmc_spi1_device = {
@@ -180,9 +180,9 @@ static struct platform_device ast_fmc_spi1_device = {
 			.platform_data = &fmc_spix_data,
 		},
         .num_resources  = ARRAY_SIZE(ast_fmc_spi1_resource),
-        .resource       = ast_fmc_spi1_resource,        
+        .resource       = ast_fmc_spi1_resource,
 };
-#endif 
+#endif
 
 #endif	//CONFIG_SPI_FMC
 
@@ -202,12 +202,12 @@ static struct resource ast_spi_resource0[] = {
 		.start			= AST_SPI0_MEM + 0x04,
 		.end				= AST_SPI0_MEM + SZ_16,
 		.flags			= IORESOURCE_IO,
-	},	
+	},
 };
 
 static struct platform_device ast_spi_device0 = {
         .name           = "ast-spi",
-#if defined(CONFIG_ARCH_AST1010)		
+#if defined(CONFIG_ARCH_AST1010)
 		.id 		= 0,
 #else
 		.id		= 1,
@@ -216,7 +216,7 @@ static struct platform_device ast_spi_device0 = {
 			.platform_data = &ast_spi0_data,
 		},
         .num_resources  = ARRAY_SIZE(ast_spi_resource0),
-        .resource       = ast_spi_resource0,  			
+        .resource       = ast_spi_resource0,
 };
 
 #if defined(AST_SPI1_BASE)
@@ -235,7 +235,7 @@ static struct resource aspeed_spi1_resource[] = {
 		.start			= AST_SPI1_MEM,
 		.end			= AST_SPI1_MEM + SZ_16,
 		.flags			= IORESOURCE_IO,
-	},	
+	},
 };
 
 static struct platform_device aspeed_spi_device1 = {
@@ -245,7 +245,7 @@ static struct platform_device aspeed_spi_device1 = {
 			.platform_data = &ast_spi1_data,
 		},
         .num_resources  = ARRAY_SIZE(aspeed_spi1_resource),
-        .resource       = aspeed_spi1_resource,  			
+        .resource       = aspeed_spi1_resource,
 };
 
 #endif
@@ -261,11 +261,11 @@ static struct mtd_partition ast_spi_flash0_partitions[] = {
 	}, {
 		.name	= "env",
 		.offset 	= 0x60000,
-		.size		= 0x20000,            
+		.size		= 0x20000,
 	}, {
 		.name   	= "kernel",
 		.offset 	= 0x80000,
-		.size   	= 0x280000,     
+		.size   	= 0x280000,
 	}, {
 		.name   	= "rootfs",
 		.offset 	= 0x400000,
@@ -283,7 +283,7 @@ static struct mtd_partition ast_spi_flash1_partitions[] = {
 		.name	= "uboot",
 		.offset = 0,
 		.size	= 0x00030000,
-		.mask_flags = MTD_WRITEABLE,				
+		.mask_flags = MTD_WRITEABLE,
 	},
 	{
 		.name	= "uboot-env",
@@ -319,9 +319,9 @@ static struct flash_platform_data ast_spi_flash0_data = {
 	.type 		  = "mx25l25635e",	//AST2400 A1
 #elif defined(CONFIG_ARCH_AST3200)
 	.type 		  = "w25q256",
-#else		
-	.type 		  = "mx25l12805d",	//old AST2300 
-#endif		
+#else
+	.type 		  = "mx25l12805d",	//old AST2300
+#endif
 	.nr_parts       = ARRAY_SIZE(ast_spi_flash0_partitions),
 	.parts          = ast_spi_flash0_partitions,
 };
@@ -339,7 +339,7 @@ static struct spi_board_info ast_spi_devices[] = {
 		.modalias    		= "m25p80",
 		.platform_data  	= &ast_spi_flash1_data,
 		.chip_select    		= 0, //.chip_select This tells your device driver which chipselect to use.
-		.max_speed_hz    	= 50 * 1000 * 1000, 
+		.max_speed_hz    	= 50 * 1000 * 1000,
 		.bus_num    		= 0, //  This chooses if SPI0 or SPI1 of the SoC is used.
 		.mode 			= SPI_MODE_0,
 	}, {
@@ -356,17 +356,17 @@ static struct spi_board_info ast_spi_devices[] = {
 		.modalias    		= "m25p80",
 		.platform_data  	= &ast_spi_flash0_data,
 		.chip_select    		= 0, //.chip_select This tells your device driver which chipselect to use.
-		.max_speed_hz    	= 100 * 1000 * 1000, 
+		.max_speed_hz    	= 100 * 1000 * 1000,
 		.bus_num    		= 0, //  This chooses if SPI0 or SPI1 of the SoC is used.
 		.mode 			= SPI_MODE_0,
-#if 0		
+#if 0
 	}, {
 		.modalias    		= "spidev",
 		.chip_select    		= 0,
 		.max_speed_hz    	= 30 * 1000 * 1000,
 		.bus_num    		= 0,
 		.mode 			= SPI_MODE_0,
-#endif		
+#endif
 	},
 };
 
@@ -375,7 +375,7 @@ static struct spi_board_info ast_spi1_devices[] = {
 		.modalias    		= "m25p80",
 		.platform_data  	= &ast_spi_flash1_data,
 		.chip_select    		= 0, //.chip_select This tells your device driver which chipselect to use.
-		.max_speed_hz    	= 50 * 1000 * 1000, 
+		.max_speed_hz    	= 50 * 1000 * 1000,
 		.bus_num    		= 1, //  This chooses if SPI0 or SPI1 of the SoC is used.
 		.mode 			= SPI_MODE_0,
 	},
@@ -393,7 +393,7 @@ static struct mtd_partition ast_spi_flash1_partitions[] = {
 };
 
 static struct flash_platform_data ast_spi_flash1_data = {
-//        .type           = "w25q64",	
+//        .type           = "w25q64",
 	.type           = "mx25l6405d",
         .nr_parts       = ARRAY_SIZE(ast_spi_flash1_partitions),
         .parts          = ast_spi_flash1_partitions,
@@ -405,10 +405,10 @@ static struct spi_board_info ast_spi1_devices[] = {
         .modalias    = "m25p80",
 	.platform_data  = &ast_spi_flash1_data,
         .chip_select    = 0, //.chip_select This tells your device driver which chipselect to use.
-        .max_speed_hz    = 100 * 1000 * 1000, 
+        .max_speed_hz    = 100 * 1000 * 1000,
         .bus_num    = 1, //  This chooses if SPI0 or SPI1 of the SoC is used.
      	.mode = SPI_MODE_0,
-    }, 
+    },
 };
 #endif
 
@@ -427,7 +427,7 @@ void __init ast_add_device_spi(void)
 //	spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
 
 #if defined(CONFIG_SPI_AST) || defined(CONFIG_SPI_AST_MODULE)
-	//pin switch by trap[13:12]	-- [0:1] Enable SPI Master 
+	//pin switch by trap[13:12]	-- [0:1] Enable SPI Master
 	platform_device_register(&ast_spi_device0);
 	spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
 #endif
@@ -437,7 +437,7 @@ void __init ast_add_device_spi(void)
 	writel(readl(AST_SCU_BASE + 0x70) | 0x10,AST_SCU_BASE + 0x70);
 	platform_device_register(&aspeed_spi_device1);
 	spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
-#endif	
+#endif
 
 }
 #else

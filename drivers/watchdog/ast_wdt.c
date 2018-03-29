@@ -126,8 +126,11 @@ MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds. (0<heartbeat<65536, 
 static int nowayout = WATCHDOG_NOWAYOUT;
 module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
-
+#ifdef CONFIG_YAMP
+static int force_disable = 1; // In YAMP, temporarily disable WDT, until fscd is running
+#else
 static int force_disable = 0; // setting this to 1 will disable the wdt timer
+#endif
 module_param(force_disable, int, 0);
 MODULE_PARM_DESC(force_disable, "Disable watchdog by default "
 		"(default=0, enable watchdog)");

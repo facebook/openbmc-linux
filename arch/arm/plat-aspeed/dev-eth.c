@@ -42,8 +42,8 @@
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || \
 	defined(CONFIG_CMM) || defined(CONFIG_FBTP) || defined(CONFIG_PWNEPTUNE) || \
-	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || \
-	defined(CONFIG_YOSEMITE) || defined(CONFIG_MINIPACK) || defined(CONFIG_MINILAKETB)
+	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE) || \
+  defined(CONFIG_MINIPACK) || defined(CONFIG_MINILAKETB) || defined(CONFIG_YAMP)
 #define DRVNAME "ftgmac100"
 #else
 #define DRVNAME "ast_gmac"
@@ -170,7 +170,6 @@ void __init ast_add_device_gmac(void)
 	* 10(2): ASPEED's MAC is connected to NC-SI PHY chip directly
 	* 11: Reserved
 	*/
-
 	phy_mode = ast_scu_get_phy_config(0);
 	switch(phy_mode) {
 		case 0:

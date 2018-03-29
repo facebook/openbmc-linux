@@ -48,7 +48,6 @@
 
 // #define TIME_POWERUP_PREP
 
-
 #define DRV_NAME	"ftgmac100"
 #define DRV_VERSION	"0.7"
 
@@ -3118,6 +3117,8 @@ static int ftgmac100_open(struct net_device *netdev)
     defined(CONFIG_MINIPACK)
 	ftgmac100_start_hw(priv, 1000);
 #elif defined(CONFIG_FBTP)
+	ftgmac100_start_hw(priv, 100);
+#elif defined(CONFIG_YAMP)
 	ftgmac100_start_hw(priv, 100);
 #elif defined(CONFIG_FBTTN)
 	ftgmac100_start_hw(priv, 100);
