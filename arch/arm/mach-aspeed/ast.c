@@ -82,6 +82,12 @@ static struct map_desc ast_io_desc[] __initdata = {
 		.pfn			= __phys_to_pfn(AST_UART0_BASE),
 		.length 		= SZ_4K,
 		.type			= MT_DEVICE,
+	}, {
+
+		.virtual		= IO_ADDRESS(AST_SRAM_BASE),
+		.pfn			= __phys_to_pfn(AST_SRAM_BASE),
+		.length 		= SZ_32K + SZ_4K,
+		.type			= MT_DEVICE,
 	},
 };
 

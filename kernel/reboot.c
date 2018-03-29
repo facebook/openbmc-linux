@@ -16,6 +16,19 @@
 #include <linux/syscalls.h>
 #include <linux/syscore_ops.h>
 #include <linux/uaccess.h>
+#include <mach/hardware.h>
+
+#define AST_SRAM_BMC_REBOOT_BASE (AST_SRAM_BASE + 0x1200)
+#if defined(CONFIG_COLDFIRE)
+#define SRAM_BMC_REBOOT_BASE	AST_SRAM_BMC_REBOOT_BASE
+#else
+#define SRAM_BMC_REBOOT_BASE	IO_ADDRESS((AST_SRAM_BMC_REBOOT_BASE))
+#endif
+
+#define SRAM_REBOOT_OFFSET		(SRAM_BMC_REBOOT_BASE + 0x04)
+#define BIT_RECORD_LOG			(1 << 8)
+#define FLAG_REBOOT_CMD 		(1 << 0)
+
 
 /*
  * this indicates whether you can reboot with ctrl-alt-del: the default is yes
@@ -216,6 +229,10 @@ void kernel_restart(char *cmd)
 	kernel_restart_prepare(cmd);
 	migrate_to_reboot_cpu();
 	syscore_shutdown();
+
+	// set SRAM_REBOOT_OFFSET value to '0x101', means reboot occur
+	*(u32 *)(SRAM_REBOOT_OFFSET) |= BIT_RECORD_LOG | FLAG_REBOOT_CMD;
+
 	if (!cmd)
 		pr_emerg("Restarting system\n");
 	else

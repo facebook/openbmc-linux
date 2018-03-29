@@ -23,9 +23,22 @@
 #include <linux/sysrq.h>
 #include <linux/init.h>
 #include <linux/nmi.h>
+#include <mach/hardware.h>
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
+
+#define AST_SRAM_BMC_REBOOT_BASE (AST_SRAM_BASE + 0x1200)
+#if defined(CONFIG_COLDFIRE)
+#define SRAM_BMC_REBOOT_BASE	AST_SRAM_BMC_REBOOT_BASE
+#else
+#define SRAM_BMC_REBOOT_BASE	IO_ADDRESS((AST_SRAM_BMC_REBOOT_BASE))
+#endif
+
+#define SRAM_PANIC_OFFSET		(SRAM_BMC_REBOOT_BASE + 0x00)
+#define BIT_RECORD_LOG			(1 << 8)
+#define FLAG_KERN_PANIC 		(1 << 0)
+
 
 int panic_on_oops = CONFIG_PANIC_ON_OOPS_VALUE;
 static unsigned long tainted_mask;
@@ -190,6 +203,10 @@ void panic(const char *fmt, ...)
 	}
 #endif
 	pr_emerg("---[ end Kernel panic - not syncing: %s\n", buf);
+
+	// set SRAM_PANIC_OFFSET value to '0x101', means kernel panic occur
+	*(u32 *)(SRAM_PANIC_OFFSET) |= BIT_RECORD_LOG | FLAG_KERN_PANIC;
+
 	local_irq_enable();
 	for (i = 0; ; i += PANIC_TIMER_STEP) {
 		touch_softlockup_watchdog();
