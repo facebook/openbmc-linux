@@ -261,6 +261,12 @@ config FBY2
  select EGFX_IRQ
     bool "Facebook FBY2"
 
+config MINILAKETB
+ select USB_ARCH_HAS_EHCI
+ select AST_UART_SDMA
+ select EGFX_IRQ
+    bool "Facebook MINILAKETB"
+
 config PWNEPTUNE
 	select USB_ARCH_HAS_EHCI
 	select AST_UART_SDMA
@@ -274,6 +280,7 @@ config AST_CONSOLE_UART_BASE
     default 0x1e783000 if MINIPACK
     default 0x1e784000 if FBTP
     default 0x1e784000 if FBY2
+    default 0x1e784000 if MINILAKETB
     default 0x1e784000
 	help
 	  Please provide the physical address corresponding to the

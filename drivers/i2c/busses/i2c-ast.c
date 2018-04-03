@@ -58,7 +58,7 @@
 #define AST_LOCKUP_DETECTED (0x1 << 15)
 
 // Enable SCL/SDA pull LOW detection for Yosemite platform
-#ifdef CONFIG_YOSEMITE || CONFIG_FBY2
+#ifdef CONFIG_YOSEMITE || CONFIG_FBY2 || CONFIG_MINILAKETB
 #define AST_I2C_LOW_TIMEOUT 0x07
 #else
 #define AST_I2C_LOW_TIMEOUT 0x00
@@ -161,7 +161,7 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
 #endif
 
 
-#ifdef CONFIG_FBY2
+#ifdef CONFIG_FBY2 || CONFIG_MINILAKETB
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
     data = 0xFFF5E700;
     return data;
@@ -272,7 +272,7 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 		ast_i2c_write(i2c_dev, AST_NO_TIMEOUT_CTRL, I2C_AC_TIMING_REG2);
 	}
 #else
-#ifndef CONFIG_FBY2
+#ifndef CONFIG_FBY2 || CONFIG_MINILAKETB
 	if(i2c_dev->ast_i2c_data->bus_clk/1000 > 400) {
 		printk("high speed mode enable clk [%dkhz]\n",i2c_dev->ast_i2c_data->bus_clk/1000);
 		ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG) |

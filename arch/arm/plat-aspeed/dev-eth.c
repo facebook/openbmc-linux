@@ -43,7 +43,7 @@
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || \
 	defined(CONFIG_CMM) || defined(CONFIG_FBTP) || defined(CONFIG_PWNEPTUNE) || \
 	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || \
-	defined(CONFIG_YOSEMITE) || defined(CONFIG_MINIPACK)
+	defined(CONFIG_YOSEMITE) || defined(CONFIG_MINIPACK) || defined(CONFIG_MINILAKETB)
 #define DRVNAME "ftgmac100"
 #else
 #define DRVNAME "ast_gmac"
