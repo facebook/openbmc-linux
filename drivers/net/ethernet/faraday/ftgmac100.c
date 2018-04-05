@@ -3114,7 +3114,8 @@ static int ftgmac100_open(struct net_device *netdev)
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || \
     defined(CONFIG_CMM) || defined (CONFIG_PWNEPTUNE) || \
-    defined(CONFIG_MINIPACK)
+    defined(CONFIG_MINIPACK) || defined (CONFIG_GALAXY100) || \
+    defined(CONFIG_MINILAKETB)
 	ftgmac100_start_hw(priv, 1000);
 #elif defined(CONFIG_FBTP)
 	ftgmac100_start_hw(priv, 100);
@@ -3123,9 +3124,7 @@ static int ftgmac100_open(struct net_device *netdev)
 #elif defined(CONFIG_FBTTN)
 	ftgmac100_start_hw(priv, 100);
 #elif defined(CONFIG_FBY2)  || defined(CONFIG_YOSEMITE)
- ftgmac100_start_hw(priv, 100);
-#elif defined(CONFIG_MINILAKETB)
-	ftgmac100_start_hw(priv, 1000);
+	ftgmac100_start_hw(priv, 100);
 #else
 	ftgmac100_start_hw(priv, 10);
 #endif
