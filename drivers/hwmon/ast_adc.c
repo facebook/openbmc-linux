@@ -492,8 +492,8 @@ ast_show_adc(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_hyster_upper(ast_adc, index));
 		case 7: //hystersis lower
 			return sprintf(sysfsbuf, "%d \n", ast_get_adc_hyster_lower(ast_adc, index));
-		case 8: //voltage
-			return sprintf(sysfsbuf, "%d\n", ast_get_voltage(ast_adc, index));
+		case 8: //voltage in mV as expected by lm_sensors
+			return sprintf(sysfsbuf, "%d\n", ast_get_voltage(ast_adc, index) * 10);
 		case 9: //r1
 			return sprintf(sysfsbuf, "%d\n", vcc_ref[index].r1);
 		case 10: //r2
