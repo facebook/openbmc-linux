@@ -56,14 +56,14 @@
 
 
 /***************************************************************************/
-#define AST_TIMER_EXT_CLK_1M		(1*1000*1000)				/* 1M */
-#define TIMER_RELOAD					(AST_TIMER_EXT_CLK_1M / HZ)
+#define AST_TIMER_EXT_CLK_1M	(1*1000*1000)	/* 1MHz */
+#define TIMER_RELOAD		(AST_TIMER_EXT_CLK_1M / HZ)
 
 /* Ticks */
-#define TICKS_PER_uSEC                  		1		/* AST_TIMER_EXT_CLK_1M / 10 ^ 6 */
+#define TICKS_PER_uSEC		1	/* AST_TIMER_EXT_CLK_1M / 10 ^ 6 */
 
 /* How long is the timer interval? */
-#define TICKS2USECS(x)				((x) / TICKS_PER_uSEC)
+#define TICKS2USECS(x)		((x) / TICKS_PER_uSEC)
 
 /***************************************************************************/
 static void __iomem *ast_timer_base;
@@ -82,7 +82,6 @@ static unsigned long ast_gettimeoffset(void)
 	ticks2 = ast_timer_read(AST_TIMER_COUNT);
 	do {
 		ticks1 = ticks2;
-//		status = readl(AST_RAW_STS(0));// __raw_readl(IO_ADDRESS(ASPEED_VIC_BASE) + ASPEED_VIC_RAW_STATUS_OFFSET);
 		ticks2 = ast_timer_read(AST_TIMER_COUNT);
 	} while (ticks2 > ticks1);
 
@@ -107,20 +106,16 @@ static irqreturn_t ast_timer_interrupt(int irq, void *dev_id)
 }
 
 static void ast_set_mode(enum clock_event_mode mode,
-	struct clock_event_device *evt)
+                         struct clock_event_device *evt)
 {
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
 		ast_timer_write(TIMER_RELOAD - 1, AST_TIMER_RELOAD);
 		ast_timer_write(TIMER_RELOAD - 1, AST_TIMER_COUNT);
-		ast_timer_write(TIMER_CTRL_T1_ENABLE | TIMER_CTRL_T1_EXT_REF, AST_TIMER_CTRL1);
+		ast_timer_write(TIMER_CTRL_T1_ENABLE | TIMER_CTRL_T1_EXT_REF,
+		                AST_TIMER_CTRL1);
 		break;
-
-//	case CLOCK_EVT_MODE_ONESHOT:
-		/* period set, and timer enabled in 'next_event' hook */
-//		ctrl |= TIMER_CTRL_ONESHOT;
-//		break;
 
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
@@ -130,11 +125,12 @@ static void ast_set_mode(enum clock_event_mode mode,
 }
 
 static int ast_set_next_event(unsigned long next,
-	struct clock_event_device *evt)
+                              struct clock_event_device *evt)
 {
 	ast_timer_write(next, AST_TIMER_RELOAD);
 
-	ast_timer_write(TIMER_CTRL_T1_ENABLE | ast_timer_read(AST_TIMER_CTRL1), AST_TIMER_CTRL1);
+	ast_timer_write(TIMER_CTRL_T1_ENABLE | ast_timer_read(AST_TIMER_CTRL1),
+	                AST_TIMER_CTRL1);
 
 	return 0;
 }
@@ -185,23 +181,23 @@ void __init ast_init_timer(void)
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
 
 	ast_clockevent.irq = IRQ_TIMER0;
-	ast_clockevent.mult = div_sc(TIMER_FREQ_KHZ, NSEC_PER_MSEC, ast_clockevent.shift);
-	ast_clockevent.max_delta_ns = clockevent_delta2ns(0xffffffff, &ast_clockevent);
-	ast_clockevent.min_delta_ns = clockevent_delta2ns(0xf, &ast_clockevent);
+	ast_clockevent.mult = div_sc(TIMER_FREQ_KHZ, NSEC_PER_MSEC,
+	                             ast_clockevent.shift);
+	ast_clockevent.max_delta_ns = clockevent_delta2ns(0xffffffff,
+	                                                  &ast_clockevent);
+	ast_clockevent.min_delta_ns = clockevent_delta2ns(0xf,
+	                                                  &ast_clockevent);
 
 	setup_irq(IRQ_TIMER0, &ast_timer_irq);
 	clockevents_register_device(&ast_clockevent);
 #else	
 
-	ast_timer_write(TIMER_CTRL_T1_ENABLE | TIMER_CTRL_T1_EXT_REF, AST_TIMER_CTRL1);
+	ast_timer_write(TIMER_CTRL_T1_ENABLE | TIMER_CTRL_T1_EXT_REF,
+	                AST_TIMER_CTRL1);
 
 	/* 
 	 * Make irqs happen for the system timer
 	 */
 	setup_irq(IRQ_TIMER0, &ast_timer_irq);
-
 #endif
-
-
 }
-
