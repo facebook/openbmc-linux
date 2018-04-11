@@ -23,6 +23,7 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
+#include <linux/sched_clock.h>
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
 
@@ -37,10 +38,14 @@
 #include <asm/mach/time.h>
 
 /***************************************************************************/
-#define AST_TIMER_COUNT			0x00
-#define AST_TIMER_RELOAD		0x04
-#define AST_TIMER_MATCH1		0x08
-#define AST_TIMER_MATCH2		0x0C
+#define AST_TIMER1_COUNT		0x00
+#define AST_TIMER1_RELOAD		0x04
+#define AST_TIMER1_MATCH1		0x08
+#define AST_TIMER1_MATCH2		0x0C
+#define AST_TIMER2_COUNT		0x10
+#define AST_TIMER2_RELOAD		0x14
+#define AST_TIMER2_MATCH1		0x18
+#define AST_TIMER2_MATCH2		0x1C
 #define AST_TIMER_CTRL1			0x30
 #define AST_TIMER_CTRL2			0x34
 #define AST_TIMER_CTRL3			0x38
@@ -57,7 +62,9 @@
 
 /***************************************************************************/
 #define AST_TIMER_EXT_CLK_1M	(1*1000*1000)	/* 1MHz */
-#define TIMER_RELOAD		(AST_TIMER_EXT_CLK_1M / HZ)
+#define AST_TIMER_RELOAD_HZ	(AST_TIMER_EXT_CLK_1M / HZ)
+#define AST_TIMER_RELOAD_MIN	0x1
+#define AST_TIMER_RELOAD_MAX	0xFFFFFFFF
 
 /* Ticks */
 #define TICKS_PER_uSEC		1	/* AST_TIMER_EXT_CLK_1M / 10 ^ 6 */
@@ -79,13 +86,13 @@ static unsigned long ast_gettimeoffset(void)
 	unsigned long ticks1, ticks2;//, status;
 
 
-	ticks2 = ast_timer_read(AST_TIMER_COUNT);
+	ticks2 = ast_timer_read(AST_TIMER1_COUNT);
 	do {
 		ticks1 = ticks2;
 		ticks2 = ast_timer_read(AST_TIMER_COUNT);
 	} while (ticks2 > ticks1);
 
-	ticks1 = TIMER_RELOAD - ticks2;
+	ticks1 = AST_TIMER_RELOAD_HZ - ticks2;
 
 	return TICKS2USECS(ticks1);
 }
@@ -111,8 +118,8 @@ static void ast_set_mode(enum clock_event_mode mode,
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
-		ast_timer_write(TIMER_RELOAD - 1, AST_TIMER_RELOAD);
-		ast_timer_write(TIMER_RELOAD - 1, AST_TIMER_COUNT);
+		ast_timer_write(AST_TIMER_RELOAD_HZ - 1, AST_TIMER1_RELOAD);
+		ast_timer_write(AST_TIMER_RELOAD_HZ - 1, AST_TIMER1_COUNT);
 		ast_timer_write(TIMER_CTRL_T1_ENABLE | TIMER_CTRL_T1_EXT_REF,
 		                AST_TIMER_CTRL1);
 		break;
@@ -127,7 +134,7 @@ static void ast_set_mode(enum clock_event_mode mode,
 static int ast_set_next_event(unsigned long next,
                               struct clock_event_device *evt)
 {
-	ast_timer_write(next, AST_TIMER_RELOAD);
+	ast_timer_write(next, AST_TIMER1_RELOAD);
 
 	ast_timer_write(TIMER_CTRL_T1_ENABLE | ast_timer_read(AST_TIMER_CTRL1),
 	                AST_TIMER_CTRL1);
@@ -143,6 +150,27 @@ static struct clock_event_device ast_clockevent = {
 	.set_next_event	= ast_set_next_event,
 	.rating		= 300,
 	.cpumask	= cpu_all_mask,
+};
+
+/*
+ * Clocksource: ASPEED integrated 1MHz timer.
+ */
+static cycle_t ast_read_cycles(struct clocksource *cs)
+{
+	return (cycle_t)(~ast_timer_read(AST_TIMER2_COUNT));
+}
+
+static u64 ast_read_sched_clock(void)
+{
+	return (u64)(~ast_timer_read(AST_TIMER2_COUNT));
+}
+
+static struct clocksource ast_clocksource = {
+	.name		= "ast_clocksource",
+	.rating		= 300,
+	.mask		= CLOCKSOURCE_MASK(32),
+	.read		= ast_read_cycles,
+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 #else
 static irqreturn_t 
@@ -175,23 +203,32 @@ void __init ast_init_timer(void)
 	ast_timer_write(0, AST_TIMER_CTRL2);
 	ast_timer_write(0, AST_TIMER_CTRL3);
 
-	ast_timer_write(TIMER_RELOAD - 1, AST_TIMER_RELOAD);
-	ast_timer_write(TIMER_RELOAD - 1, AST_TIMER_COUNT);
+	ast_timer_write(AST_TIMER_RELOAD_HZ - 1, AST_TIMER1_RELOAD);
+	ast_timer_write(AST_TIMER_RELOAD_HZ - 1, AST_TIMER1_COUNT);
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
 
 	ast_clockevent.irq = IRQ_TIMER0;
 	ast_clockevent.mult = div_sc(TIMER_FREQ_KHZ, NSEC_PER_MSEC,
 	                             ast_clockevent.shift);
-	ast_clockevent.max_delta_ns = clockevent_delta2ns(0xffffffff,
+	ast_clockevent.max_delta_ns = clockevent_delta2ns(AST_TIMER_RELOAD_MAX,
 	                                                  &ast_clockevent);
-	ast_clockevent.min_delta_ns = clockevent_delta2ns(0xf,
+	ast_clockevent.min_delta_ns = clockevent_delta2ns(AST_TIMER_RELOAD_MIN,
 	                                                  &ast_clockevent);
 
 	setup_irq(IRQ_TIMER0, &ast_timer_irq);
 	clockevents_register_device(&ast_clockevent);
-#else	
 
+	/* Set up free-running clocksource timer with interrupt disabled. */
+	ast_timer_write(0, AST_TIMER2_COUNT);
+	ast_timer_write(0, AST_TIMER2_MATCH1);
+	ast_timer_write(0, AST_TIMER2_MATCH2);
+	ast_timer_write(AST_TIMER_RELOAD_MAX, AST_TIMER2_RELOAD);
+	ast_timer_write(TIMER_CTRL_T2_ENABLE | TIMER_CTRL_T2_EXT_REF |
+	                ast_timer_read(AST_TIMER_CTRL1), AST_TIMER_CTRL1);
+	clocksource_register_hz(&ast_clocksource, AST_TIMER_EXT_CLK_1M);
+	sched_clock_register(ast_read_sched_clock, 32, AST_TIMER_EXT_CLK_1M);
+#else
 	ast_timer_write(TIMER_CTRL_T1_ENABLE | TIMER_CTRL_T1_EXT_REF,
 	                AST_TIMER_CTRL1);
 
