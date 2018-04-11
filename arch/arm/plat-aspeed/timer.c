@@ -134,10 +134,17 @@ static void ast_set_mode(enum clock_event_mode mode,
 static int ast_set_next_event(unsigned long next,
                               struct clock_event_device *evt)
 {
+	u32 val;
+
+	/* Stop the timer at first. */
+	val = ast_timer_read(AST_TIMER_CTRL1) & (~TIMER_CTRL_T1_ENABLE);
+	ast_timer_write(val, AST_TIMER_CTRL1);
+
 	ast_timer_write(next, AST_TIMER1_RELOAD);
 
-	ast_timer_write(TIMER_CTRL_T1_ENABLE | ast_timer_read(AST_TIMER_CTRL1),
-	                AST_TIMER_CTRL1);
+	/* Re-enable the timer. */
+	val = ast_timer_read(AST_TIMER_CTRL1) | TIMER_CTRL_T1_ENABLE;
+	ast_timer_write(val, AST_TIMER_CTRL1);
 
 	return 0;
 }
