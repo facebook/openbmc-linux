@@ -397,9 +397,9 @@ static int __init ast_rtc_probe(struct platform_device *pdev)
 		//combination mode
 		rtc_write(ast_rtc->base, ALARM_MODE_SELECT | RTC_LOCK | RTC_ENABLE, RTC_CONTROL);
 
-		rtc_write(ast_rtc->base, 0, RTC_CNTR_STS_1);
+		rtc_write(ast_rtc->base, SET_DAY_VAL(1), RTC_CNTR_STS_1);
 
-		rtc_write(ast_rtc->base, 0, RTC_CNTR_STS_2);
+		rtc_write(ast_rtc->base, SET_YEAR_VAL(70), RTC_CNTR_STS_2);
 
 		rtc_write(ast_rtc->base, 0, RTC_ALARM);
 		rtc_write(ast_rtc->base, ~RTC_LOCK & rtc_read(ast_rtc->base, RTC_CONTROL), RTC_CONTROL);
