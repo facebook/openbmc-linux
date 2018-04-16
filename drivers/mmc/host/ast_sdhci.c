@@ -833,7 +833,7 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
 
 #ifdef CONFIG_WO_CD
 	if(sdhci_readl(host, SDHCI_AST_EXT) & SDHCI_EXT_CD_INFO) {
-		sdhci_writel(host, 
+		sdhci_writel(host,
 					sdhci_readl(host, SDHCI_AST_EXT) | SDHCI_EXT_CD_DIS(host->slot),
 					SDHCI_AST_EXT);
 	}
@@ -850,7 +850,7 @@ static void sdhci_finish_data(struct sdhci_host *host)
 
 #ifdef CONFIG_WO_CD
 	if(sdhci_readl(host, SDHCI_AST_EXT) & SDHCI_EXT_CD_INFO) {
-		sdhci_writel(host, 
+		sdhci_writel(host,
 					sdhci_readl(host, SDHCI_AST_EXT) & ~(SDHCI_EXT_CD_DIS(host->slot)),
 					SDHCI_AST_EXT);
 	}
@@ -1025,8 +1025,8 @@ static void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 	}
 	div >>= 1;
 
-	//Issue : For ast2300, ast2400 couldn't set div = 0 means /1 , so set source is ~50Mhz up 
-	
+	//Issue : For ast2300, ast2400 couldn't set div = 0 means /1 , so set source is ~50Mhz up
+
 	clk = div << SDHCI_DIVIDER_SHIFT;
 	clk |= SDHCI_CLOCK_INT_EN;
 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
@@ -1195,12 +1195,12 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		ctrl |= SDHCI_CTRL_8BITBUS;
 	else
 		ctrl &= ~SDHCI_CTRL_8BITBUS;
-#else	
+#else
 	if (ios->bus_width == MMC_BUS_WIDTH_8)
 		ast_sdhc_info->sd_set_8bit_mode(1);
 	else
 		ast_sdhc_info->sd_set_8bit_mode(0);
-#endif 
+#endif
 
 	if (ios->bus_width == MMC_BUS_WIDTH_4)
 		ctrl |= SDHCI_CTRL_4BITBUS;
@@ -1633,7 +1633,7 @@ out:
  *                                                                           *
 \*****************************************************************************/
 
-#if defined CONFIG_PM && !defined CONFIG_MINIPACK
+#if defined CONFIG_PM && !defined CONFIG_MINIPACK && !defined CONFIG_YAMP
 
 static int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
 {
@@ -1731,7 +1731,7 @@ int sdhci_add_host(struct sdhci_host *host)
 //Both ports's capabilities are 0, software needs to reset SDIO
 #define	SDIO000				0x1e740000
 #define	SDIO004				0x1e740004
-	
+
 #define	SDIO_ALL_SOFTWARE_RESET		0x01
 
 	if ((*(unsigned int*)(IO_ADDRESS(0x1E740140)) == 0) && (*(unsigned int*)(IO_ADDRESS(0x1E740240)) == 0)) {
@@ -1742,9 +1742,9 @@ int sdhci_add_host(struct sdhci_host *host)
 			temp = (*(unsigned int*)(IO_ADDRESS(SDIO000)) & SDIO_ALL_SOFTWARE_RESET);
 		} while (temp == SDIO_ALL_SOFTWARE_RESET);
 	}
-	//Card detect debounce timing 
+	//Card detect debounce timing
 	*(unsigned int*)(IO_ADDRESS(SDIO004)) = 0x1000;
-#endif	
+#endif
 	///////////////////////////////////////////////////////////////////
 
 	mmc = host->mmc;
@@ -1766,7 +1766,7 @@ int sdhci_add_host(struct sdhci_host *host)
 	caps = (host->quirks & SDHCI_QUIRK_MISSING_CAPS) ? host->caps :
 		sdhci_readl(host, SDHCI_CAPABILITIES);
 
-	//Ryan Add for timeout 
+	//Ryan Add for timeout
 	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
 	host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
 
@@ -1807,7 +1807,7 @@ int sdhci_add_host(struct sdhci_host *host)
 				host->flags &= ~(SDHCI_USE_SDMA | SDHCI_USE_ADMA);
 			}
 		}
-*/		
+*/
 	}
 
 	if (host->flags & SDHCI_USE_ADMA) {
@@ -1843,7 +1843,7 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	host->max_clk = ast_sdhc_info->sd_clock_src_get()/1000000;
 	DBG("host->max_clk = %d Mhz\n",host->max_clk);
-	
+
 	if (host->max_clk == 0) {
 		printk(KERN_ERR "%s: Hardware doesn't specify base clock "
 			"frequency.\n", mmc_hostname(mmc));
@@ -1888,7 +1888,7 @@ int sdhci_add_host(struct sdhci_host *host)
 	if (!(host->quirks & SDHCI_QUIRK_FORCE_1_BIT_DATA))
 		mmc->caps |= MMC_CAP_4_BIT_DATA;
 #endif
-	
+
 
 	if (caps & SDHCI_CAN_DO_HISPD)
 		mmc->caps |= MMC_CAP_SD_HIGHSPEED;
@@ -2064,16 +2064,16 @@ static int sdhci_probe(struct platform_device *pdev)
 	}
 
 	host->slot = pdev->id;
-	
+
 #ifdef CONFIG_WO_CD
 	if(sdhci_readl(host, SDHCI_AST_EXT) & SDHCI_EXT_CD_INFO) {
 		printk("Without Card Detection \n");
-		sdhci_writel(host, 
+		sdhci_writel(host,
 					sdhci_readl(host, SDHCI_AST_EXT) | SDHCI_EXT_CD_MODE_EN(host->slot),
 					SDHCI_AST_EXT);
 	}
 #endif
-	
+
 	host->hw_name = res->name;
 	host->irq = platform_get_irq(pdev, 0);
 	if (host->irq < 0) {
@@ -2157,7 +2157,7 @@ static struct platform_driver ast_sdhci_driver = {
 	.driver.owner	= THIS_MODULE,
 	.probe		= sdhci_probe,
 	.remove		= sdhci_remove_host,
-#if defined CONFIG_PM && !defined CONFIG_MINIPACK
+#if defined CONFIG_PM && !defined CONFIG_MINIPACK && !defined CONFIG_YAMP
 	.resume		= sdhci_resume_host,
 	.suspend	= sdhci_suspend_host,
 #endif
