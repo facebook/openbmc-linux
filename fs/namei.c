@@ -1619,10 +1619,10 @@ static inline int walk_component(struct nameidata *nd, struct path *path,
 		if (err < 0)
 			goto out_err;
 
-		inode = path->dentry->d_inode;
 		err = -ENOENT;
 		if (d_is_negative(path->dentry))
 			goto out_path_put;
+		inode = path->dentry->d_inode;
 	}
 
 	if (should_follow_link(path->dentry, follow)) {
@@ -1893,6 +1893,9 @@ static int path_init(int dfd, const struct filename *name, unsigned int flags,
 {
 	int retval = 0;
 	const char *s = name->name;
+
+	if (!*s)
+		flags &= ~LOOKUP_RCU;
 
 	nd->last_type = LAST_ROOT; /* if there are only slashes... */
 	nd->flags = flags | LOOKUP_JUMPED | LOOKUP_PARENT;
@@ -2839,22 +2842,10 @@ no_open:
 		dentry = lookup_real(dir, dentry, nd->flags);
 		if (IS_ERR(dentry))
 			return PTR_ERR(dentry);
-
-		if (create_error) {
-			int open_flag = op->open_flag;
-
-			error = create_error;
-			if ((open_flag & O_EXCL)) {
-				if (!dentry->d_inode)
-					goto out;
-			} else if (!dentry->d_inode) {
-				goto out;
-			} else if ((open_flag & O_TRUNC) &&
-				   d_is_reg(dentry)) {
-				goto out;
-			}
-			/* will fail later, go on to get the right error */
-		}
+	}
+	if (create_error && !dentry->d_inode) {
+		error = create_error;
+		goto out;
 	}
 looked_up:
 	path->dentry = dentry;
@@ -3078,6 +3069,7 @@ retry_lookup:
 		path_to_nameidata(path, nd);
 		goto out;
 	}
+	inode = path->dentry->d_inode;
 finish_lookup:
 	/* we _can_ be in RCU mode here */
 	if (should_follow_link(path->dentry, !symlink_ok)) {
@@ -3152,6 +3144,10 @@ opened:
 			goto exit_fput;
 	}
 out:
+	if (unlikely(error > 0)) {
+		WARN_ON(1);
+		error = -EINVAL;
+	}
 	if (got_write)
 		mnt_drop_write(nd->path.mnt);
 	path_put(&save_parent);

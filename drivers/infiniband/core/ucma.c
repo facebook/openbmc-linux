@@ -1050,6 +1050,9 @@ static ssize_t ucma_init_qp_attr(struct ucma_file *file,
 	if (copy_from_user(&cmd, inbuf, sizeof(cmd)))
 		return -EFAULT;
 
+	if (cmd.qp_state > IB_QPS_ERR)
+		return -EINVAL;
+
 	ctx = ucma_get_ctx(file, cmd.id);
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
@@ -1186,6 +1189,9 @@ static ssize_t ucma_set_option(struct ucma_file *file, const char __user *inbuf,
 	ctx = ucma_get_ctx(file, cmd.id);
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
+
+	if (unlikely(cmd.optval > KMALLOC_MAX_SIZE))
+		return -EINVAL;
 
 	optval = memdup_user((void __user *) (unsigned long) cmd.optval,
 			     cmd.optlen);
@@ -1486,6 +1492,9 @@ static ssize_t ucma_write(struct file *filp, const char __user *buf,
 	struct ucma_file *file = filp->private_data;
 	struct rdma_ucm_cmd_hdr hdr;
 	ssize_t ret;
+
+	if (WARN_ON_ONCE(!ib_safe_file_access(filp)))
+		return -EACCES;
 
 	if (len < sizeof(hdr))
 		return -EINVAL;

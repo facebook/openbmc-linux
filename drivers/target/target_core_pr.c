@@ -58,8 +58,10 @@ void core_pr_dump_initiator_port(
 	char *buf,
 	u32 size)
 {
-	if (!pr_reg->isid_present_at_reg)
+	if (!pr_reg->isid_present_at_reg) {
 		buf[0] = '\0';
+		return;
+	}
 
 	snprintf(buf, size, ",i,0x%s", pr_reg->pr_reg_isid);
 }
@@ -329,7 +331,7 @@ static int core_scsi3_pr_seq_non_holder(
 			 * RESERVATION CONFLICT on some CDBs */
 
 	if (!se_sess->se_node_acl->device_list)
-		return;
+		return 0;
 
 	se_deve = se_sess->se_node_acl->device_list[cmd->orig_fe_lun];
 	/*

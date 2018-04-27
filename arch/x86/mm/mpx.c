@@ -120,19 +120,19 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 	switch (type) {
 	case REG_TYPE_RM:
 		regno = X86_MODRM_RM(insn->modrm.value);
-		if (X86_REX_B(insn->rex_prefix.value) == 1)
+		if (X86_REX_B(insn->rex_prefix.value))
 			regno += 8;
 		break;
 
 	case REG_TYPE_INDEX:
 		regno = X86_SIB_INDEX(insn->sib.value);
-		if (X86_REX_X(insn->rex_prefix.value) == 1)
+		if (X86_REX_X(insn->rex_prefix.value))
 			regno += 8;
 		break;
 
 	case REG_TYPE_BASE:
 		regno = X86_SIB_BASE(insn->sib.value);
-		if (X86_REX_B(insn->rex_prefix.value) == 1)
+		if (X86_REX_B(insn->rex_prefix.value))
 			regno += 8;
 		break;
 
@@ -142,7 +142,7 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 		break;
 	}
 
-	if (regno > nr_registers) {
+	if (regno >= nr_registers) {
 		WARN_ONCE(1, "decoded an instruction with an invalid register");
 		return -EINVAL;
 	}
@@ -312,7 +312,7 @@ siginfo_t *mpx_generate_siginfo(struct pt_regs *regs,
 	 * We were not able to extract an address from the instruction,
 	 * probably because there was something invalid in it.
 	 */
-	if (info->si_addr == (void *)-1) {
+	if (info->si_addr == (void __user *)-1) {
 		err = -EINVAL;
 		goto err_out;
 	}
