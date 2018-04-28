@@ -1,5 +1,5 @@
 /*
- * SPI device definitions for CMM
+ * SPI device definitions for Facebook devices
  *
  * Copyright 2015-present Facebook. All Rights Reserved.
  *
@@ -65,20 +65,21 @@ static struct ast_spi_driver_data ast_fmc_driver_data = {
 
 static struct ast_spi_driver_data ast_spi0_driver_data = {
     .get_div = ast_spi_calculate_divisor,
+#if defined CONFIG_AST_SPI0_CS1
+    .num_chipselect = 2,
+#else
     .num_chipselect = 1,
+#endif
 };
 
 #if defined AST_SOC_G5
 static struct ast_spi_driver_data ast_spi1_driver_data = {
     .get_div = ast_spi_calculate_divisor,
+#if defined CONFIG_AST_SPI1_CS1
     .num_chipselect = 2,
-};
-#endif
-
-#if defined (CONFIG_YAMP)
-static struct ast_spi_driver_data ast_yamp_spi1_driver_data = {
-    .get_div = ast_spi_calculate_divisor,
+#else
     .num_chipselect = 1,
+#endif
 };
 #endif
 
@@ -161,21 +162,6 @@ static struct resource ast_spi1_resource[] = {
 };
 #endif
 
-#if defined CONFIG_YAMP
-static struct resource ast_yamp_spi1_resource[] = {
-  {
-     .start  = AST_SPI1_BASE,
-     .end    = AST_SPI1_BASE + SZ_16,
-     .flags  = IORESOURCE_MEM,
-  },
-  {
-     .start  = AST_SPI1_CS0_BASE,
-     .end    = AST_SPI1_CS0_BASE + SZ_16,
-     .flags  = IORESOURCE_BUS,
-  },
-};
-#endif
-
 static struct platform_device ast_fmc_device = {
 	.name           = "fmc-spi",
 	.id             = 0,
@@ -212,19 +198,6 @@ static struct platform_device ast_spi1_device = {
   .num_resources  = ARRAY_SIZE(ast_spi1_resource),
   .resource       = ast_spi1_resource,
 };
-#endif
-
-#if defined(CONFIG_YAMP)
-static struct platform_device ast_yamp_spi1_device = {
-       .name           = "ast-spi",
-       .id             = 1,
-       .dev = {
-          .platform_data = &ast_yamp_spi1_driver_data,
-       },
-      .num_resources  = ARRAY_SIZE(ast_yamp_spi1_resource),
-      .resource       = ast_yamp_spi1_resource,
-};
-
 #endif
 
 static struct mtd_partition ast_legacy_partitions[] = {
@@ -429,7 +402,7 @@ static struct spi_board_info ast_spi0_devices[] = {
 
 #if defined AST_SOC_G5
 static struct spi_board_info ast_spi1_devices[] = {
-#if defined CONFIG_MINIPACK
+#if defined CONFIG_MINIPACK || defined CONFIG_YAMP
   {
     .modalias           = "spidev",
     .chip_select        = 0,
@@ -437,6 +410,8 @@ static struct spi_board_info ast_spi1_devices[] = {
     .bus_num            = 2,
     .mode               = SPI_MODE_0,
   },
+#endif
+#if defined CONFIG_MINIPACK
   {
     .modalias           = "at25",
     .platform_data      = &m95m02,
@@ -449,17 +424,6 @@ static struct spi_board_info ast_spi1_devices[] = {
 };
 #endif
 
-#if defined (CONFIG_YAMP)
-static struct spi_board_info ast_yamp_spi1_devices[] = {
-    {
-        .modalias           = "spidev",         // Generic
-        .chip_select        = 0,                // Should be correct
-        .max_speed_hz       = 33 * 1000 * 1000, // Should be safe
-        .bus_num            = 2,                // According to the reference code, this should be 1. Are we sure?
-        .mode               = SPI_MODE_0,
-    },
-};
-#endif
 
 static int __init dual_flash_enabled_handler(char *str)
 {
@@ -490,7 +454,7 @@ void __init ast_add_device_spi(void)
 	platform_device_register(&ast_spi1_device);
 	spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
 #elif defined(CONFIG_YAMP)
-  platform_device_register(&ast_yamp_spi1_device);
-  spi_register_board_info(ast_yamp_spi1_devices, ARRAY_SIZE(ast_yamp_spi1_devices));
+	platform_device_register(&ast_spi1_device);
+	spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
 #endif
 }
