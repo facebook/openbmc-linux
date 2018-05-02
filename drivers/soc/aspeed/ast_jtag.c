@@ -125,13 +125,16 @@ struct controller_mode_param {
 //#define USE_INTERRUPTS
 #define WAIT_ITERATIONS 75
 #ifdef AST_JTAG_DEBUG
-#define JTAG_DBUG(fmt, args...) printk(KERN_DEBUG "%s() " fmt,__FUNCTION__, ## args)
+#define JTAG_DBUG(fmt, ...) \
+	printk(KERN_DEBUG "%s:%d " fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #else
 #define JTAG_DBUG(fmt, args...)
 #endif
 
-#define JTAG_ERR(fmt, args...) printk(KERN_ERR "%s() " fmt,__FUNCTION__, ## args)
-#define JTAG_MSG(fmt, args...) printk(fmt, ## args)
+#define JTAG_ERR(fmt, ...) \
+	printk(KERN_ERR "%s:%d " fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define JTAG_MSG(fmt, ...) \
+	printk(KERN_INFO fmt, ##__VA_ARGS__)
 
 struct ast_jtag_info {
 	void __iomem	    *reg_base;
@@ -176,7 +179,7 @@ typedef struct
 // these are the string representations of the TAP states corresponding to the enums literals in JtagStateEncode
 const char* const c_statestr[] = {"TLR", "RTI", "SelDR", "CapDR", "ShfDR", "Ex1DR", "PauDR", "Ex2DR", "UpdDR", "SelIR", "CapIR", "ShfIR", "Ex1IR", "PauIR", "Ex2IR", "UpdIR"};
 
-struct ast_jtag_info *ast_jtag;
+static struct ast_jtag_info *ast_jtag = NULL;
 
 // this is the complete set TMS cycles for going from any TAP state to any other TAP state, following a “shortest path” rule
 const TmsCycle _tmsCycleLookup[][16] = {
@@ -1153,6 +1156,10 @@ static int ast_jtag_probe(struct platform_device *pdev)
 
 	JTAG_DBUG("ast_jtag_probe\n");
 
+	if (!(ast_jtag = kzalloc(sizeof(struct ast_jtag_info), GFP_KERNEL))) {
+		return -ENOMEM;
+	}
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (NULL == res) {
 		dev_err(&pdev->dev, "cannot get IORESOURCE_MEM\n");
@@ -1164,10 +1171,6 @@ static int ast_jtag_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "cannot reserved region\n");
 		ret = -ENXIO;
 		goto out;
-	}
-
-	if (!(ast_jtag = kzalloc(sizeof(struct ast_jtag_info), GFP_KERNEL))) {
-		return -ENOMEM;
 	}
 
 	ast_jtag->reg_base = ioremap(res->start, resource_size(res));
@@ -1191,6 +1194,8 @@ static int ast_jtag_probe(struct platform_device *pdev)
 	}
 #endif
 
+	ast_jtag_master(SW_MODE);
+
 	ast_jtag->flag = 0;
 	init_waitqueue_head(&ast_jtag->jtag_wq);
 
@@ -1201,17 +1206,14 @@ static int ast_jtag_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, ast_jtag);
-	dev_set_drvdata(ast_jtag_misc.this_device, ast_jtag);
 
 	ret = sysfs_create_group(&pdev->dev.kobj, &jtag_attribute_group);
 	if (ret) {
-		printk(KERN_ERR "ast_jtag: failed to create sysfs device attributes.\n");
+		JTAG_ERR("ast_jtag: failed to create sysfs device attributes.\n");
 		return -1;
 	}
 
-  ast_jtag_master(SW_MODE);
-
-	printk(KERN_INFO "ast_jtag: driver successfully loaded.\n");
+	JTAG_MSG("ast_jtag: driver successfully loaded.\n");
 
 	return 0;
 
@@ -1222,6 +1224,11 @@ out_irq:
 out_region:
 	release_mem_region(res->start, res->end - res->start + 1);
 out:
+	if (ast_jtag) {
+	  kfree(ast_jtag);
+	  ast_jtag = NULL;
+	}
+
 	printk(KERN_WARNING "applesmc: driver init failed (ret=%d)!\n", ret);
 	return ret;
 }
@@ -1231,12 +1238,13 @@ static int ast_jtag_remove(struct platform_device *pdev)
 	struct resource *res;
 	struct ast_jtag_info *ast_jtag = platform_get_drvdata(pdev);
 
-  if (ast_jtag == NULL)
-    return 0;
+	if (ast_jtag == NULL)
+		return 0;
 
 	JTAG_DBUG("ast_jtag_remove\n");
 
-  sysfs_remove_group(&pdev->dev.kobj, &jtag_attribute_group);
+	sysfs_remove_group(&pdev->dev.kobj, &jtag_attribute_group);
+
 	misc_deregister(&ast_jtag_misc);
 
 #ifdef USE_INTERRUPTS
@@ -1246,19 +1254,16 @@ static int ast_jtag_remove(struct platform_device *pdev)
 	iounmap(ast_jtag->reg_base);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-  if (res != NULL)
-    release_mem_region(res->start, res->end - res->start + 1);
+	if (res != NULL)
+		release_mem_region(res->start, res->end - res->start + 1);
 
 	platform_set_drvdata(pdev, NULL);
 
-  if (res != NULL)
-	  release_mem_region(res->start, res->end - res->start + 1);
+	kfree(ast_jtag);
 
-  kfree(ast_jtag);
+	ast_jtag_slave();
 
-  ast_jtag_slave();
-
-  JTAG_DBUG("JTAG driver removed successfully!\n");
+	JTAG_MSG("ast_jtag: JTAG driver removed successfully!\n");
 
 	return 0;
 }
