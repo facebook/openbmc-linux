@@ -150,6 +150,13 @@ struct ast_jtag_info {
 static u32 ast_scu_base = IO_ADDRESS(AST_SCU_BASE);
 static DEFINE_SPINLOCK(jtag_state_lock);
 
+static u32 g_sw_tdi;
+static u32 g_sw_tck;
+static u32 g_sw_tms;
+
+#define JTAG_SW_MODE_VAL_MASK \
+	(JTAG_SW_MODE_TDIO|JTAG_SW_MODE_TCK|JTAG_SW_MODE_TMS)
+
 typedef enum {
     JtagTLR,
     JtagRTI,
@@ -328,9 +335,12 @@ void reset_tap(struct ast_jtag_info *ast_jtag, xfer_mode mode) {
     unsigned char i;
     if (mode == SW_MODE) {
         // clear tap state and go back to TLR
+        g_sw_tms = JTAG_SW_MODE_TMS;
+        g_sw_tdi = 0;
         for (i = 0; i < 9; i++) {
-            TCK_Cycle(ast_jtag, 1, 0);
+	        TCK_Cycle(ast_jtag, (g_sw_tms) ? 1 : 0, (g_sw_tdi) ? 1 : 0);
         }
+        g_sw_tck = JTAG_SW_MODE_TCK;
     } else {
         ast_jtag_write(ast_jtag, 0, AST_JTAG_SW);  // disable sw mode
         mdelay(1);
@@ -1033,24 +1043,37 @@ static int jtag_release(struct inode *inode, struct file *file)
 static ssize_t show_tdo(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
-
-	return sprintf(buf, "%s\n", ast_jtag_read(ast_jtag, AST_JTAG_SW) & JTAG_SW_MODE_TDIO? "1":"0");
+	return sprintf(buf, "%s\n",
+		       ast_jtag_read(ast_jtag, AST_JTAG_SW) & JTAG_SW_MODE_TDIO
+		       ? "1" : "0");
 }
 
 static DEVICE_ATTR(tdo, S_IRUGO, show_tdo, NULL);
 
+static inline void ast_jtag_write_sw_reg(void) {
+	u32 old_val = ast_jtag_read(ast_jtag, AST_JTAG_SW);
+	u32 val = (old_val & ~JTAG_SW_MODE_VAL_MASK) | (g_sw_tdi|g_sw_tck|g_sw_tms);
+	JTAG_DBUG("write SW register from value %#x -> %#x. tms=%d tck=%d tdi=%d\n",
+		  old_val, val,
+		  g_sw_tms ? 1 : 0, g_sw_tck ? 1 : 0, g_sw_tdi ? 1 : 0);
+	ast_jtag_write(ast_jtag, val, AST_JTAG_SW);
+}
+
+#define STORE_COMMON(buf, count, tdx, true_value) do {	\
+	unsigned long val;				\
+	int err;					\
+	err = kstrtoul(buf, 0, &val);			\
+	if (err)					\
+		return err;				\
+	tdx = val ? true_value : 0;			\
+	ast_jtag_write_sw_reg();			\
+	return count;					\
+} while (0);
+
 static ssize_t store_tdi(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	u32 tdi;
-	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
-
-	tdi = simple_strtoul(buf, NULL, 1);
-
-	ast_jtag_write(ast_jtag, ast_jtag_read(ast_jtag, AST_JTAG_SW) | JTAG_SW_MODE_EN | (tdi * JTAG_SW_MODE_TDIO), AST_JTAG_SW);
-
-	return count;
+	STORE_COMMON(buf, count, g_sw_tdi, JTAG_SW_MODE_TDIO);
 }
 
 static DEVICE_ATTR(tdi, S_IWUSR, NULL, store_tdi);
@@ -1058,14 +1081,7 @@ static DEVICE_ATTR(tdi, S_IWUSR, NULL, store_tdi);
 static ssize_t store_tms(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	u32 tms;
-	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
-
-	tms = simple_strtoul(buf, NULL, 1);
-
-	ast_jtag_write(ast_jtag, ast_jtag_read(ast_jtag, AST_JTAG_SW) | JTAG_SW_MODE_EN | (tms * JTAG_SW_MODE_TMS), AST_JTAG_SW);
-
-	return count;
+	STORE_COMMON(buf, count, g_sw_tms, JTAG_SW_MODE_TMS);
 }
 
 static DEVICE_ATTR(tms, S_IWUSR, NULL, store_tms);
@@ -1073,14 +1089,7 @@ static DEVICE_ATTR(tms, S_IWUSR, NULL, store_tms);
 static ssize_t store_tck(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	u32 tck;
-	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
-
-	tck = simple_strtoul(buf, NULL, 1);
-
-	ast_jtag_write(ast_jtag, ast_jtag_read(ast_jtag, AST_JTAG_SW) | JTAG_SW_MODE_EN | (tck * JTAG_SW_MODE_TDIO), AST_JTAG_SW);
-
-	return count;
+	STORE_COMMON(buf, count, g_sw_tck, JTAG_SW_MODE_TCK);
 }
 
 static DEVICE_ATTR(tck, S_IWUSR, NULL, store_tck);
@@ -1111,10 +1120,11 @@ static ssize_t show_frequency(struct device *dev,
 static ssize_t store_frequency(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	u32 val;
-	struct ast_jtag_info *ast_jtag = dev_get_drvdata(dev);
-
-	val = simple_strtoul(buf, NULL, 10);
+	unsigned long val;
+	int err;
+	err = kstrtoul(buf, 0, &val);
+	if (err)
+		return err;
 	ast_jtag_set_freq(ast_jtag, val);
 
 	return count;
