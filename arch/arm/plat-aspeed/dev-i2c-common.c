@@ -41,6 +41,15 @@ static struct ast_i2c_driver_data ast_i2c_data = {
 	.get_i2c_clock = ast_get_pclk,
 };
 
+static struct ast_i2c_driver_data ast_i2c_data_1M = {
+	.bus_clk = 1000000,		//bus clock 1000KHz
+	.master_dma = MASTER_XFER_MODE,
+	.slave_dma = SLAVE_XFER_MODE,
+	.request_pool_buff_page = request_pool_buff_page,
+	.free_pool_buff_page = free_pool_buff_page,
+	.get_i2c_clock = ast_get_pclk,
+};
+
 static u64 ast_i2c_dma_mask = 0xffffffffUL;
 static struct resource ast_i2c_dev0_resources[] = {
 	[0] = {
@@ -61,7 +70,11 @@ static struct platform_device ast_i2c_dev0_device = {
 	.dev = {
 		.dma_mask = &ast_i2c_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
+#if defined(CONFIG_AST_I2C_0_1M)
+		.platform_data = &ast_i2c_data_1M,
+#else
 		.platform_data = &ast_i2c_data,
+#endif
 	},
 	.resource = ast_i2c_dev0_resources,
 	.num_resources = ARRAY_SIZE(ast_i2c_dev0_resources),
@@ -422,7 +435,9 @@ void __init ast_add_device_i2c_common(void)
 		printk("ast_add_device_i2c ERROR \n");
 		return;
 	}
-
+#if defined(CONFIG_AST_I2C_0_1M)
+	ast_i2c_data_1M.reg_gr = ast_i2c_data.reg_gr;// 1MHz reg_gr setting
+#endif
 	platform_device_register(&ast_i2c_dev0_device);
 	platform_device_register(&ast_i2c_dev1_device);
 	platform_device_register(&ast_i2c_dev2_device);

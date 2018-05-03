@@ -355,6 +355,10 @@ config I2C_AST1070
           This driver can also be built as a module.  If so, the module
           will be called i2c-ast.
 
+config AST_I2C_0_1M
+        bool "AST I2C0 speed 1MHz"
+        depends on I2C_AST
+
 config AST_I2C_SLAVE_MODE
         bool "AST I2C Slave mode"
 	depends on I2C_AST
