@@ -301,6 +301,8 @@ typedef struct {
 	unsigned short EtherType; /* DMTF NC-SI */
 /* NC-SI Control Packet */
 	/* Management Controller should set this field to 0x00 */
+
+/* 16 bytes NC-SI header */
 	unsigned char  MC_ID;
 	/* For NC-SI 1.0 spec, this field has to set 0x01 */
 	unsigned char  Header_Revision;
@@ -314,10 +316,12 @@ typedef struct {
 	unsigned short  Reserved_3;
 	unsigned short  Reserved_4;
 	unsigned short  Reserved_5;
+/* end of NC-SI header */
 	unsigned short  Response_Code;
 	unsigned short  Reason_Code;
 	unsigned char   Payload_Data[128];
-} NCSI_Response_Packet;
+} __attribute__((packed)) NCSI_Response_Packet;
+
 
 /* Standard Response Code */
 #define COMMAND_COMPLETED     0x00
@@ -334,34 +338,36 @@ typedef struct {
 #define INVALID_PAYLOAD_LENGTH      0x0005
 #define UNKNOWN_COMMAND_TYPE      0x7FFF
 
-struct AEN_Packet {
+typedef struct {
 /* Ethernet Header */
 	unsigned char  DA[6];
 	unsigned char  SA[6]; /* Network Controller SA = FF:FF:FF:FF:FF:FF */
 	unsigned short EtherType; /* DMTF NC-SI */
 /* AEN Packet Format */
+	/* AEN HEADER */
 	/* Network Controller should set this field to 0x00 */
 	unsigned char  MC_ID;
 	/* For NC-SI 1.0 spec, this field has to set 0x01 */
 	unsigned char  Header_Revision;
 	unsigned char  Reserved_1; /* Reserved has to set to 0x00 */
-/*    unsigned char  IID = 0x00; // Instance ID = 0 in Network Controller */
-/*    unsigned char  Command = 0xFF; // AEN = 0xFF */
+	unsigned char  IID;        /* Instance ID = 0 in AEN */
+	unsigned char  Command;    /* AEN = 0xFF */
 	unsigned char  Channel_ID;
-	/* Payload Length = 4 in Network Controller AEN Packet */
-/*    unsigned short Payload_Length = 0x04; */
+	unsigned short Payload_Length; /* Payload Length = 4 in Network Controller AEN Packet */
 	unsigned long  Reserved_2;
 	unsigned long  Reserved_3;
+/* end of  AEN HEADER */
+	unsigned char  Reserved_4[3];
 	unsigned char  AEN_Type;
-/*    unsigned char  Reserved_4[3] = {0x00, 0x00, 0x00}; */
-	unsigned long  Optional_AEN_Data;
-	unsigned long  Payload_Checksum;
-};
+	unsigned char  Optional_AEN_Data[64];
+} __attribute__((packed)) AEN_Packet;
 
 /* AEN Type */
-#define LINK_STATUS_CHANGE      0x0
-#define CONFIGURATION_REQUIRED      0x1
-#define HOST_NC_DRIVER_STATUS_CHANGE    0x2
+#define AEN_TYPE_LINK_STATUS_CHANGE           0x0
+#define AEN_TYPE_CONFIGURATION_REQUIRED       0x1
+#define AEN_TYPE_HOST_NC_DRIVER_STATUS_CHANGE 0x2
+#define AEN_TYPE_OEM                          0x80
+
 
 typedef struct {
 	unsigned char Package_ID;

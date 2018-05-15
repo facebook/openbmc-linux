@@ -45,8 +45,10 @@
 #include <linux/time.h>
 #include <linux/netlink.h>
 #include <linux/skbuff.h>
-
+#include <linux/kfifo.h>
+#include <linux/workqueue.h>
 // #define TIME_POWERUP_PREP
+
 
 #define DRV_NAME	"ftgmac100"
 #define DRV_VERSION	"0.7"
@@ -60,6 +62,16 @@
 #define NCSI_DATA_PAYLOAD 64 /* for getting the size of the nc-si control data packet */
 #define noNCSI_DEBUG   /* for debug printf messages */
 
+#define noDEBUG_AEN
+// special  channel/cmd  used for register AEN handler with kernel
+#define REG_AEN_CH  0xfa
+#define REG_AEN_CMD 0xce
+
+#ifdef DEBUG_AEN
+  #define AEN_PRINT(fmt, args...) printk(fmt, ##args)
+#else
+  #define AEN_PRINT(fmt, args...)
+#endif
 
 /******************************************************************************
  * private data
@@ -68,6 +80,8 @@ struct ftgmac100_descs {
 	struct ftgmac100_rxdes rxdes[RX_QUEUE_ENTRIES];
 	struct ftgmac100_txdes txdes[TX_QUEUE_ENTRIES];
 };
+
+#define MAX_AEN_BUFFER 8
 
 struct ftgmac100 {
 	struct resource *res;
@@ -108,6 +122,11 @@ struct ftgmac100 {
 		#define MEZZ_BCM        0x02
 	unsigned int  powerup_prep_host_id;
 	struct completion ncsi_complete;
+
+	DECLARE_KFIFO(AEN_buffer, AEN_Packet, MAX_AEN_BUFFER);
+	struct workqueue_struct *ncsi_wq;  // work queue to NC-SI packets
+	struct work_struct work_aen;       // work type for AEN
+	int aen_pid;  // pid of AEN handler
 #endif
 };
 
@@ -150,6 +169,85 @@ static DEFINE_MUTEX(netlink_mutex);
 
 static int Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev);
 
+
+// worker function for AEN packets
+static void
+ftgmac_aen_worker(struct work_struct *work)
+{
+	struct ftgmac100 *lp = container_of(work, struct ftgmac100, work_aen);
+	struct nlmsghdr *nlh;
+	int pid;
+	AEN_Packet packet;
+	NCSI_NL_RSP_T *buf;
+
+	/* for outgoing message response */
+	struct sk_buff *skb_out;
+	int msg_size;
+	int res;
+
+	AEN_PRINT("ftgmac workqueue - AEN packet, pid=%d\n", lp->aen_pid);
+	// check if there's work to do
+	if (kfifo_is_empty(&lp->AEN_buffer)) {
+		AEN_PRINT(KERN_ERR "%s: Empty AEN fifo\n", __FUNCTION__);
+		return;
+	}
+
+	while (!kfifo_is_empty(&lp->AEN_buffer))
+	{
+		kfifo_out(&lp->AEN_buffer, &packet, 1);
+
+		// check if there is a registered AEN handler for this device
+		if (lp->aen_pid == 0) {
+			AEN_PRINT("%s: no registered AEN handler found\n", __FUNCTION__);
+			return;
+		} else {
+			// AEN handler registered, check if the process is still running
+			struct pid *pid_struct = find_get_pid(lp->aen_pid);
+			struct task_struct *task = pid_task(pid_struct,PIDTYPE_PID);
+			if (task == NULL) {
+				printk(KERN_ERR "%s: AEN handler (pid:%d) does not appear to be running\n",
+				       __FUNCTION__, lp->aen_pid);
+				return;
+			}
+		}
+
+		AEN_PRINT("%s: packet->AEN_Type = 0x%x\n", __FUNCTION__, packet.AEN_Type);
+		AEN_PRINT("%s: packet->Optional_AEN_Data = 0x%lx\n", __FUNCTION__, (long)packet.Optional_AEN_Data[0]);
+		AEN_PRINT("%s: fifo len=%d\n", __FUNCTION__, kfifo_len(&lp->AEN_buffer));
+
+		msg_size = sizeof(NCSI_NL_MSG_T);
+		pid = lp->aen_pid; /*pid of sending process */
+		skb_out = nlmsg_new(msg_size,0);
+		if (!skb_out) {
+			printk(KERN_ERR "%s: Failed to allocate new skb\n", __FUNCTION__);
+			return;
+		}
+
+		nlh=nlmsg_put(skb_out,0,0,NLMSG_DONE,msg_size,0);
+		NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
+
+		buf = (NCSI_NL_RSP_T *)nlmsg_data(nlh);
+		buf->payload_length = sizeof(AEN_Packet);
+		memcpy(buf->msg_payload, &packet, sizeof(AEN_Packet));
+
+		AEN_PRINT(KERN_INFO, "%s, %d 0x%x 0x%x", __FUNCTION__,
+						((NCSI_NL_RSP_T *)(nlmsg_data(nlh)))->payload_length,
+						((NCSI_NL_RSP_T *)(nlmsg_data(nlh)))->msg_payload[0],
+						((NCSI_NL_RSP_T *)(nlmsg_data(nlh)))->msg_payload[1]
+					);
+
+		res = nlmsg_unicast(netlink_sk, skb_out, pid);
+
+		if (res<0) {
+			AEN_PRINT(KERN_INFO "%s: Error sending to AEN Handler, res=%d\n",
+						__FUNCTION__, res);
+		} else {
+			AEN_PRINT(KERN_INFO "%s: sending AEN to handler\n", __FUNCTION__);
+		}
+	}
+	return;
+}
+
 static struct packet_type ptype_ncsi = {
  .type = __constant_htons(ETH_P_NCSI),
  .func = Rx_NCSI,
@@ -171,16 +269,33 @@ Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, str
   }
 
   resp = (NCSI_Response_Packet *)skb_mac_header(skb);
-  // ignore AEN packet
-  if (((resp->MC_ID == 0x00) &&
-       (resp->Header_Revision == 0x01) &&
-       (resp->IID == 0x00) &&
-       (resp->Command == 0xFF))) {
+  resp_len = ETH_HLEN + NCSI_HDR_LEN + be16_to_cpu(resp->Payload_Length);
+
+  // handle AEN packet
+  if ((resp->MC_ID == 0x00) &&
+      (resp->Header_Revision == 0x01) &&
+      (resp->IID == 0x00) &&
+      (resp->Command == 0xFF)) {
+    AEN_PRINT("ftgmac: dev:%s AEN received, Type=0x%x, payload=0x%lx\n", dev->name,
+              ((AEN_Packet *)resp)->AEN_Type, (long)((AEN_Packet *)resp)->Optional_AEN_Data[0]);
+
+    if ((resp_len > sizeof(AEN_Packet)) ||
+        (resp_len > (skb->tail - (u8 *)resp)) ||
+        (kfifo_is_full(&lp->AEN_buffer))) {
+      printk("ftgmac: AEN packet dropped, len=%d, (max=%d), (skb(%d)), fifofull(%d), \n", resp_len,
+			        sizeof(AEN_Packet), (skb->tail - (u8 *)resp), kfifo_is_full(&lp->AEN_buffer));
+      kfree_skb(skb);
+      return NET_RX_DROP;
+    }
+
+    kfifo_in(&lp->AEN_buffer, (AEN_Packet *)resp, 1);
+    queue_work(lp->ncsi_wq, &lp->work_aen);
+
     kfree_skb(skb);
     return NET_RX_SUCCESS;
   }
 
-  resp_len = ETH_HLEN + NCSI_HDR_LEN + be16_to_cpu(resp->Payload_Length);
+
   if ((resp_len > sizeof(NCSI_Response_Packet)) || (resp_len > (skb->tail - (u8 *)resp))) {
     kfree_skb(skb);
     return NET_RX_DROP;
@@ -1307,9 +1422,19 @@ static void ncsi_recv_msg_cb(struct sk_buff *skb)
     return;
   }
 
-	send_ncsi_cmd(dev, buf->channel_id, buf->cmd, buf->payload_length,
+	/* handle AEN daemon registration message */
+	if ((buf->channel_id == REG_AEN_CH) && (buf->cmd == REG_AEN_CMD)) {
+    struct ftgmac100 *lp = netdev_priv(dev);
+    lp->aen_pid = nlh->nlmsg_pid;
+		printk(KERN_INFO "ftgmac: %s AEN handler (pid:%d) registered\n",
+		       dev->name, lp->aen_pid);
+		return;
+	}
+
+  send_ncsi_cmd(dev, buf->channel_id, buf->cmd, buf->payload_length,
 	             buf->msg_payload,
 							 &(ncsi_nl_rsp.payload_length), &(ncsi_nl_rsp.msg_payload[0]));
+
 	msg_size = sizeof(NCSI_NL_RSP_T);
 	msg = (unsigned char *)&ncsi_nl_rsp;
 
@@ -1328,7 +1453,7 @@ static void ncsi_recv_msg_cb(struct sk_buff *skb)
 	res=nlmsg_unicast(skb->sk, skb_out, pid);
 	if(res<0)
 	{
-		printk(KERN_INFO "%s: Error while sending bak to user\n", __FUNCTION__);
+		printk(KERN_INFO "%s: Error while sending back to user\n", __FUNCTION__);
 	}
 }
 
@@ -3406,7 +3531,21 @@ static int ftgmac100_probe(struct platform_device *pdev)
 		printk("dev_attr_powerup_prep_host_id registered\n");
 
 	ncsi_nl_socket_init();
-  mutex_init(&ncsi_mutex);
+	mutex_init(&ncsi_mutex);
+
+	priv->ncsi_wq = alloc_ordered_workqueue("ncsi_aen_work", 0);
+	if (priv->ncsi_wq == NULL) {
+		printk("ftgmac: error creating AEN work queue for %s", netdev->name);
+	} else {
+		printk("ftgmac: aen work queue created for %s", netdev->name);
+	}
+
+	INIT_WORK(&priv->work_aen, ftgmac_aen_worker);
+	INIT_KFIFO(priv->AEN_buffer);
+
+	/* show the number of used elements */
+	AEN_PRINT(KERN_INFO "ftgmac %d fifo len: %u\n", netdev->name, kfifo_len(&priv->AEN_buffer));
+
 #endif
 	return 0;
 
@@ -3436,12 +3575,17 @@ static int __exit ftgmac100_remove(struct platform_device *pdev)
 
 	netdev = platform_get_drvdata(pdev);
 
+	priv = netdev_priv(netdev);
+
 #ifdef CONFIG_FTGMAC100_NCSI
 	device_remove_file(&netdev->dev, &dev_attr_powerup_prep_host_id);
 	ncsi_nl_socket_exit();
+	cancel_work_sync(&priv->work_aen);
+	if (priv->ncsi_wq) {
+		flush_workqueue(priv->ncsi_wq);
+		destroy_workqueue(priv->ncsi_wq);
+	}
 #endif
-
-	priv = netdev_priv(netdev);
 
 	unregister_netdev(netdev);
 
@@ -3453,6 +3597,7 @@ static int __exit ftgmac100_remove(struct platform_device *pdev)
 	release_resource(priv->res);
 
 	netif_napi_del(&priv->napi);
+
 	free_netdev(netdev);
 	return 0;
 }
