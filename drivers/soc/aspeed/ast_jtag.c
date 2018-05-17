@@ -123,6 +123,7 @@ struct controller_mode_param {
 //#define AST_JTAG_DEBUG
 /* Disable to optimize performance */
 //#define USE_INTERRUPTS
+#define WAIT_ITERATIONS 75
 #ifdef AST_JTAG_DEBUG
 #define JTAG_DBUG(fmt, args...) printk(KERN_DEBUG "%s() " fmt,__FUNCTION__, ## args)
 #else
@@ -265,114 +266,53 @@ static u8 TCK_Cycle(struct ast_jtag_info *ast_jtag, u8 TMS, u8 TDI) {
     return (ast_jtag_read(ast_jtag, AST_JTAG_SW) & JTAG_SW_MODE_TDIO) ? 1 : 0;
 }
 
-#define WAIT_ITERATIONS 75
-
-void ast_jtag_wait_instruction_pause_complete(struct ast_jtag_info *ast_jtag) {
+static void ast_jtag_wait_instruction(struct ast_jtag_info *ast_jtag, u32 flag)
+{
 #ifdef USE_INTERRUPTS
-    wait_event_interruptible(ast_jtag->jtag_wq, (ast_jtag->flag == JTAG_INST_PAUSE));
-    ast_jtag->flag = 0;
+	wait_event_interruptible(ast_jtag->jtag_wq, (ast_jtag->flag == flag));
+	ast_jtag->flag = 0;
 #else
-    u32 status = 0;
-    u32 iterations = 0;
-    while ((status & JTAG_INST_PAUSE) == 0) {
-        status = ast_jtag_read(ast_jtag, AST_JTAG_ISR);
-        JTAG_DBUG("ast_jtag_wait_instruction_pause_complete = 0x%08x\n", status);
-        iterations++;
-        if (iterations > WAIT_ITERATIONS) {
-            JTAG_ERR("ast_jtag driver timed out waiting for instruction pause complete\n");
-            return;
-        }
-        if ((status & JTAG_DATA_COMPLETE) == 0) {
-            if(iterations % 25 == 0)
-                usleep_range(1 , 5);
-            else
-                udelay(1);
-        }
-    }
-    // clear the JTAG_INST_PAUSE bit by writing to it.
-    ast_jtag_write(ast_jtag, JTAG_INST_PAUSE | (status & 0xf), AST_JTAG_ISR);
+	u32 status = 0;
+	u32 iterations = 0;
+	while ((status & flag) == 0) {
+		status = ast_jtag_read(ast_jtag, AST_JTAG_ISR);
+		JTAG_DBUG("wait_instruction(%d) = 0x%08x\n", flag, status);
+		iterations++;
+		if (iterations > WAIT_ITERATIONS) {
+			JTAG_ERR("ast_jtag driver timed out waiting for %d\n", flag);
+			return;
+		}
+		if ((status & JTAG_DATA_COMPLETE) == 0) {
+			if(iterations % 25 == 0)
+				usleep_range(1 , 5);
+			else
+				udelay(1);
+		}
+	}
+	usleep_range(1, 5);
+	/* Clear the flag */
+	ast_jtag_write(ast_jtag, flag | (status & 0xf), AST_JTAG_ISR);
 #endif
 }
 
-void ast_jtag_wait_instruction_complete(struct ast_jtag_info *ast_jtag) {
-#ifdef USE_INTERRUPTS
-    wait_event_interruptible(ast_jtag->jtag_wq, (ast_jtag->flag == JTAG_INST_COMPLETE));
-    ast_jtag->flag = 0;
-#else
-    u32 status = 0;
-    u32 iterations = 0;
-    while ((status & JTAG_INST_COMPLETE) == 0) {
-        status = ast_jtag_read(ast_jtag, AST_JTAG_ISR);
-        JTAG_DBUG("ast_jtag_wait_instruction_complete = 0x%08x\n", status);
-        iterations++;
-        if (iterations > WAIT_ITERATIONS) {
-            JTAG_ERR("ast_jtag driver timed out waiting for instruction complete\n");
-            return;
-        }
-        if ((status & JTAG_DATA_COMPLETE) == 0) {
-            if(iterations % 25 == 0)
-                usleep_range(1 , 5);
-            else
-                udelay(1);
-        }
-    }
-    // clear the JTAG_INST_COMPLETE bit by writing to it.
-    ast_jtag_write(ast_jtag, JTAG_INST_COMPLETE | (status & 0xf), AST_JTAG_ISR);
-#endif
+void ast_jtag_wait_instruction_pause_complete(struct ast_jtag_info *ast_jtag)
+{
+	ast_jtag_wait_instruction(ast_jtag, JTAG_INST_PAUSE);
 }
 
-void ast_jtag_wait_data_pause_complete(struct ast_jtag_info *ast_jtag) {
-#ifdef USE_INTERRUPTS
-    wait_event_interruptible(ast_jtag->jtag_wq, (ast_jtag->flag == JTAG_DATA_PAUSE));
-    ast_jtag->flag = 0;
-#else
-    u32 status = 0;
-    u32 iterations = 0;
-    while ((status & JTAG_DATA_PAUSE) == 0) {
-        status = ast_jtag_read(ast_jtag, AST_JTAG_ISR);
-        JTAG_DBUG("ast_jtag_wait_data_pause_complete = 0x%08x\n", status);
-        iterations++;
-        if (iterations > WAIT_ITERATIONS) {
-            JTAG_ERR("ast_jtag driver timed out waiting for data pause complete\n");
-            return;
-        }
-        if ((status & JTAG_DATA_COMPLETE) == 0) {
-            if(iterations % 25 == 0)
-                usleep_range(1 , 5);
-            else
-                udelay(1);
-        }
-    }
-    // clear the JTAG_DATA_PAUSE bit by writing to it.
-    ast_jtag_write(ast_jtag, JTAG_DATA_PAUSE | (status & 0xf), AST_JTAG_ISR);
-#endif
+void ast_jtag_wait_instruction_complete(struct ast_jtag_info *ast_jtag)
+{
+	ast_jtag_wait_instruction(ast_jtag, JTAG_INST_COMPLETE);
 }
 
-void ast_jtag_wait_data_complete(struct ast_jtag_info *ast_jtag) {
-#ifdef USE_INTERRUPTS
-    wait_event_interruptible(ast_jtag->jtag_wq, (ast_jtag->flag == JTAG_DATA_COMPLETE));
-    ast_jtag->flag = 0;
-#else
-    u32 status = 0;
-    u32 iterations = 0;
-    while ((status & JTAG_DATA_COMPLETE) == 0) {
-        status = ast_jtag_read(ast_jtag, AST_JTAG_ISR);
-        JTAG_DBUG("ast_jtag_wait_data_complete = 0x%08x\n", status);
-        iterations++;
-        if (iterations > WAIT_ITERATIONS) {
-            JTAG_ERR("ast_jtag driver timed out waiting for data complete\n");
-            return;
-        }
-        if ((status & JTAG_DATA_COMPLETE) == 0) {
-            if(iterations % 25 == 0)
-                usleep_range(1 , 5);
-            else
-                udelay(1);
-        }
-    }
-    // clear the JTAG_DATA_COMPLETE bit by writing to it.
-    ast_jtag_write(ast_jtag, JTAG_DATA_COMPLETE | (status & 0xf), AST_JTAG_ISR);
-#endif
+void ast_jtag_wait_data_pause_complete(struct ast_jtag_info *ast_jtag)
+{
+	ast_jtag_wait_instruction(ast_jtag, JTAG_DATA_PAUSE);
+}
+
+void ast_jtag_wait_data_complete(struct ast_jtag_info *ast_jtag)
+{
+	ast_jtag_wait_instruction(ast_jtag, JTAG_DATA_COMPLETE);
 }
 
 /*************************************************************************************/
@@ -1244,7 +1184,7 @@ static int ast_jtag_probe(struct platform_device *pdev)
 		goto out_region;
 	}
 
-	ret = request_irq(ast_jtag->irq, ast_jtag_interrupt, IRQF_DISABLED, "ast-jtag", ast_jtag);
+	ret = request_irq(ast_jtag->irq, ast_jtag_interrupt, 0, "ast-jtag", ast_jtag);
 	if (ret) {
 		printk("JTAG Unable to get IRQ");
 		goto out_region;
