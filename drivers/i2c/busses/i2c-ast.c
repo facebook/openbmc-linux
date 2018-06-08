@@ -101,6 +101,8 @@ struct ast_i2c_dev {
   struct i2c_msg		slave_rx_msg[I2C_S_RX_BUF_NUM + 1];
   struct i2c_msg		slave_tx_msg;
   spinlock_t	slave_rx_lock;
+  u8					slave_rx_in;
+  u8					slave_rx_out;
 #endif
 	u32					func_ctrl_reg;
 	u8					master_xfer_first;
@@ -349,47 +351,29 @@ static void ast_i2c_slave_buff_init(struct ast_i2c_dev *i2c_dev)
 		i2c_dev->slave_rx_msg[i].len = I2C_S_BUF_SIZE;
 		i2c_dev->slave_rx_msg[i].buf = kzalloc(I2C_S_BUF_SIZE, GFP_KERNEL);
 	}
+	i2c_dev->slave_rx_in = 0;
+	i2c_dev->slave_rx_out = 0;
+	i2c_dev->adap.data_ready = 0;
 }
 
 static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 {
-	int i;
-  int count = 0;
 	unsigned long flags;
 
 	spin_lock_irqsave(&i2c_dev->slave_rx_lock, flags);
 
 	switch(i2c_dev->slave_event) {
 		case I2C_SLAVE_EVENT_START_WRITE:
-			for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
-				if (i2c_dev->slave_rx_msg[i].flags == 0) {  // only one transaction can be on I2C bus.
-					i2c_dev->slave_rx_msg[i].addr = BUFF_ONGOING;
-					break;
-				}
+			//printk("I2C_SLAVE_EVENT_START_WRITE ...\n");
+			if (i2c_dev->slave_rx_msg[i2c_dev->slave_rx_in].flags) {
+				//dev_err(i2c_dev->dev, "RX buffer full ........ use tmp msgs buff\n");
+				i2c_dev->slave_rx_out = (i2c_dev->slave_rx_in+1) % I2C_S_RX_BUF_NUM;
+				i2c_dev->slave_rx_msg[i2c_dev->slave_rx_in].flags = 0;
+				if (i2c_dev->adap.data_ready > 0)
+					i2c_dev->adap.data_ready--;
 			}
-			if(i == I2C_S_RX_BUF_NUM) {
-        // dev_err(i2c_dev->dev, "RX buffer full ........use tmp msgs buff \n");
-        for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
-          if((i2c_dev->slave_rx_msg[i].flags == 0) && (i2c_dev->slave_rx_msg[i].addr == BUFF_ONGOING)) {
-            count++;
-            i2c_dev->slave_rx_msg[i].addr = 0;
-          }
-        }
-
-        if (count) {
-          dev_err(i2c_dev->dev, "Cleared slave ongoing buffers of count: %d\n", count);
-        }
-
-        for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
-          if((i2c_dev->slave_rx_msg[i].flags == 0) && (i2c_dev->slave_rx_msg[i].addr != BUFF_ONGOING)) {
-            i2c_dev->slave_rx_msg[i].addr = BUFF_ONGOING;
-            break;
-          }
-        }
-			}
-			//printk("I2C_SLAVE_EVENT_START_WRITE ... %d \n", i);
-
-			i2c_dev->slave_msgs = &i2c_dev->slave_rx_msg[i];
+			i2c_dev->slave_rx_msg[i2c_dev->slave_rx_in].addr = BUFF_ONGOING;
+			i2c_dev->slave_msgs = &i2c_dev->slave_rx_msg[i2c_dev->slave_rx_in];
 			break;
 		case I2C_SLAVE_EVENT_START_READ:
 			// printk("I2C_SLAVE_EVENT_START_READ ERROR .. not imple \n");
@@ -409,14 +393,13 @@ static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 			break;
 		case I2C_SLAVE_EVENT_STOP:
 			//printk("I2C_SLAVE_EVENT_STOP \n");
-			for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
-				if(i2c_dev->slave_rx_msg[i].addr == BUFF_ONGOING) {
-					i2c_dev->slave_rx_msg[i].flags = BUFF_FULL;
-					i2c_dev->slave_rx_msg[i].addr = 0;
-					i2c_dev->adap.data_ready = 1;
-					wake_up_interruptible(&i2c_dev->adap.wq);
-					break;
-				}
+			if (!(i2c_dev->slave_msgs->flags & I2C_M_RD) && (i2c_dev->slave_msgs->addr == BUFF_ONGOING)) {
+				i2c_dev->slave_msgs->flags = BUFF_FULL;
+				i2c_dev->slave_msgs->addr = 0;
+				i2c_dev->slave_rx_in = (i2c_dev->slave_rx_in+1) % I2C_S_RX_BUF_NUM;
+				if (i2c_dev->adap.data_ready < I2C_S_RX_BUF_NUM)
+					i2c_dev->adap.data_ready++;
+				wake_up_interruptible(&i2c_dev->adap.wq);
 			}
 
 			i2c_dev->slave_msgs = &i2c_dev->slave_tx_msg;
@@ -429,7 +412,7 @@ static void ast_i2c_slave_rdwr_xfer(struct ast_i2c_dev *i2c_dev)
 static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 {
 	struct ast_i2c_dev *i2c_dev = adap->algo_data;
-	int ret=0, i;
+	int ret = 0;
 	unsigned long flags;
 
 	switch(msgs->flags) {
@@ -437,23 +420,20 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 //			printk("slave read \n");
 			//cur_msg = get_free_msg;
 			spin_lock_irqsave(&i2c_dev->slave_rx_lock, flags);
-
-			for(i=0; i<I2C_S_RX_BUF_NUM; i++) {
-				if((i2c_dev->slave_rx_msg[i].addr == 0) && (i2c_dev->slave_rx_msg[i].flags == BUFF_FULL)) {
-					memcpy(msgs->buf, i2c_dev->slave_rx_msg[i].buf, i2c_dev->slave_rx_msg[i].len);
-					msgs->len = i2c_dev->slave_rx_msg[i].len;
-					i2c_dev->slave_rx_msg[i].flags = 0;
-					i2c_dev->slave_rx_msg[i].len = 0;
-					break;
-				}
+			if (i2c_dev->slave_rx_msg[i2c_dev->slave_rx_out].flags == BUFF_FULL) {
+				memcpy(msgs->buf, i2c_dev->slave_rx_msg[i2c_dev->slave_rx_out].buf, i2c_dev->slave_rx_msg[i2c_dev->slave_rx_out].len);
+				msgs->len = i2c_dev->slave_rx_msg[i2c_dev->slave_rx_out].len;
+				i2c_dev->slave_rx_msg[i2c_dev->slave_rx_out].flags = 0;
+				i2c_dev->slave_rx_msg[i2c_dev->slave_rx_out].len = 0;
+				i2c_dev->slave_rx_out = (i2c_dev->slave_rx_out+1) % I2C_S_RX_BUF_NUM;
+				if (i2c_dev->adap.data_ready > 0)
+					i2c_dev->adap.data_ready--;
 			}
-			spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
-
-			if(i == I2C_S_RX_BUF_NUM) {
-				//printk("No buffer ........ \n");
+			else {
 				msgs->len = 0;
 				ret = -1;
 			}
+			spin_unlock_irqrestore(&i2c_dev->slave_rx_lock, flags);
 			break;
 		case I2C_M_RD:	//slave write
 			dev_info(i2c_dev->dev, "slave write\n");
@@ -1632,9 +1612,11 @@ next_xfer:
 			printk("rx buf i,[%x]\n",i,i2c_dev->master_msgs->buf[i]);
 		printk(" ===== \n");
 #endif
-    // STOP of master write
-		if ((i2c_dev->xfer_last == 1) && !(i2c_dev->master_msgs->flags & I2C_M_RD))
-			ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
+		if ((i2c_dev->master_xfer_mode == BYTE_XFER) || (i2c_dev->master_xfer_mode == BUFF_XFER)) {
+			// STOP of master write
+			if ((i2c_dev->xfer_last == 1) && !(i2c_dev->master_msgs->flags & I2C_M_RD))
+				ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
+		}
 		i2c_dev->cmd_err = 0;
 
 done_out:

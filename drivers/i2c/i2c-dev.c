@@ -635,8 +635,7 @@ static int i2cdev_open(struct inode *inode, struct file *file)
 		i2c_put_adapter(adap);
 		return -ENOMEM;
 	}
-  init_waitqueue_head(&adap->wq);
-  adap->data_ready = 0;
+	init_waitqueue_head(&adap->wq);
 	snprintf(client->name, I2C_NAME_SIZE, "i2c-dev %d", adap->nr);
 
 	client->adapter = adap;
@@ -663,13 +662,11 @@ static int i2cdev_poll(struct file *file, poll_table *wait)
   int events = 0;
 
   if(adap->data_ready) {
-     adap->data_ready = 0;
      return (POLLIN | POLLRDNORM);
   }
   poll_wait(file, &adap->wq, wait);
   if(adap->data_ready) {
      events = POLLIN | POLLRDNORM;
-     adap->data_ready = 0;
   }
   return events;
 }
