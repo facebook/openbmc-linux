@@ -777,6 +777,34 @@ void phy_start(struct phy_device *phydev)
 }
 EXPORT_SYMBOL(phy_start);
 
+void phy_config_led(struct mii_bus *bus)
+{
+	u16 data;
+	u8 phy_addr = 0x01; //for minilaketb
+
+	//static int ftgmac100_mdiobus_read(struct mii_bus *bus, int phy_addr, int regnum)
+    //static int ftgmac100_mdiobus_write(struct mii_bus *bus, int phy_addr, int regnum, u16 value)
+
+	//To switch to extension Page44, set register31 Data = 0x07, set register30 Data = 0x2C
+    bus->write(bus, phy_addr, 31, 0x07);
+    bus->write(bus, phy_addr, 30, 0x2C);
+
+	// LED1(Amber) is 1000M, bit6 = 1
+	// LED2(Green) is 100M/10M, bit8/9 = 1
+    data = bus->read(bus, phy_addr, 28);
+    data = data & 0xF000;
+    data = data | 0x0340;
+    bus->write(bus, phy_addr, 28, data);
+
+    data = bus->read(bus, phy_addr, 26);
+    data = data & 0xFF8F;
+    data = data | 0x0010;
+    bus->write(bus, phy_addr, 26, data);
+
+	//After LED setting, switch to page0 (register31 Data = 0x00)
+    bus->write(bus, phy_addr, 31, 0x0000);
+}
+
 /**
  * phy_state_machine - Handle the state machine
  * @work: work_struct that describes the work to be done

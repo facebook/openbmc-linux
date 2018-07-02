@@ -726,6 +726,7 @@ struct phy_device *phy_connect(struct net_device *dev, const char *bus_id,
 			       phy_interface_t interface);
 void phy_disconnect(struct phy_device *phydev);
 void phy_detach(struct phy_device *phydev);
+void phy_config_led(struct mii_bus *bus);
 void phy_start(struct phy_device *phydev);
 void phy_stop(struct phy_device *phydev);
 int phy_start_aneg(struct phy_device *phydev);

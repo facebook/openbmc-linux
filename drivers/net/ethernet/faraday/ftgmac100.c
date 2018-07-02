@@ -2117,7 +2117,7 @@ void ncsi_start(struct net_device *dev) {
         //TODO: This is an issue in  Get_Version_ID that always returns
         //mezz_type to be -1, so it only calls Get_MAC_Address_bcm.
         //It may need to work with Mlx to find a solution.
-#if defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)  || defined(CONFIG_MINILAKETB)    //For multi-host NIC initialization
+#if defined(CONFIG_FBY2) || defined(CONFIG_YOSEMITE)    //For multi-host NIC initialization
         // Try Mlx first
         Get_MAC_Address_mlx(dev);
         Set_MAC_Affinity_mlx(dev);
@@ -3258,6 +3258,7 @@ static int ftgmac100_open(struct net_device *netdev)
 	init_completion(&priv->ncsi_complete);
 	dev_add_pack(&ptype_ncsi);
 #else
+	phy_config_led(priv->mii_bus);
 	phy_start(priv->phydev);
 #endif
 
@@ -3266,10 +3267,6 @@ static int ftgmac100_open(struct net_device *netdev)
 
 	/* enable all interrupts */
 #ifdef CONFIG_FTGMAC100_NCSI
-#ifdef CONFIG_MINILAKETB
-	iowrite32(INT_MASK_ALL_ENABLED, priv->base + FTGMAC100_OFFSET_IER);
-	return 0;
-#endif
 	iowrite32(INT_MASK_NCSI_ENABLED, priv->base + FTGMAC100_OFFSET_IER);
 	ncsi_start(netdev);
 #else
