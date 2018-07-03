@@ -397,14 +397,14 @@ static int bcm54616s_read_status(struct phy_device *phydev)
 		return ret;
 	}
 
-	if (ret & (0x1 << 7)) {
+	if ((ret >> 7) & 0x1) {
 		phydev->duplex = DUPLEX_HALF;
 	} else {
 		phydev->duplex = DUPLEX_FULL;
 	}
 
 	phydev->link = 1;
-	switch (ret & (0x3 << 3)) {
+	switch ((ret >> 3) & 0x3) {
 	case 0x3:
 		/* no link */
 		phydev->link = 0;
