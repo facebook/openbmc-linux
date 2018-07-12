@@ -390,6 +390,10 @@
 						interrupts = <8>;
 						status = "disabled";
 					};
+
+					sio_regs: regs {
+						compatible = "aspeed,bmc-misc";
+					};
 				};
 			};
 
@@ -1431,5 +1435,88 @@
 	pinctrl_wdtrst2_default: wdtrst2_default {
 		function = "WDTRST2";
 		groups = "WDTRST2";
+	};
+};
+
+&sio_regs {
+	sio_2b {
+		offset = <0xf0>;
+		bit-mask = <0xff>;
+		bit-shift = <24>;
+	};
+	sio_2a {
+		offset = <0xf0>;
+		bit-mask = <0xff>;
+		bit-shift = <16>;
+	};
+	sio_29 {
+		offset = <0xf0>;
+		bit-mask = <0xff>;
+		bit-shift = <8>;
+	};
+	sio_28 {
+		offset = <0xf0>;
+		bit-mask = <0xff>;
+		bit-shift = <0>;
+	};
+	sio_2f {
+		offset = <0xf4>;
+		bit-mask = <0xff>;
+		bit-shift = <24>;
+	};
+	sio_2e {
+		offset = <0xf4>;
+		bit-mask = <0xff>;
+		bit-shift = <16>;
+	};
+	sio_2d {
+		offset = <0xf4>;
+		bit-mask = <0xff>;
+		bit-shift = <8>;
+	};
+	sio_2c {
+		offset = <0xf4>;
+		bit-mask = <0xff>;
+		bit-shift = <0>;
+	};
+	sio_23 {
+		offset = <0xf8>;
+		bit-mask = <0xff>;
+		bit-shift = <24>;
+	};
+	sio_22 {
+		offset = <0xf8>;
+		bit-mask = <0xff>;
+		bit-shift = <16>;
+	};
+	sio_21 {
+		offset = <0xf8>;
+		bit-mask = <0xff>;
+		bit-shift = <8>;
+	};
+	sio_20 {
+		offset = <0xf8>;
+		bit-mask = <0xff>;
+		bit-shift = <0>;
+	};
+	sio_27 {
+		offset = <0xfc>;
+		bit-mask = <0xff>;
+		bit-shift = <24>;
+	};
+	sio_26 {
+		offset = <0xfc>;
+		bit-mask = <0xff>;
+		bit-shift = <16>;
+	};
+	sio_25 {
+		offset = <0xfc>;
+		bit-mask = <0xff>;
+		bit-shift = <8>;
+	};
+	sio_24 {
+		offset = <0xfc>;
+		bit-mask = <0xff>;
+		bit-shift = <0>;
 	};
 };
