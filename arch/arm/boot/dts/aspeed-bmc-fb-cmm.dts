@@ -137,3 +137,7 @@
 &i2c13 {
 	status = "okay";
 };
+
+&adc {
+	status = "okay";
+};
