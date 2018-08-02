@@ -1480,6 +1480,13 @@ ast_scu_multi_func_eth(u8 num)
 
 	switch(num) {
 		case 0:
+#if defined(CONFIG_MINILAKETB) // On Minilaketb, MAC0 does not use 
+			ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL3) &
+				~SCU_FUN_PIN_MAC0_MDIO &
+				~SCU_FUN_PIN_MAC0_MDC,
+				AST_SCU_FUN_PIN_CTRL3);
+			return;
+#endif
 #if defined(CONFIG_PWNEPTUNE)
 				SCUMSG("MAC0 : RGMII \n");
 				ast_scu_write(ast_scu_read(AST_SCU_FUN_PIN_CTRL1) |
