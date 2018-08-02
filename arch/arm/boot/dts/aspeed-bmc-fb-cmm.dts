@@ -40,6 +40,16 @@
 };
 
 /*
+ * Warm reboot hangs at boot time if using the default reset type (SOC,
+ * gated by reset mask registers), and the issue can be fixed by setting
+ * reset type to "system" (full chip).
+ */
+&wdt1 {
+	status = "okay";
+	aspeed,reset-type = "system";
+};
+
+/*
  * Both wdt1 and wdt2 are enabled in aspeed-g5.dtsi but we just need
  * the first watchdog (wdt1); thus let's disable wdt2 explicitly.
  */
