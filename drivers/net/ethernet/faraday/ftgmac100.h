@@ -319,7 +319,7 @@ typedef struct {
 /* end of NC-SI header */
 	unsigned short  Response_Code;
 	unsigned short  Reason_Code;
-	unsigned char   Payload_Data[128];
+	unsigned char   Payload_Data[256];
 } __attribute__((packed)) NCSI_Response_Packet;
 
 

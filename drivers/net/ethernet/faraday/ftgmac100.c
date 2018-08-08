@@ -258,7 +258,7 @@ Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, str
 {
   struct ftgmac100 *lp = netdev_priv(dev);
   NCSI_Response_Packet *resp;
-  u16 resp_len;
+  u16 pld_len, resp_len;
 
   if (!(skb = skb_share_check(skb, GFP_ATOMIC)))
     return NET_RX_DROP;
@@ -269,7 +269,14 @@ Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, str
   }
 
   resp = (NCSI_Response_Packet *)skb_mac_header(skb);
-  resp_len = ETH_HLEN + NCSI_HDR_LEN + be16_to_cpu(resp->Payload_Length);
+  pld_len = be16_to_cpu(resp->Payload_Length);
+
+  if (!pskb_may_pull(skb, NCSI_HDR_LEN+pld_len)) {
+    kfree_skb(skb);
+    return NET_RX_DROP;
+  }
+  resp = (NCSI_Response_Packet *)skb_mac_header(skb);
+  resp_len = ETH_HLEN + NCSI_HDR_LEN + pld_len;
 
   // handle AEN packet
   if ((resp->MC_ID == 0x00) &&
@@ -280,7 +287,6 @@ Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, str
               ((AEN_Packet *)resp)->AEN_Type, (long)((AEN_Packet *)resp)->Optional_AEN_Data[0]);
 
     if ((resp_len > sizeof(AEN_Packet)) ||
-        (resp_len > (skb->tail - (u8 *)resp)) ||
         (kfifo_is_full(&lp->AEN_buffer))) {
       printk("ftgmac: AEN packet dropped, len=%d, (max=%d), (skb(%d)), fifofull(%d), \n", resp_len,
 			        sizeof(AEN_Packet), (skb->tail - (u8 *)resp), kfifo_is_full(&lp->AEN_buffer));
@@ -296,7 +302,7 @@ Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, str
   }
 
 
-  if ((resp_len > sizeof(NCSI_Response_Packet)) || (resp_len > (skb->tail - (u8 *)resp))) {
+  if (resp_len > sizeof(NCSI_Response_Packet)) {
     kfree_skb(skb);
     return NET_RX_DROP;
   }
