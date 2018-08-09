@@ -440,6 +440,19 @@ static int pca954x_probe(struct i2c_client *client,
 	idle_disconnect_dt = of_node &&
 		of_property_read_bool(of_node, "i2c-mux-idle-disconnect");
 
+	/*
+	 * "Documentation/devicetree/bindings/i2c/i2c-mux-pca954x.txt"
+	 * says it's necessary to deselect i2c mux channels when there
+	 * are several i2c muxes on the bus and the devices behind them
+	 * use same I2C addresses.
+	 * Since it's harmless to deselect the channels in idle state,
+	 * we want to apply the rule to all i2c muxes. However, there
+	 * is no way to set "idle_disconnect_dt" when muxes are created
+	 * from user space, so we always set "idle_disconnect_dt" to
+	 * true.
+	 */
+	idle_disconnect_dt = true;
+
 	ret = pca954x_irq_setup(muxc);
 	if (ret)
 		goto fail_cleanup;
