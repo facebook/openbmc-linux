@@ -328,7 +328,13 @@ static int pfe3000_probe(struct i2c_client *client,
 			return ret;
 	} else {
 		dev_model[ret] = '\0';
-		if (strcmp(PFE3000_MFR_MODEL, dev_model) != 0) {
+		/*
+		 * Some PFE3000 devices return model string with trailing
+		 * spaces: let's use strncmp() to just compare the model
+		 * string and ignore trailing spaces.
+		 */
+		if (strncmp(PFE3000_MFR_MODEL, dev_model,
+			    strlen(PFE3000_MFR_MODEL)) != 0) {
 			dev_err(&client->dev,
 				"unexpected manufacture model: [%s]\n",
 				dev_model);
