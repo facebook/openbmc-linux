@@ -259,6 +259,7 @@ Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, str
   struct ftgmac100 *lp = netdev_priv(dev);
   NCSI_Response_Packet *resp;
   u16 pld_len, resp_len;
+  static AEN_Packet localAENbuf = {0};
 
   if (!(skb = skb_share_check(skb, GFP_ATOMIC)))
     return NET_RX_DROP;
@@ -294,7 +295,8 @@ Rx_NCSI(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, str
       return NET_RX_DROP;
     }
 
-    kfifo_in(&lp->AEN_buffer, (AEN_Packet *)resp, 1);
+    memcpy(&localAENbuf, resp, resp_len);
+    kfifo_in(&lp->AEN_buffer, (AEN_Packet *)&localAENbuf, 1);
     queue_work(lp->ncsi_wq, &lp->work_aen);
 
     kfree_skb(skb);
