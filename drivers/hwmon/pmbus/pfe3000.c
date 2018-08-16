@@ -29,7 +29,7 @@
  * and 6, but the driver only supports page 0 as of now.
  */
 #define PFE3000_NUM_PAGES     1
-#define PFE3000_VALID_PAGE(p) ((p) >= 0 && (p) < PFE3000_NUM_PAGES)
+#define PFE3000_VALID_PAGE(p) ((p) >= -1 && (p) < PFE3000_NUM_PAGES)
 
 enum pfe3000_model {
 	PFE3000_12_069RA,
