@@ -97,42 +97,72 @@
 
 &i2c0 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &i2c1 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &i2c2 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &i2c3 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &i2c4 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &i2c5 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &i2c6 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &i2c7 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &i2c8 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &i2c13 {
 	status = "okay";
+	base-clock-divisor = <4>;
+	clock-low-width = <7>;
+	clock-high-width = <7>;
 };
 
 &adc {
