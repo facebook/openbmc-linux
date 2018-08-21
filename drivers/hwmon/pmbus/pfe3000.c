@@ -16,6 +16,7 @@
 #include <linux/i2c.h>
 #include <linux/ktime.h>
 #include <linux/delay.h>
+#include <linux/pmbus.h>
 #include "pmbus.h"
 
 #define PFE3000_MFR_MODEL     "PFE3000-12-069RA"
@@ -303,6 +304,10 @@ static int pfe3000_remove(struct i2c_client *client)
 	return pmbus_do_remove(client);
 }
 
+static struct pmbus_platform_data pfe3000_pdata = {
+	.flags = PMBUS_SKIP_STATUS_CHECK,
+};
+
 static int pfe3000_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -316,6 +321,8 @@ static int pfe3000_probe(struct i2c_client *client,
 				     I2C_FUNC_SMBUS_READ_WORD_DATA |
 				     I2C_FUNC_SMBUS_READ_BLOCK_DATA))
 		return -ENODEV;
+
+	client->dev.platform_data = &pfe3000_pdata;
 
 	udelay(PFE3000_ACCESS_DELAY);
 	ret = i2c_smbus_read_block_data(client, PMBUS_MFR_MODEL,
