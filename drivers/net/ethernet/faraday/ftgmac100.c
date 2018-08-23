@@ -698,7 +698,10 @@ int store_nic_fw_ver(unsigned char *data, int len)
   set_fs(KERNEL_DS);
 
   sprintf(path, "/tmp/cache_store");
-  ret = sys_mkdir(path, 0755);
+  ret = sys_access(path,0);
+  if (ret != 0)
+	ret = sys_mkdir(path, 0755);
+
   if ( ret < 0 )
   {
     printk("[%s] cannot create the dir to store the nic f/w version\n", __func__);
