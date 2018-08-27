@@ -1442,6 +1442,9 @@ static void ncsi_recv_msg_cb(struct sk_buff *skb)
 		return;
 	}
 
+  if (netif_queue_stopped(dev))
+    return;
+
   send_ncsi_cmd(dev, buf->channel_id, buf->cmd, buf->payload_length,
 	             buf->msg_payload,
 							 &(ncsi_nl_rsp.payload_length), &(ncsi_nl_rsp.msg_payload[0]));
