@@ -1132,6 +1132,7 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev,
 	unsigned char oem_cmd_type = 0x1A;
 	unsigned int oem_payload_len = 4;
 	unsigned int oem_cmd_len = OEM_HDR_LEN_BCM + oem_payload_len;
+	int data_len = (ETH_HDR_LEN+NCSI_HDR_LEN) + oem_cmd_len + 4;
 
 #ifdef TIME_POWERUP_PREP
 	unsigned long loop_cnt=0;
@@ -1139,24 +1140,22 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev,
 	long usec_elapsed;
 #endif
 
-  /* ensure only 1 instance is accessing global NCSI structure */
-  mutex_lock(&ncsi_mutex);
-
+	/* ensure only 1 instance is accessing global NCSI structure */
+	mutex_lock(&ncsi_mutex);
 
 	lp->Retry = 0;
 	do {
 		lp->InstanceID = (lp->InstanceID+1) & 0xff;
 
-		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
-		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		skb = dev_alloc_skb(data_len + 16);
+		memset(skb->data, 0, data_len);
 //TX
 		lp->NCSI_Request.IID = lp->InstanceID;
 		lp->NCSI_Request.Command = 0x50;
 		Combined_Channel_ID = (lp->NCSI_Cap.Package_ID << 5) + lp->NCSI_Cap.Channel_ID;
 		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
 		lp->NCSI_Request.Payload_Length = (oem_cmd_len << 8);
-		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, (ETH_HDR_LEN+NCSI_HDR_LEN));
-		lp->NCSI_Request.Payload_Length = oem_cmd_len;
+		memcpy(skb->data, &lp->NCSI_Request, (ETH_HDR_LEN+NCSI_HDR_LEN));
 
 		// memset(lp->Payload_Data, 0, 64);
 		// memset(&lp->NCSI_Respond, 0, sizeof(NCSI_Response_Packet));
@@ -1174,10 +1173,12 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev,
 		lp->Payload_Data[14] = 0x00;  // 14~15: HOST ID
 		lp->Payload_Data[15] = (unsigned char)host_id;
 
-		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
-		skb->len = (ETH_HDR_LEN+NCSI_HDR_LEN) + lp->NCSI_Request.Payload_Length + 4;
+		copy_data(dev, skb, oem_cmd_len);
+		skb_put(skb, data_len);
 		init_completion(&lp->ncsi_complete);
-		ftgmac100_wait_to_send_packet (skb, dev);
+		skb_reset_network_header(skb);
+		skb->dev = dev;
+		dev_queue_xmit(skb);
 
 #ifdef TIME_POWERUP_PREP
 		do_gettimeofday(&t_start);   // Start the timer
@@ -1210,7 +1211,7 @@ int Prepare_for_Host_Powerup_Bcm (struct net_device * dev,
 		}
 	} while ((lp->Retry > 0) && (lp->Retry <= BCM_RETRY_MAX));
 
-  mutex_unlock(&ncsi_mutex);
+	mutex_unlock(&ncsi_mutex);
 
 	printk("Bcm NCSI: powerup prep for slot%d ", host_id);
 	if (!tmo) {
@@ -1305,13 +1306,14 @@ static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
 	unsigned long Combined_Channel_ID, i;
 	struct sk_buff * skb;
 	int tmo;
+	int data_len = 30 + length + 4;
 
-  /* ensure only 1 instance is accessing global NCSI structure */
-  mutex_lock(&ncsi_mutex);
+	/* ensure only 1 instance is accessing global NCSI structure */
+	mutex_lock(&ncsi_mutex);
 
 	do {
-		skb = dev_alloc_skb (TX_BUF_SIZE + 16);
-		memset(skb->data, 0, TX_BUF_SIZE + 16);
+		skb = dev_alloc_skb(data_len + 16);
+		memset(skb->data, 0, data_len);
 		//TX
 		lp->InstanceID++;
 		lp->NCSI_Request.IID = lp->InstanceID;
@@ -1320,16 +1322,14 @@ static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
 		(lp->NCSI_Cap.Package_ID << 5) + channel_id;
 		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
 		lp->NCSI_Request.Payload_Length = (length << 8);
-		memcpy ((unsigned char *)skb->data, &lp->NCSI_Request, 30);
-		lp->NCSI_Request.Payload_Length = length;
-
-		for (i=0; i<length; ++i)
-			lp->Payload_Data[i] = buf[i];
-
-		copy_data (dev, skb, lp->NCSI_Request.Payload_Length);
-		skb->len =  30 + lp->NCSI_Request.Payload_Length + 4;
+		memcpy(skb->data, &lp->NCSI_Request, 30);
+		memcpy(lp->Payload_Data, buf, length);
+		copy_data(dev, skb, length);
+		skb_put(skb, data_len);
 		init_completion(&lp->ncsi_complete);
-		ftgmac100_wait_to_send_packet (skb, dev);
+		skb_reset_network_header(skb);
+		skb->dev = dev;
+		dev_queue_xmit(skb);
 
 		//RX
 		tmo = wait_for_completion_timeout(&lp->ncsi_complete, HZ/10);
@@ -1360,7 +1360,7 @@ static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
 		memset(res_buf, 0xff, *res_length);
 	}
 
-  mutex_unlock(&ncsi_mutex);
+	mutex_unlock(&ncsi_mutex);
 
 #ifdef NCSI_DEBUG
 	if (!tmo) {
