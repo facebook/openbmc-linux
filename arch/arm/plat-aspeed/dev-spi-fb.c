@@ -189,7 +189,11 @@ static struct platform_device ast_spi0_device = {
 
 #if defined AST_SOC_G5
 static struct platform_device ast_spi1_device = {
+#if defined(CONFIG_MINILAKETB)
+  .name           = "fmc-spi",
+#else
   .name           = "ast-spi",
+#endif
   .id             = 2,
 
   .dev = {
@@ -304,6 +308,16 @@ static struct mtd_partition ast_spi_flash1_partitions[] = {
     },
 };
 
+static struct mtd_partition ast_spi_flash2_partitions[] = {
+    {
+#if defined(CONFIG_MINILAKETB)
+        .name       = "bios0",
+        .offset     = 0,                  /* From 0 */
+        .size       = MTDPART_SIZ_FULL,   /* full size */
+#endif
+    },
+};
+
 /* The legacy platform data is the non-FIT, non-ROM layout */
 static struct flash_platform_data ast_legacy_platform_data = {
 	.type       = "mx25l25635e",
@@ -330,6 +344,12 @@ static struct flash_platform_data ast_spi_flash1_data = {
     .type       = "mx25l25635e",
     .nr_parts   = ARRAY_SIZE(ast_spi_flash1_partitions),
     .parts      = ast_spi_flash1_partitions,
+};
+
+static struct flash_platform_data ast_spi_flash2_data = {
+    .type       = "mx25l25635e",
+    .nr_parts   = ARRAY_SIZE(ast_spi_flash2_partitions),
+    .parts      = ast_spi_flash2_partitions,
 };
 
 static struct spi_board_info ast_dual_flash_fmc_devices[] = {
@@ -421,6 +441,16 @@ static struct spi_board_info ast_spi1_devices[] = {
     .mode               = SPI_MODE_0,
   },
 #endif
+#if defined CONFIG_MINILAKETB
+  {
+    .modalias           = "m25p80",
+    .platform_data      = &ast_spi_flash2_data,
+    .chip_select        = 0,
+    .max_speed_hz       = 50 * 1000 * 1000,
+    .bus_num            = 2,
+    .mode               = SPI_MODE_0,
+  },
+#endif
 };
 #endif
 
@@ -453,7 +483,7 @@ void __init ast_add_device_spi(void)
 	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
 	platform_device_register(&ast_spi1_device);
 	spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
-#elif defined(CONFIG_YAMP)
+#elif defined(CONFIG_YAMP) || defined(CONFIG_MINILAKETB)
 	platform_device_register(&ast_spi1_device);
 	spi_register_board_info(ast_spi1_devices, ARRAY_SIZE(ast_spi1_devices));
 #endif
