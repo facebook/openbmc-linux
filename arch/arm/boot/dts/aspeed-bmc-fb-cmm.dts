@@ -4,14 +4,13 @@
 #include "aspeed-g5.dtsi"
 
 / {
-	model = "Facebook Galaxy Chassis Management Module";
-	compatible = "aspeed,ast2500";
+	model = "Facebook Backpack CMM BMC";
+	compatible = "facebook,cmm-bmc", "aspeed,ast2500";
 
 	aliases {
 		/*
-		 * Override the default serial aliases in aspeed-g5.dtsi
-		 * to make sure /dev/ttyS* are mapped to the same uart
-		 * with cmm kernel 4.1.
+		 * Override the default serial aliases to avoid breaking
+		 * the legacy applications.
 		 */
 		serial0 = &uart5;
 		serial1 = &uart1;
@@ -19,13 +18,33 @@
 		serial3 = &uart4;
 
 		/*
-		 * The purpose of adding "i2c15" alias is to make sure
-		 * dynamic bus number (assigned to i2c-muxes) starts
-		 * from 16, and this is because we have too many user
-		 * level applications assuming i2c-mux-bus-num starts
-		 * from 16.
+		 * Hardcode the bus number of i2c switches' channels to
+		 * avoid breaking the legacy applications.
 		 */
-		i2c15 = &i2c10;
+		i2c16 = &imux16;
+		i2c17 = &imux17;
+		i2c18 = &imux18;
+		i2c19 = &imux19;
+		i2c20 = &imux20;
+		i2c21 = &imux21;
+		i2c22 = &imux22;
+		i2c23 = &imux23;
+		i2c24 = &imux24;
+		i2c25 = &imux25;
+		i2c26 = &imux26;
+		i2c27 = &imux27;
+		i2c28 = &imux28;
+		i2c29 = &imux29;
+		i2c30 = &imux30;
+		i2c31 = &imux31;
+		i2c32 = &imux32;
+		i2c33 = &imux33;
+		i2c34 = &imux34;
+		i2c35 = &imux35;
+		i2c36 = &imux36;
+		i2c37 = &imux37;
+		i2c38 = &imux38;
+		i2c39 = &imux39;
 	};
 
 	chosen {
@@ -40,9 +59,8 @@
 };
 
 /*
- * Warm reboot hangs at boot time if using the default reset type (SOC,
- * gated by reset mask registers), and the issue can be fixed by setting
- * reset type to "system" (full chip).
+ * Update reset type to "system" (full chip) to fix warm reboot hang issue
+ * when reset type is set to default ("soc", gated by reset mask registers).
  */
 &wdt1 {
 	status = "okay";
@@ -50,8 +68,7 @@
 };
 
 /*
- * Both wdt1 and wdt2 are enabled in aspeed-g5.dtsi but we just need
- * the first watchdog (wdt1); thus let's disable wdt2 explicitly.
+ * wdt2 is not used by Backpack CMM.
  */
 &wdt2 {
 	status = "disabled";
@@ -83,13 +100,8 @@
 	status = "okay";
 };
 
-/*
- * Note mac1 is actually the second mac controller (0x1e680000) because
- * mac label is 0-based (mac0 mapping to 0x1e660000) in aspeed-g5.dtsi.
- */
 &mac1 {
 	status = "okay";
-
 	no-hw-checksum;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_rgmii2_default &pinctrl_mdio2_default>;
@@ -107,6 +119,61 @@
 	base-clock-divisor = <4>;
 	clock-low-width = <7>;
 	clock-high-width = <7>;
+
+	i2c-switch@77 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x77>;
+
+		imux16: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+
+		imux17: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+
+		imux18: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+
+		imux19: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+
+		imux20: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+		};
+
+		imux21: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+		};
+
+		imux22: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+		};
+
+		imux23: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+		};
+	};
 };
 
 &i2c2 {
@@ -114,6 +181,61 @@
 	base-clock-divisor = <4>;
 	clock-low-width = <7>;
 	clock-high-width = <7>;
+
+	i2c-switch@71 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x71>;
+
+		imux24: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+
+		imux25: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+
+		imux26: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+
+		imux27: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+
+		imux28: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+		};
+
+		imux29: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+		};
+
+		imux30: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+		};
+
+		imux31: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+		};
+	};
 };
 
 &i2c3 {
@@ -156,6 +278,61 @@
 	base-clock-divisor = <4>;
 	clock-low-width = <7>;
 	clock-high-width = <7>;
+
+	i2c-switch@77 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x77>;
+
+		imux32: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+
+		imux33: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+
+		imux34: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+
+		imux35: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+
+		imux36: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+		};
+
+		imux37: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+		};
+
+		imux38: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+		};
+
+		imux39: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+		};
+	};
 };
 
 &i2c13 {
