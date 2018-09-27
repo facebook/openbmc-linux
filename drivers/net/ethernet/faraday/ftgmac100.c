@@ -335,7 +335,14 @@ static void ftgmac100_set_mac(struct ftgmac100 *priv, const unsigned char *mac);
 
 static int
 ftgmac100_wait_to_send_packet(struct sk_buff *skb, struct net_device *dev) {
-	return ftgmac100_hard_start_xmit(skb, dev);
+	int ret;
+
+	/* Disable tx/rx to avoid kernel panic due to race condition */
+	local_bh_disable();
+	ret = ftgmac100_hard_start_xmit(skb, dev);
+	local_bh_enable();
+
+	return ret;
 }
 
 void NCSI_Struct_Initialize(struct net_device *dev)
