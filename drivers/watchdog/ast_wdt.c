@@ -135,7 +135,7 @@ module_param(force_disable, int, 0);
 MODULE_PARM_DESC(force_disable, "Disable watchdog by default "
 		"(default=0, enable watchdog)");
 
-static char expect_close;
+static char magic_close;
 
 //Function Declaration
 int __init wdt_init(void);
@@ -350,7 +350,7 @@ static int wdt_set_heartbeat(int t)
         size_t i;
 
         /* In case it was set long ago */
-        expect_close = 0;
+        magic_close = 0;
 
         for (i = 0; i != count; i++)
         {
@@ -359,7 +359,7 @@ static int wdt_set_heartbeat(int t)
             return -EFAULT;
           switch(c) {
            case 'V':
-             expect_close = 42;
+             magic_close = 1;
              break;
            case 'X':
              force_disable = 1;
@@ -464,7 +464,7 @@ static int ast_wdt_open(struct inode *inode, struct file *file)
 
 static int ast_wdt_release(struct inode *inode, struct file *file)
 {
-  if (expect_close != 42 && !nowayout)
+  if (magic_close && !nowayout)
   {
      /* handles the case where the device is closed without the "magic
       * close" character (anything that is not 'V' qualifies -- see the
@@ -483,7 +483,7 @@ static int ast_wdt_release(struct inode *inode, struct file *file)
        */
       wdt_restart();
   }
-  expect_close = 0;
+  magic_close = 0;
   return 0;
 }
 
