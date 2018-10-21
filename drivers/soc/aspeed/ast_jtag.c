@@ -104,6 +104,13 @@ struct controller_mode_param {
     unsigned int     controller_mode;
 };
 
+struct run_cycle_param {
+    unsigned char     tdi;        // TDI bit value to write
+    unsigned char     tms;        // TMS bit value to write
+    unsigned char     tck;        // TCK bit value to write
+    unsigned char     tdo;        // TDO bit value to read
+};
+
 #define JTAGIOC_BASE       'T'
 
 #define AST_JTAG_IOCRUNTEST		_IOW(JTAGIOC_BASE, 0, struct runtest_idle)
@@ -118,6 +125,7 @@ struct controller_mode_param {
 
 #define AST_JTAG_SET_TCK          _IOW( JTAGIOC_BASE, 9, struct set_tck_param)
 #define AST_JTAG_GET_TCK          _IOR( JTAGIOC_BASE, 10, struct get_tck_param)
+#define AST_JTAG_RUN_CYCLE        _IOR( JTAGIOC_BASE, 11, struct run_cycle_param)
 
 /******************************************************************************/
 //#define AST_JTAG_DEBUG
@@ -329,6 +337,24 @@ void ast_jtag_wait_data_complete(struct ast_jtag_info *ast_jtag)
 void ast_jtag_bitbang(struct ast_jtag_info *ast_jtag, struct tck_bitbang *bitbang)
 {
     bitbang->tdo = TCK_Cycle(ast_jtag, bitbang->tms, bitbang->tdi);
+}
+
+void ast_jtag_run_cycle(struct ast_jtag_info *ast_jtag, struct run_cycle_param *run_cycle)
+{
+    int tdo = 0;
+    int read_val = 0;
+	  u32 old_val = ast_jtag_read(ast_jtag, AST_JTAG_SW);
+    u32 val = 0;
+
+    // Write TDI, TMS and TCK
+    g_sw_tdi = run_cycle->tdi ? JTAG_SW_MODE_TDIO : 0;
+    g_sw_tms = run_cycle->tms ? JTAG_SW_MODE_TMS : 0;
+    g_sw_tck = run_cycle->tck ? JTAG_SW_MODE_TCK : 0;
+	  val = (old_val & ~JTAG_SW_MODE_VAL_MASK) | (g_sw_tdi|g_sw_tck|g_sw_tms);
+	  ast_jtag_write(ast_jtag, val, AST_JTAG_SW);
+    read_val = ast_jtag_read(ast_jtag, AST_JTAG_SW);
+    tdo = read_val & JTAG_SW_MODE_TDIO;
+    run_cycle->tdo = tdo ? 1 : 0;
 }
 
 void reset_tap(struct ast_jtag_info *ast_jtag, xfer_mode mode) {
@@ -916,6 +942,7 @@ static long jtag_ioctl(struct file *file, unsigned int cmd,
     struct get_tck_param get_tck_param;
     struct tap_state_param tap_state_param;
     struct controller_mode_param controller_mode_param;
+  struct run_cycle_param run_cycle;
 
 	switch (cmd) {
 		case AST_JTAG_GIOCFREQ:
@@ -1003,6 +1030,14 @@ static long jtag_ioctl(struct file *file, unsigned int cmd,
                 else
                     ast_jtag_master(controller_mode_param.mode);
             }
+            break;
+        case AST_JTAG_RUN_CYCLE:
+            if (copy_from_user(&run_cycle, argp, sizeof(struct run_cycle_param)))
+                ret = -EFAULT;
+            else
+                ast_jtag_run_cycle(ast_jtag, &run_cycle);
+            if (copy_to_user(argp, &run_cycle, sizeof(struct run_cycle_param)))
+                ret = -EFAULT;
             break;
 		default:
 			return -ENOTTY;
