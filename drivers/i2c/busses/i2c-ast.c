@@ -57,12 +57,6 @@
 
 #define AST_LOCKUP_DETECTED (0x1 << 15)
 
-// Enable SCL/SDA pull LOW detection for Yosemite platform
-#ifdef CONFIG_YOSEMITE || CONFIG_FBY2 || CONFIG_MINILAKETB
-#define AST_I2C_LOW_TIMEOUT 0x07
-#else
-#define AST_I2C_LOW_TIMEOUT 0x00
-#endif //CONFIG_YOSEMITE
 
 
 struct ast_i2c_dev {
@@ -106,6 +100,8 @@ struct ast_i2c_dev {
 #endif
 	u32					func_ctrl_reg;
 	u8					master_xfer_first;
+	u16         bus_master_reset_cnt;
+	u16         bus_slave_recovery_cnt;
 };
 
 enum {
@@ -163,7 +159,7 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
 #endif
 
 
-#ifdef CONFIG_FBY2 || CONFIG_MINILAKETB
+#if defined(CONFIG_FBY2) || defined(CONFIG_MINILAKETB)
   if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
     data = 0xFFF5E700;
     return data;
@@ -274,7 +270,7 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 		ast_i2c_write(i2c_dev, AST_NO_TIMEOUT_CTRL, I2C_AC_TIMING_REG2);
 	}
 #else
-#ifndef CONFIG_FBY2 || CONFIG_MINILAKETB
+#if !defined(CONFIG_FBY2) && !defined(CONFIG_MINILAKETB)
 	if(i2c_dev->ast_i2c_data->bus_clk/1000 > 400) {
 		printk("high speed mode enable clk [%dkhz]\n",i2c_dev->ast_i2c_data->bus_clk/1000);
 		ast_i2c_write(i2c_dev, ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG) |
@@ -473,11 +469,12 @@ static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev);
 static void
 ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
 {
-  u32 temp;
   u32 ctrl_reg1, cmd_reg1;
 
   ctrl_reg1 = ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG);
   cmd_reg1 = ast_i2c_read(i2c_dev, I2C_CMD_REG);
+
+  i2c_dev->bus_master_reset_cnt++;
 
   // MASTER mode only - bus recover + reset
   // MASTER & SLAVE mode - only reset
@@ -527,12 +524,65 @@ static void ast_i2c_bus_recovery(struct ast_i2c_dev *i2c_dev,u32 reg){
 #endif
 
 static u8
+ast_i2c_slave_reset(struct ast_i2c_dev *i2c_dev)
+{
+  u32 tmp_func_ctrl_reg = 0;
+	u32 i = 0;
+	int ret;
+	u32 sts;
+
+  dev_err(i2c_dev->dev, "slave reset triggered\n");
+
+	// In this case, I2C Slave mode cannot be enabled automaitcallly.
+	// Due to the I2C bus will be Master mode only after ast_i2c_dev_init(),
+	// so store the original function control register.
+	// If the bus recover completed, we will restore the register value.
+	tmp_func_ctrl_reg = i2c_dev->func_ctrl_reg;
+
+	//Let's retry 10 times
+	for (i = 0; i < 10; i++) {
+    dev_err(i2c_dev->dev, "slave reset retry%d\n",i);
+		ast_i2c_dev_init(i2c_dev);
+
+		//Do the recovery command BIT11
+		i2c_dev->bus_slave_recovery_cnt++;
+		init_completion(&i2c_dev->cmd_complete);
+		i2c_dev->cmd_err = 0;
+		ast_i2c_write(i2c_dev, AST_I2CD_BUS_RECOVER_CMD_EN, I2C_CMD_REG);
+		ret = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout*HZ);
+		if (i2c_dev->cmd_err != 0 &&
+		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
+			i2c_dev->func_ctrl_reg = tmp_func_ctrl_reg;
+			dev_err(i2c_dev->dev, "ERROR!! Failed to do recovery command(0x%08x)\n", i2c_dev->cmd_err);
+			i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_ERROR;
+			return -1;
+		}
+		//Check 0x14's SDA and SCL status
+		sts = ast_i2c_read(i2c_dev,I2C_CMD_REG);
+		if (sts & AST_I2CD_SDA_LINE_STS) {  //Recover OK
+			i2c_dev->func_ctrl_reg = tmp_func_ctrl_reg;
+			i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_SUCCESS;
+			break ;
+		}
+	}
+	if (i == 10) {
+		i2c_dev->func_ctrl_reg = tmp_func_ctrl_reg;
+		dev_err(i2c_dev->dev, "ERROR!! recovery failed\n");
+		i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_ERROR;
+		return -1;
+	} else {
+		dev_err(i2c_dev->dev, "recovery successful\n");
+	}
+
+	return 0;
+}
+
+
+static u8
 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 {
 	u32 sts;
-	int r;
-	u32 i = 0;
-	u32 tmp_func_ctrl_reg = 0;
+	int ret;
 
 	//Check 0x14's SDA and SCL status
 	sts = ast_i2c_read(i2c_dev,I2C_CMD_REG);
@@ -556,7 +606,7 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 
 		ast_i2c_write(i2c_dev, AST_I2CD_M_STOP_CMD, I2C_CMD_REG);
 
-		r = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout*HZ);
+		ret = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout*HZ);
 
 		if(i2c_dev->cmd_err &&
 		   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
@@ -565,7 +615,7 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 			return -1;
 		}
 
-		if (r == 0) {
+		if (ret == 0) {
 			 dev_err(i2c_dev->dev, "recovery timed out\n");
 			 i2c_dev->adap.bus_status |= 0x1 << BUS_LOCK_RECOVER_TIMEOUT;
 			 return -1;
@@ -580,49 +630,15 @@ ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev)
 		//else if SDA == 0, the device is dead. We need to reset the bus
 		//And do the recovery command.
 		dev_err(i2c_dev->dev, "I2C's slave is dead, try to recover it\n");
-
-		// In this case, I2C Slave mode cannot be enabled automaitcallly.
-		// Due to the I2C bus will be Master mode only after ast_i2c_dev_init(),
-		// so store the original function control register.
-		// If the bus recover completed, we will restore the register value.
-		tmp_func_ctrl_reg = i2c_dev->func_ctrl_reg;
-
-		//Let's retry 10 times
-		for (i = 0; i < 10; i++) {
-			ast_i2c_dev_init(i2c_dev);
-			//Do the recovery command BIT11
-			init_completion(&i2c_dev->cmd_complete);
-			i2c_dev->cmd_err = 0;
-			ast_i2c_write(i2c_dev, AST_I2CD_BUS_RECOVER_CMD_EN, I2C_CMD_REG);
-
-			r = wait_for_completion_timeout(&i2c_dev->cmd_complete, i2c_dev->adap.timeout*HZ);
-			if (i2c_dev->cmd_err != 0 &&
-			   i2c_dev->cmd_err != AST_I2CD_INTR_STS_NORMAL_STOP) {
-				i2c_dev->func_ctrl_reg = tmp_func_ctrl_reg;
-				dev_err(i2c_dev->dev, "ERROR!! Failed to do recovery command(0x%08x)\n", i2c_dev->cmd_err);
-				i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_ERROR;
-				return -1;
-			}
-			//Check 0x14's SDA and SCL status
-			sts = ast_i2c_read(i2c_dev,I2C_CMD_REG);
-			if (sts & AST_I2CD_SDA_LINE_STS) {  //Recover OK
-				i2c_dev->func_ctrl_reg = tmp_func_ctrl_reg;
-				i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_SUCCESS;
-				break;
-			}
-		}
-		if (i == 10) {
-			i2c_dev->func_ctrl_reg = tmp_func_ctrl_reg;
-			dev_err(i2c_dev->dev, "ERROR!! recover failed\n");
-			i2c_dev->adap.bus_status |= 0x1 << SLAVE_DEAD_RECOVER_ERROR;
-			return -1;
-		}
+    ret = ast_i2c_slave_reset(i2c_dev);
+		if (ret)
+		  return ret;
 	} else {
 		dev_err(i2c_dev->dev, "Don't know how to handle this case?!\n");
 		i2c_dev->adap.bus_status |= 0x1 << UNDEFINED_CASE;
 		return -1;
 	}
-  dev_err(i2c_dev->dev, "Recovery successfully\n");
+  dev_err(i2c_dev->dev, "Recovery successful\n");
 	return 0;
 }
 
@@ -2145,6 +2161,50 @@ static const struct i2c_algorithm i2c_ast_algorithm = {
 	.functionality	= ast_i2c_functionality,
 };
 
+
+static ssize_t get_bus_master_reset_cnt(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+	struct ast_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+	return sprintf(buf, "%u\n", i2c_dev->bus_master_reset_cnt);
+}
+
+static ssize_t get_bus_slave_reset_cnt(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+	struct ast_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+	return sprintf(buf, "%u\n", i2c_dev->bus_slave_recovery_cnt);
+}
+
+static ssize_t perform_bus_master_reset(struct device *dev,
+				struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct ast_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+
+  ast_i2c_bus_reset(i2c_dev);
+	return count;
+}
+
+static ssize_t perform_bus_slave_reset(struct device *dev,
+				struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct ast_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+
+	ast_i2c_slave_reset(i2c_dev);
+	return count;
+}
+
+/**
+ * bus_reset attribute to be exported through sysfs
+ * (/sys/devices/platform/ast_i2c.* /bus_master_reset).
+ * (/sys/devices/platform/ast_i2c.* /bus_slave_reset).
+ */
+static DEVICE_ATTR(bus_master_reset, S_IRUGO | S_IWUSR | S_IWGRP,
+					get_bus_master_reset_cnt, perform_bus_master_reset);
+static DEVICE_ATTR(bus_slave_reset, S_IRUGO | S_IWUSR | S_IWGRP,
+					get_bus_slave_reset_cnt, perform_bus_slave_reset);
+
+
 static int ast_i2c_probe(struct platform_device *pdev)
 {
 	struct ast_i2c_dev *i2c_dev;
@@ -2257,6 +2317,8 @@ static int ast_i2c_probe(struct platform_device *pdev)
 	i2c_dev->adap.dev.parent = &pdev->dev;
 
 	ast_i2c_dev_init(i2c_dev);
+  i2c_dev->bus_master_reset_cnt = 0;
+  i2c_dev->bus_slave_recovery_cnt = 0;
 
 	ret = request_irq(i2c_dev->irq, i2c_ast_handler, IRQF_SHARED,
 			  i2c_dev->adap.name, i2c_dev);
@@ -2283,7 +2345,12 @@ static int ast_i2c_probe(struct platform_device *pdev)
 	printk(KERN_INFO "I2C: %d: AST I2C adapter [%d khz]\n",
 	       i2c_dev->bus_id,i2c_dev->ast_i2c_data->bus_clk/1000);
 
-	return 0;
+	if (device_create_file(i2c_dev->dev, &dev_attr_bus_master_reset))
+		printk("error: cannot register dev_attr_bus_master_reset attribute.\n");
+	if (device_create_file(i2c_dev->dev, &dev_attr_bus_slave_reset))
+		printk("error: cannot register dev_attr_bus_slave_reset attribute.\n");
+
+  return 0;
 
 eadapt:
 	free_irq(i2c_dev->irq, i2c_dev);
@@ -2310,6 +2377,9 @@ static int ast_i2c_remove(struct platform_device *pdev)
 
 	free_irq(i2c_dev->irq, i2c_dev);
 
+	device_remove_file(&i2c_dev->dev, &dev_attr_bus_master_reset);
+	device_remove_file(&i2c_dev->dev, &dev_attr_bus_slave_reset);
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	iounmap(i2c_dev->reg_base);
 	release_mem_region(res->start, res->end - res->start + 1);
@@ -2318,6 +2388,9 @@ static int ast_i2c_remove(struct platform_device *pdev)
 
 	return 0;
 }
+
+
+
 
 #ifdef CONFIG_PM
 static int ast_i2c_suspend(struct platform_device *pdev, pm_message_t state)
