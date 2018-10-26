@@ -146,6 +146,7 @@ typedef struct ncsi_nl_msg_t {
 
 #define MAX_RESPONSE_PAYLOAD 128 /* maximum payload size*/
 typedef struct ncsi_nl_response {
+  unsigned char cmd;
   unsigned char payload_length;
   unsigned char msg_payload[MAX_RESPONSE_PAYLOAD];
 } NCSI_NL_RSP_T;
@@ -1455,7 +1456,7 @@ static void ncsi_recv_msg_cb(struct sk_buff *skb)
   send_ncsi_cmd(dev, buf->channel_id, buf->cmd, buf->payload_length,
 	             buf->msg_payload,
 							 &(ncsi_nl_rsp.payload_length), &(ncsi_nl_rsp.msg_payload[0]));
-
+  ncsi_nl_rsp.cmd = buf->cmd;
 	msg_size = sizeof(NCSI_NL_RSP_T);
 	msg = (unsigned char *)&ncsi_nl_rsp;
 
