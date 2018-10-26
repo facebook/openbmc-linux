@@ -73,7 +73,7 @@
 		status = "okay";
 		m25p,fast-read;
 		label = "bmc";
-#include "fb-bmc-flash-layout.dtsi"
+#include "facebook-bmc-flash-layout.dtsi"
 	};
 };
 
