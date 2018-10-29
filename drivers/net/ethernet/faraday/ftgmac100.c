@@ -120,6 +120,7 @@ struct ftgmac100 {
 		#define MEZZ_UNKNOWN    -1
 		#define MEZZ_MLX        0x01
 		#define MEZZ_BCM        0x02
+                #define MEZZ_INTEL      0x03
 	unsigned int  powerup_prep_host_id;
 	struct completion ncsi_complete;
 
@@ -249,9 +250,25 @@ ftgmac_aen_worker(struct work_struct *work)
 	return;
 }
 
-static struct packet_type ptype_ncsi = {
- .type = __constant_htons(ETH_P_NCSI),
- .func = Rx_NCSI,
+static int get_netdevice_idx(char *name)
+{
+    int index = -1;
+
+    if (0 == strcmp("eth0", name))
+    {
+        index = 0;
+    }
+    else if (0 == strcmp("eth1", name))
+    {
+        index = 1;
+    }
+
+    return index;
+}
+
+static struct packet_type ptype_ncsi[2] __read_mostly = {
+    {.type = __constant_htons(ETH_P_NCSI), .dev = NULL, .func = Rx_NCSI},
+    {.type = __constant_htons(ETH_P_NCSI), .dev = NULL, .func = Rx_NCSI},
 };
 
 static int
@@ -803,6 +820,10 @@ void Get_Version_ID (struct net_device * dev)
     lp->NCSI_Respond.Payload_Data[34] == 0x11 && lp->NCSI_Respond.Payload_Data[35] == 0x3D) {
     lp->mezz_type = MEZZ_BCM;
     printk("NCSI: Mezz Vendor = Broadcom\n");
+  } else if ( lp->NCSI_Respond.Payload_Data[35] == 0x57 && lp->NCSI_Respond.Payload_Data[34] == 0x01 &&
+    lp->NCSI_Respond.Payload_Data[33] == 0x00 && lp->NCSI_Respond.Payload_Data[32] == 0x00 ) {
+    lp->mezz_type = MEZZ_INTEL;
+    printk("NCSI: Mezz Vendor = Intel\n"); 
   } else {
     lp->mezz_type = MEZZ_UNKNOWN;
     printk("NCSI error: Unknown Mezz Vendor!\n");
@@ -900,6 +921,52 @@ void Enable_AEN (struct net_device * dev)
 		}
 	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
 	lp->Retry = 0;
+}
+
+void Get_MAC_Address_intel(struct net_device *dev)
+{
+  struct ftgmac100 *lp = netdev_priv(dev);
+  struct file *filp = NULL;
+  char path[64]={0};
+  char mac_addr[6] = {0x00,0x11,0x22,0x33,0x44,0x55};
+  char mac_addr_size = sizeof(mac_addr);
+  int ret = 0;
+  int i;
+  mm_segment_t fs;
+
+  fs = get_fs();
+  set_fs(KERNEL_DS);
+
+  sprintf(path, "/sys/class/i2c-dev/i2c-6/device/6-0054/eeprom");
+
+  filp = filp_open(path, O_RDONLY, 0);
+  if ( (NULL == filp) || IS_ERR(filp) )
+  {
+    printk("[%s]Cannot use an error file pointer to get the intel NIC MAC\n",__func__);
+    printk("Use the default MAC\n");
+  }
+  else
+  {
+    filp->f_pos = 0x1907;
+    vfs_read(filp, (char *)mac_addr, mac_addr_size, &filp->f_pos);
+  }
+
+  set_fs(fs);
+
+  if ( NULL != filp )
+  {
+    filp_close(filp, NULL);
+  }
+
+  printk("NCSI: MAC  ");
+  for (i = 0; i < 6; i++)
+      printk("%02X:", mac_addr[i]);
+
+  printk("\n");
+  memcpy(dev->dev_addr, mac_addr, mac_addr_size);
+  memcpy(lp->NCSI_Request.SA, mac_addr, mac_addr_size);
+
+  ftgmac100_set_mac(lp, dev->dev_addr);
 }
 
 void Get_MAC_Address_mlx(struct net_device * dev)
@@ -2162,10 +2229,14 @@ void ncsi_start(struct net_device *dev) {
         if (priv->mezz_type == MEZZ_MLX) {
           Get_MAC_Address_mlx(dev);
           Set_MAC_Affinity_mlx(dev);
-        } else {
+        } else if (priv->mezz_type == MEZZ_BCM ) {
           Get_MAC_Address_bcm(dev);
           mdelay(500);
+        } else {
+          Get_MAC_Address_intel(dev);
+          mdelay(500);
         }
+        
 #endif
 
 				Get_Capabilities(dev);
@@ -3234,6 +3305,7 @@ static int ftgmac100_open(struct net_device *netdev)
 {
 	struct ftgmac100 *priv = netdev_priv(netdev);
 	int err;
+        int idx;
 
 	err = ftgmac100_alloc_buffers(priv);
 	if (err) {
@@ -3278,7 +3350,9 @@ static int ftgmac100_open(struct net_device *netdev)
 
 #ifdef CONFIG_FTGMAC100_NCSI
 	init_completion(&priv->ncsi_complete);
-	dev_add_pack(&ptype_ncsi);
+        idx = get_netdevice_idx(netdev->name);
+        ptype_ncsi[idx].dev = netdev;
+	dev_add_pack(&ptype_ncsi[idx]);
 #else
 	phy_config_led(priv->mii_bus);
 	phy_start(priv->phydev);
@@ -3308,7 +3382,7 @@ err_alloc:
 static int ftgmac100_stop(struct net_device *netdev)
 {
 	struct ftgmac100 *priv = netdev_priv(netdev);
-
+        
 	/* disable all interrupts */
 	iowrite32(0, priv->base + FTGMAC100_OFFSET_IER);
 
@@ -3317,7 +3391,9 @@ static int ftgmac100_stop(struct net_device *netdev)
 #ifndef CONFIG_FTGMAC100_NCSI
 	phy_stop(priv->phydev);
 #else
-	dev_remove_pack(&ptype_ncsi);
+	int idx;
+	idx = get_netdevice_idx(netdev->name);
+	dev_remove_pack(&ptype_ncsi[idx]);
 #endif
 
 	ftgmac100_stop_hw(priv);
