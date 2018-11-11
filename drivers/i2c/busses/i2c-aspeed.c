@@ -772,17 +772,59 @@ static u32 aspeed_i2c_25xx_get_clk_reg_val(u32 divisor)
 	return aspeed_i2c_get_clk_reg_val(32, divisor);
 }
 
+/*
+ * Configure Clock and AC Timing Control register based on values from
+ * device tree, only if base clock advisor and clock low/high pulse
+ * width are all specified in device tree.
+ */
+static int aspeed_i2c_of_read_clk(struct platform_device *pdev,
+				  u32 *clk_reg_val)
+{
+	int ret;
+	u32 reg_val, base_clk, clk_low_width, clk_high_width;
+
+	ret = of_property_read_u32(pdev->dev.of_node,
+				   "base-clock-divisor", &base_clk);
+	if (ret < 0) {
+		return -1;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node,
+				   "clock-low-width", &clk_low_width);
+	if (ret < 0) {
+		return -1;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node,
+				   "clock-high-width", &clk_high_width);
+	if (ret < 0) {
+		return -1;
+	}
+
+	reg_val = ((clk_high_width << ASPEED_I2CD_TIME_SCL_HIGH_SHIFT) &
+		   ASPEED_I2CD_TIME_SCL_HIGH_MASK) |
+		  ((clk_low_width << ASPEED_I2CD_TIME_SCL_LOW_SHIFT) &
+		   ASPEED_I2CD_TIME_SCL_LOW_MASK) |
+		  (base_clk & ASPEED_I2CD_TIME_BASE_DIVISOR_MASK);
+	*clk_reg_val |= reg_val;
+	return 0;
+}
+
 /* precondition: bus.lock has been acquired. */
-static int aspeed_i2c_init_clk(struct aspeed_i2c_bus *bus)
+static int aspeed_i2c_init_clk(struct aspeed_i2c_bus *bus,
+			       struct platform_device *pdev)
 {
 	u32 divisor, clk_reg_val;
 
-	divisor = DIV_ROUND_UP(bus->parent_clk_frequency, bus->bus_frequency);
 	clk_reg_val = readl(bus->base + ASPEED_I2C_AC_TIMING_REG1);
 	clk_reg_val &= (ASPEED_I2CD_TIME_TBUF_MASK |
 			ASPEED_I2CD_TIME_THDSTA_MASK |
 			ASPEED_I2CD_TIME_TACST_MASK);
-	clk_reg_val |= bus->get_clk_reg_val(divisor);
+	if (aspeed_i2c_of_read_clk(pdev, &clk_reg_val) != 0) {
+		divisor = DIV_ROUND_UP(bus->parent_clk_frequency,
+					bus->bus_frequency);
+		clk_reg_val |= bus->get_clk_reg_val(divisor);
+	}
 	writel(clk_reg_val, bus->base + ASPEED_I2C_AC_TIMING_REG1);
 	writel(ASPEED_NO_TIMEOUT_CTRL, bus->base + ASPEED_I2C_AC_TIMING_REG2);
 
@@ -799,7 +841,7 @@ static int aspeed_i2c_init(struct aspeed_i2c_bus *bus,
 	/* Disable everything. */
 	writel(0, bus->base + ASPEED_I2C_FUN_CTRL_REG);
 
-	ret = aspeed_i2c_init_clk(bus);
+	ret = aspeed_i2c_init_clk(bus, pdev);
 	if (ret < 0)
 		return ret;
 

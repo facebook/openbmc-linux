@@ -20,6 +20,23 @@ Optional Properties:
 		  specified
 - multi-master	: states that there is another master active on this bus.
 
+The following 3 optional properties allow users to control aspeed i2c clock
+and AC timing settings at finer granularity:
+- base-clock-divisor : The divisor (2 ^ <prop-value>) defines the base clock
+		       frequency which is divided from APB bus clock. Valid
+		       values [0, 15].
+		       For example, by setting property value to 4, base
+		       clock divisor is 16 (2 ^ 4); if APB bus frequency is
+		       24MHz, then base clock frequency is 1.5 (24 / 16) MHz.
+- clock-low-width    : The width (1 + <prop-value>) defines the number of
+		       base clock cycles in the low period of SCL clock.
+		       Valid values [0, 15].
+- clock-high-width   : The width defines the number of base clock cycles in
+		       the high period of SCL clock. Valid values [0, 15].
+		       Note the intepration of the property vary depending
+		       on the value of base clock divisor. Refer to AST2500
+		       datasheet for details.
+
 Example:
 
 i2c {
