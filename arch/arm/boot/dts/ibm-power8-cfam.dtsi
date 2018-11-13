@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright 2018 IBM Corp
+
+#define __MAKE_LABEL(p,i)	p##i
+#define _MAKE_LABEL(p,i)	__MAKE_LABEL(p,i)
+#define HUB_LABEL		_MAKE_LABEL(fsi_hub,CFAM_CHIP_ID)
+#define OCC_LABEL		_MAKE_LABEL(fsi_occ,CFAM_CHIP_ID)
+#define I2C_LABEL(n)		_MAKE_LABEL(_MAKE_LABEL(cfam,CFAM_CHIP_ID),_i2c##n)
+
+#address-cells = <1>;
+#size-cells = <1>;
+chip-id = <CFAM_CHIP_ID>;
+
+scom@1000 {
+	compatible = "ibm,fsi2pib";
+	reg = <0x1000 0x400>;
+};
+
+HUB_LABEL: hub@3400 {
+	compatible = "ibm,fsi-master-hub";
+	reg = <0x3400 0x400>;
+	#address-cells = <2>;
+	#size-cells = <0>;
+	no-scan-on-init;
+};
+
+#undef __MAKE_LABEL
+#undef _MAKE_LABEL
+#undef HUB_LABEL
+#undef OCC_LABEL
+#undef I2C_LABEL

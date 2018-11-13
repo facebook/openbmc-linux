@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright 2018 IBM Corp
+
+#define __MAKE_LABEL(p,i)	p##i
+#define _MAKE_LABEL(p,i)	__MAKE_LABEL(p,i)
+#define HUB_LABEL		_MAKE_LABEL(fsi_hub,CFAM_CHIP_ID)
+#define OCC_LABEL		_MAKE_LABEL(fsi_occ,CFAM_CHIP_ID)
+#define I2C_LABEL(n)		_MAKE_LABEL(_MAKE_LABEL(cfam,CFAM_CHIP_ID),_i2c##n)
+
+#address-cells = <1>;
+#size-cells = <1>;
+chip-id = <CFAM_CHIP_ID>;
+
+scom@1000 {
+	compatible = "ibm,fsi2pib";
+	reg = <0x1000 0x400>;
+};
+
+i2c@1800 {
+	compatible = "ibm,fsi-i2c-master";
+	reg = <0x1800 0x400>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	I2C_LABEL(0): i2c-bus@0 {
+		reg = <0>;
+	};
+
+	I2C_LABEL(1): i2c-bus@1 {
+		reg = <1>;
+	};
+
+	I2C_LABEL(2): i2c-bus@2 {
+		reg = <2>;
+	};
+
+	I2C_LABEL(3): i2c-bus@3 {
+		reg = <3>;
+	};
+
+	I2C_LABEL(4): i2c-bus@4 {
+		reg = <4>;
+	};
+
+	I2C_LABEL(5): i2c-bus@5 {
+		reg = <5>;
+	};
+
+	I2C_LABEL(6): i2c-bus@6 {
+		reg = <6>;
+	};
+
+	I2C_LABEL(7): i2c-bus@7 {
+		reg = <7>;
+	};
+
+	I2C_LABEL(8): i2c-bus@8 {
+		reg = <8>;
+	};
+
+	I2C_LABEL(9): i2c-bus@9 {
+		reg = <9>;
+	};
+
+	I2C_LABEL(10): i2c-bus@10 {
+		reg = <10>;
+	};
+
+	I2C_LABEL(11): i2c-bus@11 {
+		reg = <11>;
+	};
+
+	I2C_LABEL(12): i2c-bus@12 {
+		reg = <12>;
+	};
+
+	I2C_LABEL(13): i2c-bus@13 {
+		reg = <13>;
+	};
+
+	I2C_LABEL(14): i2c-bus@14 {
+		reg = <14>;
+	};
+};
+
+sbefifo@2400 {
+	compatible = "ibm,p9-sbefifo";
+	reg = <0x2400 0x400>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	OCC_LABEL: occ {
+		compatible = "ibm,p9-occ";
+	};
+};
+
+HUB_LABEL: hub@3400 {
+	compatible = "fsi-master-hub";
+	reg = <0x3400 0x400>;
+	#address-cells = <2>;
+	#size-cells = <0>;
+
+	no-scan-on-init;
+};
+
+#undef __MAKE_LABEL
+#undef _MAKE_LABEL
+#undef HUB_LABEL
+#undef OCC_LABEL
+#undef I2C_LABEL
