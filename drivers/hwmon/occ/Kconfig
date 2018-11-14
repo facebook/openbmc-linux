@@ -1,0 +1,28 @@
+#
+# On-Chip Controller configuration
+#
+
+config SENSORS_OCC
+	tristate "POWER On-Chip Controller"
+	---help---
+	This option enables support for monitoring a variety of system sensors
+	provided by the On-Chip Controller (OCC) on a POWER processor.
+
+	This driver can also be built as a module. If so, the module will be
+	called occ-hwmon.
+
+config SENSORS_OCC_P8_I2C
+	bool "POWER8 OCC through I2C"
+	depends on I2C && SENSORS_OCC
+	---help---
+	This option enables support for monitoring sensors provided by the OCC
+	on a POWER8 processor. Communications with the OCC are established
+	through I2C bus.
+
+config SENSORS_OCC_P9_SBE
+	bool "POWER9 OCC through SBE"
+	depends on FSI_OCC && SENSORS_OCC
+	---help---
+	This option enables support for monitoring sensors provided by the OCC
+	on a POWER9 processor. Communications with the OCC are established
+	through SBE engine on an FSI bus.

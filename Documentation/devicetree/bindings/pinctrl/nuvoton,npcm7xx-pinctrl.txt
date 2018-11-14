@@ -1,0 +1,70 @@
+Nuvoton NPCM7XX Pin Controllers
+
+The NPCM7XX Pin Controller multi-function routed through
+the multiplexing block, Each pin supports GPIO functionality (GPIOx)
+and multiple functions that directly connect the pin to different
+hardware blocks.
+
+Required properties:
+- compatible      : "nuvoton,npcm750-pinctrl" for Poleg NPCM750.
+
+Contents of function subnode node
+---------------------------------
+Required subnode-properties:
+- groups : An array of strings. Each string contains the name of a group.
+- function: A string containing the name of the function to mux to the
+  group.
+
+  Valid values for group and function names can be found from looking at the
+  group and function arrays in driver files:
+  drivers/pinctrl/nuvoton/pinctrl-npcm7xx.c
+
+For example, pinctrl might have subnodes like the following:
+	r1err_pins: r1err_pins {
+		groups = "r1err";
+		function = "r1err";
+	};
+	r1md_pins: r1md_pins {
+		groups = "r1md";
+		function = "r1md";
+	};
+	r1_pins: r1_pins {
+		groups = "r1";
+		function = "r1";
+	};
+
+For a specific board, if it wants to use EMC (10/100 network),
+it can add the following to its board-specific .dts file.
+emc0: eth@f0825000 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&r1_pins
+				 &r1err_pins
+				 &r1md_pins>;
+	phy-mode = "rmii";
+
+if EMC hardware is not used the EMC pin can used for GPIO56
+	pinctrl-names = "default";
+	pinctrl-0 = <&gpio56_pins>
+
+Examples
+========
+
+pinctrl: pinctrl@0 {
+	compatible = "nuvoton,npcm7xx-pinctrl";
+	status = "okay";
+	iox1_pins: iox1_pins {
+		groups = "iox1";
+		function = "iox1";
+	};
+	iox2_pins: iox2_pins {
+		groups = "iox2";
+		function = "iox2";
+	};
+
+	....
+
+	clkreq_pins: clkreq_pins {
+		groups = "clkreq";
+		function = "clkreq";
+	};
+};
