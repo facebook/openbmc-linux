@@ -712,54 +712,6 @@ int Clear_Initial_State(struct net_device *dev, int Channel_ID)
   return Found;
 }
 
-int store_nic_fw_ver(unsigned char *data, int len)
-{
-  struct file *filp = NULL;
-  char path[32]={0};
-  int ret = 0;
-  mm_segment_t fs;
-
-  fs = get_fs();
-  set_fs(KERNEL_DS);
-
-  sprintf(path, "/tmp/cache_store");
-  ret = sys_access(path,0);
-  if (ret != 0)
-	ret = sys_mkdir(path, 0755);
-
-  if ( ret < 0 )
-  {
-    printk("[%s] cannot create the dir to store the nic f/w version\n", __func__);
-  }
-  else
-  {
-    strcat(path, "/nic_fw_ver");
-    filp = filp_open(path, O_RDWR|O_CREAT|O_TRUNC, 0666);
-    if ( NULL == filp )
-    {
-      printk("[%s]Cannot open the file to write the nic f/w version\n",__func__);
-    }
-
-    if ( IS_ERR(filp) )
-    {
-      printk("[%s]Cannot use ERR filp pointer to write the file\n",__func__);
-    }
-    else
-    {
-      vfs_write(filp, (char *)data, sizeof(char)*len, &filp->f_pos);
-    }
-  }
-
-  set_fs( fs );
-
-  if ( NULL != filp )
-  {
-    filp_close(filp, NULL);
-  }
-
-  return ret;
-}
-
 void Get_Version_ID (struct net_device * dev)
 {
 	struct ftgmac100 *lp = netdev_priv(dev);
@@ -804,11 +756,6 @@ void Get_Version_ID (struct net_device * dev)
 	} while ((lp->Retry != 0) && (lp->Retry <= RETRY_COUNT));
 	lp->Retry = 0;
 
-	if ( store_nic_fw_ver(lp->NCSI_Respond.Payload_Data, NCSI_DATA_PAYLOAD) )
-	{
-	  printk("[%s]Cannot store the nic fw file correctly\n", __func__);
-	}
-
   // Set mezz type based on IANA ID
 	// MLX IANA = 00 00 81 19
 	// Broadcom IANA = 00 00 11 3D
@@ -823,7 +770,7 @@ void Get_Version_ID (struct net_device * dev)
   } else if ( lp->NCSI_Respond.Payload_Data[35] == 0x57 && lp->NCSI_Respond.Payload_Data[34] == 0x01 &&
     lp->NCSI_Respond.Payload_Data[33] == 0x00 && lp->NCSI_Respond.Payload_Data[32] == 0x00 ) {
     lp->mezz_type = MEZZ_INTEL;
-    printk("NCSI: Mezz Vendor = Intel\n"); 
+    printk("NCSI: Mezz Vendor = Intel\n");
   } else {
     lp->mezz_type = MEZZ_UNKNOWN;
     printk("NCSI error: Unknown Mezz Vendor!\n");
@@ -2236,7 +2183,7 @@ void ncsi_start(struct net_device *dev) {
           Get_MAC_Address_intel(dev);
           mdelay(500);
         }
-        
+
 #endif
 
 				Get_Capabilities(dev);
@@ -3382,7 +3329,7 @@ err_alloc:
 static int ftgmac100_stop(struct net_device *netdev)
 {
 	struct ftgmac100 *priv = netdev_priv(netdev);
-        
+
 	/* disable all interrupts */
 	iowrite32(0, priv->base + FTGMAC100_OFFSET_IER);
 
