@@ -1,0 +1,138 @@
+// SPDX-License-Identifier: GPL-2.0+
+/dts-v1/;
+
+#include "aspeed-g5.dtsi"
+
+/ {
+	model = "Facebook Galaxy Chassis Management Module";
+	compatible = "aspeed,ast2500";
+
+	aliases {
+		/*
+		 * Override the default serial aliases in aspeed-g5.dtsi
+		 * to make sure /dev/ttyS* are mapped to the same uart
+		 * with cmm kernel 4.1.
+		 */
+		serial0 = &uart5;
+		serial1 = &uart1;
+		serial2 = &uart3;
+		serial3 = &uart4;
+
+		/*
+		 * The purpose of adding "i2c15" alias is to make sure
+		 * dynamic bus number (assigned to i2c-muxes) starts
+		 * from 16, and this is because we have too many user
+		 * level applications assuming i2c-mux-bus-num starts
+		 * from 16.
+		 */
+		i2c15 = &i2c10;
+	};
+
+	chosen {
+		stdout-path = &uart1;
+		bootargs = "console=ttyS1,9600n8 root=/dev/ram rw earlyprintk";
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x80000000 0x20000000>;
+	};
+};
+
+/*
+ * Both wdt1 and wdt2 are enabled in aspeed-g5.dtsi but we just need
+ * the first watchdog (wdt1); thus let's disable wdt2 explicitly.
+ */
+&wdt2 {
+	status = "disabled";
+};
+
+&fmc {
+	status = "okay";
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		label = "bmc";
+#include "fb-bmc-flash-layout.dtsi"
+	};
+};
+
+&spi1 {
+	status = "okay";
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		label = "pnor";
+	};
+};
+
+&spi2 {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&uart3 {
+	status = "okay";
+};
+
+&uart4 {
+	status = "okay";
+};
+
+&uart5 {
+	status = "okay";
+};
+
+/*
+ * Note mac1 is actually the second mac controller (0x1e680000) because
+ * mac label is 0-based (mac0 mapping to 0x1e660000) in aspeed-g5.dtsi.
+ */
+&mac1 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_rgmii2_default &pinctrl_mdio2_default>;
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+&i2c3 {
+	status = "okay";
+};
+
+&i2c4 {
+	status = "okay";
+};
+
+&i2c5 {
+	status = "okay";
+};
+
+&i2c6 {
+	status = "okay";
+};
+
+&i2c7 {
+	status = "okay";
+};
+
+&i2c8 {
+	status = "okay";
+};
+
+&i2c13 {
+	status = "okay";
+};
