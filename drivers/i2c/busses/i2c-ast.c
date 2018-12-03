@@ -1475,7 +1475,7 @@ static void ast_i2c_slave_xfer_done(struct ast_i2c_dev *i2c_dev)
 //TX/Rx Done
 static void ast_i2c_master_xfer_done(struct ast_i2c_dev *i2c_dev)
 {
-	u32 xfer_len;
+	u32 xfer_len = 0;
 	int i;
 	u8 *pool_buf;
 	unsigned long flags;
@@ -2377,8 +2377,8 @@ static int ast_i2c_remove(struct platform_device *pdev)
 
 	free_irq(i2c_dev->irq, i2c_dev);
 
-	device_remove_file(&i2c_dev->dev, &dev_attr_bus_master_reset);
-	device_remove_file(&i2c_dev->dev, &dev_attr_bus_slave_reset);
+	device_remove_file(i2c_dev->dev, &dev_attr_bus_master_reset);
+	device_remove_file(i2c_dev->dev, &dev_attr_bus_slave_reset);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	iounmap(i2c_dev->reg_base);
