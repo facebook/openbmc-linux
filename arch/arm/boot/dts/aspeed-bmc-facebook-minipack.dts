@@ -5,7 +5,7 @@
 #include "aspeed-g5.dtsi"
 
 / {
-	model = "Facebook Minipack BMC";
+	model = "Facebook Minipack 100 BMC";
 	compatible = "facebook,minipack-bmc", "aspeed,ast2500";
 
 	aliases {

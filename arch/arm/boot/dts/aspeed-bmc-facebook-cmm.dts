@@ -5,7 +5,7 @@
 #include "aspeed-g5.dtsi"
 
 / {
-	model = "Facebook Backpack CMM BMC";
+	model = "Facebook Backpack 100 CMM BMC";
 	compatible = "facebook,cmm-bmc", "aspeed,ast2500";
 
 	aliases {
