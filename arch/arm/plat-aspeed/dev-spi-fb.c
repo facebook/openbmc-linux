@@ -300,8 +300,6 @@ static struct mtd_partition ast_spi_flash1_partitions[] = {
     {
 #if defined(CONFIG_FBTP) || defined(CONFIG_PWNEPTUNE)
         .name       = "bios0",
-#elif defined(CONFIG_LIGHTNING)
-        .name       = "flash1",
 #endif
         .offset     = 0,                  /* From 0 */
         .size       = MTDPART_SIZ_FULL,   /* full size */
@@ -393,7 +391,7 @@ static struct spi_eeprom m95m02 = {
 };
 #endif
 
-#if defined(CONFIG_FBTP)  || defined(CONFIG_LIGHTNING) || defined (CONFIG_WEDGE100) || defined (CONFIG_PWNEPTUNE) || \
+#if defined(CONFIG_FBTP)  || defined (CONFIG_WEDGE100) || defined (CONFIG_PWNEPTUNE) || \
     defined(CONFIG_MINIPACK)
 static struct spi_board_info ast_spi0_devices[] = {
     {
@@ -409,10 +407,6 @@ static struct spi_board_info ast_spi0_devices[] = {
         .chip_select        = 0,
         .max_speed_hz       = 50 * 1000 * 1000,
         .bus_num            = 1,
-#elif defined(CONFIG_LIGHTNING)
-        .chip_select        = 1,
-        .max_speed_hz       = 50 * 1000 * 1000,
-        .bus_num            = 0,
 #endif
 #endif
         .mode               = SPI_MODE_0,
@@ -475,7 +469,7 @@ void __init ast_add_device_spi(void)
   } else {
     spi_register_board_info(ast_single_flash_fmc_devices, ARRAY_SIZE(ast_single_flash_fmc_devices));
   }
-#if defined(CONFIG_FBTP) || defined(CONFIG_LIGHTNING) || defined(CONFIG_WEDGE100) || defined(CONFIG_PWNEPTUNE)
+#if defined(CONFIG_FBTP) || defined(CONFIG_WEDGE100) || defined(CONFIG_PWNEPTUNE)
 	platform_device_register(&ast_spi0_device);
 	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
 #elif defined(CONFIG_MINIPACK)
