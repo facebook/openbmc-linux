@@ -900,7 +900,7 @@ void Get_MAC_Address_intel(struct net_device *dev)
 
   set_fs(fs);
 
-  if ( NULL != filp )
+  if ( NULL != filp && !IS_ERR(filp) )
   {
     filp_close(filp, NULL);
   }
