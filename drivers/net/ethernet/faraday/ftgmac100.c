@@ -59,7 +59,7 @@
 #define MAX_PKT_SIZE		1518
 #define RX_BUF_SIZE		PAGE_SIZE	/* must be smaller than 0x3fff */
 
-#define NCSI_DATA_PAYLOAD 64 /* for getting the size of the nc-si control data packet */
+#define MAX_NCSI_DATA_PAYLOAD 1088 /*1024+64*/ /* for getting the size of the nc-si control data packet */
 #define noNCSI_DEBUG   /* for debug printf messages */
 
 #define noDEBUG_AEN
@@ -72,6 +72,8 @@
 #else
   #define AEN_PRINT(fmt, args...)
 #endif
+
+//#define DEBUG_PRINT_NCSI_PACKET
 
 /******************************************************************************
  * private data
@@ -113,7 +115,7 @@ struct ftgmac100 {
 	NCSI_Capability NCSI_Cap;
 	unsigned char InstanceID;
 	unsigned int  Retry;
-	unsigned char Payload_Data[64];
+	unsigned char Payload_Data[MAX_NCSI_DATA_PAYLOAD];
 	unsigned char Payload_Pad[4];
 	unsigned long Payload_Checksum;
 	int mezz_type;
@@ -135,22 +137,28 @@ struct ftgmac100 {
 
 #define NETLINK_USER 31
 
-#define MAX_PAYLOAD 128 /* maximum payload size*/
+typedef struct ncsi_nl_rsp_hdr_t {
+  uint8_t cmd;
+  uint16_t payload_length;
+} __attribute__((packed)) NCSI_NL_RSP_HDR_T;
+
+#define MAX_PAYLOAD  MAX_NCSI_DATA_PAYLOAD /* maximum payload size*/
+
 typedef struct ncsi_nl_msg_t {
   char dev_name[10];
   unsigned char channel_id;
   unsigned char cmd;
-  unsigned char payload_length;
+  uint16_t payload_length;
   unsigned char msg_payload[MAX_PAYLOAD];
 } NCSI_NL_MSG_T;
 
 
-#define MAX_RESPONSE_PAYLOAD 128 /* maximum payload size*/
+#define MAX_RESPONSE_PAYLOAD 1024 /* maximum payload size*/
 typedef struct ncsi_nl_response {
-  unsigned char cmd;
-  unsigned char payload_length;
+  uint8_t cmd;
+  uint16_t payload_length;
   unsigned char msg_payload[MAX_RESPONSE_PAYLOAD];
-} NCSI_NL_RSP_T;
+} __attribute__((packed)) NCSI_NL_RSP_T;
 
 NCSI_NL_RSP_T ncsi_nl_rsp;
 #endif
@@ -217,8 +225,8 @@ ftgmac_aen_worker(struct work_struct *work)
 		AEN_PRINT("%s: packet->Optional_AEN_Data = 0x%lx\n", __FUNCTION__, (long)packet.Optional_AEN_Data[0]);
 		AEN_PRINT("%s: fifo len=%d\n", __FUNCTION__, kfifo_len(&lp->AEN_buffer));
 
-		msg_size = sizeof(NCSI_NL_MSG_T);
-		pid = lp->aen_pid; /*pid of sending process */
+		msg_size =  sizeof(NCSI_NL_RSP_HDR_T) + sizeof(AEN_Packet);
+		pid = lp->aen_pid; /*pid of ncsid */
 		skb_out = nlmsg_new(msg_size,0);
 		if (!skb_out) {
 			printk(KERN_ERR "%s: Failed to allocate new skb\n", __FUNCTION__);
@@ -392,7 +400,7 @@ void NCSI_Struct_Initialize(struct net_device *dev)
 	for (i = 0; i < 4; i++)
 		lp->Payload_Pad[i] = 0;
 
-	for (i = 0; i < 64; i++)
+	for (i = 0; i < MAX_NCSI_DATA_PAYLOAD; i++)
 		lp->Payload_Data[i] = 0;
 }
 
@@ -420,15 +428,43 @@ void Calculate_Checksum(struct net_device *dev, unsigned char *buffer_base,
 		(lp->Payload_Checksum & 0xFF0000FF) + Data + Data1;
 }
 
+#ifdef DEBUG_PRINT_NCSI_PACKET
+void print_packet(struct sk_buff *skb, int Length)
+{
+  int i=0;
+
+  printk("NCSI package sent (sizeof(ctrl)=%d)\n",
+            sizeof(NCSI_Command_Packet));
+
+  for (i=0; i<(34+Length); ++i) {
+    if (i%16 == 0)
+      printk("0x%04x:    ", i);
+    printk("%02x", *(unsigned char *)(skb->data+i));
+    if ((i%4 == 3) && (i%15 != 0))
+      printk(" ");
+
+    if (i%16 == 15)
+      printk("\n");
+  }
+  printk("\n\n");
+}
+#endif
+
+
 void copy_data(struct net_device *dev, struct sk_buff *skb, int Length)
 {
 	struct ftgmac100 *lp = netdev_priv(dev);
-
 	memcpy((unsigned char *)(skb->data + 30), &lp->Payload_Data, Length);
 	Calculate_Checksum(dev, skb->data + 14, 30 + Length);
+
 	memcpy((unsigned char *)(skb->data + 30 + Length),
-			&lp->Payload_Checksum, 4);
+         &lp->Payload_Checksum, 4);
+
+#ifdef DEBUG_PRINT_NCSI_PACKET
+  print_packet(skb, Length);
+#endif
 }
+
 
 #if 0
 void NCSI_Rx(struct net_device *dev)
@@ -877,7 +913,6 @@ void Get_MAC_Address_intel(struct net_device *dev)
   char path[64]={0};
   char mac_addr[6] = {0x00,0x11,0x22,0x33,0x44,0x55};
   char mac_addr_size = sizeof(mac_addr);
-  int ret = 0;
   int i;
   mm_segment_t fs;
 
@@ -1321,14 +1356,16 @@ static DEVICE_ATTR(powerup_prep_host_id, S_IRUGO | S_IWUSR | S_IWGRP,
 
 
 static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
-													unsigned char cmd, unsigned char length, unsigned char *buf,
-													unsigned char *res_length, unsigned char *res_buf)
+													unsigned char cmd, uint16_t length, unsigned char *buf,
+													uint16_t *res_length, unsigned char *res_buf)
 {
 	struct ftgmac100 *lp = netdev_priv(dev);
-	unsigned long Combined_Channel_ID, i;
+	unsigned long Combined_Channel_ID;
 	struct sk_buff * skb;
 	int tmo;
-	int data_len = 30 + length + 4;
+  int ncsi_pad = (4 - length%4)%4;  // NCSI requries 32 bit alignment
+	int data_len = 30 + length + ncsi_pad + 4;
+  int i;
 
 	/* ensure only 1 instance is accessing global NCSI structure */
 	mutex_lock(&ncsi_mutex);
@@ -1343,10 +1380,23 @@ static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
 		Combined_Channel_ID =
 		(lp->NCSI_Cap.Package_ID << 5) + channel_id;
 		lp->NCSI_Request.Channel_ID = Combined_Channel_ID;
-		lp->NCSI_Request.Payload_Length = (length << 8);
+		lp->NCSI_Request.Payload_Length = htons(length);
+
+#ifdef DEBUG_PRINT_NCSI_PACKET
+    printk("ch_id(%02x), iid(0x%02x), len(0x%02x), pad(%02x)\n",
+           channel_id, lp->InstanceID, length, ncsi_pad);
+#endif
+
 		memcpy(skb->data, &lp->NCSI_Request, 30);
 		memcpy(lp->Payload_Data, buf, length);
-		copy_data(dev, skb, length);
+    memcpy((unsigned char *)(skb->data + 30), &lp->Payload_Data, length);
+    //Calculate_Checksum(dev, skb->data + 14, 30 + length);
+    //memcpy((unsigned char *)(skb->data + 30 + length + ncsi_pad),
+          //&lp->Payload_Checksum, 4);
+#ifdef DEBUG_PRINT_NCSI_PACKET
+  print_packet(skb, length+ncsi_pad);
+#endif
+
 		skb_put(skb, data_len);
 		init_completion(&lp->ncsi_complete);
 		skb_reset_network_header(skb);
@@ -1384,16 +1434,20 @@ static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
 
 	mutex_unlock(&ncsi_mutex);
 
-#ifdef NCSI_DEBUG
+#ifdef DEBUG_PRINT_NCSI_PACKET
 	if (!tmo) {
 		printk("timed out!");
 	} else {
 		printk("cmd response detail:\n");
 		for (i=0; i<be16_to_cpu(lp->NCSI_Respond.Payload_Length); ++i) {
-			if (i && !(i%16))
-				printk("\n");
+      if (i%16 == 0)
+        printk("0x%04x:    ",i);
+			printk("%02x", ((u8 *)&lp->NCSI_Respond.Response_Code)[i]);
+      if ((i%4 == 3) && (i%15 != 0))
+        printk(" ");
 
-			printk("0x%x ", ((u8 *)&lp->NCSI_Respond.Response_Code)[i]);
+      if (i%16 == 15)
+        printk("\n");
 		}
 	}
 	printk("\n\n");
@@ -1467,11 +1521,20 @@ static void ncsi_recv_msg_cb(struct sk_buff *skb)
   if (netif_queue_stopped(dev))
     return;
 
-  send_ncsi_cmd(dev, buf->channel_id, buf->cmd, buf->payload_length,
+  if (buf->cmd == 0xde) {
+    int j = 0;
+    ncsi_nl_rsp.payload_length = buf->payload_length;
+    memcpy(ncsi_nl_rsp.msg_payload, buf->msg_payload, ncsi_nl_rsp.payload_length);
+    for (j = 0; j < ncsi_nl_rsp.payload_length; ++j) {
+      ncsi_nl_rsp.msg_payload[j] -= 1;
+    }
+  } else {
+    send_ncsi_cmd(dev, buf->channel_id, buf->cmd, buf->payload_length,
 	             buf->msg_payload,
 							 &(ncsi_nl_rsp.payload_length), &(ncsi_nl_rsp.msg_payload[0]));
+  }
   ncsi_nl_rsp.cmd = buf->cmd;
-	msg_size = sizeof(NCSI_NL_RSP_T);
+	msg_size = sizeof(NCSI_NL_RSP_HDR_T) + ncsi_nl_rsp.payload_length;
 	msg = (unsigned char *)&ncsi_nl_rsp;
 
   /* send the NC-Si response back via Netlink socket */
