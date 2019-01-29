@@ -234,6 +234,56 @@ static struct mtd_partition ast_legacy_partitions[] = {
 	},
 };
 
+static struct mtd_partition ast_secondary_partitions[] = {
+	{
+		.name       = "u-bootx",           /* Alt u-boot */
+		.offset     = 0,                   /* From 0 */
+		.size       = 0x60000,             /* Size 384K */
+		.mask_flags = MTD_WRITEABLE,
+	}, {
+		.name       = "envx",              /* Alt U-Boot NVRAM */
+		.offset     = MTDPART_OFS_APPEND,  /* From 384K */
+		.size       = 0x20000,             /* Size 128K, two sectors */
+	}, {
+		.name       = "fitx",              /* Alt kernel, rootfs */
+		.offset     = MTDPART_OFS_APPEND,  /* From 896K */
+		.size       = 0x1B80000,           /* Size 27.25M */
+	}, {
+		.name       = "datax",             /* Alt Data partition */
+		.offset     = 0x1C00000,	   /* From 0x1C00000 */
+		.size       = MTDPART_SIZ_FULL,    /* Full size */
+	}, {
+		.name       = "flash1",
+		.offset     = 0,                   /* Writable alt-flash */
+		.size       = MTDPART_SIZ_FULL,    /* full size */
+	},
+};
+
+static struct mtd_partition ast_primary_partitions[] = {
+	{
+		.name       = "u-boot",            /* Primary u-boot */
+		.offset     = 0,                   /* From 0 */
+		.size       = 0x60000,             /* Size 384K */
+		.mask_flags = MTD_WRITEABLE,
+	}, {
+		.name       = "env",               /* U-Boot NVRAM */
+		.offset     = MTDPART_OFS_APPEND,  /* From 384K */
+		.size       = 0x20000,             /* Size 128K, two sectors */
+	}, {
+		.name       = "fit",               /* kernel, rootfs */
+		.offset     = MTDPART_OFS_APPEND,  /* From 896K */
+		.size       = 0x1B80000,           /* Size 27.25M */
+	}, {
+		.name       = "data0",
+		.offset     = 0x1C00000,	   /* From 0x1C00000 */
+		.size       = MTDPART_SIZ_FULL,
+	}, {
+		.name       = "flash0",
+		.offset     = 0,                   /* From 0 */
+		.size       = MTDPART_SIZ_FULL,    /* full size */
+	},
+};
+
 static struct mtd_partition ast_rom_partitions[] = {
 	{
 		.name       = "rom",               /* ROM (SPL), recovery U-boot */
@@ -254,7 +304,7 @@ static struct mtd_partition ast_rom_partitions[] = {
 		.size       = 0x1B20000,           /* Size 27.125M */
 	}, {
 		.name       = "dataro",            /* RO Data partition */
-		.offset     = MTDPART_OFS_APPEND,  /* From 0x1C00000 */
+		.offset     = 0x1C00000,	   /* From 0x1C00000 */
 		.size       = MTDPART_SIZ_FULL,    /* Full size */
 	}, {
 		.name       = "flash0",
@@ -283,7 +333,7 @@ static struct mtd_partition ast_data_partitions[] = {
 		.size       = 0x1B20000,           /* Size 27.125M */
 	}, {
 		.name       = "data0",
-		.offset     = MTDPART_OFS_APPEND,
+		.offset     = 0x1C00000,	   /* From 0x1C00000 */
 		.size       = MTDPART_SIZ_FULL,
 	}, {
 		.name       = "flash1",
@@ -337,6 +387,20 @@ static struct flash_platform_data ast_data_platform_data = {
 	.parts      = ast_data_partitions,
 };
 
+/* The secondary boot platform data */
+static struct flash_platform_data ast_secondary_platform_data = {
+	.type       = "mx25l25635e",
+	.nr_parts   = ARRAY_SIZE(ast_secondary_partitions),
+	.parts      = ast_secondary_partitions,
+};
+
+/* The primary boot platform data */
+static struct flash_platform_data ast_primary_platform_data = {
+	.type       = "mx25l25635e",
+	.nr_parts   = ARRAY_SIZE(ast_primary_partitions),
+	.parts      = ast_primary_partitions,
+};
+
 /* The optional SPI0.0 (Flash1) SPI controller */
 static struct flash_platform_data ast_spi_flash1_data = {
     .type       = "mx25l25635e",
@@ -350,25 +414,43 @@ static struct flash_platform_data ast_spi_flash2_data = {
     .parts      = ast_spi_flash2_partitions,
 };
 
+static struct spi_board_info ast_vboot_fmc_devices[] = {
+	{
+		.modalias 	= "m25p80",
+		.platform_data 	= &ast_data_platform_data,
+		.chip_select 	= 1,
+		.max_speed_hz 	= 50 * 1000 * 1000,
+		.bus_num 	= 0,
+		.mode 		= SPI_MODE_0,
+	},
+	{
+		.modalias 	= "m25p80",
+		/* There are two potential layouts depending ROM availability. */
+		.platform_data 	= &ast_rom_platform_data,
+		.chip_select 	= 0,
+		.max_speed_hz 	= 50 * 1000 * 1000,
+		.bus_num 	= 0,
+		.mode 		= SPI_MODE_0,
+	},
+};
+
 static struct spi_board_info ast_dual_flash_fmc_devices[] = {
 	{
-		.modalias    		= "m25p80",
-		.platform_data  = &ast_data_platform_data,
-		.chip_select    = 1,
-		.max_speed_hz   = 50 * 1000 * 1000,
-		.bus_num    		= 0,
-		.mode 			    = SPI_MODE_0,
+		.modalias 	= "m25p80",
+		.platform_data 	= &ast_primary_platform_data,
+		.chip_select 	= 0,
+		.max_speed_hz 	= 50 * 1000 * 1000,
+		.bus_num 	= 0,
+		.mode 		= SPI_MODE_0,
 	},
 	{
-		.modalias    		= "m25p80",
-		/* There are two potential layouts depending ROM availability. */
-		.platform_data  = &ast_rom_platform_data,
-		.chip_select    = 0,
-		.max_speed_hz   = 50 * 1000 * 1000,
-		.bus_num    		= 0,
-		.mode 			    = SPI_MODE_0,
+		.modalias 	= "m25p80",
+		.platform_data 	= &ast_secondary_platform_data,
+		.chip_select 	= 1,
+		.max_speed_hz 	= 50 * 1000 * 1000,
+		.bus_num 	= 0,
+		.mode 		= SPI_MODE_0,
 	},
-
 };
 
 static struct spi_board_info ast_single_flash_fmc_devices[] = {
@@ -451,9 +533,22 @@ static struct spi_board_info ast_spi1_devices[] = {
 
 static int __init dual_flash_enabled_handler(char *str)
 {
-  if (str[0] == '1') {
-    dual_flash_enabled = 1;
-  }
+	if (kstrtol(str, 10, &dual_flash_enabled)) {
+		dual_flash_enabled = 0;
+	}
+#if defined(CONFIG_FBTP) || defined(CONFIG_FBY2) || defined(CONFIG_FBTTN)
+  /* HACK: Considering u-boot stores the boot-parameters in the
+   * environment, there is a possibility that u-boot might
+   * incorrectly store the flag as 1. This will happen if we upgrade
+   * from an image before this commit to an image built with this
+   * commit and just before rebooting, the env is modified. This causes
+   * the fw_setenv tool to rebuild the env to the default (old boot
+   * parameters before this commit). This is a workaround which avoids
+   * that by assuming that for these platforms u-boot means 2 when it
+   * says 1. */
+	if (dual_flash_enabled == 1)
+		dual_flash_enabled = 2;
+#endif
   return 0;
 }
 early_param("dual_flash", dual_flash_enabled_handler);
@@ -464,7 +559,9 @@ void __init ast_add_device_spi(void)
 
   /* Use kernel configuration from u-boot to enable dual
    * flash FMC configuration */
-  if (dual_flash_enabled) {
+  if (dual_flash_enabled == 2) {
+    spi_register_board_info(ast_vboot_fmc_devices, ARRAY_SIZE(ast_vboot_fmc_devices));
+  } else if (dual_flash_enabled == 1) {
     spi_register_board_info(ast_dual_flash_fmc_devices, ARRAY_SIZE(ast_dual_flash_fmc_devices));
   } else {
     spi_register_board_info(ast_single_flash_fmc_devices, ARRAY_SIZE(ast_single_flash_fmc_devices));
