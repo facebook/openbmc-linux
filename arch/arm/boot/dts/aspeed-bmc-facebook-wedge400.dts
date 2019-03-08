@@ -9,11 +9,7 @@
 	compatible = "facebook,wedge400-bmc", "aspeed,ast2500";
 
 	aliases {
-		/*
-		 * Hardcode the bus number of i2c switches' channels to
-		 * avoid breaking the legacy applications.
-		 */
-		/* i2c mux 0 */
+		/* i2c switch 2-0070 (pca9548), total 8 channels */
 		i2c14 = &imux14;
 		i2c15 = &imux15;
 		i2c16 = &imux16;
@@ -23,7 +19,7 @@
 		i2c20 = &imux20;
 		i2c21 = &imux21;
 		
-		/* i2c mux 1 */
+		/* i2c switch 8-0071 (pca9548), total 8 channels */
 		i2c22 = &imux22;
 		i2c23 = &imux23;
 		i2c24 = &imux24;
@@ -33,7 +29,7 @@
 		i2c28 = &imux28;
 		i2c29 = &imux29;
 		
-		/* i2c mux 2*/
+		/* i2c switch 11-0076 (pca9548), total 8 channels */
 		i2c30 = &imux30;
 		i2c31 = &imux31;
 		i2c32 = &imux32;
