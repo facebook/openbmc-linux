@@ -17,11 +17,30 @@
 		serial1 = &uart1;
 		serial2 = &uart2;
 		serial3 = &uart3;
+
+		spi2 = &spi2;
 	};
 
 	chosen {
 		stdout-path = &uart5;
 		bootargs = "console=ttyS0,9600n8 root=/dev/ram rw";
+	};
+};
+
+&spi2 {
+	status = "okay";
+	compatible = "aspeed,ast2500-spi-master";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi2ck_default
+		     &pinctrl_spi2cs0_default
+		     &pinctrl_spi2cs1_default
+		     &pinctrl_spi2miso_default
+		     &pinctrl_spi2mosi_default>;
+
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <33000000>;
+		reg = <0>;
 	};
 };
 
