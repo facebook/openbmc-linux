@@ -101,12 +101,12 @@ void __init ast_add_device_sdhci(void)
 	ast_scu_multi_func_sdhc_8bit_mode();
 	platform_device_register(&ast_sdhci_device0);
 #else
-#if !defined CONFIG_MINIPACK && !defined CONFIG_YAMP
+#if !defined CONFIG_MINIPACK && !defined CONFIG_YAMP && !defined CONFIG_WEDGE400
 	platform_device_register(&ast_sdhci_device0);
 #endif
 	platform_device_register(&ast_sdhci_device1);
 #endif
-#if defined CONFIG_MINIPACK || defined CONFIG_YAMP
+#if defined CONFIG_MINIPACK || defined CONFIG_YAMP || defined CONFIG_WEDGE400
 	ast_scu_multi_func_sdhc_slot(2);
 #else
 	ast_scu_multi_func_sdhc_slot(3);

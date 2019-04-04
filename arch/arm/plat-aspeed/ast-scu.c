@@ -1665,7 +1665,7 @@ ast_scu_multi_func_i2c(void)
        // In AST2400 and AST2500, i2c 10 - 13 pins are shared w/ SD/MMC.
 #ifdef CONFIG_MMC_AST
        /* Minipack use i2c 10 - 13 pin as i2c function and SD2 function */
-#if defined(CONFIG_MINIPACK) || defined(CONFIG_YAMP)
+#if defined(CONFIG_MINIPACK) || defined(CONFIG_YAMP) || defined(CONFIG_WEDGE400)
 	ast_scu_write((ast_scu_read(AST_SCU_FUN_PIN_CTRL5) |
                                         SCU_FUC_PIN_I2C3 |
                                         SCU_FUC_PIN_I2C4 |

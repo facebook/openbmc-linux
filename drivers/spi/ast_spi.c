@@ -149,7 +149,7 @@ ast_g5_spi_setup(struct spi_device *spi)
 	 * bus speed.
 	 */
 
-#if defined CONFIG_MINIPACK
+#if defined CONFIG_MINIPACK || defined CONFIG_WEDGE400
 	/* We need to change max_speed_hz manually. */
 #else
 	if (spi->max_speed_hz) {

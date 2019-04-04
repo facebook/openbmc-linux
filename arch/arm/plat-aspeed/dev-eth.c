@@ -45,7 +45,7 @@
 	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || \
 	defined(CONFIG_YOSEMITE) || defined(CONFIG_MINIPACK) || \
 	defined(CONFIG_MINILAKETB) || defined(CONFIG_YAMP) || \
-	defined(CONFIG_GALAXY100)
+	defined(CONFIG_GALAXY100) || defined(CONFIG_WEDGE400)
 #define DRVNAME "ftgmac100"
 #else
 #define DRVNAME "ast_gmac"
@@ -158,7 +158,7 @@ void __init ast_add_device_gmac(void)
 	// MAC specs.
 #if !defined(CONFIG_WEDGE) && !defined(CONFIG_WEDGE100) && \
     !defined(CONFIG_CMM) && !defined(CONFIG_MINIPACK) && \
-    !defined(CONFIG_GALAXY100)
+    !defined(CONFIG_GALAXY100) && !defined(CONFIG_WEDGE400)
 
 	ast_eth0_data.DF_support = !isRevA0;
 

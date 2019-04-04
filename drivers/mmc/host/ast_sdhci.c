@@ -1633,7 +1633,7 @@ out:
  *                                                                           *
 \*****************************************************************************/
 
-#if defined CONFIG_PM && !defined CONFIG_MINIPACK && !defined CONFIG_YAMP
+#if defined CONFIG_PM && !defined CONFIG_MINIPACK && !defined CONFIG_YAMP && !defined CONFIG_WEDGE400
 
 static int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
 {
@@ -2157,7 +2157,7 @@ static struct platform_driver ast_sdhci_driver = {
 	.driver.owner	= THIS_MODULE,
 	.probe		= sdhci_probe,
 	.remove		= sdhci_remove_host,
-#if defined CONFIG_PM && !defined CONFIG_MINIPACK && !defined CONFIG_YAMP
+#if defined CONFIG_PM && !defined CONFIG_MINIPACK && !defined CONFIG_YAMP && !defined CONFIG_WEDGE400
 	.resume		= sdhci_resume_host,
 	.suspend	= sdhci_suspend_host,
 #endif

@@ -371,7 +371,7 @@ static int bcm54616s_config_aneg(struct phy_device *phydev)
 	ret = genphy_config_aneg(phydev);
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || defined(CONFIG_CMM) || \
-	defined(CONFIG_MINIPACK) || defined(CONFIG_YAMP) || \
+	defined(CONFIG_MINIPACK) || defined(CONFIG_YAMP) || defined(CONFIG_WEDGE400) || \
 	defined(CONFIG_GALAXY100)
 	/* disable GTXCLK Clock Delay */
 	phy_write(phydev, 0x1C, 0x8C00);

@@ -212,6 +212,9 @@ config WEDGE
 config WEDGE100
         bool "Facebook Wedge100"
 
+config WEDGE400
+        bool "Facebook Wedge400"
+
 config MINIPACK
         bool "Facebook Minipack"
 
@@ -281,7 +284,7 @@ config AST_CONSOLE_UART_BASE
     default 0x1e783000 if CMM
     default 0x1e784000 if YAMP
     default 0x1e78e000 if WEDGE || WEDGE100
-    default 0x1e783000 if MINIPACK
+    default 0x1e783000 if MINIPACK || WEDGE400
     default 0x1e784000 if FBTP
     default 0x1e784000 if FBY2
     default 0x1e784000 if MINILAKETB

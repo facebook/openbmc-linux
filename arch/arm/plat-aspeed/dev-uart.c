@@ -195,7 +195,7 @@ static struct plat_serial8250_port ast_uart_data[] = {
 /* Without this, tty offset might change for others */
 #if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP) ||  defined(CONFIG_FBY2) || defined(CONFIG_PWNEPTUNE) || \
     defined(CONFIG_MINIPACK) || defined(CONFIG_MINILAKETB) || \
-    defined(CONFIG_YAMP)
+    defined(CONFIG_YAMP) || defined(CONFIG_WEDGE400)
 	{
 		.mapbase	= AST_UART2_BASE,
 		.irq		= IRQ_UART2,
@@ -439,6 +439,11 @@ iounmap(reg_base);
 	ast_scu_multi_func_uart(2);
 	ast_scu_multi_func_uart(3);
 	ast_scu_multi_func_uart(4);
+#elif defined CONFIG_WEDGE400
+    ast_scu_multi_func_uart(1);
+    ast_scu_multi_func_uart(2);
+    ast_scu_multi_func_uart(3);
+    ast_scu_multi_func_uart(4);
 #else
 	ast_scu_multi_func_uart(1);
 	ast_scu_multi_func_uart(3);

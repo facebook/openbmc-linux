@@ -173,7 +173,7 @@ static struct platform_device ast_fmc_device = {
 };
 
 static struct platform_device ast_spi0_device = {
-#if defined CONFIG_WEDGE100 || defined CONFIG_MINIPACK
+#if defined CONFIG_WEDGE100 || defined CONFIG_MINIPACK || defined CONFIG_WEDGE400
           .name           = "ast-spi",
           .id             = 1,
 #else
@@ -464,7 +464,7 @@ static struct spi_board_info ast_single_flash_fmc_devices[] = {
 	},
 };
 
-#ifdef CONFIG_MINIPACK
+#ifdef CONFIG_MINIPACK || CONFIG_WEDGE400
 static struct spi_eeprom m95m02 = {
   .byte_len    = SZ_2M / 8,
   .name        = "m95m02",
@@ -474,10 +474,10 @@ static struct spi_eeprom m95m02 = {
 #endif
 
 #if defined(CONFIG_FBTP)  || defined (CONFIG_WEDGE100) || defined (CONFIG_PWNEPTUNE) || \
-    defined(CONFIG_MINIPACK)
+    defined(CONFIG_MINIPACK) || defined (CONFIG_WEDGE400)
 static struct spi_board_info ast_spi0_devices[] = {
     {
-#if defined(CONFIG_WEDGE100) || defined(CONFIG_MINIPACK)
+#if defined(CONFIG_WEDGE100) || defined(CONFIG_MINIPACK) || defined(CONFIG_WEDGE400)
         .modalias           = "spidev",
         .chip_select        = 0,
         .max_speed_hz       = 33 * 1000 * 1000,
@@ -498,7 +498,7 @@ static struct spi_board_info ast_spi0_devices[] = {
 
 #if defined AST_SOC_G5
 static struct spi_board_info ast_spi1_devices[] = {
-#if defined CONFIG_MINIPACK || defined CONFIG_YAMP
+#if defined CONFIG_MINIPACK || defined CONFIG_YAMP || defined CONFIG_WEDGE400
   {
     .modalias           = "spidev",
     .chip_select        = 0,
@@ -507,7 +507,7 @@ static struct spi_board_info ast_spi1_devices[] = {
     .mode               = SPI_MODE_0,
   },
 #endif
-#if defined CONFIG_MINIPACK
+#if defined CONFIG_MINIPACK || defined CONFIG_WEDGE400
   {
     .modalias           = "at25",
     .platform_data      = &m95m02,
@@ -569,7 +569,7 @@ void __init ast_add_device_spi(void)
 #if defined(CONFIG_FBTP) || defined(CONFIG_WEDGE100) || defined(CONFIG_PWNEPTUNE)
 	platform_device_register(&ast_spi0_device);
 	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
-#elif defined(CONFIG_MINIPACK)
+#elif defined(CONFIG_MINIPACK) || defined(CONFIG_WEDGE400)
 	platform_device_register(&ast_spi0_device);
 	spi_register_board_info(ast_spi0_devices, ARRAY_SIZE(ast_spi0_devices));
 	platform_device_register(&ast_spi1_device);
