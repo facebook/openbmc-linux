@@ -77,6 +77,13 @@ config SPI_ARMADA_3700
 	  This enables support for the SPI controller present on the
 	  Marvell Armada 3700 SoCs.
 
+config SPI_ASPEED
+	tristate "ASPEED SPI Controller"
+	depends on ARCH_ASPEED
+	help
+	  This enables support for the SPI controller present on the
+	  ASPEED SoCs.
+
 config SPI_ATMEL
 	tristate "Atmel SPI Controller"
 	depends on ARCH_AT91 || COMPILE_TEST
