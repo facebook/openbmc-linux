@@ -429,21 +429,11 @@ writel(readl(reg_base + AST_LPC_HICR9)
 iounmap(reg_base);
 #elif defined(CONFIG_LIGHTNING)
 
-#elif defined CONFIG_MINIPACK
+#elif defined(CONFIG_MINIPACK) || defined(CONFIG_YAMP) || defined(CONFIG_WEDGE400)
 	ast_scu_multi_func_uart(1);
 	ast_scu_multi_func_uart(2);
 	ast_scu_multi_func_uart(3);
 	ast_scu_multi_func_uart(4);
-#elif defined CONFIG_YAMP
-	ast_scu_multi_func_uart(1);
-	ast_scu_multi_func_uart(2);
-	ast_scu_multi_func_uart(3);
-	ast_scu_multi_func_uart(4);
-#elif defined CONFIG_WEDGE400
-    ast_scu_multi_func_uart(1);
-    ast_scu_multi_func_uart(2);
-    ast_scu_multi_func_uart(3);
-    ast_scu_multi_func_uart(4);
 #else
 	ast_scu_multi_func_uart(1);
 	ast_scu_multi_func_uart(3);
