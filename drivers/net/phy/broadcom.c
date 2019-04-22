@@ -455,6 +455,49 @@ static int bcm54616s_config_aneg(struct phy_device *phydev)
 	return ret;
 }
 
+static int bcm54616s_read_status(struct phy_device *phydev)
+{
+	int ret;
+
+	ret = genphy_read_status(phydev);
+	if (ret < 0) {
+		return ret;
+	}
+
+	/* read LED status to find out duplex and speed */
+	ret = bcm_phy_read_shadow(phydev, 0x8);
+	if (ret < 0) {
+		return ret;
+	}
+
+	if ((ret >> 7) & 0x1) {
+		phydev->duplex = DUPLEX_HALF;
+	} else {
+		phydev->duplex = DUPLEX_FULL;
+	}
+
+	switch ((ret >> 3) & 0x3) {
+	case 0x3:
+		/* no link */
+		phydev->link = 0;
+		break;
+	case 0x2:
+		/* 10BASE-T */
+		phydev->speed = SPEED_10;
+		break;
+	case 0x1:
+		/* 100BASE-TX */
+		phydev->speed = SPEED_100;
+		break;
+	case 0x0:
+		/* 1000BASE-T */
+		phydev->speed = SPEED_1000;
+		break;
+	}
+
+	return 0;
+}
+
 static int brcm_phy_setbits(struct phy_device *phydev, int reg, int set)
 {
 	int val;
@@ -644,6 +687,7 @@ static struct phy_driver broadcom_drivers[] = {
 	.features	= PHY_GBIT_FEATURES,
 	.config_init	= bcm54xx_config_init,
 	.config_aneg	= bcm54616s_config_aneg,
+	.read_status	= bcm54616s_read_status,
 	.ack_interrupt	= bcm_phy_ack_intr,
 	.config_intr	= bcm_phy_config_intr,
 }, {
