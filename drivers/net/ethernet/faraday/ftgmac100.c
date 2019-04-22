@@ -62,6 +62,16 @@
 #define MAX_NCSI_DATA_PAYLOAD 1088 /*1024+64*/ /* for getting the size of the nc-si control data packet */
 #define noNCSI_DEBUG   /* for debug printf messages */
 
+/*
+ * Only for YAMP's BMC address, we need to add 2 to host's MAC Base Address.
+ * On other platform we add 1.
+ */
+#if defined(CONFIG_YAMP)
+  #define BMC_MAC_OFFSET 2
+#else
+  #define BMC_MAC_OFFSET 1
+#endif
+
 #define noDEBUG_AEN
 // special  channel/cmd  used for register AEN handler with kernel
 #define REG_AEN_CH  0xfa
@@ -1019,13 +1029,13 @@ void Get_MAC_Address_mlx(struct net_device * dev)
 
 
 #define BCM_MAC_ADDR_OFFSET   32
-
 void Get_MAC_Address_bcm(struct net_device * dev)
 {
   struct ftgmac100 *lp = netdev_priv(dev);
   unsigned long Combined_Channel_ID, i;
   struct sk_buff * skb;
   int tmo;
+  uint16_t offset, carry;
 
   do {
     skb = dev_alloc_skb (TX_BUF_SIZE + 16);
@@ -1079,8 +1089,16 @@ void Get_MAC_Address_bcm(struct net_device * dev)
     printk("%02X:", lp->NCSI_Respond.Payload_Data[BCM_MAC_ADDR_OFFSET+i]);
   printk("\n");
 
-  // Increase mac address by 1 for BMC's address
-  lp->NCSI_Respond.Payload_Data[37] = lp->NCSI_Respond.Payload_Data[37] + 1;;
+  carry = BMC_MAC_OFFSET;
+  offset = BCM_MAC_ADDR_OFFSET + ETH_ALEN - 1;
+  do {
+    // Start with the last nimble of the MAC address, then add the carry
+    // , if any, to the upper nimble.
+    carry += (uint8_t)(lp->NCSI_Respond.Payload_Data[offset]);
+    lp->NCSI_Respond.Payload_Data[offset] = (char)carry;
+    carry = carry >> 8;
+  } while (carry != 0 && --offset >= BCM_MAC_ADDR_OFFSET);
+
   memcpy(lp->NCSI_Request.SA, &lp->NCSI_Respond.Payload_Data[BCM_MAC_ADDR_OFFSET], 6);
   memcpy(dev->dev_addr, &lp->NCSI_Respond.Payload_Data[BCM_MAC_ADDR_OFFSET], 6);
 
