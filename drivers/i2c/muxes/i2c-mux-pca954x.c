@@ -484,6 +484,15 @@ static int pca954x_probe(struct i2c_client *client,
 
 	idle_disconnect_dt = np &&
 		of_property_read_bool(np, "i2c-mux-idle-disconnect");
+	/*
+	 * Below statement is needed because there is no way to enable
+	 * "idle_disconnect_dt" when the device is created from user
+	 * space (instead of device tree).
+	 * Refer to pca954x device binding document for why the flag is
+	 * needed:
+	 *   -Documentation/devicetree/bindings/i2c/i2c-mux-pca954x.txt
+	 */
+	idle_disconnect_dt = true;
 	if (idle_disconnect_dt)
 		data->idle_state = MUX_IDLE_DISCONNECT;
 
