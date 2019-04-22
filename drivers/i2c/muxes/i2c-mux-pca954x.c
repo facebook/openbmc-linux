@@ -51,6 +51,10 @@
 #include <linux/spinlock.h>
 #include <dt-bindings/mux/mux.h>
 
+static bool ignore_probe;
+module_param(ignore_probe, bool, 0);
+MODULE_PARM_DESC(ignore_probe, "Ignore probe result. Always assume the mux is present.");
+
 #define PCA954X_MAX_NCHANS 8
 
 #define PCA954X_IRQ_OFFSET 4
@@ -494,8 +498,12 @@ static int pca954x_probe(struct i2c_client *client,
 	 */
 	ret = pca954x_init(client, data);
 	if (ret < 0) {
-		dev_warn(dev, "probe failed\n");
-		return -ENODEV;
+		if (ignore_probe) {
+			dev_warn(dev, "probe failed. Ignored.\n");
+		} else {
+			dev_warn(dev, "probe failed\n");
+			return -ENODEV;
+		}
 	}
 
 	ret = pca954x_irq_setup(muxc);
