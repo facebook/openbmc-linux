@@ -662,6 +662,11 @@ static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 	struct ncsi_rsp_oem_pkt *rsp;
 	struct sockaddr saddr;
 	int ret = 0;
+#ifdef CONFIG_NET_NCSI_MC_MAC_OFFSET
+	int mac_offset = CONFIG_NET_NCSI_MC_MAC_OFFSET;
+#else
+	int mac_offset = 1;
+#endif
 
 	/* Get the response header */
 	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
@@ -669,8 +674,11 @@ static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 	saddr.sa_family = ndev->type;
 	ndev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
 	memcpy(saddr.sa_data, &rsp->data[BCM_MAC_ADDR_OFFSET], ETH_ALEN);
-	/* Increase mac address by 1 for BMC's address */
-	eth_addr_inc((u8 *)saddr.sa_data);
+	/* Management Controller's MAC address is calculated by adding
+	 * the offset to Network Controller's (base) MAC address.
+	 */
+	while (mac_offset-- > 0)
+		eth_addr_inc((u8 *)saddr.sa_data);
 	if (!is_valid_ether_addr((const u8 *)saddr.sa_data))
 		return -ENXIO;
 
