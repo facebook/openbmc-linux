@@ -70,6 +70,9 @@
 		i2c45 = &imux45;
 		i2c46 = &imux46;
 		i2c47 = &imux47;
+
+		spi1 = &spi1;
+		spi2 = &spi2;
 	};
 
 	chosen {
@@ -102,6 +105,44 @@
 		flash1@0 {
 			reg = <0x0 0x4000000>;
 		};
+	};
+};
+
+&spi1 {
+	status = "okay";
+	compatible = "aspeed,ast2500-spi-master";
+
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <24750000>;
+		reg = <0>;
+	};
+};
+
+&spi2 {
+	status = "okay";
+	compatible = "aspeed,ast2500-spi-master";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi2ck_default
+		     &pinctrl_spi2cs0_default
+		     &pinctrl_spi2cs1_default
+		     &pinctrl_spi2miso_default
+		     &pinctrl_spi2mosi_default>;
+
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <24750000>;
+		reg = <0>;
+	};
+
+	eeprom@1 {
+		compatible = "atmel,at25";
+		spi-max-frequency = <5000000>;
+		reg = <1>;
+
+		at25,addr-mode = <4>;
+		at25,page-size = <256>;
+		at25,byte-len = <0x40000>;
 	};
 };
 
