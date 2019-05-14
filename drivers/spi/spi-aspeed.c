@@ -35,19 +35,26 @@
  * Register definitions.
  */
 #define ASPEED_CFG_REG			0x00
+#define ASPEED_CE_CTRL_REG		0x04
 #define ASPEED_CTRL_REG_CE0		0x10
 #define ASPEED_CTRL_REG_CE1		0x14
 #define ASPEED_ADDR_RANGE_REG_CE0	0x30
 #define ASPEED_ADDR_RANGE_REG_CE1	0x34
 
 /*
- * Fields in SPI Flash Configuration Register.
+ * Fields in SPI Flash Configuration Register SPIR00.
  */
 #define ASPEED_CFG_ENABLE_WR_CE0	BIT(16)
 #define ASPEED_CFG_ENABLE_WR_CE1	BIT(17)
 
 /*
- * Fields in CE# Control register.
+ * Fields in SPI CE Control Register SPIR04.
+ */
+#define ASPEED_CTRL_DIV2_TIMING_CE0	BIT(8)
+#define ASPEED_CTRL_DIV2_TIMING_CE1	BIT(9)
+
+/*
+ * Fields in CE# Control register SPIR10/SPIR14.
  */
 #define ASPEED_CTRL_NORMAL_RD_MODE	0
 #define ASPEED_CTRL_RD_CMD_MODE		1
@@ -55,6 +62,7 @@
 #define ASPEED_CTRL_USER_MODE		3
 #define ASPEED_CTRL_STOP_ACTIVE		BIT(2)
 #define ASPEED_CTRL_CLK_MODE_3		BIT(4)
+#define ASPEED_CTRL_CLK_DIV4_MODE	BIT(13)
 #define ASPEED_CTRL_CLK_DIV_MAX		16
 #define ASPEED_CTRL_CLK_DIV_MASK	(0xF << 8)
 #define ASPEED_CTRL_CLK_DIV(d)		(((d) & 0xF) << 8)
@@ -92,16 +100,19 @@ static struct {
 	u32 ctrl_reg;
 	u32 addr_range_reg;
 	u32 enable_write;
+	u32 div2_mode;
 } cs_reg_map[ASPEED_SPI_CS_NUM] = {
 	[0] = {	/* chip select #0 */
 		.ctrl_reg = ASPEED_CTRL_REG_CE0,
 		.addr_range_reg = ASPEED_ADDR_RANGE_REG_CE0,
 		.enable_write = ASPEED_CFG_ENABLE_WR_CE0,
+		.div2_mode = ASPEED_CTRL_DIV2_TIMING_CE0,
 	},
 	[1] = {	/* chip select #1 */
 		.ctrl_reg = ASPEED_CTRL_REG_CE1,
 		.addr_range_reg = ASPEED_ADDR_RANGE_REG_CE1,
 		.enable_write = ASPEED_CFG_ENABLE_WR_CE1,
+		.div2_mode = ASPEED_CTRL_DIV2_TIMING_CE1,
 	},
 };
 
@@ -133,6 +144,21 @@ static void aspeed_deactivate_cs(struct aspeed_spi_priv *priv, u8 cs)
 	aspeed_reg_write(priv, val, ctrl_reg);
 }
 
+static bool aspeed_check_set_div2(struct aspeed_spi_priv *priv,
+				  u8 cs, u32 spi_max_freq)
+{
+	u32 div, val;
+
+	div = priv->ahb_clk_freq / spi_max_freq;
+	if (div <= ASPEED_CTRL_CLK_DIV_MAX)
+		return false;
+
+	val = aspeed_reg_read(priv, ASPEED_CE_CTRL_REG);
+	val |= cs_reg_map[cs].div2_mode;
+	aspeed_reg_write(priv, val, ASPEED_CE_CTRL_REG);
+	return true;
+}
+
 /*
  * Calculate spi clock frequency divisor. Refer to AST2500 datasheet,
  * Chapter 14, CE# Control Register, bit 11:8 for details.
@@ -161,7 +187,7 @@ static int
 aspeed_spi_setup(struct spi_device *slave)
 {
 	u8 cs = slave->chip_select;
-	u32 div, val, ctrl_reg;
+	u32 div, val, ctrl_reg, freq;
 	struct aspeed_spi_priv *priv = spi_master_get_devdata(slave->master);
 
 	if (cs >= ASPEED_SPI_CS_NUM) {
@@ -188,9 +214,17 @@ aspeed_spi_setup(struct spi_device *slave)
 	val = aspeed_reg_read(priv, ctrl_reg);
 	val &= ~ASPEED_CTRL_CLK_MODE_3; /* clock mode 3 is not supported */
 	if (slave->max_speed_hz != 0) {
+		freq = slave->max_speed_hz;
 		val &= ~ASPEED_CTRL_CLK_DIV_MASK;
-		div = aspeed_spi_clk_div(priv->ahb_clk_freq,
-					 slave->max_speed_hz);
+
+		if (aspeed_check_set_div2(priv, cs, freq)) {
+			/*
+			 * SPI clock divided by 4.
+			 */
+			val |= ASPEED_CTRL_CLK_DIV4_MODE;
+			freq = freq >> 2;
+		}
+		div = aspeed_spi_clk_div(priv->ahb_clk_freq, freq);
 		val |= ASPEED_CTRL_CLK_DIV(div);
 	}
 	aspeed_reg_write(priv, val, ctrl_reg);
