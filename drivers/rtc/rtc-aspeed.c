@@ -115,6 +115,13 @@ static int aspeed_rtc_probe(struct platform_device *pdev)
 
 	spin_lock_init(&rtc->lock);
 
+	if (!(readl(rtc->base + RTC_CTRL) & RTC_ENABLE)) {
+		// start RTC from 2000/1/1 00:00:00
+		writel(RTC_UNLOCK, rtc->base + RTC_CTRL);
+		writel(1 << 24, rtc->base + RTC_TIME);
+		writel((20 << 16) | 1, rtc->base + RTC_YEAR);
+	}
+
 	/* Enable RTC and clear the unlock bit */
 	writel(RTC_ENABLE, rtc->base + RTC_CTRL);
 
