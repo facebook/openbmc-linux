@@ -270,6 +270,7 @@ enum {
 	ncsi_dev_state_config_ebf,
 #if IS_ENABLED(CONFIG_IPV6)
 	ncsi_dev_state_config_egmf,
+	ncsi_dev_state_config_dgmf,
 #endif
 	ncsi_dev_state_config_ecnt,
 	ncsi_dev_state_config_ec,
@@ -321,6 +322,7 @@ struct ncsi_dev_priv {
 
 	bool                multi_package;   /* Enable multiple packages   */
 	u32                 package_whitelist; /* Packages to configure    */
+	unsigned char       mac_addr[6];
 };
 
 struct ncsi_cmd_arg {

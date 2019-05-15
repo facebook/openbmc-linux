@@ -966,6 +966,9 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 		ret = -1;
 
 #if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
+		if (nc->version.mf_id == NCSI_OEM_MFR_MLX_ID)
+			nd->state = ncsi_dev_state_config_sma;
+
 		nca.type = NCSI_PKT_CMD_OEM;
 		nca.package = np->id;
 		nca.channel = nc->id;
@@ -984,6 +987,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 	case ncsi_dev_state_config_ebf:
 #if IS_ENABLED(CONFIG_IPV6)
 	case ncsi_dev_state_config_egmf:
+	case ncsi_dev_state_config_dgmf:
 #endif
 	case ncsi_dev_state_config_ecnt:
 	case ncsi_dev_state_config_ec:
@@ -1046,6 +1050,12 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 			    (nc->caps[NCSI_CAP_GENERIC].cap &
 			     NCSI_CAP_GENERIC_MC))
 				nd->state = ncsi_dev_state_config_egmf;
+
+			if (nc->version.mf_id == NCSI_OEM_MFR_MLX_ID)
+				nd->state = ncsi_dev_state_config_dgmf;
+		} else if (nd->state == ncsi_dev_state_config_dgmf) {
+			nca.type = NCSI_PKT_CMD_DGMF;
+			nd->state = ncsi_dev_state_config_ecnt;
 		} else if (nd->state == ncsi_dev_state_config_egmf) {
 			nca.type = NCSI_PKT_CMD_EGMF;
 			nca.dwords[0] = nc->caps[NCSI_CAP_MC].cap;
@@ -1727,6 +1737,7 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 		ndp->requests[i].ndp = ndp;
 		timer_setup(&ndp->requests[i].timer, ncsi_request_timeout, 0);
 	}
+	memset(ndp->mac_addr, 0xff, sizeof(ndp->mac_addr));
 
 	spin_lock_irqsave(&ncsi_dev_lock, flags);
 #if IS_ENABLED(CONFIG_IPV6)

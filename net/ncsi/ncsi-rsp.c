@@ -623,6 +623,7 @@ static int ncsi_rsp_handler_oem_mlx_gma(struct ncsi_request *nr)
 
 	/* Get the response header */
 	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
+	memcpy(ndp->mac_addr, &rsp->data[MLX_MAC_ADDR_OFFSET], ETH_ALEN);
 
 	saddr.sa_family = ndev->type;
 	ndev->priv_flags |= IFF_LIVE_ADDR_CHANGE;

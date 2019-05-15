@@ -366,7 +366,7 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	eh = skb_push(nr->cmd, sizeof(*eh));
 	eh->h_proto = htons(ETH_P_NCSI);
 	eth_broadcast_addr(eh->h_dest);
-	eth_broadcast_addr(eh->h_source);
+	memcpy(eh->h_source, nca->ndp->mac_addr, ETH_ALEN);
 
 	/* Start the timer for the request that might not have
 	 * corresponding response. Given NCSI is an internal
