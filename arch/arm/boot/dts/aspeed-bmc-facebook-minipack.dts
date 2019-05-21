@@ -190,6 +190,7 @@
 
 &i2c0 {
 	status = "okay";
+	bus-frequency = <400000>;
 };
 
 &i2c1 {
