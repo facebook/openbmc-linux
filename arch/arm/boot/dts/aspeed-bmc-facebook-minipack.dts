@@ -191,6 +191,7 @@
 &i2c0 {
 	status = "okay";
 	bus-frequency = <400000>;
+	multi-master;
 };
 
 &i2c1 {
@@ -262,6 +263,7 @@
 
 &i2c4 {
 	status = "okay";
+	multi-master;
 };
 
 &i2c5 {
