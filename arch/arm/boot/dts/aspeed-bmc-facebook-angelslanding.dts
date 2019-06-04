@@ -38,13 +38,90 @@
 	};
 };
 
+&wdt1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_wdtrst1_default>;
+	aspeed,reset-type = "soc";
+	aspeed,external-signal;
+	aspeed,ext-push-pull;
+	aspeed,ext-active-high;
+	aspeed,ext-pulse-duration = <256>;
+};
+
 &fmc {
 	status = "okay";
 	flash@0 {
 		status = "okay";
 		m25p,fast-read;
-		label = "bmc";
-#include "facebook-bmc-flash-layout.dtsi"
+		label = "spi0.0";
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			rom@0 {
+				reg = <0x0 0x60000>;
+				label = "rom";
+			};
+			envro@60000 {
+				reg = <0x60000 0x20000>;
+				label = "envro";
+			};
+			u-bootro@80000 {
+				reg = <0x80000 0x60000>;
+				label = "u-bootro";
+			};
+			fitro@e0000 {
+				reg = <0xe0000 0x1b20000>;
+				label = "fitro";
+			};
+			dataro@1c00000 {
+				reg = <0x1c00000 0x400000>;
+				label = "dataro";
+			};
+			flash0@0 {
+				reg = <0x0 0x2000000>;
+				label = "flash0";
+			};
+		};
+	};
+	flash@1 {
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			romx@0 {
+				reg = <0x0 0x60000>;
+				label = "romx";
+			};
+			env@60000 {
+				reg = <0x60000 0x20000>;
+				label = "env";
+			};
+			u-boot@80000 {
+				reg = <0x80000 0x60000>;
+				label = "u-boot";
+			};
+			fit@e0000 {
+				reg = <0xe0000 0x1b20000>;
+				label = "fit";
+			};
+			data0@1c00000 {
+				reg = <0x1c00000 0x400000>;
+				label = "data0";
+			};
+			flash1@0 {
+				reg = <0x0 0x2000000>;
+				label = "flash1";
+			};
+			flash1rw@10000 {
+				reg = <0x10000 0x1ff0000>;
+				label = "flash1rw";
+			};
+		};
 	};
 };
 
@@ -73,13 +150,13 @@
 	snoop-ports = <0x80>;
 };
 
-&vuart {
-	// VUART Host Console
+&rtc {
 	status = "okay";
 };
 
 &uart1 {
 	// Host Console
+	resets = <>;
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_txd1_default
@@ -88,6 +165,7 @@
 
 &uart2 {
 	// SOL Host Console
+	resets = <>;
 	status = "okay";
 };
 
@@ -95,6 +173,7 @@
 	// SOL BMC Console
 	status = "okay";
 };
+
 &uart5 {
 	// BMC Console
 	status = "okay";
@@ -105,6 +184,7 @@
 	status = "okay";
 	kcs_addr = <0xca8>;
 };
+
 &kcs3 {
 	// BMC KCS channel 3
 	status = "okay";
@@ -113,17 +193,14 @@
 
 &mac0 {
 	status = "okay";
-
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rmii1_default>;
+	no-hw-checksum;
 	use-ncsi;
 };
 
 &mac1 {
 	status = "okay";
-
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rmii2_default>;
+	no-hw-checksum;
+	use-ncsi;
 };
 
 &peci0 {
@@ -135,6 +212,7 @@
 };
 
 &i2c0 {
+	multi-master;
 	status = "okay";
 };
 
@@ -143,56 +221,44 @@
 };
 
 &i2c2 {
+	multi-master;
 	status = "okay";
 };
 
 &i2c3 {
+	multi-master;
 	status = "okay";
 };
 
 &i2c4 {
 	status = "okay";
-   /* Baseboard FRU */
-  eeprom@54 {
-     compatible = "atmel,24c64";
-     reg = <0x54>;
-  };  
+	// Baseboard FRU
+	eeprom@54 {
+		compatible = "atmel,24c64";
+		reg = <0x54>;
+	};
 };
 
 &i2c5 {
+	multi-master;
 	status = "okay";
 };
 
 &i2c6 {
+	multi-master;
 	status = "okay";
 };
 
 &i2c7 {
+	multi-master;
 	status = "okay";
 };
 
 &i2c8 {
-	status = "okay";
-};
-
-&i2c9 {
-	status = "okay";
-};
-
-&i2c10 {
-	status = "okay";
-};
-
-&i2c11 {
-	status = "okay";
-};
-
-&i2c12 {
+	multi-master;
 	status = "okay";
 };
 
 &i2c13 {
 	status = "okay";
 };
-
-
