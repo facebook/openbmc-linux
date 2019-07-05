@@ -191,6 +191,13 @@
 				reg = <0x1e720000 0x8000>;	// 32K
 			};
 
+			sdhci: sdhci@1e740000 {
+				compatible = "simple-bus";
+				#address-cells = <1>;
+				#size-cells = <1>;
+				ranges = <0 0x1e740000 0x1000>;
+			};
+
 			gpio: gpio@1e780000 {
 				#gpio-cells = <2>;
 				gpio-controller;
@@ -404,6 +411,19 @@
 		cmd-timeout-ms = <1000>;
 		status = "disabled";
 	};
+};
+
+&sdhci {
+
+	sdhci_ic: interrupt-controller@0 {
+		#interrupt-cells = <1>;
+		compatible = "aspeed,aspeed-sdhci-irq";
+		reg = <0x0 0x100>;
+		interrupts = <26>;
+		interrupt-controller;
+		clocks = <&syscon ASPEED_CLK_GATE_SDCLK>;
+	};
+
 };
 
 &i2c {

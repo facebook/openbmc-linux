@@ -1,0 +1,25 @@
+Device tree configuration for the SDHCI Interrupt Controller on the AST24XX and
+AST25XX SoCs.
+
+Required Properties:
+- #address-cells	: should be 1
+- #size-cells 		: should be 1
+- #interrupt-cells 	: should be 1
+- compatible 		: should be "aspeed,aspeed-sdhci-ic"
+- reg			: address start and range of controller
+- interrupts		: interrupt number
+- interrupt-controller	: denotes that the controller receives and fires
+			  new interrupts for child busses
+
+Example:
+
+sdhci_ic: interrupt-controller@0 {
+	#interrupt-cells = <1>;
+	#size-cells = <1>;
+	#interrupt-cells = <1>;
+	compatible = "aspeed,aspeed-sdhci-irq";
+	reg = <0x0 0x100>;
+	interrupts = <26>;
+	interrupt-controller;
+	clocks = <&syscon ASPEED_CLK_GATE_SDCLK>;
+};
