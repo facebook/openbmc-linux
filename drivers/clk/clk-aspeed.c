@@ -20,6 +20,7 @@
 
 #define ASPEED_RESET_CTRL	0x04
 #define ASPEED_CLK_SELECTION	0x08
+#define  ASPEED_SDIO_CLK_EN BIT(15)
 #define ASPEED_CLK_STOP_CTRL	0x0c
 #define ASPEED_MPLL_PARAM	0x20
 #define ASPEED_HPLL_PARAM	0x24
@@ -260,6 +261,11 @@ static int aspeed_clk_enable(struct clk_hw *hw)
 	enval = (gate->flags & CLK_GATE_SET_TO_DISABLE) ? 0 : clk;
 	regmap_update_bits(gate->map, ASPEED_CLK_STOP_CTRL, clk, enval);
 
+	/* sd ext clk */
+	if (gate->reset_idx == 16) {
+		regmap_update_bits(gate->map, ASPEED_CLK_SELECTION, ASPEED_SDIO_CLK_EN, ASPEED_SDIO_CLK_EN);
+	}
+
 	if (gate->reset_idx >= 0) {
 		/* A delay of 10ms is specified by the ASPEED docs */
 		mdelay(10);
@@ -317,7 +323,7 @@ static const u8 aspeed_resets[] = {
 	[ASPEED_RESET_PECI]	= 10,
 	[ASPEED_RESET_I2C]	=  2,
 	[ASPEED_RESET_AHB]	=  1,
-
+	[ASPEED_RESET_SDHCI]	= 16,
 	/*
 	 * SCUD4 resets start at an offset to separate them from
 	 * the SCU04 resets.
