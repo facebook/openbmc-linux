@@ -1,0 +1,42 @@
+Device Tree Bindings for the ASPEED SoC SDHCI Controller
+
+This file documents differences between the core properties in mmc.txt
+and the properties present in the ASPEED SDHCI
+
+Required properties:
+- compatible : should be "aspeed,ast2500-sdhci" or "aspeed,ast2400-sdhci"
+- clocks : phandle + clock specifier pair of the external clock
+- interrupts : interrupt number
+- interrupt-parent : interrupt controller for bus, should reference a
+                     aspeed,aspeed-sdhci-ic interrupt controller
+
+Example:
+
+sdhci {
+	compatible = "simple-bus";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	ranges = <0 0x1e740000 0x1000>;
+
+	sdhci_ic: interrupt-controller@0 {
+		#interrupt-cells = <1>;
+		compatible = "aspeed,aspeed-sdhci-irq";
+		reg = <0x0 0x100>;
+		interrupts = <26>;
+		interrupt-controller;
+		clocks = <&syscon ASPEED_CLK_GATE_SDCLK>;
+		clock-names = "sdclk", "sd_extclk";
+	};
+
+	sdhci_slot0: sdhci_slot0@100 {
+		compatible = "aspeed,sdhci-ast2500";
+		reg = <0x100 0x100>;
+		interrupts = <0>;
+		interrupt-parent = <&sdhci_ic>;
+		slot = <0>;
+		sdhci,auto-cmd12;
+		clocks = <&syscon ASPEED_CLK_SDIO>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sd1_default>;
+	};
+};
