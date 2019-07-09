@@ -108,8 +108,6 @@
 &spi1 {
 	status = "okay";
 	compatible = "aspeed,ast2500-spi-master";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi1_default>;
 
 	spidev@0 {
 		compatible = "rohm,dh2228fv";
