@@ -580,37 +580,6 @@ static inline int lm90_select_remote_channel(struct i2c_client *client,
 	return 0;
 }
 
-static int max6657_write_convrate(struct i2c_client *client, int val)
-{
-	int err_c = 0;
-	int err;
-	int config_orig, config_stop;
-
-	/* Save config and stop conversion*/
-	config_orig = lm90_read_reg(client, LM90_REG_R_CONFIG1);
-	if (config_orig < 0)
-		return config_orig;
-
-	config_stop = config_orig | 0x40;
-	if (config_orig != config_stop) {
-		err = i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1,
-						config_stop);
-		if (err < 0)
-			return err;
-	}
-
-	/* Set conv rate */
-	err = i2c_smbus_write_byte_data(client, LM90_REG_W_CONVRATE, val);
-
-	/* Revert change to config */
-	if (config_orig != config_stop)
-		err_c = i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1,
-						  config_orig);
-
-	return err < 0 ? err : err_c;
-}
-
-
 /*
  * Set conversion rate.
  * client->update_lock must be held when calling this function (unless we are
@@ -631,10 +600,7 @@ static int lm90_set_convrate(struct i2c_client *client, struct lm90_data *data,
 		if (interval >= update_interval * 3 / 4)
 			break;
 
-	if (data->kind == max6657)
-		err = max6657_write_convrate(client, i);
-	else
-		err = i2c_smbus_write_byte_data(client, LM90_REG_W_CONVRATE, i);
+	err = i2c_smbus_write_byte_data(client, LM90_REG_W_CONVRATE, i);
 	data->update_interval = DIV_ROUND_CLOSEST(update_interval, 64);
 	return err;
 }
@@ -1640,11 +1606,8 @@ static void lm90_restore_conf(void *_data)
 	struct i2c_client *client = data->client;
 
 	/* Restore initial configuration */
-	if (data->kind == max6657)
-		max6657_write_convrate(client, data->convrate_orig);
-	else
-		i2c_smbus_write_byte_data(client, LM90_REG_W_CONVRATE,
-					  data->convrate_orig);
+	i2c_smbus_write_byte_data(client, LM90_REG_W_CONVRATE,
+				  data->convrate_orig);
 	i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1,
 				  data->config_orig);
 }
@@ -1659,20 +1622,13 @@ static int lm90_init_client(struct i2c_client *client, struct lm90_data *data)
 	data->convrate_orig = convrate;
 
 	/*
-	 * Start the conversions: 500ms; 2Hz conversion rate.
+	 * Start the conversions.
 	 */
-	if (data->kind != max6657)
-		lm90_set_convrate(client, data, 500);
+	lm90_set_convrate(client, data, 500);	/* 500ms; 2Hz conversion rate */
 	config = lm90_read_reg(client, LM90_REG_R_CONFIG1);
 	if (config < 0)
 		return config;
 	data->config_orig = config;
-
-	if (data->kind == max6657) {
-		int err = lm90_set_convrate(client, data, 500);
-		if (err < 0)
-			return err;
-	}
 
 	/* Check Temperature Range Select */
 	if (data->kind == adt7461 || data->kind == tmp451) {
