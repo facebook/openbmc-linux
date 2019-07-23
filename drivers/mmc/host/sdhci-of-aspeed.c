@@ -20,7 +20,12 @@
 #include <linux/of_gpio.h>
 #include <linux/mmc/sdhci-aspeed-data.h>
 #include <linux/reset.h>
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 #include "sdhci-pltfm.h"
+
+#define AST_SCU_FUN_PIN_CTRL5	0x90 /* Multi-function Pin Control#5*/
+#define SCU_FUC_PIN_SD1_8BIT	(0x1 << 3)
 
 static void sdhci_aspeed_set_clock(struct sdhci_host *host, unsigned int clock)
 {
@@ -110,6 +115,8 @@ static int sdhci_aspeed_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct sdhci_pltfm_host *pltfm_host;
 	struct aspeed_sdhci_irq *sdhci_irq;
+	struct regmap *scu_map;
+	unsigned int val;
 
 	int ret;
 
@@ -135,6 +142,29 @@ static int sdhci_aspeed_probe(struct platform_device *pdev)
 	ret = sdhci_add_host(host);
 	if (ret)
 		goto err_sdhci_add;
+
+	if (host->mmc->caps & MMC_CAP_8_BIT_DATA) {
+		/* *
+		 * just return if failed to enable 8 bits mode
+		 * MMC will work under 4 bits mode eventually.
+		 */
+		scu_map = syscon_regmap_lookup_by_compatible("aspeed,ast2500-scu");
+		if (IS_ERR(scu_map)) {
+			printk("%s no syscon regmap\n", (mmc_hostname(host->mmc)));
+			return 0;
+		}
+		ret = regmap_read(scu_map, AST_SCU_FUN_PIN_CTRL5, &val);
+		if (ret) {
+			printk("%s failed to read SCU90\n", (mmc_hostname(host->mmc)));
+			return 0;
+		}
+		val |= SCU_FUC_PIN_SD1_8BIT; // enable SD1 port 8 bits mode
+		ret = regmap_write(scu_map, AST_SCU_FUN_PIN_CTRL5, val);
+		if (ret) {
+			printk("%s failed to enable SD1 8bit mode\n", (mmc_hostname(host->mmc)));
+			return 0;
+		}
+	}
 
 	return 0;
 
