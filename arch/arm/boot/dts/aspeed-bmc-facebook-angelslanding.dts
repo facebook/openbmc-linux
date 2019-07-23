@@ -262,3 +262,11 @@
 &i2c13 {
 	status = "okay";
 };
+
+&sdhci_slot0 {
+	// eMMC
+	status = "okay";
+	bus-width = <8>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sd1_default>;
+};
