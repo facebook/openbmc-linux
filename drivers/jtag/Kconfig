@@ -1,0 +1,31 @@
+menuconfig JTAG
+    tristate "JTAG support"
+    ---help---
+      This provides basic core functionality support for jtag class devices
+      Hardware equipped with JTAG microcontroller which can be built
+      on top of this drivers. Driver exposes the set of IOCTL to the
+      user space for:
+      SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
+      SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
+      RUNTEST (Forces IEEE 1149.1 bus to a run state for specified
+      number of clocks).
+
+      If you want this support, you should say Y here.
+
+      To compile this driver as a module, choose M here: the module will
+      be called jtag.
+
+menuconfig JTAG_ASPEED
+    tristate "Aspeed SoC JTAG controller support"
+    depends on JTAG && HAS_IOMEM
+    depends on ARCH_ASPEED || COMPILE_TEST
+    ---help---
+      This provides a support for Aspeed JTAG device, equipped on
+      Aspeed SoC 24xx and 25xx families. Drivers allows programming
+      of hardware devices, connected to SoC through the JTAG interface.
+
+      If you want this support, you should say Y here.
+
+      To compile this driver as a module, choose M here: the module will
+      be called jtag-aspeed.
+
