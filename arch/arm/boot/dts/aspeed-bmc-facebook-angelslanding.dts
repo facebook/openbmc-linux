@@ -64,6 +64,7 @@
 		status = "okay";
 		m25p,fast-read;
 		label = "spi0.0";
+		spi-max-frequency = <12000000>;
 		partitions {
 			compatible = "fixed-partitions";
 			#address-cells = <1>;
@@ -98,6 +99,7 @@
 		status = "okay";
 		m25p,fast-read;
 		label = "spi0.1";
+		spi-max-frequency = <12000000>;
 		partitions {
 			compatible = "fixed-partitions";
 			#address-cells = <1>;
@@ -131,6 +133,9 @@
 				label = "flash1rw";
 			};
 		};
+	};
+	flash@2 {
+		spi-max-frequency = <12000000>;
 	};
 };
 
