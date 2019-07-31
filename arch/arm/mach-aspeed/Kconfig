@@ -261,6 +261,12 @@ config CMM
 	select EGFX_IRQ
     bool "Facebook CMM"
 
+config FBY3_POC
+ select USB_ARCH_HAS_EHCI
+ select AST_UART_SDMA
+ select EGFX_IRQ
+    bool "Facebook FBY3-POC"
+
 config FBY2
  select USB_ARCH_HAS_EHCI
  select AST_UART_SDMA

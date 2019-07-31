@@ -42,7 +42,7 @@
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100) || \
 	defined(CONFIG_CMM) || defined(CONFIG_FBTP) || defined(CONFIG_PWNEPTUNE) || \
-	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || \
+	defined(CONFIG_FBTTN) || defined(CONFIG_FBY2) || defined(CONFIG_FBY3_POC) || \
 	defined(CONFIG_YOSEMITE) || defined(CONFIG_MINIPACK) || \
 	defined(CONFIG_MINILAKETB) || defined(CONFIG_YAMP) || \
 	defined(CONFIG_GALAXY100) || defined(CONFIG_WEDGE400)

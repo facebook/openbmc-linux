@@ -82,6 +82,11 @@ ifeq ($(CONFIG_FBY2),y)
   PLATFB = 1
 endif
 
+ifeq ($(CONFIG_FBY3_POC),y)
+  obj-y += dev-uart.o dev-i2c-fby3-poc.o
+  PLATFB = 1
+endif
+
 ifeq ($(CONFIG_MINILAKETB), y)
   obj-y += dev-uart.o dev-i2c-minilaketb.o
   PLATFB = 1

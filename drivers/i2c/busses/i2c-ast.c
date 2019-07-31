@@ -150,7 +150,7 @@ static u32 select_i2c_clock(struct ast_i2c_dev *i2c_dev)
 	}
 #endif
 
-#if defined(CONFIG_FBY2) || defined(CONFIG_MINILAKETB)
+#if defined(CONFIG_FBY2) || defined(CONFIG_FBY3_POC) || defined(CONFIG_MINILAKETB)
 	if (i2c_dev->ast_i2c_data->bus_clk == 1000000) {
 		data = 0xFFF5E700;
 		return data;
@@ -279,7 +279,7 @@ static void ast_i2c_dev_init(struct ast_i2c_dev *i2c_dev)
 		ast_i2c_write(i2c_dev, AST_NO_TIMEOUT_CTRL, I2C_AC_TIMING_REG2);
 	}
 #else
-#if !defined(CONFIG_FBY2) && !defined(CONFIG_MINILAKETB)
+#if !defined(CONFIG_FBY2) && !defined(CONFIG_FBY3_POC) && !defined(CONFIG_MINILAKETB)
 	if (i2c_dev->ast_i2c_data->bus_clk / 1000 > 400) {
 		printk("high speed mode enable clk [%dkhz]\n",
 		       i2c_dev->ast_i2c_data->bus_clk / 1000);

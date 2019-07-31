@@ -165,7 +165,7 @@ static void ast_pwm_taco_init(void)
 	ast_pwm_tacho_write(ast_pwm_tacho, AST_PTCR_CTRL_CLK_EN, AST_PTCR_CTRL);
 #endif
 
-#if defined(CONFIG_FBY2)
+#if defined(CONFIG_FBY2) || defined(CONFIG_FBY3_POC)
 	ast_pwm_tacho_write(ast_pwm_tacho, 0x09435F05, AST_PTCR_CLK_CTRL);
 	ast_pwm_tacho_write(ast_pwm_tacho, 0x43004300, AST_PTCR_DUTY0_CTRL);
 	ast_pwm_tacho_write(ast_pwm_tacho, AST_PTCR_CTRL_PWMB_EN | AST_PTCR_CTRL_PWMA_EN | AST_PTCR_CTRL_CLK_EN, AST_PTCR_CTRL);

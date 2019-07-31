@@ -536,7 +536,7 @@ static int __init dual_flash_enabled_handler(char *str)
 	if (kstrtol(str, 10, &dual_flash_enabled)) {
 		dual_flash_enabled = 0;
 	}
-#if defined(CONFIG_FBTP) || defined(CONFIG_FBY2) || defined(CONFIG_FBTTN)
+#if defined(CONFIG_FBTP) || defined(CONFIG_FBY2) || defined(CONFIG_FBTTN) || defined(CONFIG_FBY3_POC)
   /* HACK: Considering u-boot stores the boot-parameters in the
    * environment, there is a possibility that u-boot might
    * incorrectly store the flag as 1. This will happen if we upgrade

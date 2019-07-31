@@ -194,7 +194,7 @@ static struct plat_serial8250_port ast_uart_data[] = {
 	},
 /* Without this, tty offset might change for others */
 #if defined(CONFIG_YOSEMITE) || defined(CONFIG_FBTP) ||  defined(CONFIG_FBY2) || defined(CONFIG_PWNEPTUNE) || \
-    defined(CONFIG_MINIPACK) || defined(CONFIG_MINILAKETB) || \
+    defined(CONFIG_MINIPACK) || defined(CONFIG_MINILAKETB) || defined(CONFIG_FBY3_POC) || \
     defined(CONFIG_YAMP) || defined(CONFIG_WEDGE400)
 	{
 		.mapbase	= AST_UART2_BASE,
@@ -405,7 +405,7 @@ void __init ast_add_device_uart(void)
          reg_base + AST_LPC_HICR9);
 	ast_scu_multi_func_uart(1);
 	ast_scu_multi_func_uart(2);
-#elif defined(CONFIG_FBY2)
+#elif defined(CONFIG_FBY2) || defined(CONFIG_FBY3_POC)
   /* We need to disable the reset source of UART1/2 from LPC control for slot serial.
      The default of UART1/2 is enable.
      The default of UART3/4 is disable.       */
