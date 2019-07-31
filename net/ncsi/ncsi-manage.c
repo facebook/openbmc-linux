@@ -926,6 +926,11 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 	switch (nd->state) {
 	case ncsi_dev_state_config:
 	case ncsi_dev_state_config_sp:
+#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
+		nd->state = ncsi_dev_state_config_cis;
+		schedule_work(&ndp->work);
+		break;
+#endif
 		ndp->pending_req_num = 1;
 
 		/* Select the specific package */
@@ -1294,6 +1299,13 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_probe_deselect;
 		/* Fall through */
 	case ncsi_dev_state_probe_deselect:
+#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
+		ndp->active_package = ncsi_add_package(ndp, 0);
+		ncsi_add_channel(ndp->active_package, 0);
+		nd->state = ncsi_dev_state_probe_cis;
+		schedule_work(&ndp->work);
+		break;
+#endif
 		ndp->pending_req_num = 8;
 
 		/* Deselect all possible packages */
@@ -1377,6 +1389,10 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 			nd->state = ncsi_dev_state_probe_dp;
 		break;
 	case ncsi_dev_state_probe_dp:
+#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
+		ndp->flags |= NCSI_DEV_PROBED;
+		break;
+#endif
 		ndp->pending_req_num = 1;
 
 		/* Deselect the current package */

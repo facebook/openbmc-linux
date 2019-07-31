@@ -23,3 +23,9 @@ config NET_NCSI_MC_MAC_OFFSET
 	---help---
 	  This defines the offset between Network Controller's (base) MAC
 	  address and Management Controller's MAC address.
+config NCSI_SKIP_SEL_PKG
+	bool "Skip sending NCSI Select/Deselect Package command"
+	depends on NET_NCSI
+	---help---
+	  Workaround that some NICs may stop responding after receiving
+	  NCSI Select/Deselect Package command.
