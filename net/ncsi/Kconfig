@@ -17,7 +17,8 @@ config NCSI_OEM_CMD_GET_MAC
 	  This allows to get MAC address from NCSI firmware and set them back to
 		controller.
 config NET_NCSI_MC_MAC_OFFSET
-	int "Offset of Management Controller's MAC Address"
+	int
+	prompt "Offset of Management Controller's MAC Address"
 	depends on NCSI_OEM_CMD_GET_MAC
 	default 1
 	---help---
