@@ -1,0 +1,265 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2018 Facebook Inc.
+/dts-v1/;
+
+#include "aspeed-g5.dtsi"
+
+/ {
+	model = "Facebook Sonora Pass BMC";
+	compatible = "facebook,sonorapass-bmc", "aspeed,ast2500";
+
+	aliases {
+		/*
+		 * Override the default serial aliases to avoid breaking
+		 * the legacy applications.
+		 */
+		serial0 = &uart5;
+		serial1 = &uart1;
+	};
+
+	chosen {
+		stdout-path = &uart5;
+		bootargs = "debug console=ttyS4,57600n8 root=/dev/ram rw";
+	};
+
+	memory@80000000 {
+		reg = <0x80000000 0x20000000>;
+	};
+
+	iio-hwmon {
+		compatible = "iio-hwmon";
+		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
+					<&adc 4>, <&adc 5>, <&adc 6>;
+	};
+
+	iio-hwmon-battery {
+		compatible = "iio-hwmon";
+		io-channels = <&adc 7>;
+	};
+};
+
+&wdt1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_wdtrst1_default>;
+	aspeed,reset-type = "soc";
+	aspeed,external-signal;
+	aspeed,ext-push-pull;
+	aspeed,ext-active-high;
+	aspeed,ext-pulse-duration = <256>;
+};
+
+&fmc {
+	status = "okay";
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.0";
+		spi-max-frequency = <12000000>;
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			rom@0 {
+				reg = <0x0 0x60000>;
+				label = "rom";
+			};
+			envro@60000 {
+				reg = <0x60000 0x20000>;
+				label = "envro";
+			};
+			u-bootro@80000 {
+				reg = <0x80000 0x60000>;
+				label = "u-bootro";
+			};
+			fitro@e0000 {
+				reg = <0xe0000 0x1b20000>;
+				label = "fitro";
+			};
+			dataro@1c00000 {
+				reg = <0x1c00000 0x400000>;
+				label = "dataro";
+			};
+			flash0@0 {
+				reg = <0x0 0x2000000>;
+				label = "flash0";
+			};
+		};
+	};
+	flash@1 {
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
+		spi-max-frequency = <12000000>;
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			romx@0 {
+				reg = <0x0 0x60000>;
+				label = "romx";
+			};
+			env@60000 {
+				reg = <0x60000 0x20000>;
+				label = "env";
+			};
+			u-boot@80000 {
+				reg = <0x80000 0x60000>;
+				label = "u-boot";
+			};
+			fit@e0000 {
+				reg = <0xe0000 0x1b20000>;
+				label = "fit";
+			};
+			data0@1c00000 {
+				reg = <0x1c00000 0x400000>;
+				label = "data0";
+			};
+			flash1@0 {
+				reg = <0x0 0x2000000>;
+				label = "flash1";
+			};
+			flash1rw@10000 {
+				reg = <0x10000 0x1ff0000>;
+				label = "flash1rw";
+			};
+		};
+	};
+	flash@2 {
+		spi-max-frequency = <12000000>;
+	};
+};
+
+&spi1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi1_default>;
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		label = "pnor";
+	};
+};
+
+&ibt {
+	status = "disabled";
+};
+
+&lpc_ctrl {
+	// Enable LPC clock
+	status = "okay";
+};
+
+&lpc_snoop {
+	status = "okay";
+	snoop-ports = <0x80>;
+};
+
+&rtc {
+	status = "okay";
+};
+
+&uart1 {
+	// Host Console
+	resets = <>;
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_txd1_default
+		     &pinctrl_rxd1_default>;
+};
+
+&uart2 {
+	// SOL Host Console
+	resets = <>;
+	status = "okay";
+};
+
+&uart3 {
+	// SOL BMC Console
+	status = "okay";
+};
+
+&uart5 {
+	// BMC Console
+	status = "okay";
+};
+
+&kcs2 {
+	// BMC KCS channel 2
+	status = "okay";
+	kcs_addr = <0xca8>;
+};
+
+&kcs3 {
+	// BMC KCS channel 3
+	status = "okay";
+	kcs_addr = <0xca2>;
+};
+
+&mac0 {
+	status = "okay";
+	no-hw-checksum;
+	use-ncsi;
+};
+
+&mac1 {
+	status = "okay";
+	no-hw-checksum;
+	use-ncsi;
+};
+
+&peci0 {
+	status = "okay";
+};
+
+&adc {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+&i2c3 {
+	status = "okay";
+};
+
+&i2c4 {
+	status = "okay";
+};
+
+&i2c5 {
+	status = "okay";
+};
+
+&i2c6 {
+	status = "okay";
+};
+
+&i2c7 {
+	status = "okay";
+};
+
+&i2c8 {
+	status = "okay";
+};
+
+&i2c13 {
+	status = "okay";
+};
+
+&sdhci_slot0 {
+	// eMMC
+	status = "okay";
+	bus-width = <8>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sd1_default>;
+};
