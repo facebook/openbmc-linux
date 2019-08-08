@@ -3,11 +3,10 @@ Device tree configuration for the I2C busses on the AST24XX and AST25XX SoCs.
 Required Properties:
 - #address-cells	: should be 1
 - #size-cells		: should be 0
-- reg			: address offset and range of bus registers and buffer
-- reg-names		: "bus-regs" and "buf" are recognized by Aspeed I2C
-			  driver. "bus-regs" is default. "buf" is optional in
-			  case of enabling I2C dedicated SRAM for buffer mode
-			  transfer support
+- reg			: Address offset and range of bus registers.
+			  An additional SRAM buffer address offset and range is
+			  optional in case of enabling I2C dedicated SRAM for
+			  buffer mode transfer support.
 - compatible		: should be "aspeed,ast2400-i2c-bus"
 			  or "aspeed,ast2500-i2c-bus"
 - clocks		: root clock of bus, should reference the APB
@@ -20,7 +19,7 @@ Optional Properties:
 - bus-frequency	: frequency of the bus clock in Hz defaults to 100 kHz when not
 		  specified
 - multi-master	: states that there is another master active on this bus.
-- aspeed,dma-buf-size	: should be 4096 in case of AST2500.
+- aspeed,dma-buf-size	: size of DMA buffer (from 2 to 4095 in case of AST2500)
 			  Only AST2500 supports DMA mode under some limitations:
 			  I2C is sharing the DMA H/W with UHCI host controller
 			  and MCTP controller. Since those controllers operate
@@ -61,7 +60,6 @@ i2c {
 		#size-cells = <0>;
 		#interrupt-cells = <1>;
 		reg = <0x40 0x40>;
-		reg-names = "bus-regs";
 		compatible = "aspeed,ast2500-i2c-bus";
 		clocks = <&syscon ASPEED_CLK_APB>;
 		resets = <&syscon ASPEED_RESET_I2C>;
@@ -76,7 +74,6 @@ i2c {
 		#size-cells = <0>;
 		#interrupt-cells = <1>;
 		reg = <0x80 0x40>, <0x210 0x10>;
-		reg-names = "bus-regs", "buf";
 		compatible = "aspeed,ast2500-i2c-bus";
 		clocks = <&syscon ASPEED_CLK_APB>;
 		resets = <&syscon ASPEED_RESET_I2C>;
@@ -91,7 +88,6 @@ i2c {
 		#size-cells = <0>;
 		#interrupt-cells = <1>;
 		reg = <0xc0 0x40>;
-		reg-names = "bus-regs";
 		aspeed,dma-buf-size = <4095>;
 		compatible = "aspeed,ast2500-i2c-bus";
 		clocks = <&syscon ASPEED_CLK_APB>;

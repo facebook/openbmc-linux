@@ -153,6 +153,7 @@
 #define ASPEED_I2CD_DMA_ALIGN				4
 
 /* 0x28 : I2CD DMA Transfer Length Register */
+#define ASPEED_I2CD_DMA_LEN_SHIFT			0
 #define ASPEED_I2CD_DMA_LEN_MASK			GENMASK(11, 0)
 
 enum aspeed_i2c_master_state {
@@ -334,10 +335,12 @@ static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 	/* Slave was sent something. */
 	if (irq_status & ASPEED_I2CD_INTR_RX_DONE) {
 		if (bus->dma_buf &&
-		    bus->slave_state == ASPEED_I2C_SLAVE_WRITE_RECEIVED)
+		    bus->slave_state == ASPEED_I2C_SLAVE_WRITE_RECEIVED &&
+		    !(irq_status & ASPEED_I2CD_INTR_NORMAL_STOP))
 			value = bus->dma_buf[0];
 		else if (bus->buf_base &&
-			 bus->slave_state == ASPEED_I2C_SLAVE_WRITE_RECEIVED)
+			 bus->slave_state == ASPEED_I2C_SLAVE_WRITE_RECEIVED &&
+			 !(irq_status & ASPEED_I2CD_INTR_NORMAL_STOP))
 			value = readb(bus->buf_base);
 		else
 			value = readl(bus->base + ASPEED_I2C_BYTE_BUF_REG) >> 8;
@@ -355,28 +358,29 @@ static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 
 	/* Slave was asked to stop. */
 	if (irq_status & ASPEED_I2CD_INTR_NORMAL_STOP) {
-		if (bus->dma_buf &&
-		    bus->slave_state == ASPEED_I2C_SLAVE_WRITE_RECEIVED) {
-			len = bus->dma_buf_size -
-			      FIELD_GET(ASPEED_I2CD_DMA_LEN_MASK,
-					readl(bus->base +
-					      ASPEED_I2C_DMA_LEN_REG));
-			for (i = 0; i < len; i++) {
-				value = bus->dma_buf[i];
-				i2c_slave_event(slave,
-						I2C_SLAVE_WRITE_RECEIVED,
-						&value);
-			}
-		} else if (bus->buf_base &&
-			  bus->slave_state == ASPEED_I2C_SLAVE_WRITE_RECEIVED) {
-			len = FIELD_GET(ASPEED_I2CD_BUF_RX_COUNT_MASK,
-					readl(bus->base +
-					      ASPEED_I2C_BUF_CTRL_REG));
-			for (i = 0; i < len; i++) {
-				value = readb(bus->buf_base + i);
-				i2c_slave_event(slave,
-						I2C_SLAVE_WRITE_RECEIVED,
-						&value);
+		if (bus->slave_state == ASPEED_I2C_SLAVE_WRITE_RECEIVED &&
+		    irq_status & ASPEED_I2CD_INTR_RX_DONE) {
+			if (bus->dma_buf) {
+				len = bus->dma_buf_size -
+				      FIELD_GET(ASPEED_I2CD_DMA_LEN_MASK,
+						readl(bus->base +
+						      ASPEED_I2C_DMA_LEN_REG));
+				for (i = 0; i < len; i++) {
+					value = bus->dma_buf[i];
+					i2c_slave_event(slave,
+							I2C_SLAVE_WRITE_RECEIVED,
+							&value);
+				}
+			} else if (bus->buf_base) {
+				len = FIELD_GET(ASPEED_I2CD_BUF_RX_COUNT_MASK,
+						readl(bus->base +
+						      ASPEED_I2C_BUF_CTRL_REG));
+				for (i = 0; i < len; i++) {
+					value = readb(bus->buf_base + i);
+					i2c_slave_event(slave,
+							I2C_SLAVE_WRITE_RECEIVED,
+							&value);
+				}
 			}
 		}
 		irq_handled |= ASPEED_I2CD_INTR_NORMAL_STOP;
@@ -1375,15 +1379,13 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
 	struct aspeed_i2c_bus *bus;
 	bool sram_enabled = true;
 	struct clk *parent_clk;
-	struct resource *res;
 	int irq, ret;
 
 	bus = devm_kzalloc(&pdev->dev, sizeof(*bus), GFP_KERNEL);
 	if (!bus)
 		return -ENOMEM;
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "bus-regs");
-	bus->base = devm_ioremap_resource(&pdev->dev, res);
+	bus->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(bus->base))
 		return PTR_ERR(bus->base);
 
@@ -1446,11 +1448,14 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
 	if (sram_enabled && !IS_ENABLED(CONFIG_USB_UHCI_ASPEED) &&
 	    of_device_is_compatible(pdev->dev.of_node,
 				    "aspeed,ast2500-i2c-bus")) {
+		u32 dma_len_max = ASPEED_I2CD_DMA_LEN_MASK >>
+				  ASPEED_I2CD_DMA_LEN_SHIFT;
+
 		ret = device_property_read_u32(&pdev->dev,
 					       "aspeed,dma-buf-size",
 					       &bus->dma_buf_size);
-		if (!ret && bus->dma_buf_size > ASPEED_I2CD_DMA_LEN_MASK)
-			bus->dma_buf_size = ASPEED_I2CD_DMA_LEN_MASK;
+		if (!ret && bus->dma_buf_size > dma_len_max)
+			bus->dma_buf_size = dma_len_max;
 	}
 
 	if (bus->dma_buf_size) {
@@ -1476,7 +1481,9 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
 	}
 
 	if (!bus->dma_buf && sram_enabled) {
-		res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "buf");
+		struct resource *res = platform_get_resource(pdev,
+							     IORESOURCE_MEM, 1);
+
 		bus->buf_base = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(bus->buf_base) || resource_size(res) < 2) {
 			bus->buf_base = NULL;
