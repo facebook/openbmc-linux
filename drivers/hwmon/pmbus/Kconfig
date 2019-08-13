@@ -135,15 +135,6 @@ config SENSORS_MAX8688
 	  This driver can also be built as a module. If so, the module will
 	  be called max8688.
 
-config SENSORS_PFE3000
-	tristate "Bel PFE3000"
-	help
-	  If you say yes here you get hardware monitoring support for Bel
-          Power Solutions PFE3000.
-
-	  This driver can also be built as a module. If so, the module will
-	  be called pfe3000.
-
 config SENSORS_TPS40422
 	tristate "TI TPS40422"
 	help
