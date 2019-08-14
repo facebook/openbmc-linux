@@ -15,9 +15,21 @@
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/i2c.h>
+#include <linux/pmbus.h>
+
 #include "pmbus.h"
 
 enum chips {pfe1100, pfe3000};
+
+/*
+ * Disable status check for pfe3000 devices, because some devices report
+ * communication error (invalid command) for VOUT_MODE command (0x20)
+ * although correct VOUT_MODE (0x16) is returned: it leads to incorrect
+ * exponent in linear mode.
+ */
+static struct pmbus_platform_data pfe3000_plat_data = {
+	.flags = PMBUS_SKIP_STATUS_CHECK,
+};
 
 static struct pmbus_driver_info pfe_driver_info[] = {
 	[pfe1100] = {
@@ -92,8 +104,10 @@ static int pfe_pmbus_probe(struct i2c_client *client,
 	 * probe which leads to probe failure (read status word failed).
 	 * So let's set the device to page 0 at the beginning.
 	 */
-	if (model == pfe3000)
+	if (model == pfe3000) {
+		client->dev.platform_data = &pfe3000_plat_data;
 		i2c_smbus_write_byte_data(client, PMBUS_PAGE, 0);
+	}
 
 	return pmbus_do_probe(client, id, &pfe_driver_info[model]);
 }
