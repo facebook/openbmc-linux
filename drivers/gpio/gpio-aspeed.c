@@ -1158,6 +1158,7 @@ static int __init aspeed_gpio_probe(struct platform_device *pdev)
 	struct aspeed_gpio *gpio;
 	struct resource *res;
 	int rc, i, banks;
+	bool init_cmdsrc = true;
 
 	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
 	if (!gpio)
@@ -1208,14 +1209,20 @@ static int __init aspeed_gpio_probe(struct platform_device *pdev)
 	 * Populate it with initial values read from the HW and switch
 	 * all command sources to the ARM by default
 	 */
+
+	if (of_property_read_bool(pdev->dev.of_node, "aspeed,skip-init-cmdsrc"))
+		init_cmdsrc = false;
+
 	for (i = 0; i < banks; i++) {
 		const struct aspeed_gpio_bank *bank = &aspeed_gpio_banks[i];
 		void __iomem *addr = bank_reg(gpio, bank, reg_rdata);
 		gpio->dcache[i] = ioread32(addr);
-		aspeed_gpio_change_cmd_source(gpio, bank, 0, GPIO_CMDSRC_ARM);
-		aspeed_gpio_change_cmd_source(gpio, bank, 1, GPIO_CMDSRC_ARM);
-		aspeed_gpio_change_cmd_source(gpio, bank, 2, GPIO_CMDSRC_ARM);
-		aspeed_gpio_change_cmd_source(gpio, bank, 3, GPIO_CMDSRC_ARM);
+		if (init_cmdsrc) {
+			aspeed_gpio_change_cmd_source(gpio, bank, 0, GPIO_CMDSRC_ARM);
+			aspeed_gpio_change_cmd_source(gpio, bank, 1, GPIO_CMDSRC_ARM);
+			aspeed_gpio_change_cmd_source(gpio, bank, 2, GPIO_CMDSRC_ARM);
+			aspeed_gpio_change_cmd_source(gpio, bank, 3, GPIO_CMDSRC_ARM);
+		}
 	}
 
 	rc = devm_gpiochip_add_data(&pdev->dev, &gpio->chip, gpio);
