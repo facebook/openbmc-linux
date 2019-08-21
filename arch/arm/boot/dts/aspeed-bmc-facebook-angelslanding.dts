@@ -23,7 +23,7 @@
 		i2c20 = &imux20;
 		i2c21 = &imux21;
 		i2c22 = &imux22;
-		i2c23 = &imux23;   
+		i2c23 = &imux23;
 	};
 
 	chosen {
@@ -163,6 +163,10 @@
 &lpc_snoop {
 	status = "okay";
 	snoop-ports = <0x80>;
+};
+
+&gpio {
+	aspeed,skip-init-cmdsrc;
 };
 
 &rtc {
