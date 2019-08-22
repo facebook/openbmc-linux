@@ -479,6 +479,14 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_suspend_select;
 		/* Fall through */
 	case ncsi_dev_state_suspend_select:
+#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
+		if (ndp->flags & NCSI_DEV_RESHUFFLE)
+			nd->state = ncsi_dev_state_suspend_gls;
+		else
+			nd->state = ncsi_dev_state_suspend_dcnt;
+		schedule_work(&ndp->work);
+		break;
+#endif
 		ndp->pending_req_num = 1;
 
 		nca.type = NCSI_PKT_CMD_SP;
@@ -558,6 +566,11 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 		}
 		break;
 	case ncsi_dev_state_suspend_deselect:
+#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
+		nd->state = ncsi_dev_state_suspend_done;
+		schedule_work(&ndp->work);
+		break;
+#endif
 		ndp->pending_req_num = 1;
 
 		nca.type = NCSI_PKT_CMD_DP;
@@ -1301,7 +1314,6 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 	case ncsi_dev_state_probe_deselect:
 #if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
 		ndp->active_package = ncsi_add_package(ndp, 0);
-		ncsi_add_channel(ndp->active_package, 0);
 		nd->state = ncsi_dev_state_probe_cis;
 		schedule_work(&ndp->work);
 		break;
