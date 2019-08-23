@@ -392,7 +392,18 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 			ic->ino, ic->state);
 		mutex_unlock(&c->alloc_sem);
 		spin_unlock(&c->inocache_lock);
-		BUG();
+
+		/*
+		 * XXX We have seen several instances of failures on Facebook
+		 * CMM BMC and root cause is not clear yet.
+		 * Instead of crashing the system (by calling BUG()), let's
+		 * dump a warning and terminate garbage thread: platform owner
+		 * or administrator will decide how to fix the problem.
+		 */
+		pr_crit("terminating garbage collect thread %i (%s): "
+			"filesystem corrupted!\n",
+			current->pid, current->comm);
+		return -ENOSPC;
 
 	case INO_STATE_READING:
 		/* Someone's currently trying to read it. We must wait for
