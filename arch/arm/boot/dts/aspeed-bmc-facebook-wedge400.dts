@@ -368,3 +368,24 @@
 &vhub {
 	status = "okay";
 };
+
+&spi1 {
+	status = "okay";
+	compatible = "aspeed,ast2500-spi-master";
+
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <8250000>;
+		reg = <0>;
+	};
+};
+
+&sdhci_slot1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sd2_default>;
+};
+
+&jtag {
+	status = "okay";
+};
