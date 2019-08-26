@@ -189,6 +189,7 @@ struct ncsi_package;
 #define NCSI_TO_CHANNEL(p, c)	(((p) << NCSI_PACKAGE_SHIFT) | (c))
 #define NCSI_MAX_PACKAGE	8
 #define NCSI_MAX_CHANNEL	32
+#define NCSI_ROUND32(x)    (((x) + 3) & ~3) /* Round to 32 bit boundary */
 
 struct ncsi_channel {
 	unsigned char               id;
