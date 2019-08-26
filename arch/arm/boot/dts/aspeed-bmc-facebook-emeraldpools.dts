@@ -42,8 +42,14 @@
 	flash@0 {
 		status = "okay";
 		m25p,fast-read;
-		label = "bmc";
-#include "facebook-bmc-flash-layout.dtsi"
+		label = "spi0.0";
+#include "facebook-bmc-flash0-layout.dtsi"
+	};
+	flash@1 {
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
+#include "facebook-bmc-flash1-layout.dtsi"
 	};
 };
 

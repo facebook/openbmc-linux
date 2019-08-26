@@ -56,74 +56,14 @@
 		m25p,fast-read;
 		label = "spi0.0";
 		spi-max-frequency = <12000000>;
-		partitions {
-			compatible = "fixed-partitions";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			rom@0 {
-				reg = <0x0 0x60000>;
-				label = "rom";
-			};
-			envro@60000 {
-				reg = <0x60000 0x20000>;
-				label = "envro";
-			};
-			u-bootro@80000 {
-				reg = <0x80000 0x60000>;
-				label = "u-bootro";
-			};
-			fitro@e0000 {
-				reg = <0xe0000 0x1b20000>;
-				label = "fitro";
-			};
-			dataro@1c00000 {
-				reg = <0x1c00000 0x400000>;
-				label = "dataro";
-			};
-			flash0@0 {
-				reg = <0x0 0x2000000>;
-				label = "flash0";
-			};
-		};
+#include "facebook-bmc-flash0-layout.dtsi"
 	};
 	flash@1 {
 		status = "okay";
 		m25p,fast-read;
 		label = "spi0.1";
 		spi-max-frequency = <12000000>;
-		partitions {
-			compatible = "fixed-partitions";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			romx@0 {
-				reg = <0x0 0x60000>;
-				label = "romx";
-			};
-			env@60000 {
-				reg = <0x60000 0x20000>;
-				label = "env";
-			};
-			u-boot@80000 {
-				reg = <0x80000 0x60000>;
-				label = "u-boot";
-			};
-			fit@e0000 {
-				reg = <0xe0000 0x1b20000>;
-				label = "fit";
-			};
-			data0@1c00000 {
-				reg = <0x1c00000 0x400000>;
-				label = "data0";
-			};
-			flash1@0 {
-				reg = <0x0 0x2000000>;
-				label = "flash1";
-			};
-			flash1rw@10000 {
-				reg = <0x10000 0x1ff0000>;
-				label = "flash1rw";
-			};
-		};
+#include "facebook-bmc-flash1-layout.dtsi"
 	};
 	flash@2 {
 		spi-max-frequency = <12000000>;
