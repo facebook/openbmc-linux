@@ -78,7 +78,7 @@ struct jtag_xfer {
     __u8    direction;
     __u8    endstate;
     __u32   length;
-    __u64   tdio;
+    __u32   *tdio;
 };
 
 /* ioctl interface */

@@ -110,7 +110,7 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
             return -EINVAL;
 
         data_size = DIV_ROUND_UP(xfer.length, BITS_PER_BYTE);
-        xfer_data = memdup_user(u64_to_user_ptr(xfer.tdio), data_size);
+        xfer_data = memdup_user((void __user *)(xfer.tdio), data_size);
 
         if (!xfer_data)
             return -EFAULT;
@@ -121,7 +121,7 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
             return -EFAULT;
         }
 
-        err = copy_to_user(u64_to_user_ptr(xfer.tdio),
+        err = copy_to_user((void __user *)(xfer.tdio),
                    (void *)(xfer_data), data_size);
 
         if (err) {
