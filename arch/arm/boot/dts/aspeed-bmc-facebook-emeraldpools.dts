@@ -99,24 +99,6 @@
 
 &i2c5 {
 	status = "okay";
-	// GPU thermal sensor
-	tmp421@9e {
-		compatible = "ti,tmp421";
-		reg = <0x9e>;
-	};
-	tmp421@98 {
-		compatible = "ti,tmp421";
-		reg = <0x98>;
-	};
-	// PCIe switch thermal sensor
-	tmp422@9a {
-		compatible = "ti,tmp422";
-		reg = <0x9a>;
-	};
-	tmp422@9c {
-		compatible = "ti,tmp422";
-		reg = <0x9c>;
-	};
 };
 
 &i2c6 {
@@ -126,6 +108,24 @@
 		compatible = "atmel,24c64";
 		reg = <0x54>;
 	};
+	// GPU thermal sensor
+	tmp421@4c {
+		compatible = "ti,tmp421";
+		reg = <0x4c>;
+	};
+	tmp421@4f {
+		compatible = "ti,tmp421";
+		reg = <0x4f>;
+	};
+	// PCIe switch thermal sensor
+//	tmp422@4d {
+//		compatible = "ti,tmp422";
+//		reg = <0x4d>;
+//	};
+//	tmp422@4e {
+//		compatible = "ti,tmp422";
+//		reg = <0x4e>;
+//	};
 };
 
 &i2c7 {
