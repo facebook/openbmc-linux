@@ -603,10 +603,12 @@ static int aspeed_jtag_xfer(struct jtag *jtag, struct jtag_xfer *xfer,
         /* hw mode */
         aspeed_jtag_write(aspeed_jtag, 0, ASPEED_JTAG_SW);
         aspeed_jtag_xfer_hw(aspeed_jtag, xfer, data);
+        if (xfer->endstate == JTAG_STATE_IDLE) {
+            aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_SW_MODE_EN |
+              ASPEED_JTAG_SW_MODE_TDIO, ASPEED_JTAG_SW);
+        }
     }
 
-    aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_SW_MODE_EN |
-              ASPEED_JTAG_SW_MODE_TDIO, ASPEED_JTAG_SW);
     aspeed_jtag->status = xfer->endstate;
     return 0;
 }
