@@ -12,47 +12,64 @@
 #include <linux/module.h>
 #include "pmbus.h"
 
-#define IR35221_MFR_VIN_PEAK		0xc5
-#define IR35221_MFR_VOUT_PEAK		0xc6
-#define IR35221_MFR_IOUT_PEAK		0xc7
-#define IR35221_MFR_TEMP_PEAK		0xc8
-#define IR35221_MFR_VIN_VALLEY		0xc9
-#define IR35221_MFR_VOUT_VALLEY		0xca
-#define IR35221_MFR_IOUT_VALLEY		0xcb
-#define IR35221_MFR_TEMP_VALLEY		0xcc
+#define IR352XX_MFR_VIN_PEAK		0xc5
+#define IR352XX_MFR_VOUT_PEAK		0xc6
+#define IR352XX_MFR_IOUT_PEAK		0xc7
+#define IR352XX_MFR_TEMP_PEAK		0xc8
+#define IR352XX_MFR_VIN_VALLEY		0xc9
+#define IR352XX_MFR_VOUT_VALLEY		0xca
+#define IR352XX_MFR_IOUT_VALLEY		0xcb
+#define IR352XX_MFR_TEMP_VALLEY		0xcc
 
-static int ir35221_read_word_data(struct i2c_client *client, int page, int reg)
+#define IR352XX_MFR_DATA_LEN		2
+
+enum chips {ir35215, ir35221};
+
+struct ir352xx_data {
+	u8 mfr_model[IR352XX_MFR_DATA_LEN];
+};
+
+static struct ir352xx_data ir352xx_chips[] = {
+	[ir35215] = {
+		.mfr_model = {0x5d, 0},
+	},
+	[ir35221] = {
+		.mfr_model = {0x6c, 0},
+	},
+};
+
+static int ir352xx_read_word_data(struct i2c_client *client, int page, int reg)
 {
 	int ret;
 
 	switch (reg) {
 	case PMBUS_VIRT_READ_VIN_MAX:
-		ret = pmbus_read_word_data(client, page, IR35221_MFR_VIN_PEAK);
+		ret = pmbus_read_word_data(client, page, IR352XX_MFR_VIN_PEAK);
 		break;
 	case PMBUS_VIRT_READ_VOUT_MAX:
-		ret = pmbus_read_word_data(client, page, IR35221_MFR_VOUT_PEAK);
+		ret = pmbus_read_word_data(client, page, IR352XX_MFR_VOUT_PEAK);
 		break;
 	case PMBUS_VIRT_READ_IOUT_MAX:
-		ret = pmbus_read_word_data(client, page, IR35221_MFR_IOUT_PEAK);
+		ret = pmbus_read_word_data(client, page, IR352XX_MFR_IOUT_PEAK);
 		break;
 	case PMBUS_VIRT_READ_TEMP_MAX:
-		ret = pmbus_read_word_data(client, page, IR35221_MFR_TEMP_PEAK);
+		ret = pmbus_read_word_data(client, page, IR352XX_MFR_TEMP_PEAK);
 		break;
 	case PMBUS_VIRT_READ_VIN_MIN:
 		ret = pmbus_read_word_data(client, page,
-					   IR35221_MFR_VIN_VALLEY);
+					   IR352XX_MFR_VIN_VALLEY);
 		break;
 	case PMBUS_VIRT_READ_VOUT_MIN:
 		ret = pmbus_read_word_data(client, page,
-					   IR35221_MFR_VOUT_VALLEY);
+					   IR352XX_MFR_VOUT_VALLEY);
 		break;
 	case PMBUS_VIRT_READ_IOUT_MIN:
 		ret = pmbus_read_word_data(client, page,
-					   IR35221_MFR_IOUT_VALLEY);
+					   IR352XX_MFR_IOUT_VALLEY);
 		break;
 	case PMBUS_VIRT_READ_TEMP_MIN:
 		ret = pmbus_read_word_data(client, page,
-					   IR35221_MFR_TEMP_VALLEY);
+					   IR352XX_MFR_TEMP_VALLEY);
 		break;
 	default:
 		ret = -ENODATA;
@@ -62,12 +79,13 @@ static int ir35221_read_word_data(struct i2c_client *client, int page, int reg)
 	return ret;
 }
 
-static int ir35221_probe(struct i2c_client *client,
+static int ir352xx_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
 	struct pmbus_driver_info *info;
 	u8 buf[I2C_SMBUS_BLOCK_MAX];
 	int ret;
+	struct ir352xx_data *data = &ir352xx_chips[id->driver_data];
 
 	if (!i2c_check_functionality(client->adapter,
 				     I2C_FUNC_SMBUS_READ_BYTE_DATA
@@ -90,7 +108,8 @@ static int ir35221_probe(struct i2c_client *client,
 		dev_err(&client->dev, "Failed to read PMBUS_MFR_MODEL\n");
 		return ret;
 	}
-	if (ret != 2 || !(buf[0] == 0x6c && buf[1] == 0x00)) {
+	if (ret != 2 || buf[0] != data->mfr_model[0] ||
+	    buf[1] != data->mfr_model[1]) {
 		dev_err(&client->dev, "MFR_MODEL unrecognised\n");
 		return -ENODEV;
 	}
@@ -100,7 +119,7 @@ static int ir35221_probe(struct i2c_client *client,
 	if (!info)
 		return -ENOMEM;
 
-	info->read_word_data = ir35221_read_word_data;
+	info->read_word_data = ir352xx_read_word_data;
 
 	info->pages = 2;
 	info->format[PSC_VOLTAGE_IN] = linear;
@@ -121,20 +140,21 @@ static int ir35221_probe(struct i2c_client *client,
 	return pmbus_do_probe(client, id, info);
 }
 
-static const struct i2c_device_id ir35221_id[] = {
-	{"ir35221", 0},
+static const struct i2c_device_id ir352xx_id[] = {
+	{"ir35215", ir35215},
+	{"ir35221", ir35221},
 	{}
 };
 
-MODULE_DEVICE_TABLE(i2c, ir35221_id);
+MODULE_DEVICE_TABLE(i2c, ir352xx_id);
 
 static struct i2c_driver ir35221_driver = {
 	.driver = {
 		.name	= "ir35221",
 	},
-	.probe		= ir35221_probe,
+	.probe		= ir352xx_probe,
 	.remove		= pmbus_do_remove,
-	.id_table	= ir35221_id,
+	.id_table	= ir352xx_id,
 };
 
 module_i2c_driver(ir35221_driver);
