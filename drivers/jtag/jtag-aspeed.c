@@ -15,6 +15,7 @@
 #include <linux/reset.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/delay.h>
 #include <uapi/linux/jtag.h>
 
 #define ASPEED_JTAG_DATA        0x00
@@ -704,6 +705,14 @@ int aspeed_jtag_init(struct platform_device *pdev,
               ASPEED_JTAG_ISR_DATA_PAUSE_EN |
               ASPEED_JTAG_ISR_DATA_COMPLETE_EN,
               ASPEED_JTAG_ISR);
+
+    /* reset TAP */
+    aspeed_jtag_write(aspeed_jtag, 0, ASPEED_JTAG_SW);
+    aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_CTL_ENG_EN |
+              ASPEED_JTAG_CTL_ENG_OUT_EN |
+              ASPEED_JTAG_CTL_FORCE_TMS, ASPEED_JTAG_CTRL);
+    aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_SW_MODE_EN |
+              ASPEED_JTAG_SW_MODE_TDIO, ASPEED_JTAG_SW);
 
     aspeed_jtag->flag = 0;
     aspeed_jtag->mode = 0;
