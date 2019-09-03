@@ -62,16 +62,18 @@
 &fmc {
 	status = "okay";
 	flash@0 {
+		reg = < 1 >;
 		status = "okay";
 		m25p,fast-read;
-		label = "spi0.0";
+		label = "spi0.1";
 		spi-max-frequency = <12000000>;
 #include "facebook-bmc-flash0-layout.dtsi"
 	};
 	flash@1 {
+		reg = < 0 >;
 		status = "okay";
 		m25p,fast-read;
-		label = "spi0.1";
+		label = "spi0.0";
 		spi-max-frequency = <12000000>;
 #include "facebook-bmc-flash1-layout.dtsi"
 	};
