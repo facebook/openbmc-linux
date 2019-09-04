@@ -362,10 +362,6 @@
 	status = "okay";
 };
 
-&uhci {
-	status = "okay";
-};
-
 &vhub {
 	status = "okay";
 };
