@@ -1,0 +1,38 @@
+Nuvoton NPCM Platform Environment Control Interface (PECI) bus
+
+Required properties:
+- compatible        : "nuvoton,npcm750-peci" for the NPCM7XX BMC.
+- reg               : specifies PECI physical base address and size of the registers.
+- #address-cells    : Should be <1> required to define a client address.
+- #size-cells       : Should be <0> required to define a client address.
+- interrupts        : Contain the PECI interrupt with flags for falling edge.
+- clocks            : phandle of PECI reference clock.
+
+Optional properties:
+- cmd-timeout-ms    : Command timeout in units of ms.
+                      1 ~ 60000 (default: 1000)
+- pull-down         : Defines the PECI I/O internal pull down operation.
+		      0 - pull down always enable (default)
+		      1 - pull down only during transactions.
+		      2 - pull down always disable.
+- host-neg-bit-rate : Define host negotiation bit rate divider.
+                      the host negotiation bit rate calculate with formula:
+                      clock frequency[Hz] / [4 x {host-neg-bit-rate + 1}]
+		      7 ~ 31 (default: 15)
+- high-volt-range   : Adapts PECI I/O interface to voltage range, the property
+                      is a boolean parameter define as follow:
+		      false - PECI I/O interface voltage range of 0.8-1.06V. (default)
+		      true - PECI I/O interface voltage range of 0.95-1.26V.
+
+Example:
+	peci: peci-bus@100000 {
+		compatible = "nuvoton,npcm750-peci";
+		reg = <0x100000 0x200>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&clk NPCM7XX_CLK_APB3>;
+		cmd-timeout-ms = <1000>;
+		pull-down = <0>;
+		host-neg-bit-rate = <15>;
+	};

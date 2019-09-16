@@ -1,0 +1,50 @@
+#
+# Platform Environment Control Interface (PECI) subsystem configuration
+#
+
+config PECI
+	bool "PECI support"
+	select RT_MUTEXES
+	select CRC8
+	help
+	  The Platform Environment Control Interface (PECI) is a one-wire bus
+	  interface that provides a communication channel from Intel processors
+	  and chipset components to external monitoring or control devices.
+
+	  If you want PECI support, you should say Y here and also to the
+	  specific driver for your bus adapter(s) below.
+
+if PECI
+
+#
+# PECI hardware bus configuration
+#
+
+menu "PECI Hardware Bus support"
+
+config PECI_ASPEED
+	tristate "ASPEED PECI support"
+	select REGMAP_MMIO
+	depends on OF
+	depends on ARCH_ASPEED || COMPILE_TEST
+	help
+	  Say Y here if you want support for the Platform Environment Control
+	  Interface (PECI) bus adapter driver on the ASPEED SoCs.
+
+	  This support is also available as a module.  If so, the module
+	  will be called peci-aspeed.
+
+config PECI_NPCM
+	tristate "Nuvoton NPCM PECI support"
+	select REGMAP_MMIO
+	depends on OF
+	depends on ARCH_NPCM || COMPILE_TEST
+	help
+	  Say Y here if you want support for the Platform Environment Control
+	  Interface (PECI) bus adapter driver on the Nuvoton NPCM SoCs.
+
+	  This support is also available as a module. If so, the module
+	  will be called peci-npcm.
+endmenu
+
+endif # PECI
