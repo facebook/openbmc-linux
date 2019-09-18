@@ -113,14 +113,14 @@
 		reg = <0x4f>;
 	};
 	// PCIe switch thermal sensor
-//	tmp422@4d {
-//		compatible = "ti,tmp422";
-//		reg = <0x4d>;
-//	};
-//	tmp422@4e {
-//		compatible = "ti,tmp422";
-//		reg = <0x4e>;
-//	};
+	tmp422@4d {
+		compatible = "ti,tmp422";
+		reg = <0x4d>;
+	};
+	tmp422@4e {
+		compatible = "ti,tmp422";
+		reg = <0x4e>;
+	};
 };
 
 &i2c7 {
