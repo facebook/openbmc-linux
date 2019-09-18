@@ -29,3 +29,11 @@ menuconfig JTAG_ASPEED
       To compile this driver as a module, choose M here: the module will
       be called jtag-aspeed.
 
+config JTAG_ASPEED_USE_INTERRUPTS
+    bool "Enable interrupt mode"
+    default y
+    depends on JTAG_ASPEED
+    ---help---
+      If y, use Interrupt Service Routine(ISR) to monitor IR/DR transmission signal.
+      Otherwise, use iteration instead.
+
