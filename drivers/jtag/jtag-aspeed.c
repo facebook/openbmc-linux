@@ -91,6 +91,8 @@
 #define JTAG_MSG(fmt, ...) \
 	printk(KERN_INFO fmt, ##__VA_ARGS__)
 
+#define WAIT_ITERATIONS 75
+
 struct aspeed_jtag {
     void __iomem            *reg_base;
     struct device           *dev;
@@ -196,34 +198,73 @@ static char aspeed_jtag_tck_cycle(struct aspeed_jtag *aspeed_jtag,
     return tdo;
 }
 
+#if !IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
+static void aspeed_jtag_wait_interrupt(struct aspeed_jtag *aspeed_jtag, u32 flag)
+{
+    u32 status = 0;
+    u32 iterations = 0;
+    while ((status & flag) == 0) {
+        status = aspeed_jtag_read(aspeed_jtag, ASPEED_JTAG_ISR);
+        iterations++;
+        if (iterations > WAIT_ITERATIONS) {
+            JTAG_ERR("aspeed_jtag driver timed out waitting for %d\n", flag);
+            return;
+        }
+        if ((status & flag) == 0) {
+            if (iterations % 25 == 0) {
+                usleep_range(1, 5);
+            } else {
+                udelay(1);
+            }
+        }
+    }
+    usleep_range(1, 5);
+    aspeed_jtag_write(aspeed_jtag, flag | (status & 0xf), ASPEED_JTAG_ISR);
+}
+#endif
+
 static void aspeed_jtag_wait_instruction_pause(struct aspeed_jtag *aspeed_jtag)
 {
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
     wait_event_interruptible(aspeed_jtag->jtag_wq, aspeed_jtag->flag &
                  ASPEED_JTAG_ISR_INST_PAUSE);
     aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_INST_PAUSE;
+#else
+    aspeed_jtag_wait_interrupt(aspeed_jtag, ASPEED_JTAG_ISR_INST_PAUSE);
+#endif
 }
 
-static void
-aspeed_jtag_wait_instruction_complete(struct aspeed_jtag *aspeed_jtag)
+static void aspeed_jtag_wait_instruction_complete(struct aspeed_jtag *aspeed_jtag)
 {
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
     wait_event_interruptible(aspeed_jtag->jtag_wq, aspeed_jtag->flag &
                  ASPEED_JTAG_ISR_INST_COMPLETE);
     aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_INST_COMPLETE;
+#else
+    aspeed_jtag_wait_interrupt(aspeed_jtag, ASPEED_JTAG_ISR_INST_COMPLETE);
+#endif
 }
 
-static void
-aspeed_jtag_wait_data_pause_complete(struct aspeed_jtag *aspeed_jtag)
+static void aspeed_jtag_wait_data_pause(struct aspeed_jtag *aspeed_jtag)
 {
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
     wait_event_interruptible(aspeed_jtag->jtag_wq, aspeed_jtag->flag &
                  ASPEED_JTAG_ISR_DATA_PAUSE);
     aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_DATA_PAUSE;
+#else
+    aspeed_jtag_wait_interrupt(aspeed_jtag, ASPEED_JTAG_ISR_DATA_PAUSE);
+#endif
 }
 
 static void aspeed_jtag_wait_data_complete(struct aspeed_jtag *aspeed_jtag)
 {
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
     wait_event_interruptible(aspeed_jtag->jtag_wq, aspeed_jtag->flag &
                  ASPEED_JTAG_ISR_DATA_COMPLETE);
     aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_DATA_COMPLETE;
+#else
+    aspeed_jtag_wait_interrupt(aspeed_jtag, ASPEED_JTAG_ISR_DATA_COMPLETE);
+#endif
 }
 
 static void aspeed_jtag_sm_cycle(struct aspeed_jtag *aspeed_jtag, const u8 *tms,
@@ -410,15 +451,19 @@ static void aspeed_jtag_xfer_push_data(struct aspeed_jtag *aspeed_jtag,
     dev_dbg(aspeed_jtag->dev, "shift bits %d\n", bits_len);
 
     if (type == JTAG_SIR_XFER) {
+        aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_INST_PAUSE;
         aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_IOUT_LEN(bits_len),
                   ASPEED_JTAG_CTRL);
         aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_DOUT_LEN(bits_len) |
                   ASPEED_JTAG_CTL_INST_EN, ASPEED_JTAG_CTRL);
+        aspeed_jtag_wait_instruction_pause(aspeed_jtag);
     } else {
+        aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_DATA_PAUSE;
         aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_DOUT_LEN(bits_len),
                   ASPEED_JTAG_CTRL);
         aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_DOUT_LEN(bits_len) |
                   ASPEED_JTAG_CTL_DATA_EN, ASPEED_JTAG_CTRL);
+        aspeed_jtag_wait_data_pause(aspeed_jtag);
     }
 }
 
@@ -431,6 +476,7 @@ static void aspeed_jtag_xfer_push_data_last(struct aspeed_jtag *aspeed_jtag,
         if (type == JTAG_SIR_XFER) {
             dev_dbg(aspeed_jtag->dev, "IR Keep Pause\n");
 
+            aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_INST_PAUSE;
             aspeed_jtag_write(aspeed_jtag,
                       ASPEED_JTAG_IOUT_LEN(shift_bits),
                       ASPEED_JTAG_CTRL);
@@ -441,6 +487,8 @@ static void aspeed_jtag_xfer_push_data_last(struct aspeed_jtag *aspeed_jtag,
             aspeed_jtag_wait_instruction_pause(aspeed_jtag);
         } else {
             dev_dbg(aspeed_jtag->dev, "DR Keep Pause\n");
+
+            aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_DATA_PAUSE;
             aspeed_jtag_write(aspeed_jtag,
                       ASPEED_JTAG_DOUT_LEN(shift_bits) |
                       ASPEED_JTAG_CTL_DR_UPDATE,
@@ -450,12 +498,13 @@ static void aspeed_jtag_xfer_push_data_last(struct aspeed_jtag *aspeed_jtag,
                       ASPEED_JTAG_CTL_DR_UPDATE |
                       ASPEED_JTAG_CTL_DATA_EN,
                       ASPEED_JTAG_CTRL);
-            aspeed_jtag_wait_data_pause_complete(aspeed_jtag);
+            aspeed_jtag_wait_data_pause(aspeed_jtag);
         }
     } else {
         if (type == JTAG_SIR_XFER) {
             dev_dbg(aspeed_jtag->dev, "IR go IDLE\n");
 
+            aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_INST_COMPLETE;
             aspeed_jtag_write(aspeed_jtag,
                       ASPEED_JTAG_IOUT_LEN(shift_bits) |
                       ASPEED_JTAG_CTL_LASPEED_INST,
@@ -469,6 +518,7 @@ static void aspeed_jtag_xfer_push_data_last(struct aspeed_jtag *aspeed_jtag,
         } else {
             dev_dbg(aspeed_jtag->dev, "DR go IDLE\n");
 
+            aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_DATA_COMPLETE;
             aspeed_jtag_write(aspeed_jtag,
                       ASPEED_JTAG_DOUT_LEN(shift_bits) |
                       ASPEED_JTAG_CTL_LASPEED_DATA,
@@ -621,6 +671,7 @@ static int aspeed_jtag_status_get(struct jtag *jtag, u32 *status)
     return 0;
 }
 
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
 static irqreturn_t aspeed_jtag_interrupt(s32 this_irq, void *dev_id)
 {
     struct aspeed_jtag *aspeed_jtag = dev_id;
@@ -638,7 +689,7 @@ static irqreturn_t aspeed_jtag_interrupt(s32 this_irq, void *dev_id)
         aspeed_jtag->flag |= status & ASPEED_JTAG_ISR_INT_MASK;
     }
 
-    if (aspeed_jtag->flag) {
+    if (aspeed_jtag->flag & ASPEED_JTAG_ISR_INT_MASK) {
         wake_up_interruptible(&aspeed_jtag->jtag_wq);
         ret = IRQ_HANDLED;
     } else {
@@ -648,6 +699,7 @@ static irqreturn_t aspeed_jtag_interrupt(s32 this_irq, void *dev_id)
     }
     return ret;
 }
+#endif
 
 int aspeed_jtag_init(struct platform_device *pdev,
              struct aspeed_jtag *aspeed_jtag)
@@ -689,6 +741,7 @@ int aspeed_jtag_init(struct platform_device *pdev,
     aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_SW_MODE_EN |
               ASPEED_JTAG_SW_MODE_TDIO, ASPEED_JTAG_SW);
 
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
     err = devm_request_irq(aspeed_jtag->dev, aspeed_jtag->irq,
                    aspeed_jtag_interrupt, 0,
                    "aspeed-jtag", aspeed_jtag);
@@ -697,6 +750,7 @@ int aspeed_jtag_init(struct platform_device *pdev,
         goto clk_unprep;
     }
     dev_dbg(&pdev->dev, "IRQ %d.\n", aspeed_jtag->irq);
+#endif
 
     aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_ISR_INST_PAUSE |
               ASPEED_JTAG_ISR_INST_COMPLETE |
