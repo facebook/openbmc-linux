@@ -1270,6 +1270,13 @@ int fsi_master_register(struct fsi_master *master)
 		return rc;
 	}
 
+	/* For temporary compatibility reasons, create a symlink from
+	 * the class interface to the top-level device node */
+	rc = sysfs_create_link(master->dev.kobj.parent->parent,
+			&master->dev.kobj, dev_name(&master->dev));
+	if (rc)
+		dev_info(&master->dev, "can't create class compat symlink");
+
 	np = dev_of_node(&master->dev);
 	if (!of_property_read_bool(np, "no-scan-on-init")) {
 		mutex_lock(&master->scan_lock);
