@@ -103,6 +103,18 @@ struct platform_device ast_i2c_dev0_device = {
 	.num_resources = ARRAY_SIZE(ast_i2c_dev0_resources),
 };
 
+struct platform_device ast_i2c_dev0_device_1M = {
+        .name = "ast-i2c",
+        .id = 0,
+        .dev = {
+                .dma_mask = &ast_i2c_dma_mask,
+                .coherent_dma_mask = 0xffffffff,
+                .platform_data = &ast_i2c_data_1M,
+        },
+        .resource = ast_i2c_dev0_resources,
+        .num_resources = ARRAY_SIZE(ast_i2c_dev0_resources),
+};
+
 static struct resource ast_i2c_dev1_resources[] = {
 	[0] = {
 		.start = AST_I2C_DEV1_BASE,
@@ -557,40 +569,40 @@ static struct i2c_board_info ast_i2c_board_info_7[] __initdata = {
 
 static struct i2c_board_info ast_i2c_board_info_8[] __initdata = {
         // TPM (0x40)
-        {
-            I2C_BOARD_INFO("slb9645tt", 0x20),
-        },
+        //{
+        //    I2C_BOARD_INFO("slb9645tt", 0x20),
+        //},
 };
 
 static struct i2c_board_info ast_i2c_board_info_9[] __initdata = {
         // INLET TEMP Sensor (0x9C)
-        {
-            I2C_BOARD_INFO("tmp75", 0x4e),
-        },
+        //{
+        //    I2C_BOARD_INFO("tmp75", 0x4e),
+        //},
         // OUTLET TEMP Sensor (0x9E)
-        {
-            I2C_BOARD_INFO("tmp75", 0x4f),
-        },
+        //{
+        //    I2C_BOARD_INFO("tmp75", 0x4f),
+        //},
 };
 
 static struct i2c_board_info ast_i2c_board_info_10[] __initdata = {
         // ADM1278, 0x20 (8BIT) -> ML HSC
-        {
-            I2C_BOARD_INFO("adm1278", 0x40),
-        },
-        {
-            I2C_BOARD_INFO("24c128", 0x51),
-        },
+        //{
+        //    I2C_BOARD_INFO("adm1278", 0x40),
+        //},
+        //{
+        //    I2C_BOARD_INFO("24c128", 0x51),
+        //},
 };
 
 static struct i2c_board_info ast_i2c_board_info_11[] __initdata = {
         // Mezz C connector -> OCP MEZZ
-        {
-            I2C_BOARD_INFO("tmp421", 0x1f),
-        },
-        {
-            I2C_BOARD_INFO("24c128", 0x50),
-        },
+        //{
+        //    I2C_BOARD_INFO("tmp421", 0x1f),
+        //},
+        //{
+        //    I2C_BOARD_INFO("24c128", 0x50),
+        //},
 };
 
 static struct i2c_board_info ast_i2c_board_info_12[] __initdata = {
@@ -612,10 +624,23 @@ void __init ast_add_device_i2c(void)
 		return;
 	}
 
+        unsigned bmc_location = 120;//GPIOP0
+        int gval = gpio_get_value(bmc_location);
+
         ast_i2c_data_1M.reg_gr = ast_i2c_data.reg_gr;// 1MHz reg_gr setting
         ast_i2c_data_400K.reg_gr = ast_i2c_data.reg_gr;// 400KHz reg_gr setting
 
-	platform_device_register(&ast_i2c_dev0_device);
+        if ( gval == 1 ) {
+          printk("BMC is locataed on a NIC expansion board!\n");
+          //Adjust the i2c speed of bus0 to 1MHz for BIC
+          //We only take the speed into account but not i2c devices.
+          //For i2c devices, user can add them via sysfs
+          platform_device_register(&ast_i2c_dev0_device_1M);
+        } else {
+          printk("BMC is located on a baseboard!\n");
+          platform_device_register(&ast_i2c_dev0_device);
+        }
+
 	platform_device_register(&ast_i2c_dev1_device_1M);
 	platform_device_register(&ast_i2c_dev2_device);
 	platform_device_register(&ast_i2c_dev3_device_1M);
