@@ -383,3 +383,10 @@
 &ehci1 {
 	status = "okay";
 };
+
+&sdhci_slot0 {
+       status = "okay";
+
+       pinctrl-names = "default";
+       pinctrl-0 = <&pinctrl_sd1_default>;
+};
