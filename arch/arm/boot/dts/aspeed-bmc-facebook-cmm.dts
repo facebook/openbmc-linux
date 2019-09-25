@@ -383,3 +383,14 @@
 &ehci1 {
 	status = "okay";
 };
+
+&sdmmc {
+       status = "okay";
+};
+
+&sdhci0 {
+       status = "okay";
+
+       pinctrl-names = "default";
+       pinctrl-0 = <&pinctrl_sd1_default>;
+};
