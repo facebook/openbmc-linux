@@ -389,171 +389,148 @@
 
 &gpio {
 	pin_gpio_a3 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(A, 3) GPIO_ACTIVE_LOW>;
 		output;
 		line-name = "BMC_EMMC_RST_N_R";
 	};
 
 	pin_gpio_aa0 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(AA, 0) GPIO_ACTIVE_LOW>;
 		input;
 		line-name = "DEBUG_PRESENT_N";
 	};
 
 	pin_gpio_aa1 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(AA, 1) GPIO_ACTIVE_LOW>;
 		output;
 		line-name = "SYS_CPLD_RST_N";
 	};
 
 	pin_gpio_aa2 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(AA, 2) GPIO_ACTIVE_LOW>;
 		input;
 		line-name = "SYS_CPLD_INT_N";
 	};
 
 	pin_gpio_aa7 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(AA, 7) GPIO_ACTIVE_LOW>;
 		output;
 		line-name = "BMC_SCM_CPLD_EN";
 	};
 
 	pin_gpio_ab0 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(AB, 0) GPIO_ACTIVE_HIGH>;
 		input;
 		line-name = "CPLD_INT_BMC";
 	};
 
 	pin_gpio_ac5 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(AC, 5) GPIO_ACTIVE_LOW>;
 		input;
 		line-name = "SCM_LPC_FRAME_N";
 	};
 
 	pin_gpio_ac6 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(AC, 6) GPIO_ACTIVE_LOW>;
 		input;
 		line-name = "SCM_LPC_SERIRQ_N";
 	};
 
 	pin_gpio_ac7 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(AC, 7) GPIO_ACTIVE_LOW>;
 		input;
 		line-name = "BMC_LPCRST_N";
 	};
 
 	pin_gpio_e2 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(E, 2) GPIO_ACTIVE_HIGH>;
 		input;
 		line-name = "TH3_POWER_OK";
 	};
 
 	pin_gpio_f4 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(F, 4) GPIO_ACTIVE_HIGH>;
 		both;
 		line-name = "CPU_CATERR_MSMI";
 	};
 
 	pin_gpio_g0 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(G, 0) GPIO_ACTIVE_HIGH>;
 		output;
 		line-name = "BMC_JTAG_MUX_IN";
 	};
 
 	pin_gpio_g1 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(G, 1) GPIO_ACTIVE_LOW>;
 		output;
 		line-name = "DOM_FPGA1_JTAG_EN_N";
 	};
 
 	pin_gpio_g2 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(G, 2) GPIO_ACTIVE_LOW>;
 		output;
 		line-name = "DOM_FPGA2_JTAG_EN_N";
 	};
 
 	pin_gpio_g4 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(G, 4) GPIO_ACTIVE_HIGH>;
 		input;
 		line-name = "BMC_CPLD_BOARD_REV_ID0";
 	};
 
 	pin_gpio_g5 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(G, 5) GPIO_ACTIVE_HIGH>;
 		input;
 		line-name = "BMC_CPLD_BOARD_REV_ID1";
 	};
 
 	pin_gpio_g6 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(G, 6) GPIO_ACTIVE_HIGH>;
 		input;
 		line-name = "BMC_CPLD_BOARD_REV_ID2";
 	};
 
 	pin_gpio_i4 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(I, 4) GPIO_ACTIVE_HIGH>;
+		output;
 		line-name = "BMC_SPI1_CS0";
 	};
 
 	pin_gpio_i5 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(I, 5) GPIO_ACTIVE_HIGH>;
+		output;
 		line-name = "BMC_SPI1_CLK";
 	};
 
 	pin_gpio_i6 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(I, 6) GPIO_ACTIVE_HIGH>;
 		line-name = "BMC_SPI1_MOSI";
 	};
 
 	pin_gpio_i7 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(I, 7) GPIO_ACTIVE_HIGH>;
 		line-name = "BMC_SPI1_MISO";
 	};
 
 	pin_gpio_j0 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(J, 0) GPIO_ACTIVE_HIGH>;
 		output;
 		line-name = "PWR_CPLD_JTAG_EN_N";
 	};
 
 	pin_gpio_j1 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(J, 1) GPIO_ACTIVE_LOW>;
 		output;
 		line-name = "SYS_CPLD_JTAG_EN_N";
 	};
 
 	pin_gpio_j2 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(J, 2) GPIO_ACTIVE_LOW>;
 		output;
 		line-name = "SCM_CPLD_JTAG_EN_N";
 	};
 
 	pin_gpio_j3 {
-		gpio-hog;
 		gpios = <ASPEED_GPIO(J, 3) GPIO_ACTIVE_LOW>;
 		output;
 		line-name = "FCM_CPLD_JTAG_EN_N";
