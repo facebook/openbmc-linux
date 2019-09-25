@@ -177,3 +177,9 @@
 &vhub {
 	status = "okay";
 };
+
+&sdhci_slot1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sd2_default>;
+};
