@@ -568,49 +568,21 @@ static struct i2c_board_info ast_i2c_board_info_7[] __initdata = {
 };
 
 static struct i2c_board_info ast_i2c_board_info_8[] __initdata = {
-        // TPM (0x40)
-        //{
-        //    I2C_BOARD_INFO("slb9645tt", 0x20),
-        //},
 };
 
 static struct i2c_board_info ast_i2c_board_info_9[] __initdata = {
-        // INLET TEMP Sensor (0x9C)
-        //{
-        //    I2C_BOARD_INFO("tmp75", 0x4e),
-        //},
-        // OUTLET TEMP Sensor (0x9E)
-        //{
-        //    I2C_BOARD_INFO("tmp75", 0x4f),
-        //},
 };
 
 static struct i2c_board_info ast_i2c_board_info_10[] __initdata = {
-        // ADM1278, 0x20 (8BIT) -> ML HSC
-        //{
-        //    I2C_BOARD_INFO("adm1278", 0x40),
-        //},
-        //{
-        //    I2C_BOARD_INFO("24c128", 0x51),
-        //},
 };
 
 static struct i2c_board_info ast_i2c_board_info_11[] __initdata = {
-        // Mezz C connector -> OCP MEZZ
-        //{
-        //    I2C_BOARD_INFO("tmp421", 0x1f),
-        //},
-        //{
-        //    I2C_BOARD_INFO("24c128", 0x50),
-        //},
 };
 
 static struct i2c_board_info ast_i2c_board_info_12[] __initdata = {
-
 };
 
 static struct i2c_board_info ast_i2c_board_info_13[] __initdata = {
-        //USB Connector
 };
 
 void __init ast_add_device_i2c(void)
