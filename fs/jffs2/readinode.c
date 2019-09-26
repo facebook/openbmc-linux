@@ -970,6 +970,9 @@ static int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_inf
 	union jffs2_node_union *node;
 	size_t retlen;
 	int len, err;
+	unsigned long node_total = 0;
+	unsigned long node_crc_error = 0;
+	unsigned long node_magic_error = 0;
 
 	rii->mctime_ver = 0;
 
@@ -1039,22 +1042,18 @@ static int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_inf
 		}
 
 		node = (union jffs2_node_union *)buf;
+		node_total++;
 
 		/* No need to mask in the valid bit; it shouldn't be invalid */
 		if (je32_to_cpu(node->u.hdr_crc) != crc32(0, node, sizeof(node->u)-4)) {
-			JFFS2_NOTICE("Node header CRC failed at %#08x. {%04x,%04x,%08x,%08x}\n",
-				     ref_offset(ref), je16_to_cpu(node->u.magic),
-				     je16_to_cpu(node->u.nodetype),
-				     je32_to_cpu(node->u.totlen),
-				     je32_to_cpu(node->u.hdr_crc));
+			node_crc_error++;
 			jffs2_dbg_dump_node(c, ref_offset(ref));
 			jffs2_mark_node_obsolete(c, ref);
 			goto cont;
 		}
 		if (je16_to_cpu(node->u.magic) != JFFS2_MAGIC_BITMASK) {
 			/* Not a JFFS2 node, whinge and move on */
-			JFFS2_NOTICE("Wrong magic bitmask 0x%04x in node header at %#08x.\n",
-				     je16_to_cpu(node->u.magic), ref_offset(ref));
+			node_magic_error++;
 			jffs2_mark_node_obsolete(c, ref);
 			goto cont;
 		}
@@ -1112,6 +1111,10 @@ static int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_inf
 	kfree(buf);
 
 	f->highest_version = rii->highest_version;
+
+	if (node_crc_error != 0 || node_magic_error != 0)
+		JFFS2_NOTICE("inode #%u: total %u nodes, crc_error %u, magic_error %u\n",
+			     f->inocache->ino, node_total, node_crc_error, node_magic_error);
 
 	dbg_readinode("nodes of inode #%u were read, the highest version is %u, latest_mctime %u, mctime_ver %u.\n",
 		      f->inocache->ino, rii->highest_version, rii->latest_mctime,
