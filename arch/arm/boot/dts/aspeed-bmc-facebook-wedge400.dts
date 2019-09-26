@@ -536,3 +536,8 @@
 		line-name = "FCM_CPLD_JTAG_EN_N";
 	};
 };
+
+&uhci {
+	status = "okay";
+};
+
