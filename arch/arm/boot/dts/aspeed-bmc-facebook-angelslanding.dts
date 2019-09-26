@@ -163,6 +163,10 @@
 	status = "okay";
 };
 
+&ehci1 {
+  status = "okay";
+};
+
 &adc {
 	status = "okay";
 };
