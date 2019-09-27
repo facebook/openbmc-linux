@@ -1,16 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright(c) 2013-2015 Intel Corporation. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
  */
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
 #include <linux/device.h>
 #include <linux/ndctl.h>
@@ -24,6 +17,10 @@
 #include "nd.h"
 
 static DEFINE_IDA(dimm_ida);
+
+static bool noblk;
+module_param(noblk, bool, 0444);
+MODULE_PARM_DESC(noblk, "force disable BLK / local alias support");
 
 /*
  * Retrieve bus and dimm handle and return if this bus supports
@@ -53,7 +50,7 @@ static int validate_dimm(struct nvdimm_drvdata *ndd)
 
 	rc = nvdimm_check_config_data(ndd->dev);
 	if (rc)
-		dev_dbg(ndd->dev, "%pf: %s error: %d\n",
+		dev_dbg(ndd->dev, "%ps: %s error: %d\n",
 				__builtin_return_address(0), __func__, rc);
 	return rc;
 }
@@ -487,12 +484,12 @@ static ssize_t security_store(struct device *dev,
 	 * done while probing is idle and the DIMM is not in active use
 	 * in any region.
 	 */
-	device_lock(dev);
+	nd_device_lock(dev);
 	nvdimm_bus_lock(dev);
 	wait_nvdimm_bus_probe_idle(dev);
 	rc = __security_store(dev, buf, len);
 	nvdimm_bus_unlock(dev);
-	device_unlock(dev);
+	nd_device_unlock(dev);
 
 	return rc;
 }
@@ -551,6 +548,8 @@ struct nvdimm *__nvdimm_create(struct nvdimm_bus *nvdimm_bus,
 
 	nvdimm->dimm_id = dimm_id;
 	nvdimm->provider_data = provider_data;
+	if (noblk)
+		flags |= 1 << NDD_NOBLK;
 	nvdimm->flags = flags;
 	nvdimm->cmd_mask = cmd_mask;
 	nvdimm->num_flush = num_flush;

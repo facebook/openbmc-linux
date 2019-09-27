@@ -21,7 +21,7 @@
 
 	chosen {
 		stdout-path = &uart3;
-		bootargs = "debug console=ttyS2,9600n8 root=/dev/ram rw";
+		bootargs = "console=ttyS2,9600n8 root=/dev/ram rw";
 	};
 
 	memory@40000000 {

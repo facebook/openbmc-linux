@@ -10,7 +10,7 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_atomic_helper.h>
-#include <drm/drm_crtc_helper.h>
+#include <drm/drm_probe_helper.h>
 #include <drm/drm_gem.h>
 
 #include <linux/of_device.h>
@@ -582,6 +582,7 @@ static void xen_drm_drv_fini(struct xen_drm_front_info *front_info)
 
 	drm_kms_helper_poll_fini(dev);
 	drm_dev_unplug(dev);
+	drm_dev_put(dev);
 
 	front_info->drm_info = NULL;
 

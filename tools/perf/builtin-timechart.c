@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * builtin-timechart.c - make an svg timechart of system activity
  *
@@ -5,11 +6,6 @@
  *
  * Authors:
  *     Arjan van de Ven <arjan@linux.intel.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; version 2
- * of the License.
  */
 
 #include <errno.h>
@@ -17,9 +13,6 @@
 #include <traceevent/event-parse.h>
 
 #include "builtin.h"
-
-#include "util/util.h"
-
 #include "util/color.h"
 #include <linux/list.h>
 #include "util/cache.h"
@@ -28,6 +21,7 @@
 #include <linux/kernel.h>
 #include <linux/rbtree.h>
 #include <linux/time64.h>
+#include <linux/zalloc.h>
 #include "util/symbol.h"
 #include "util/thread.h"
 #include "util/callchain.h"
@@ -1602,11 +1596,9 @@ static int __cmd_timechart(struct timechart *tchart, const char *output_name)
 		{ "syscalls:sys_exit_select",		process_exit_poll },
 	};
 	struct perf_data data = {
-		.file      = {
-			.path = input_name,
-		},
-		.mode      = PERF_DATA_MODE_READ,
-		.force     = tchart->force,
+		.path  = input_name,
+		.mode  = PERF_DATA_MODE_READ,
+		.force = tchart->force,
 	};
 
 	struct perf_session *session = perf_session__new(&data, false,

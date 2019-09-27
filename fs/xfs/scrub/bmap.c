@@ -9,27 +9,19 @@
 #include "xfs_format.h"
 #include "xfs_trans_resv.h"
 #include "xfs_mount.h"
-#include "xfs_defer.h"
 #include "xfs_btree.h"
 #include "xfs_bit.h"
 #include "xfs_log_format.h"
 #include "xfs_trans.h"
-#include "xfs_sb.h"
 #include "xfs_inode.h"
-#include "xfs_inode_fork.h"
 #include "xfs_alloc.h"
-#include "xfs_rtalloc.h"
 #include "xfs_bmap.h"
-#include "xfs_bmap_util.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_rmap.h"
 #include "xfs_rmap_btree.h"
-#include "xfs_refcount.h"
-#include "scrub/xfs_scrub.h"
 #include "scrub/scrub.h"
 #include "scrub/common.h"
 #include "scrub/btree.h"
-#include "scrub/trace.h"
 
 /* Set us up with an inode's bmap. */
 int
@@ -281,6 +273,31 @@ xchk_bmap_extent_xref(
 	xchk_ag_free(info->sc, &info->sc->sa);
 }
 
+/*
+ * Directories and attr forks should never have blocks that can't be addressed
+ * by a xfs_dablk_t.
+ */
+STATIC void
+xchk_bmap_dirattr_extent(
+	struct xfs_inode	*ip,
+	struct xchk_bmap_info	*info,
+	struct xfs_bmbt_irec	*irec)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+	xfs_fileoff_t		off;
+
+	if (!S_ISDIR(VFS_I(ip)->i_mode) && info->whichfork != XFS_ATTR_FORK)
+		return;
+
+	if (!xfs_verify_dablk(mp, irec->br_startoff))
+		xchk_fblock_set_corrupt(info->sc, info->whichfork,
+				irec->br_startoff);
+
+	off = irec->br_startoff + irec->br_blockcount - 1;
+	if (!xfs_verify_dablk(mp, off))
+		xchk_fblock_set_corrupt(info->sc, info->whichfork, off);
+}
+
 /* Scrub a single extent record. */
 STATIC int
 xchk_bmap_extent(
@@ -304,6 +321,8 @@ xchk_bmap_extent(
 	if (irec->br_startoff < info->lastoff)
 		xchk_fblock_set_corrupt(info->sc, info->whichfork,
 				irec->br_startoff);
+
+	xchk_bmap_dirattr_extent(ip, info, irec);
 
 	/* There should never be a "hole" extent in either extent list. */
 	if (irec->br_startblock == HOLESTARTBLOCK)

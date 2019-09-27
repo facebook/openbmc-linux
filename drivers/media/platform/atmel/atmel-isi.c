@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2011 Atmel Corporation
  * Josh Wu, <josh.wu@atmel.com>
@@ -5,10 +6,6 @@
  * Based on previous work by Lars Haring, <lars.haring@atmel.com>
  * and Sedji Gaouaou
  * Based on the bttv driver for Bt848 with respective copyright holders
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/clk.h>
@@ -110,7 +107,7 @@ struct atmel_isi {
 	bool				enable_preview_path;
 
 	struct completion		complete;
-	/* ISI peripherial clock */
+	/* ISI peripheral clock */
 	struct clk			*pclk;
 	unsigned int			irq;
 
@@ -1078,7 +1075,7 @@ static void isi_graph_notify_unbind(struct v4l2_async_notifier *notifier,
 
 	dev_dbg(isi->dev, "Removing %s\n", video_device_node_name(isi->vdev));
 
-	/* Checks internaly if vdev have been init or not */
+	/* Checks internally if vdev have been init or not */
 	video_unregister_device(isi->vdev);
 }
 

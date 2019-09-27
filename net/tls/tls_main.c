@@ -61,6 +61,8 @@ static LIST_HEAD(device_list);
 static DEFINE_SPINLOCK(device_spinlock);
 static struct proto tls_prots[TLS_NUM_PROTS][TLS_NUM_CONFIG][TLS_NUM_CONFIG];
 static struct proto_ops tls_sw_proto_ops;
+static void build_protos(struct proto prot[TLS_NUM_CONFIG][TLS_NUM_CONFIG],
+			 struct proto *base);
 
 static void update_sk_prot(struct sock *sk, struct tls_context *ctx)
 {
@@ -144,7 +146,6 @@ retry:
 	}
 
 	ctx->in_tcp_sendpages = false;
-	ctx->sk_write_space(sk);
 
 	return 0;
 }
@@ -207,23 +208,29 @@ int tls_push_partial_record(struct sock *sk, struct tls_context *ctx,
 	return tls_push_sg(sk, ctx, sg, offset, flags);
 }
 
-int tls_push_pending_closed_record(struct sock *sk,
-				   struct tls_context *tls_ctx,
-				   int flags, long *timeo)
+bool tls_free_partial_record(struct sock *sk, struct tls_context *ctx)
 {
-	struct tls_sw_context_tx *ctx = tls_sw_ctx_tx(tls_ctx);
+	struct scatterlist *sg;
 
-	if (tls_is_partially_sent_record(tls_ctx) ||
-	    !list_empty(&ctx->tx_list))
-		return tls_tx_records(sk, flags);
-	else
-		return tls_ctx->push_pending_record(sk, flags);
+	sg = ctx->partially_sent_record;
+	if (!sg)
+		return false;
+
+	while (1) {
+		put_page(sg_page(sg));
+		sk_mem_uncharge(sk, sg->length);
+
+		if (sg_is_last(sg))
+			break;
+		sg++;
+	}
+	ctx->partially_sent_record = NULL;
+	return true;
 }
 
 static void tls_write_space(struct sock *sk)
 {
 	struct tls_context *ctx = tls_get_ctx(sk);
-	struct tls_sw_context_tx *tx_ctx = tls_sw_ctx_tx(ctx);
 
 	/* If in_tcp_sendpages call lower protocol write space handler
 	 * to ensure we wake up any waiting operations there. For example
@@ -234,17 +241,17 @@ static void tls_write_space(struct sock *sk)
 		return;
 	}
 
-	/* Schedule the transmission if tx list is ready */
-	if (is_tx_ready(tx_ctx) && !sk->sk_write_pending) {
-		/* Schedule the transmission */
-		if (!test_and_set_bit(BIT_TX_SCHEDULED, &tx_ctx->tx_bitmask))
-			schedule_delayed_work(&tx_ctx->tx_work.work, 0);
-	}
+#ifdef CONFIG_TLS_DEVICE
+	if (ctx->tx_conf == TLS_HW)
+		tls_device_write_space(sk, ctx);
+	else
+#endif
+		tls_sw_write_space(sk, ctx);
 
 	ctx->sk_write_space(sk);
 }
 
-static void tls_ctx_free(struct tls_context *ctx)
+void tls_ctx_free(struct tls_context *ctx)
 {
 	if (!ctx)
 		return;
@@ -254,56 +261,65 @@ static void tls_ctx_free(struct tls_context *ctx)
 	kfree(ctx);
 }
 
-static void tls_sk_proto_close(struct sock *sk, long timeout)
+static void tls_sk_proto_cleanup(struct sock *sk,
+				 struct tls_context *ctx, long timeo)
 {
-	struct tls_context *ctx = tls_get_ctx(sk);
-	long timeo = sock_sndtimeo(sk, 0);
-	void (*sk_proto_close)(struct sock *sk, long timeout);
-	bool free_ctx = false;
-
-	lock_sock(sk);
-	sk_proto_close = ctx->sk_proto_close;
-
-	if ((ctx->tx_conf == TLS_HW_RECORD && ctx->rx_conf == TLS_HW_RECORD) ||
-	    (ctx->tx_conf == TLS_BASE && ctx->rx_conf == TLS_BASE)) {
-		free_ctx = true;
-		goto skip_tx_cleanup;
-	}
-
-	if (!tls_complete_pending_work(sk, ctx, 0, &timeo))
+	if (unlikely(sk->sk_write_pending) &&
+	    !wait_on_pending_writer(sk, &timeo))
 		tls_handle_open_record(sk, 0);
 
 	/* We need these for tls_sw_fallback handling of other packets */
 	if (ctx->tx_conf == TLS_SW) {
 		kfree(ctx->tx.rec_seq);
 		kfree(ctx->tx.iv);
-		tls_sw_free_resources_tx(sk);
+		tls_sw_release_resources_tx(sk);
+#ifdef CONFIG_TLS_DEVICE
+	} else if (ctx->tx_conf == TLS_HW) {
+		tls_device_free_resources_tx(sk);
+#endif
 	}
 
-	if (ctx->rx_conf == TLS_SW) {
-		kfree(ctx->rx.rec_seq);
-		kfree(ctx->rx.iv);
-		tls_sw_free_resources_rx(sk);
-	}
+	if (ctx->rx_conf == TLS_SW)
+		tls_sw_release_resources_rx(sk);
 
 #ifdef CONFIG_TLS_DEVICE
 	if (ctx->rx_conf == TLS_HW)
 		tls_device_offload_cleanup_rx(sk);
-
-	if (ctx->tx_conf != TLS_HW && ctx->rx_conf != TLS_HW) {
-#else
-	{
 #endif
-		tls_ctx_free(ctx);
-		ctx = NULL;
-	}
+}
 
-skip_tx_cleanup:
+static void tls_sk_proto_close(struct sock *sk, long timeout)
+{
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	struct tls_context *ctx = tls_get_ctx(sk);
+	long timeo = sock_sndtimeo(sk, 0);
+	bool free_ctx;
+
+	if (ctx->tx_conf == TLS_SW)
+		tls_sw_cancel_work_tx(ctx);
+
+	lock_sock(sk);
+	free_ctx = ctx->tx_conf != TLS_HW && ctx->rx_conf != TLS_HW;
+
+	if (ctx->tx_conf != TLS_BASE || ctx->rx_conf != TLS_BASE)
+		tls_sk_proto_cleanup(sk, ctx, timeo);
+
+	write_lock_bh(&sk->sk_callback_lock);
+	if (free_ctx)
+		icsk->icsk_ulp_data = NULL;
+	sk->sk_prot = ctx->sk_proto;
+	if (sk->sk_write_space == tls_write_space)
+		sk->sk_write_space = ctx->sk_write_space;
+	write_unlock_bh(&sk->sk_callback_lock);
 	release_sock(sk);
-	sk_proto_close(sk, timeout);
-	/* free ctx for TLS_HW_RECORD, used by tcp_set_state
-	 * for sk->sk_prot->unhash [tls_hw_unhash]
-	 */
+	if (ctx->tx_conf == TLS_SW)
+		tls_sw_free_ctx_tx(ctx);
+	if (ctx->rx_conf == TLS_SW || ctx->rx_conf == TLS_HW)
+		tls_sw_strparser_done(ctx);
+	if (ctx->rx_conf == TLS_SW)
+		tls_sw_free_ctx_rx(ctx);
+	ctx->sk_proto_close(sk, timeout);
+
 	if (free_ctx)
 		tls_ctx_free(ctx);
 }
@@ -368,6 +384,30 @@ static int do_tls_getsockopt_tx(struct sock *sk, char __user *optval,
 			rc = -EFAULT;
 		break;
 	}
+	case TLS_CIPHER_AES_GCM_256: {
+		struct tls12_crypto_info_aes_gcm_256 *
+		  crypto_info_aes_gcm_256 =
+		  container_of(crypto_info,
+			       struct tls12_crypto_info_aes_gcm_256,
+			       info);
+
+		if (len != sizeof(*crypto_info_aes_gcm_256)) {
+			rc = -EINVAL;
+			goto out;
+		}
+		lock_sock(sk);
+		memcpy(crypto_info_aes_gcm_256->iv,
+		       ctx->tx.iv + TLS_CIPHER_AES_GCM_256_SALT_SIZE,
+		       TLS_CIPHER_AES_GCM_256_IV_SIZE);
+		memcpy(crypto_info_aes_gcm_256->rec_seq, ctx->tx.rec_seq,
+		       TLS_CIPHER_AES_GCM_256_REC_SEQ_SIZE);
+		release_sock(sk);
+		if (copy_to_user(optval,
+				 crypto_info_aes_gcm_256,
+				 sizeof(*crypto_info_aes_gcm_256)))
+			rc = -EFAULT;
+		break;
+	}
 	default:
 		rc = -EINVAL;
 	}
@@ -407,7 +447,9 @@ static int do_tls_setsockopt_conf(struct sock *sk, char __user *optval,
 				  unsigned int optlen, int tx)
 {
 	struct tls_crypto_info *crypto_info;
+	struct tls_crypto_info *alt_crypto_info;
 	struct tls_context *ctx = tls_get_ctx(sk);
+	size_t optsize;
 	int rc = 0;
 	int conf;
 
@@ -416,10 +458,13 @@ static int do_tls_setsockopt_conf(struct sock *sk, char __user *optval,
 		goto out;
 	}
 
-	if (tx)
+	if (tx) {
 		crypto_info = &ctx->crypto_send.info;
-	else
+		alt_crypto_info = &ctx->crypto_recv.info;
+	} else {
 		crypto_info = &ctx->crypto_recv.info;
+		alt_crypto_info = &ctx->crypto_send.info;
+	}
 
 	/* Currently we don't support set crypto info more than one time */
 	if (TLS_CRYPTO_INFO_READY(crypto_info)) {
@@ -434,27 +479,46 @@ static int do_tls_setsockopt_conf(struct sock *sk, char __user *optval,
 	}
 
 	/* check version */
-	if (crypto_info->version != TLS_1_2_VERSION) {
+	if (crypto_info->version != TLS_1_2_VERSION &&
+	    crypto_info->version != TLS_1_3_VERSION) {
 		rc = -ENOTSUPP;
 		goto err_crypto_info;
 	}
 
-	switch (crypto_info->cipher_type) {
-	case TLS_CIPHER_AES_GCM_128: {
-		if (optlen != sizeof(struct tls12_crypto_info_aes_gcm_128)) {
+	/* Ensure that TLS version and ciphers are same in both directions */
+	if (TLS_CRYPTO_INFO_READY(alt_crypto_info)) {
+		if (alt_crypto_info->version != crypto_info->version ||
+		    alt_crypto_info->cipher_type != crypto_info->cipher_type) {
 			rc = -EINVAL;
 			goto err_crypto_info;
 		}
-		rc = copy_from_user(crypto_info + 1, optval + sizeof(*crypto_info),
-				    optlen - sizeof(*crypto_info));
-		if (rc) {
-			rc = -EFAULT;
-			goto err_crypto_info;
-		}
+	}
+
+	switch (crypto_info->cipher_type) {
+	case TLS_CIPHER_AES_GCM_128:
+		optsize = sizeof(struct tls12_crypto_info_aes_gcm_128);
+		break;
+	case TLS_CIPHER_AES_GCM_256: {
+		optsize = sizeof(struct tls12_crypto_info_aes_gcm_256);
 		break;
 	}
+	case TLS_CIPHER_AES_CCM_128:
+		optsize = sizeof(struct tls12_crypto_info_aes_ccm_128);
+		break;
 	default:
 		rc = -EINVAL;
+		goto err_crypto_info;
+	}
+
+	if (optlen != optsize) {
+		rc = -EINVAL;
+		goto err_crypto_info;
+	}
+
+	rc = copy_from_user(crypto_info + 1, optval + sizeof(*crypto_info),
+			    optlen - sizeof(*crypto_info));
+	if (rc) {
+		rc = -EFAULT;
 		goto err_crypto_info;
 	}
 
@@ -467,6 +531,8 @@ static int do_tls_setsockopt_conf(struct sock *sk, char __user *optval,
 		{
 #endif
 			rc = tls_set_sw_offload(sk, ctx, 1);
+			if (rc)
+				goto err_crypto_info;
 			conf = TLS_SW;
 		}
 	} else {
@@ -478,12 +544,12 @@ static int do_tls_setsockopt_conf(struct sock *sk, char __user *optval,
 		{
 #endif
 			rc = tls_set_sw_offload(sk, ctx, 0);
+			if (rc)
+				goto err_crypto_info;
 			conf = TLS_SW;
 		}
+		tls_sw_strparser_arm(sk, ctx);
 	}
-
-	if (rc)
-		goto err_crypto_info;
 
 	if (tx)
 		ctx->tx_conf = conf;
@@ -548,7 +614,45 @@ static struct tls_context *create_ctx(struct sock *sk)
 	ctx->setsockopt = sk->sk_prot->setsockopt;
 	ctx->getsockopt = sk->sk_prot->getsockopt;
 	ctx->sk_proto_close = sk->sk_prot->close;
+	ctx->unhash = sk->sk_prot->unhash;
 	return ctx;
+}
+
+static void tls_build_proto(struct sock *sk)
+{
+	int ip_ver = sk->sk_family == AF_INET6 ? TLSV6 : TLSV4;
+
+	/* Build IPv6 TLS whenever the address of tcpv6 _prot changes */
+	if (ip_ver == TLSV6 &&
+	    unlikely(sk->sk_prot != smp_load_acquire(&saved_tcpv6_prot))) {
+		mutex_lock(&tcpv6_prot_mutex);
+		if (likely(sk->sk_prot != saved_tcpv6_prot)) {
+			build_protos(tls_prots[TLSV6], sk->sk_prot);
+			smp_store_release(&saved_tcpv6_prot, sk->sk_prot);
+		}
+		mutex_unlock(&tcpv6_prot_mutex);
+	}
+
+	if (ip_ver == TLSV4 &&
+	    unlikely(sk->sk_prot != smp_load_acquire(&saved_tcpv4_prot))) {
+		mutex_lock(&tcpv4_prot_mutex);
+		if (likely(sk->sk_prot != saved_tcpv4_prot)) {
+			build_protos(tls_prots[TLSV4], sk->sk_prot);
+			smp_store_release(&saved_tcpv4_prot, sk->sk_prot);
+		}
+		mutex_unlock(&tcpv4_prot_mutex);
+	}
+}
+
+static void tls_hw_sk_destruct(struct sock *sk)
+{
+	struct tls_context *ctx = tls_get_ctx(sk);
+	struct inet_connection_sock *icsk = inet_csk(sk);
+
+	ctx->sk_destruct(sk);
+	/* Free ctx */
+	tls_ctx_free(ctx);
+	icsk->icsk_ulp_data = NULL;
 }
 
 static int tls_hw_prot(struct sock *sk)
@@ -564,12 +668,17 @@ static int tls_hw_prot(struct sock *sk)
 			if (!ctx)
 				goto out;
 
+			spin_unlock_bh(&device_spinlock);
+			tls_build_proto(sk);
 			ctx->hash = sk->sk_prot->hash;
 			ctx->unhash = sk->sk_prot->unhash;
 			ctx->sk_proto_close = sk->sk_prot->close;
+			ctx->sk_destruct = sk->sk_destruct;
+			sk->sk_destruct = tls_hw_sk_destruct;
 			ctx->rx_conf = TLS_HW_RECORD;
 			ctx->tx_conf = TLS_HW_RECORD;
 			update_sk_prot(sk, ctx);
+			spin_lock_bh(&device_spinlock);
 			rc = 1;
 			break;
 		}
@@ -663,17 +772,15 @@ static void build_protos(struct proto prot[TLS_NUM_CONFIG][TLS_NUM_CONFIG],
 	prot[TLS_HW_RECORD][TLS_HW_RECORD] = *base;
 	prot[TLS_HW_RECORD][TLS_HW_RECORD].hash		= tls_hw_hash;
 	prot[TLS_HW_RECORD][TLS_HW_RECORD].unhash	= tls_hw_unhash;
-	prot[TLS_HW_RECORD][TLS_HW_RECORD].close	= tls_sk_proto_close;
 }
 
 static int tls_init(struct sock *sk)
 {
-	int ip_ver = sk->sk_family == AF_INET6 ? TLSV6 : TLSV4;
 	struct tls_context *ctx;
 	int rc = 0;
 
 	if (tls_hw_prot(sk))
-		goto out;
+		return 0;
 
 	/* The TLS ulp is currently supported only for TCP sockets
 	 * in ESTABLISHED state.
@@ -684,39 +791,36 @@ static int tls_init(struct sock *sk)
 	if (sk->sk_state != TCP_ESTABLISHED)
 		return -ENOTSUPP;
 
+	tls_build_proto(sk);
+
 	/* allocate tls context */
+	write_lock_bh(&sk->sk_callback_lock);
 	ctx = create_ctx(sk);
 	if (!ctx) {
 		rc = -ENOMEM;
 		goto out;
 	}
 
-	/* Build IPv6 TLS whenever the address of tcpv6	_prot changes */
-	if (ip_ver == TLSV6 &&
-	    unlikely(sk->sk_prot != smp_load_acquire(&saved_tcpv6_prot))) {
-		mutex_lock(&tcpv6_prot_mutex);
-		if (likely(sk->sk_prot != saved_tcpv6_prot)) {
-			build_protos(tls_prots[TLSV6], sk->sk_prot);
-			smp_store_release(&saved_tcpv6_prot, sk->sk_prot);
-		}
-		mutex_unlock(&tcpv6_prot_mutex);
-	}
-
-	if (ip_ver == TLSV4 &&
-	    unlikely(sk->sk_prot != smp_load_acquire(&saved_tcpv4_prot))) {
-		mutex_lock(&tcpv4_prot_mutex);
-		if (likely(sk->sk_prot != saved_tcpv4_prot)) {
-			build_protos(tls_prots[TLSV4], sk->sk_prot);
-			smp_store_release(&saved_tcpv4_prot, sk->sk_prot);
-		}
-		mutex_unlock(&tcpv4_prot_mutex);
-	}
-
 	ctx->tx_conf = TLS_BASE;
 	ctx->rx_conf = TLS_BASE;
+	ctx->sk_proto = sk->sk_prot;
 	update_sk_prot(sk, ctx);
 out:
+	write_unlock_bh(&sk->sk_callback_lock);
 	return rc;
+}
+
+static void tls_update(struct sock *sk, struct proto *p)
+{
+	struct tls_context *ctx;
+
+	ctx = tls_get_ctx(sk);
+	if (likely(ctx)) {
+		ctx->sk_proto_close = p->close;
+		ctx->sk_proto = p;
+	} else {
+		sk->sk_prot = p;
+	}
 }
 
 void tls_register_device(struct tls_device *device)
@@ -739,6 +843,7 @@ static struct tcp_ulp_ops tcp_tls_ulp_ops __read_mostly = {
 	.name			= "tls",
 	.owner			= THIS_MODULE,
 	.init			= tls_init,
+	.update			= tls_update,
 };
 
 static int __init tls_register(void)

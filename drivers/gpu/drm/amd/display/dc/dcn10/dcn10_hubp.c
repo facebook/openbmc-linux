@@ -63,7 +63,7 @@ void hubp1_set_blank(struct hubp *hubp, bool blank)
 		}
 
 		hubp->mpcc_id = 0xf;
-		hubp->opp_id = 0xf;
+		hubp->opp_id = OPP_ID_INVALID;
 	}
 }
 
@@ -115,7 +115,7 @@ static void hubp1_set_hubp_blank_en(struct hubp *hubp, bool blank)
 	REG_UPDATE(DCHUBP_CNTL, HUBP_BLANK_EN, blank_en);
 }
 
-static void hubp1_vready_workaround(struct hubp *hubp,
+void hubp1_vready_workaround(struct hubp *hubp,
 		struct _vcs_dpi_display_pipe_dest_params_st *pipe_dest)
 {
 	uint32_t value = 0;
@@ -306,6 +306,28 @@ void hubp1_program_pixel_format(
 		REG_UPDATE(DCSURF_SURFACE_CONFIG,
 				SURFACE_PIXEL_FORMAT, 12);
 		break;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+	case SURFACE_PIXEL_FORMAT_GRPH_RGB111110_FIX:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 112);
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_BGR101111_FIX:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 113);
+		break;
+	case SURFACE_PIXEL_FORMAT_VIDEO_ACrYCb2101010:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 114);
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_RGB111110_FLOAT:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 118);
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_BGR101111_FLOAT:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 119);
+		break;
+#endif
 	default:
 		BREAK_TO_DEBUGGER();
 		break;
@@ -1177,6 +1199,10 @@ void hubp1_vtg_sel(struct hubp *hubp, uint32_t otg_inst)
 	REG_UPDATE(DCHUBP_CNTL, HUBP_VTG_SEL, otg_inst);
 }
 
+void hubp1_init(struct hubp *hubp)
+{
+	//do nothing
+}
 static const struct hubp_funcs dcn10_hubp_funcs = {
 	.hubp_program_surface_flip_and_addr =
 			hubp1_program_surface_flip_and_addr,
@@ -1200,7 +1226,12 @@ static const struct hubp_funcs dcn10_hubp_funcs = {
 	.hubp_clear_underflow = hubp1_clear_underflow,
 	.hubp_disable_control =  hubp1_disable_control,
 	.hubp_get_underflow_status = hubp1_get_underflow_status,
+	.hubp_init = hubp1_init,
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+	.dmdata_set_attributes = NULL,
+	.dmdata_load = NULL,
+#endif
 };
 
 /*****************************************/
@@ -1221,7 +1252,7 @@ void dcn10_hubp_construct(
 	hubp1->hubp_shift = hubp_shift;
 	hubp1->hubp_mask = hubp_mask;
 	hubp1->base.inst = inst;
-	hubp1->base.opp_id = 0xf;
+	hubp1->base.opp_id = OPP_ID_INVALID;
 	hubp1->base.mpcc_id = 0xf;
 }
 

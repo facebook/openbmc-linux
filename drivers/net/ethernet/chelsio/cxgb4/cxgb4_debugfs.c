@@ -2620,7 +2620,7 @@ static inline struct port_info *ethqset2pinfo(struct adapter *adap, int qset)
 	}
 
 	/* should never happen! */
-	BUG_ON(1);
+	BUG();
 	return NULL;
 }
 
@@ -3143,7 +3143,7 @@ static int tid_info_show(struct seq_file *seq, void *v)
 			seq_printf(seq, ", in use: %u/%u\n",
 				   atomic_read(&t->tids_in_use),
 				   atomic_read(&t->hash_tids_in_use));
-		} else if (adap->flags & FW_OFLD_CONN) {
+		} else if (adap->flags & CXGB4_FW_OFLD_CONN) {
 			seq_printf(seq, "TID range: %u..%u/%u..%u",
 				   t->aftid_base,
 				   t->aftid_end,
@@ -3236,8 +3236,10 @@ static ssize_t blocked_fl_write(struct file *filp, const char __user *ubuf,
 		return -ENOMEM;
 
 	err = bitmap_parse_user(ubuf, count, t, adap->sge.egr_sz);
-	if (err)
+	if (err) {
+		kvfree(t);
 		return err;
+	}
 
 	bitmap_copy(adap->sge.blocked_fl, t, adap->sge.egr_sz);
 	kvfree(t);

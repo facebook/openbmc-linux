@@ -63,15 +63,10 @@ static vm_fault_t qxl_ttm_fault(struct vm_fault *vmf)
 
 int qxl_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	struct drm_file *file_priv;
-	struct qxl_device *qdev;
 	int r;
+	struct drm_file *file_priv = filp->private_data;
+	struct qxl_device *qdev = file_priv->minor->dev->dev_private;
 
-	if (unlikely(vma->vm_pgoff < DRM_FILE_PAGE_OFFSET))
-		return -EINVAL;
-
-	file_priv = filp->private_data;
-	qdev = file_priv->minor->dev->dev_private;
 	if (qdev == NULL) {
 		DRM_ERROR(
 		 "filp->private_data->minor->dev->dev_private == NULL\n");
@@ -100,6 +95,11 @@ static int qxl_invalidate_caches(struct ttm_bo_device *bdev, uint32_t flags)
 static int qxl_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 			     struct ttm_mem_type_manager *man)
 {
+	struct qxl_device *qdev = qxl_get_qdev(bdev);
+	unsigned int gpu_offset_shift =
+		64 - (qdev->rom->slot_gen_bits + qdev->rom->slot_id_bits + 8);
+	struct qxl_memslot *slot;
+
 	switch (type) {
 	case TTM_PL_SYSTEM:
 		/* System memory */
@@ -110,8 +110,11 @@ static int qxl_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 	case TTM_PL_VRAM:
 	case TTM_PL_PRIV:
 		/* "On-card" video ram */
+		slot = (type == TTM_PL_VRAM) ?
+			&qdev->main_slot : &qdev->surfaces_slot;
+		slot->gpu_offset = (uint64_t)type << gpu_offset_shift;
 		man->func = &ttm_bo_manager_func;
-		man->gpu_offset = 0;
+		man->gpu_offset = slot->gpu_offset;
 		man->flags = TTM_MEMTYPE_FLAG_FIXED |
 			     TTM_MEMTYPE_FLAG_MAPPABLE;
 		man->available_caching = TTM_PL_MASK_CACHING;
@@ -196,7 +199,7 @@ static void qxl_ttm_io_mem_free(struct ttm_bo_device *bdev,
  * TTM backend functions.
  */
 struct qxl_ttm_tt {
-	struct ttm_dma_tt		ttm;
+	struct ttm_tt		        ttm;
 	struct qxl_device		*qdev;
 	u64				offset;
 };
@@ -225,7 +228,7 @@ static void qxl_ttm_backend_destroy(struct ttm_tt *ttm)
 {
 	struct qxl_ttm_tt *gtt = (void *)ttm;
 
-	ttm_dma_tt_fini(&gtt->ttm);
+	ttm_tt_fini(&gtt->ttm);
 	kfree(gtt);
 }
 
@@ -245,13 +248,13 @@ static struct ttm_tt *qxl_ttm_tt_create(struct ttm_buffer_object *bo,
 	gtt = kzalloc(sizeof(struct qxl_ttm_tt), GFP_KERNEL);
 	if (gtt == NULL)
 		return NULL;
-	gtt->ttm.ttm.func = &qxl_backend_func;
+	gtt->ttm.func = &qxl_backend_func;
 	gtt->qdev = qdev;
-	if (ttm_dma_tt_init(&gtt->ttm, bo, page_flags)) {
+	if (ttm_tt_init(&gtt->ttm, bo, page_flags)) {
 		kfree(gtt);
 		return NULL;
 	}
-	return &gtt->ttm.ttm;
+	return &gtt->ttm;
 }
 
 static void qxl_move_null(struct ttm_buffer_object *bo,
@@ -320,7 +323,7 @@ int qxl_ttm_init(struct qxl_device *qdev)
 	r = ttm_bo_device_init(&qdev->mman.bdev,
 			       &qxl_bo_driver,
 			       qdev->ddev.anon_inode->i_mapping,
-			       DRM_FILE_PAGE_OFFSET, 0);
+			       false);
 	if (r) {
 		DRM_ERROR("failed initializing buffer object driver(%d).\n", r);
 		return r;

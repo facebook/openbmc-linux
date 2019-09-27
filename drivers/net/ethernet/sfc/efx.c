@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /****************************************************************************
  * Driver for Solarflare network controllers and boards
  * Copyright 2005-2006 Fen Systems Ltd.
  * Copyright 2005-2013 Solarflare Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation, incorporated herein by reference.
  */
 
 #include <linux/module.h>
@@ -915,7 +912,7 @@ rollback:
 
 void efx_schedule_slow_fill(struct efx_rx_queue *rx_queue)
 {
-	mod_timer(&rx_queue->slow_fill, jiffies + msecs_to_jiffies(100));
+	mod_timer(&rx_queue->slow_fill, jiffies + msecs_to_jiffies(10));
 }
 
 static bool efx_default_channel_want_txqs(struct efx_channel *channel)
@@ -3617,11 +3614,7 @@ static int efx_pci_probe(struct pci_dev *pci_dev,
 		netif_warn(efx, probe, efx->net_dev,
 			   "failed to create MTDs (%d)\n", rc);
 
-	rc = pci_enable_pcie_error_reporting(pci_dev);
-	if (rc && rc != -EINVAL)
-		netif_notice(efx, probe, efx->net_dev,
-			     "PCIE error reporting unavailable (%d).\n",
-			     rc);
+	(void)pci_enable_pcie_error_reporting(pci_dev);
 
 	if (efx->type->udp_tnl_push_ports)
 		efx->type->udp_tnl_push_ports(efx);

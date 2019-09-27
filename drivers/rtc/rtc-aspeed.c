@@ -8,48 +8,44 @@
 #include <linux/io.h>
 
 struct aspeed_rtc {
-	struct rtc_device	*rtc_dev;
-	void __iomem		*base;
-	spinlock_t		lock;
+	struct rtc_device *rtc_dev;
+	void __iomem *base;
 };
 
 #define RTC_TIME	0x00
 #define RTC_YEAR	0x04
 #define RTC_CTRL	0x10
 
-#define RTC_UNLOCK	0x02
-#define RTC_ENABLE	0x01
+#define RTC_UNLOCK	BIT(1)
+#define RTC_ENABLE	BIT(0)
 
 static int aspeed_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct aspeed_rtc *rtc = dev_get_drvdata(dev);
-	unsigned int cent, year, mon, day, hour, min, sec;
-	unsigned long flags;
+	unsigned int cent, year;
 	u32 reg1, reg2;
 
-	spin_lock_irqsave(&rtc->lock, flags);
+	if (!(readl(rtc->base + RTC_CTRL) & RTC_ENABLE)) {
+		dev_dbg(dev, "%s failing as rtc disabled\n", __func__);
+		return -EINVAL;
+	}
 
 	do {
 		reg2 = readl(rtc->base + RTC_YEAR);
 		reg1 = readl(rtc->base + RTC_TIME);
 	} while (reg2 != readl(rtc->base + RTC_YEAR));
 
-	day  = (reg1 >> 24) & 0x1f;
-	hour = (reg1 >> 16) & 0x1f;
-	min  = (reg1 >>  8) & 0x3f;
-	sec  = (reg1 >>  0) & 0x3f;
+	tm->tm_mday = (reg1 >> 24) & 0x1f;
+	tm->tm_hour = (reg1 >> 16) & 0x1f;
+	tm->tm_min = (reg1 >> 8) & 0x3f;
+	tm->tm_sec = (reg1 >> 0) & 0x3f;
+
 	cent = (reg2 >> 16) & 0x1f;
-	year = (reg2 >>  8) & 0x7f;
-	/*
-	 * Month is 1-12 in hardware, and 0-11 in struct rtc_time, however we
-	 * are using mktime64 which is 1-12, so no adjustment is necessary
-	 */
-	mon  = (reg2 >>  0) & 0x0f;
+	year = (reg2 >> 8) & 0x7f;
+	tm->tm_mon = ((reg2 >>  0) & 0x0f) - 1;
+	tm->tm_year = year + (cent * 100) - 1900;
 
-	rtc_time64_to_tm(mktime64(cent * 100 + year, mon, day, hour, min, sec),
-			tm);
-
-	spin_unlock_irqrestore(&rtc->lock, flags);
+	dev_dbg(dev, "%s %ptR", __func__, tm);
 
 	return 0;
 }
@@ -57,11 +53,8 @@ static int aspeed_rtc_read_time(struct device *dev, struct rtc_time *tm)
 static int aspeed_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct aspeed_rtc *rtc = dev_get_drvdata(dev);
-	unsigned long flags;
 	u32 reg1, reg2, ctrl;
 	int year, cent;
-
-	spin_lock_irqsave(&rtc->lock, flags);
 
 	cent = (tm->tm_year + 1900) / 100;
 	year = tm->tm_year % 100;
@@ -69,9 +62,8 @@ static int aspeed_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	reg1 = (tm->tm_mday << 24) | (tm->tm_hour << 16) | (tm->tm_min << 8) |
 		tm->tm_sec;
 
-	/* Hardware is 1-12, convert to 0-11 */
 	reg2 = ((cent & 0x1f) << 16) | ((year & 0x7f) << 8) |
-		((tm->tm_mon & 0xf) + 1);
+		((tm->tm_mon + 1) & 0xf);
 
 	ctrl = readl(rtc->base + RTC_CTRL);
 	writel(ctrl | RTC_UNLOCK, rtc->base + RTC_CTRL);
@@ -79,9 +71,8 @@ static int aspeed_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	writel(reg1, rtc->base + RTC_TIME);
 	writel(reg2, rtc->base + RTC_YEAR);
 
-	writel(ctrl, rtc->base + RTC_CTRL);
-
-	spin_unlock_irqrestore(&rtc->lock, flags);
+	/* Re-lock and ensure enable is set now that a time is programmed */
+	writel(ctrl | RTC_ENABLE, rtc->base + RTC_CTRL);
 
 	return 0;
 }
@@ -93,8 +84,9 @@ static const struct rtc_class_ops aspeed_rtc_ops = {
 
 static int aspeed_rtc_probe(struct platform_device *pdev)
 {
-	struct resource *res;
 	struct aspeed_rtc *rtc;
+	struct resource *res;
+	int ret;
 
 	rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
 	if (!rtc)
@@ -105,25 +97,19 @@ static int aspeed_rtc_probe(struct platform_device *pdev)
 	if (IS_ERR(rtc->base))
 		return PTR_ERR(rtc->base);
 
-	platform_set_drvdata(pdev, rtc);
-
-	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
-						&aspeed_rtc_ops, THIS_MODULE);
-
+	rtc->rtc_dev = devm_rtc_allocate_device(&pdev->dev);
 	if (IS_ERR(rtc->rtc_dev))
 		return PTR_ERR(rtc->rtc_dev);
 
-	spin_lock_init(&rtc->lock);
+	platform_set_drvdata(pdev, rtc);
 
-	if (!(readl(rtc->base + RTC_CTRL) & RTC_ENABLE)) {
-		// start RTC from 2000/1/1 00:00:00
-		writel(RTC_UNLOCK, rtc->base + RTC_CTRL);
-		writel(1 << 24, rtc->base + RTC_TIME);
-		writel((20 << 16) | 1, rtc->base + RTC_YEAR);
-	}
+	rtc->rtc_dev->ops = &aspeed_rtc_ops;
+	rtc->rtc_dev->range_min = RTC_TIMESTAMP_BEGIN_1900;
+	rtc->rtc_dev->range_max = 38814989399LL; /* 3199-12-31 23:59:59 */
 
-	/* Enable RTC and clear the unlock bit */
-	writel(RTC_ENABLE, rtc->base + RTC_CTRL);
+	ret = rtc_register_device(rtc->rtc_dev);
+	if (ret)
+		return ret;
 
 	return 0;
 }
@@ -131,6 +117,7 @@ static int aspeed_rtc_probe(struct platform_device *pdev)
 static const struct of_device_id aspeed_rtc_match[] = {
 	{ .compatible = "aspeed,ast2400-rtc", },
 	{ .compatible = "aspeed,ast2500-rtc", },
+	{ .compatible = "aspeed,ast2600-rtc", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, aspeed_rtc_match);
@@ -144,6 +131,6 @@ static struct platform_driver aspeed_rtc_driver = {
 
 module_platform_driver_probe(aspeed_rtc_driver, aspeed_rtc_probe);
 
-MODULE_DESCRIPTION("Aspeed RTC driver");
+MODULE_DESCRIPTION("ASPEED RTC driver");
 MODULE_AUTHOR("Joel Stanley <joel@jms.id.au>");
 MODULE_LICENSE("GPL");

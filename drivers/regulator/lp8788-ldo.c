@@ -1,14 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * TI LP8788 MFD - ldo regulator driver
  *
  * Copyright 2012 Texas Instruments
  *
  * Author: Milo(Woogyom) Kim <milo.kim@ti.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
  */
 
 #include <linux/module.h>
@@ -186,7 +182,7 @@ static const struct regulator_ops lp8788_ldo_voltage_fixed_ops = {
 	.enable_time = lp8788_ldo_enable_time,
 };
 
-static struct regulator_desc lp8788_dldo_desc[] = {
+static const struct regulator_desc lp8788_dldo_desc[] = {
 	{
 		.name = "dldo1",
 		.id = DLDO1,
@@ -343,7 +339,7 @@ static struct regulator_desc lp8788_dldo_desc[] = {
 	},
 };
 
-static struct regulator_desc lp8788_aldo_desc[] = {
+static const struct regulator_desc lp8788_aldo_desc[] = {
 	{
 		.name = "aldo1",
 		.id = ALDO1,

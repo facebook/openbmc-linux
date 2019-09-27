@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/fs/locks.c
  *
@@ -352,6 +353,12 @@ EXPORT_SYMBOL_GPL(locks_alloc_lock);
 
 void locks_release_private(struct file_lock *fl)
 {
+	BUG_ON(waitqueue_active(&fl->fl_wait));
+	BUG_ON(!list_empty(&fl->fl_list));
+	BUG_ON(!list_empty(&fl->fl_blocked_requests));
+	BUG_ON(!list_empty(&fl->fl_blocked_member));
+	BUG_ON(!hlist_unhashed(&fl->fl_link));
+
 	if (fl->fl_ops) {
 		if (fl->fl_ops->fl_release_private)
 			fl->fl_ops->fl_release_private(fl);
@@ -371,12 +378,6 @@ EXPORT_SYMBOL_GPL(locks_release_private);
 /* Free a lock which is not in use. */
 void locks_free_lock(struct file_lock *fl)
 {
-	BUG_ON(waitqueue_active(&fl->fl_wait));
-	BUG_ON(!list_empty(&fl->fl_list));
-	BUG_ON(!list_empty(&fl->fl_blocked_requests));
-	BUG_ON(!list_empty(&fl->fl_blocked_member));
-	BUG_ON(!hlist_unhashed(&fl->fl_link));
-
 	locks_release_private(fl);
 	kmem_cache_free(filelock_cache, fl);
 }
@@ -657,9 +658,6 @@ static inline int locks_overlap(struct file_lock *fl1, struct file_lock *fl2)
  */
 static int posix_same_owner(struct file_lock *fl1, struct file_lock *fl2)
 {
-	if (fl1->fl_lmops && fl1->fl_lmops->lm_compare_owner)
-		return fl2->fl_lmops == fl1->fl_lmops &&
-			fl1->fl_lmops->lm_compare_owner(fl1, fl2);
 	return fl1->fl_owner == fl2->fl_owner;
 }
 
@@ -700,8 +698,6 @@ static void locks_delete_global_locks(struct file_lock *fl)
 static unsigned long
 posix_owner_key(struct file_lock *fl)
 {
-	if (fl->fl_lmops && fl->fl_lmops->lm_owner_key)
-		return fl->fl_lmops->lm_owner_key(fl);
 	return (unsigned long)fl->fl_owner;
 }
 
@@ -1058,7 +1054,7 @@ static int flock_lock_inode(struct inode *inode, struct file_lock *request)
 			return -ENOMEM;
 	}
 
-	percpu_down_read_preempt_disable(&file_rwsem);
+	percpu_down_read(&file_rwsem);
 	spin_lock(&ctx->flc_lock);
 	if (request->fl_flags & FL_ACCESS)
 		goto find_conflict;
@@ -1100,7 +1096,7 @@ find_conflict:
 
 out:
 	spin_unlock(&ctx->flc_lock);
-	percpu_up_read_preempt_enable(&file_rwsem);
+	percpu_up_read(&file_rwsem);
 	if (new_fl)
 		locks_free_lock(new_fl);
 	locks_dispose_list(&dispose);
@@ -1138,7 +1134,7 @@ static int posix_lock_inode(struct inode *inode, struct file_lock *request,
 		new_fl2 = locks_alloc_lock();
 	}
 
-	percpu_down_read_preempt_disable(&file_rwsem);
+	percpu_down_read(&file_rwsem);
 	spin_lock(&ctx->flc_lock);
 	/*
 	 * New lock request. Walk all POSIX locks and look for conflicts. If
@@ -1160,6 +1156,11 @@ static int posix_lock_inode(struct inode *inode, struct file_lock *request,
 			 */
 			error = -EDEADLK;
 			spin_lock(&blocked_lock_lock);
+			/*
+			 * Ensure that we don't find any locks blocked on this
+			 * request during deadlock detection.
+			 */
+			__locks_wake_up_blocks(request);
 			if (likely(!posix_locks_deadlock(request, fl))) {
 				error = FILE_LOCK_DEFERRED;
 				__locks_insert_block(fl, request,
@@ -1312,7 +1313,7 @@ static int posix_lock_inode(struct inode *inode, struct file_lock *request,
 	}
  out:
 	spin_unlock(&ctx->flc_lock);
-	percpu_up_read_preempt_enable(&file_rwsem);
+	percpu_up_read(&file_rwsem);
 	/*
 	 * Free any unused locks.
 	 */
@@ -1471,7 +1472,7 @@ static void lease_clear_pending(struct file_lock *fl, int arg)
 	switch (arg) {
 	case F_UNLCK:
 		fl->fl_flags &= ~FL_UNLOCK_PENDING;
-		/* fall through: */
+		/* fall through */
 	case F_RDLCK:
 		fl->fl_flags &= ~FL_DOWNGRADE_PENDING;
 	}
@@ -1528,11 +1529,21 @@ static void time_out_leases(struct inode *inode, struct list_head *dispose)
 
 static bool leases_conflict(struct file_lock *lease, struct file_lock *breaker)
 {
-	if ((breaker->fl_flags & FL_LAYOUT) != (lease->fl_flags & FL_LAYOUT))
-		return false;
-	if ((breaker->fl_flags & FL_DELEG) && (lease->fl_flags & FL_LEASE))
-		return false;
-	return locks_conflict(breaker, lease);
+	bool rc;
+
+	if ((breaker->fl_flags & FL_LAYOUT) != (lease->fl_flags & FL_LAYOUT)) {
+		rc = false;
+		goto trace;
+	}
+	if ((breaker->fl_flags & FL_DELEG) && (lease->fl_flags & FL_LEASE)) {
+		rc = false;
+		goto trace;
+	}
+
+	rc = locks_conflict(breaker, lease);
+trace:
+	trace_leases_conflict(rc, lease, breaker);
+	return rc;
 }
 
 static bool
@@ -1584,7 +1595,7 @@ int __break_lease(struct inode *inode, unsigned int mode, unsigned int type)
 		return error;
 	}
 
-	percpu_down_read_preempt_disable(&file_rwsem);
+	percpu_down_read(&file_rwsem);
 	spin_lock(&ctx->flc_lock);
 
 	time_out_leases(inode, &dispose);
@@ -1636,13 +1647,13 @@ restart:
 	locks_insert_block(fl, new_fl, leases_conflict);
 	trace_break_lease_block(inode, new_fl);
 	spin_unlock(&ctx->flc_lock);
-	percpu_up_read_preempt_enable(&file_rwsem);
+	percpu_up_read(&file_rwsem);
 
 	locks_dispose_list(&dispose);
 	error = wait_event_interruptible_timeout(new_fl->fl_wait,
 						!new_fl->fl_blocker, break_time);
 
-	percpu_down_read_preempt_disable(&file_rwsem);
+	percpu_down_read(&file_rwsem);
 	spin_lock(&ctx->flc_lock);
 	trace_break_lease_unblock(inode, new_fl);
 	locks_delete_block(new_fl);
@@ -1659,7 +1670,7 @@ restart:
 	}
 out:
 	spin_unlock(&ctx->flc_lock);
-	percpu_up_read_preempt_enable(&file_rwsem);
+	percpu_up_read(&file_rwsem);
 	locks_dispose_list(&dispose);
 	locks_free_lock(new_fl);
 	return error;
@@ -1729,7 +1740,7 @@ int fcntl_getlease(struct file *filp)
 
 	ctx = smp_load_acquire(&inode->i_flctx);
 	if (ctx && !list_empty_careful(&ctx->flc_lease)) {
-		percpu_down_read_preempt_disable(&file_rwsem);
+		percpu_down_read(&file_rwsem);
 		spin_lock(&ctx->flc_lock);
 		time_out_leases(inode, &dispose);
 		list_for_each_entry(fl, &ctx->flc_lease, fl_list) {
@@ -1739,7 +1750,7 @@ int fcntl_getlease(struct file *filp)
 			break;
 		}
 		spin_unlock(&ctx->flc_lock);
-		percpu_up_read_preempt_enable(&file_rwsem);
+		percpu_up_read(&file_rwsem);
 
 		locks_dispose_list(&dispose);
 	}
@@ -1747,10 +1758,10 @@ int fcntl_getlease(struct file *filp)
 }
 
 /**
- * check_conflicting_open - see if the given dentry points to a file that has
+ * check_conflicting_open - see if the given file points to an inode that has
  *			    an existing open that would conflict with the
  *			    desired lease.
- * @dentry:	dentry to check
+ * @filp:	file to check
  * @arg:	type of lease that we're trying to acquire
  * @flags:	current lock flags
  *
@@ -1758,30 +1769,42 @@ int fcntl_getlease(struct file *filp)
  * conflict with the lease we're trying to set.
  */
 static int
-check_conflicting_open(const struct dentry *dentry, const long arg, int flags)
+check_conflicting_open(struct file *filp, const long arg, int flags)
 {
-	int ret = 0;
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = locks_inode(filp);
+	int self_wcount = 0, self_rcount = 0;
 
 	if (flags & FL_LAYOUT)
 		return 0;
 
-	if ((arg == F_RDLCK) && inode_is_open_for_write(inode))
+	if (arg == F_RDLCK)
+		return inode_is_open_for_write(inode) ? -EAGAIN : 0;
+	else if (arg != F_WRLCK)
+		return 0;
+
+	/*
+	 * Make sure that only read/write count is from lease requestor.
+	 * Note that this will result in denying write leases when i_writecount
+	 * is negative, which is what we want.  (We shouldn't grant write leases
+	 * on files open for execution.)
+	 */
+	if (filp->f_mode & FMODE_WRITE)
+		self_wcount = 1;
+	else if (filp->f_mode & FMODE_READ)
+		self_rcount = 1;
+
+	if (atomic_read(&inode->i_writecount) != self_wcount ||
+	    atomic_read(&inode->i_readcount) != self_rcount)
 		return -EAGAIN;
 
-	if ((arg == F_WRLCK) && ((d_count(dentry) > 1) ||
-	    (atomic_read(&inode->i_count) > 1)))
-		ret = -EAGAIN;
-
-	return ret;
+	return 0;
 }
 
 static int
 generic_add_lease(struct file *filp, long arg, struct file_lock **flp, void **priv)
 {
 	struct file_lock *fl, *my_fl = NULL, *lease;
-	struct dentry *dentry = filp->f_path.dentry;
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = locks_inode(filp);
 	struct file_lock_context *ctx;
 	bool is_deleg = (*flp)->fl_flags & FL_DELEG;
 	int error;
@@ -1813,10 +1836,10 @@ generic_add_lease(struct file *filp, long arg, struct file_lock **flp, void **pr
 		return -EINVAL;
 	}
 
-	percpu_down_read_preempt_disable(&file_rwsem);
+	percpu_down_read(&file_rwsem);
 	spin_lock(&ctx->flc_lock);
 	time_out_leases(inode, &dispose);
-	error = check_conflicting_open(dentry, arg, lease->fl_flags);
+	error = check_conflicting_open(filp, arg, lease->fl_flags);
 	if (error)
 		goto out;
 
@@ -1873,7 +1896,7 @@ generic_add_lease(struct file *filp, long arg, struct file_lock **flp, void **pr
 	 * precedes these checks.
 	 */
 	smp_mb();
-	error = check_conflicting_open(dentry, arg, lease->fl_flags);
+	error = check_conflicting_open(filp, arg, lease->fl_flags);
 	if (error) {
 		locks_unlink_lock_ctx(lease);
 		goto out;
@@ -1884,7 +1907,7 @@ out_setup:
 		lease->fl_lmops->lm_setup(lease, priv);
 out:
 	spin_unlock(&ctx->flc_lock);
-	percpu_up_read_preempt_enable(&file_rwsem);
+	percpu_up_read(&file_rwsem);
 	locks_dispose_list(&dispose);
 	if (is_deleg)
 		inode_unlock(inode);
@@ -1907,7 +1930,7 @@ static int generic_delete_lease(struct file *filp, void *owner)
 		return error;
 	}
 
-	percpu_down_read_preempt_disable(&file_rwsem);
+	percpu_down_read(&file_rwsem);
 	spin_lock(&ctx->flc_lock);
 	list_for_each_entry(fl, &ctx->flc_lease, fl_list) {
 		if (fl->fl_file == filp &&
@@ -1920,7 +1943,7 @@ static int generic_delete_lease(struct file *filp, void *owner)
 	if (victim)
 		error = fl->fl_lmops->lm_change(victim, F_UNLCK, &dispose);
 	spin_unlock(&ctx->flc_lock);
-	percpu_up_read_preempt_enable(&file_rwsem);
+	percpu_up_read(&file_rwsem);
 	locks_dispose_list(&dispose);
 	return error;
 }
@@ -2643,13 +2666,13 @@ locks_remove_lease(struct file *filp, struct file_lock_context *ctx)
 	if (list_empty(&ctx->flc_lease))
 		return;
 
-	percpu_down_read_preempt_disable(&file_rwsem);
+	percpu_down_read(&file_rwsem);
 	spin_lock(&ctx->flc_lock);
 	list_for_each_entry_safe(fl, tmp, &ctx->flc_lease, fl_list)
 		if (filp == fl->fl_file)
 			lease_modify(fl, F_UNLCK, &dispose);
 	spin_unlock(&ctx->flc_lock);
-	percpu_up_read_preempt_enable(&file_rwsem);
+	percpu_up_read(&file_rwsem);
 
 	locks_dispose_list(&dispose);
 }

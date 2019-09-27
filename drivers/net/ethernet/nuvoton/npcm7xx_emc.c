@@ -1829,8 +1829,8 @@ static int npcm7xx_mii_setup(struct net_device *dev)
 		goto out3;
 	}
 
-	phydev->supported &= PHY_BASIC_FEATURES;
-	phydev->advertising = phydev->supported;
+	linkmode_and(phydev->supported, phydev->supported, PHY_BASIC_FEATURES);
+	linkmode_copy(phydev->advertising, phydev->supported);
 	ether->phy_dev = phydev;
 
 	return 0;

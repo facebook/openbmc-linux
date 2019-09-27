@@ -200,17 +200,10 @@ void chcr_verify_tag(struct aead_request *req, u8 *input, int *err)
 
 static int chcr_inc_wrcount(struct chcr_dev *dev)
 {
-	int err = 0;
-
-	spin_lock_bh(&dev->lock_chcr_dev);
 	if (dev->state == CHCR_DETACH)
-		err = 1;
-	else
-		atomic_inc(&dev->inflight);
-
-	spin_unlock_bh(&dev->lock_chcr_dev);
-
-	return err;
+		return 1;
+	atomic_inc(&dev->inflight);
+	return 0;
 }
 
 static inline void chcr_dec_wrcount(struct chcr_dev *dev)
@@ -1101,8 +1094,8 @@ static int chcr_final_cipher_iv(struct ablkcipher_request *req,
 	int ret = 0;
 
 	if (subtype == CRYPTO_ALG_SUB_TYPE_CTR)
-		ctr_add_iv(iv, req->info, (reqctx->processed /
-			   AES_BLOCK_SIZE));
+		ctr_add_iv(iv, req->info, DIV_ROUND_UP(reqctx->processed,
+						       AES_BLOCK_SIZE));
 	else if (subtype == CRYPTO_ALG_SUB_TYPE_XTS)
 		ret = chcr_update_tweak(req, iv, 1);
 	else if (subtype == CRYPTO_ALG_SUB_TYPE_CBC) {
@@ -1368,7 +1361,6 @@ static int chcr_aes_decrypt(struct ablkcipher_request *req)
 static int chcr_device_init(struct chcr_context *ctx)
 {
 	struct uld_ctx *u_ctx = NULL;
-	struct adapter *adap;
 	unsigned int id;
 	int txq_perchan, txq_idx, ntxq;
 	int err = 0, rxq_perchan, rxq_idx;
@@ -1382,7 +1374,6 @@ static int chcr_device_init(struct chcr_context *ctx)
 			goto out;
 		}
 		ctx->dev = &u_ctx->dev;
-		adap = padap(ctx->dev);
 		ntxq = u_ctx->lldi.ntxq;
 		rxq_perchan = u_ctx->lldi.nrxq / u_ctx->lldi.nchan;
 		txq_perchan = ntxq / u_ctx->lldi.nchan;
@@ -2132,7 +2123,6 @@ static int chcr_ahash_setkey(struct crypto_ahash *tfm, const u8 *key,
 	 * ipad in hmacctx->ipad and opad in hmacctx->opad location
 	 */
 	shash->tfm = hmacctx->base_hash;
-	shash->flags = crypto_shash_get_flags(hmacctx->base_hash);
 	if (keylen > bs) {
 		err = crypto_shash_digest(shash, key, keylen,
 					  hmacctx->ipad);
@@ -2762,7 +2752,7 @@ static int set_msg_len(u8 *block, unsigned int msglen, int csize)
 	return 0;
 }
 
-static void generate_b0(struct aead_request *req, u8 *ivptr,
+static int generate_b0(struct aead_request *req, u8 *ivptr,
 			unsigned short op_type)
 {
 	unsigned int l, lp, m;
@@ -2787,6 +2777,8 @@ static void generate_b0(struct aead_request *req, u8 *ivptr,
 	rc = set_msg_len(b0 + 16 - l,
 			 (op_type == CHCR_DECRYPT_OP) ?
 			 req->cryptlen - m : req->cryptlen, l);
+
+	return rc;
 }
 
 static inline int crypto_ccm_check_iv(const u8 *iv)
@@ -2821,7 +2813,7 @@ static int ccm_format_packet(struct aead_request *req,
 		*((unsigned short *)(reqctx->scratch_pad + 16)) =
 				htons(assoclen);
 
-	generate_b0(req, ivptr, op_type);
+	rc = generate_b0(req, ivptr, op_type);
 	/* zero the ctr value */
 	memset(ivptr + 15 - ivptr[0], 0, ivptr[0] + 1);
 	return rc;
@@ -3517,7 +3509,6 @@ static int chcr_authenc_setkey(struct crypto_aead *authenc, const u8 *key,
 		SHASH_DESC_ON_STACK(shash, base_hash);
 
 		shash->tfm = base_hash;
-		shash->flags = crypto_shash_get_flags(base_hash);
 		bs = crypto_shash_blocksize(base_hash);
 		align = KEYCTX_ALIGN_PAD(max_authsize);
 		o_ptr =  actx->h_iopad + param.result_size + align;
@@ -3676,9 +3667,9 @@ static int chcr_aead_op(struct aead_request *req,
 	/* Form a WR from req */
 	skb = create_wr_fn(req, u_ctx->lldi.rxq_ids[a_ctx(tfm)->rx_qidx], size);
 
-	if (IS_ERR(skb) || !skb) {
+	if (IS_ERR_OR_NULL(skb)) {
 		chcr_dec_wrcount(cdev);
-		return PTR_ERR(skb);
+		return PTR_ERR_OR_ZERO(skb);
 	}
 
 	skb->dev = u_ctx->lldi.ports[0];

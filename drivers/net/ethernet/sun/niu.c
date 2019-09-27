@@ -1217,8 +1217,6 @@ static int link_status_1g_rgmii(struct niu *np, int *link_up_p)
 
 	spin_lock_irqsave(&np->lock, flags);
 
-	err = -EINVAL;
-
 	err = mii_read(np, np->phy_addr, MII_BMSR);
 	if (err < 0)
 		goto out;
@@ -7464,6 +7462,7 @@ static int niu_add_ethtool_tcam_entry(struct niu *np,
 					class = CLASS_CODE_USER_PROG4;
 					break;
 				default:
+					class = CLASS_CODE_UNRECOG;
 					break;
 				}
 				ret = tcam_user_ip_class_set(np, class, 0,

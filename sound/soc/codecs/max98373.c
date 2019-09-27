@@ -267,6 +267,12 @@ static int max98373_dai_hw_params(struct snd_pcm_substream *substream,
 	case 48000:
 		sampling_rate = MAX98373_PCM_SR_SET1_SR_48000;
 		break;
+	case 88200:
+		sampling_rate = MAX98373_PCM_SR_SET1_SR_88200;
+		break;
+	case 96000:
+		sampling_rate = MAX98373_PCM_SR_SET1_SR_96000;
+		break;
 	default:
 		dev_err(component->dev, "rate %d not supported\n",
 			params_rate(params));
@@ -408,7 +414,7 @@ static int max98373_dac_event(struct snd_soc_dapm_widget *w,
 		regmap_update_bits(max98373->regmap,
 			MAX98373_R20FF_GLOBAL_SHDN,
 			MAX98373_GLOBAL_EN_MASK, 0);
-		max98373->tdm_mode = 0;
+		max98373->tdm_mode = false;
 		break;
 	default:
 		return 0;
@@ -919,9 +925,9 @@ static int max98373_i2c_probe(struct i2c_client *i2c,
 
 	/* update interleave mode info */
 	if (device_property_read_bool(&i2c->dev, "maxim,interleave_mode"))
-		max98373->interleave_mode = 1;
+		max98373->interleave_mode = true;
 	else
-		max98373->interleave_mode = 0;
+		max98373->interleave_mode = false;
 
 
 	/* regmap initialization */

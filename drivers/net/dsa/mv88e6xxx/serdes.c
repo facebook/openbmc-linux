@@ -1,14 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Marvell 88E6xxx SERDES manipulation, via SMI bus
  *
  * Copyright (c) 2008 Marvell Semiconductor
  *
  * Copyright (c) 2017 Andrew Lunn <andrew@lunn.ch>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include <linux/interrupt.h>
@@ -212,7 +208,7 @@ static irqreturn_t mv88e6352_serdes_thread_fn(int irq, void *dev_id)
 	u16 status;
 	int err;
 
-	mutex_lock(&chip->reg_lock);
+	mv88e6xxx_reg_lock(chip);
 
 	err = mv88e6352_serdes_read(chip, MV88E6352_SERDES_INT_STATUS, &status);
 	if (err)
@@ -223,7 +219,7 @@ static irqreturn_t mv88e6352_serdes_thread_fn(int irq, void *dev_id)
 		mv88e6352_serdes_irq_link(chip, port->port);
 	}
 out:
-	mutex_unlock(&chip->reg_lock);
+	mv88e6xxx_reg_unlock(chip);
 
 	return ret;
 }
@@ -257,12 +253,12 @@ int mv88e6352_serdes_irq_setup(struct mv88e6xxx_chip *chip, int port)
 	/* Requesting the IRQ will trigger irq callbacks. So we cannot
 	 * hold the reg_lock.
 	 */
-	mutex_unlock(&chip->reg_lock);
+	mv88e6xxx_reg_unlock(chip);
 	err = request_threaded_irq(chip->ports[port].serdes_irq, NULL,
 				   mv88e6352_serdes_thread_fn,
 				   IRQF_ONESHOT, "mv88e6xxx-serdes",
 				   &chip->ports[port]);
-	mutex_lock(&chip->reg_lock);
+	mv88e6xxx_reg_lock(chip);
 
 	if (err) {
 		dev_err(chip->dev, "Unable to request SERDES interrupt: %d\n",
@@ -283,9 +279,9 @@ void mv88e6352_serdes_irq_free(struct mv88e6xxx_chip *chip, int port)
 	/* Freeing the IRQ will trigger irq callbacks. So we cannot
 	 * hold the reg_lock.
 	 */
-	mutex_unlock(&chip->reg_lock);
+	mv88e6xxx_reg_unlock(chip);
 	free_irq(chip->ports[port].serdes_irq, &chip->ports[port]);
-	mutex_lock(&chip->reg_lock);
+	mv88e6xxx_reg_lock(chip);
 
 	chip->ports[port].serdes_irq = 0;
 }
@@ -510,21 +506,48 @@ static void mv88e6390_serdes_irq_link_sgmii(struct mv88e6xxx_chip *chip,
 					    int port, int lane)
 {
 	struct dsa_switch *ds = chip->ds;
+	int duplex = DUPLEX_UNKNOWN;
+	int speed = SPEED_UNKNOWN;
+	int link, err;
 	u16 status;
-	bool up;
 
-	mv88e6390_serdes_read(chip, lane, MDIO_MMD_PHYXS,
-			      MV88E6390_SGMII_STATUS, &status);
+	err = mv88e6390_serdes_read(chip, lane, MDIO_MMD_PHYXS,
+				    MV88E6390_SGMII_PHY_STATUS, &status);
+	if (err) {
+		dev_err(chip->dev, "can't read SGMII PHY status: %d\n", err);
+		return;
+	}
 
-	/* Status must be read twice in order to give the current link
-	 * status. Otherwise the change in link status since the last
-	 * read of the register is returned.
-	 */
-	mv88e6390_serdes_read(chip, lane, MDIO_MMD_PHYXS,
-			      MV88E6390_SGMII_STATUS, &status);
-	up = status & MV88E6390_SGMII_STATUS_LINK;
+	link = status & MV88E6390_SGMII_PHY_STATUS_LINK ?
+	       LINK_FORCED_UP : LINK_FORCED_DOWN;
 
-	dsa_port_phylink_mac_change(ds, port, up);
+	if (status & MV88E6390_SGMII_PHY_STATUS_SPD_DPL_VALID) {
+		duplex = status & MV88E6390_SGMII_PHY_STATUS_DUPLEX_FULL ?
+			 DUPLEX_FULL : DUPLEX_HALF;
+
+		switch (status & MV88E6390_SGMII_PHY_STATUS_SPEED_MASK) {
+		case MV88E6390_SGMII_PHY_STATUS_SPEED_1000:
+			speed = SPEED_1000;
+			break;
+		case MV88E6390_SGMII_PHY_STATUS_SPEED_100:
+			speed = SPEED_100;
+			break;
+		case MV88E6390_SGMII_PHY_STATUS_SPEED_10:
+			speed = SPEED_10;
+			break;
+		default:
+			dev_err(chip->dev, "invalid PHY speed\n");
+			return;
+		}
+	}
+
+	err = mv88e6xxx_port_setup_mac(chip, port, link, speed, duplex,
+				       PAUSE_OFF, PHY_INTERFACE_MODE_NA);
+	if (err)
+		dev_err(chip->dev, "can't propagate PHY settings to MAC: %d\n",
+			err);
+	else
+		dsa_port_phylink_mac_change(ds, port, link == LINK_FORCED_UP);
 }
 
 static int mv88e6390_serdes_irq_enable_sgmii(struct mv88e6xxx_chip *chip,
@@ -598,7 +621,7 @@ static irqreturn_t mv88e6390_serdes_thread_fn(int irq, void *dev_id)
 
 	lane = mv88e6390x_serdes_get_lane(chip, port->port);
 
-	mutex_lock(&chip->reg_lock);
+	mv88e6xxx_reg_lock(chip);
 
 	switch (cmode) {
 	case MV88E6XXX_PORT_STS_CMODE_SGMII:
@@ -614,7 +637,7 @@ static irqreturn_t mv88e6390_serdes_thread_fn(int irq, void *dev_id)
 		}
 	}
 out:
-	mutex_unlock(&chip->reg_lock);
+	mv88e6xxx_reg_unlock(chip);
 
 	return ret;
 }
@@ -643,12 +666,12 @@ int mv88e6390x_serdes_irq_setup(struct mv88e6xxx_chip *chip, int port)
 	/* Requesting the IRQ will trigger irq callbacks. So we cannot
 	 * hold the reg_lock.
 	 */
-	mutex_unlock(&chip->reg_lock);
+	mv88e6xxx_reg_unlock(chip);
 	err = request_threaded_irq(chip->ports[port].serdes_irq, NULL,
 				   mv88e6390_serdes_thread_fn,
 				   IRQF_ONESHOT, "mv88e6xxx-serdes",
 				   &chip->ports[port]);
-	mutex_lock(&chip->reg_lock);
+	mv88e6xxx_reg_lock(chip);
 
 	if (err) {
 		dev_err(chip->dev, "Unable to request SERDES interrupt: %d\n",
@@ -682,9 +705,9 @@ void mv88e6390x_serdes_irq_free(struct mv88e6xxx_chip *chip, int port)
 	/* Freeing the IRQ will trigger irq callbacks. So we cannot
 	 * hold the reg_lock.
 	 */
-	mutex_unlock(&chip->reg_lock);
+	mv88e6xxx_reg_unlock(chip);
 	free_irq(chip->ports[port].serdes_irq, &chip->ports[port]);
-	mutex_lock(&chip->reg_lock);
+	mv88e6xxx_reg_lock(chip);
 
 	chip->ports[port].serdes_irq = 0;
 }

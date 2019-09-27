@@ -1,9 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018 Chelsio Communications, Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  *
  * Written by: Atul Gupta (atul.gupta@chelsio.com)
  */
@@ -30,7 +27,6 @@
  */
 static LIST_HEAD(cdev_list);
 static DEFINE_MUTEX(cdev_mutex);
-static DEFINE_MUTEX(cdev_list_lock);
 
 static DEFINE_MUTEX(notify_mutex);
 static RAW_NOTIFIER_HEAD(listen_notify_list);

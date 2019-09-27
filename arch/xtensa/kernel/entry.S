@@ -1842,7 +1842,8 @@ ENDPROC(fast_store_prohibited)
 
 ENTRY(system_call)
 
-	entry	a1, 32
+	/* reserve 4 bytes on stack for function parameter */
+	abi_entry(4)
 
 	/* regs->syscall = regs->areg[2] */
 
@@ -1860,6 +1861,8 @@ ENTRY(system_call)
 	l32i	a7, a2, PT_SYSCALL
 
 1:
+	s32i	a7, a1, 4
+
 	/* syscall = sys_call_table[syscall_nr] */
 
 	movi	a4, sys_call_table
@@ -1890,12 +1893,16 @@ ENTRY(system_call)
 
 	s32i	a6, a2, PT_AREG2
 	bnez	a3, 1f
-	retw
+	abi_ret(4)
 
 1:
+	l32i	a4, a1, 4
+	l32i	a3, a2, PT_SYSCALL
+	s32i	a4, a2, PT_SYSCALL
 	mov	a6, a2
 	call4	do_syscall_trace_leave
-	retw
+	s32i	a3, a2, PT_SYSCALL
+	abi_ret(4)
 
 ENDPROC(system_call)
 
@@ -1946,7 +1953,7 @@ ENDPROC(system_call)
 
 ENTRY(_switch_to)
 
-	entry	a1, 48
+	abi_entry(XTENSA_SPILL_STACK_RESERVE)
 
 	mov	a11, a3			# and 'next' (a3)
 
@@ -2007,7 +2014,7 @@ ENTRY(_switch_to)
 	wsr	a14, ps
 	rsync
 
-	retw
+	abi_ret(XTENSA_SPILL_STACK_RESERVE)
 
 ENDPROC(_switch_to)
 

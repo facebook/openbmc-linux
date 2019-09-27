@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Add configfs and memory store: Kyungchan Koh <kkc6196@fb.com> and
  * Shaohua Li <shli@fb.com>
@@ -326,11 +327,12 @@ static ssize_t nullb_device_power_store(struct config_item *item,
 		set_bit(NULLB_DEV_FL_CONFIGURED, &dev->flags);
 		dev->power = newp;
 	} else if (dev->power && !newp) {
-		mutex_lock(&lock);
-		dev->power = newp;
-		null_del_dev(dev->nullb);
-		mutex_unlock(&lock);
-		clear_bit(NULLB_DEV_FL_UP, &dev->flags);
+		if (test_and_clear_bit(NULLB_DEV_FL_UP, &dev->flags)) {
+			mutex_lock(&lock);
+			dev->power = newp;
+			null_del_dev(dev->nullb);
+			mutex_unlock(&lock);
+		}
 		clear_bit(NULLB_DEV_FL_CONFIGURED, &dev->flags);
 	}
 
@@ -1104,7 +1106,7 @@ static int null_handle_bio(struct nullb_cmd *cmd)
 		len = bvec.bv_len;
 		err = null_transfer(nullb, bvec.bv_page, len, bvec.bv_offset,
 				     op_is_write(bio_op(bio)), sector,
-				     bio_op(bio) & REQ_FUA);
+				     bio->bi_opf & REQ_FUA);
 		if (err) {
 			spin_unlock_irq(&nullb->lock);
 			return err;
@@ -1196,7 +1198,7 @@ static blk_status_t null_handle_cmd(struct nullb_cmd *cmd)
 	if (!cmd->error && dev->zoned) {
 		sector_t sector;
 		unsigned int nr_sectors;
-		int op;
+		enum req_opf op;
 
 		if (dev->queue_mode == NULL_Q_BIO) {
 			op = bio_op(cmd->bio);
@@ -1487,7 +1489,6 @@ static int setup_queues(struct nullb *nullb)
 	if (!nullb->queues)
 		return -ENOMEM;
 
-	nullb->nr_queues = 0;
 	nullb->queue_depth = nullb->dev->hw_queue_depth;
 
 	return 0;
@@ -1678,7 +1679,6 @@ static int null_add_dev(struct nullb_device *dev)
 	if (dev->cache_size > 0) {
 		set_bit(NULLB_DEV_FL_CACHE, &nullb->dev->flags);
 		blk_queue_write_cache(nullb->q, true, true);
-		blk_queue_flush_queueable(nullb->q, true);
 	}
 
 	if (dev->zoned) {
@@ -1747,6 +1747,11 @@ static int __init null_init(void)
 	if (!is_power_of_2(g_zone_size)) {
 		pr_err("null_blk: zone_size must be power-of-two\n");
 		return -EINVAL;
+	}
+
+	if (g_home_node != NUMA_NO_NODE && g_home_node >= nr_online_nodes) {
+		pr_err("null_blk: invalid home_node value\n");
+		g_home_node = NUMA_NO_NODE;
 	}
 
 	if (g_queue_mode == NULL_Q_RQ) {

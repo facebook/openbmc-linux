@@ -1,13 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Driver model for leds and led triggers
  *
  * Copyright (C) 2005 John Lenz <lenz@cs.wisc.edu>
  * Copyright (C) 2005 Richard Purdie <rpurdie@openedhand.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
  */
 #ifndef __LINUX_LEDS_H_INCLUDED
 #define __LINUX_LEDS_H_INCLUDED
@@ -217,6 +213,19 @@ extern int led_set_brightness_sync(struct led_classdev *led_cdev,
  * Returns: 0 on success or negative error value on failure
  */
 extern int led_update_brightness(struct led_classdev *led_cdev);
+
+/**
+ * led_get_default_pattern - return default pattern
+ *
+ * @led_cdev: the LED to get default pattern for
+ * @size:     pointer for storing the number of elements in returned array,
+ *            modified only if return != NULL
+ *
+ * Return:    Allocated array of integers with default pattern from device tree
+ *            or NULL.  Caller is responsible for kfree().
+ */
+extern u32 *led_get_default_pattern(struct led_classdev *led_cdev,
+				    unsigned int *size);
 
 /**
  * led_sysfs_disable - disable LED sysfs interface

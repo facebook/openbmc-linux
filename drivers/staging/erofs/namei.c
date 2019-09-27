@@ -149,7 +149,7 @@ static struct page *find_target_block_classic(struct inode *dir,
 				head = mid + 1;
 				startprfx = matched;
 
-				if (likely(!IS_ERR(candidate)))
+				if (!IS_ERR(candidate))
 					put_page(candidate);
 				candidate = page;
 				*_ndirents = ndirents;
@@ -188,7 +188,7 @@ int erofs_namei(struct inode *dir,
 	ndirents = 0;
 	page = find_target_block_classic(dir, &qn, &ndirents);
 
-	if (unlikely(IS_ERR(page)))
+	if (IS_ERR(page))
 		return PTR_ERR(page);
 
 	data = kmap_atomic(page);
@@ -198,7 +198,7 @@ int erofs_namei(struct inode *dir,
 	else
 		de = (struct erofs_dirent *)data;
 
-	if (likely(!IS_ERR(de))) {
+	if (!IS_ERR(de)) {
 		*nid = le64_to_cpu(de->nid);
 		*d_type = de->file_type;
 	}
@@ -211,7 +211,8 @@ int erofs_namei(struct inode *dir,
 
 /* NOTE: i_mutex is already held by vfs */
 static struct dentry *erofs_lookup(struct inode *dir,
-	struct dentry *dentry, unsigned int flags)
+				   struct dentry *dentry,
+				   unsigned int flags)
 {
 	int err;
 	erofs_nid_t nid;
@@ -246,12 +247,10 @@ static struct dentry *erofs_lookup(struct inode *dir,
 
 const struct inode_operations erofs_dir_iops = {
 	.lookup = erofs_lookup,
-};
-
-const struct inode_operations erofs_dir_xattr_iops = {
-	.lookup = erofs_lookup,
+	.getattr = erofs_getattr,
 #ifdef CONFIG_EROFS_FS_XATTR
 	.listxattr = erofs_listxattr,
 #endif
+	.get_acl = erofs_get_acl,
 };
 

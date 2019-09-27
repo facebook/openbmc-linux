@@ -14,6 +14,7 @@ int qcom_snd_parse_of(struct snd_soc_card *card)
 	struct device *dev = card->dev;
 	struct snd_soc_dai_link *link;
 	struct of_phandle_args args;
+	struct snd_soc_dai_link_component *dlc;
 	int ret, num_links;
 
 	ret = snd_soc_of_parse_card_name(card, "model");
@@ -40,8 +41,22 @@ int qcom_snd_parse_of(struct snd_soc_card *card)
 
 	card->num_links = num_links;
 	link = card->dai_link;
+
 	for_each_child_of_node(dev->of_node, np) {
+		dlc = devm_kzalloc(dev, 2 * sizeof(*dlc), GFP_KERNEL);
+		if (!dlc)
+			return -ENOMEM;
+
+		link->cpus	= &dlc[0];
+		link->platforms	= &dlc[1];
+
+		link->num_cpus		= 1;
+		link->num_platforms	= 1;
+
 		cpu = of_get_child_by_name(np, "cpu");
+		platform = of_get_child_by_name(np, "platform");
+		codec = of_get_child_by_name(np, "codec");
+
 		if (!cpu) {
 			dev_err(dev, "Can't find cpu DT node\n");
 			ret = -EINVAL;
@@ -54,22 +69,20 @@ int qcom_snd_parse_of(struct snd_soc_card *card)
 			dev_err(card->dev, "error getting cpu phandle\n");
 			goto err;
 		}
-		link->cpu_of_node = args.np;
+		link->cpus->of_node = args.np;
 		link->id = args.args[0];
 
-		ret = snd_soc_of_get_dai_name(cpu, &link->cpu_dai_name);
+		ret = snd_soc_of_get_dai_name(cpu, &link->cpus->dai_name);
 		if (ret) {
 			dev_err(card->dev, "error getting cpu dai name\n");
 			goto err;
 		}
 
-		platform = of_get_child_by_name(np, "platform");
-		codec = of_get_child_by_name(np, "codec");
 		if (codec && platform) {
-			link->platform_of_node = of_parse_phandle(platform,
+			link->platforms->of_node = of_parse_phandle(platform,
 					"sound-dai",
 					0);
-			if (!link->platform_of_node) {
+			if (!link->platforms->of_node) {
 				dev_err(card->dev, "platform dai not found\n");
 				ret = -EINVAL;
 				goto err;
@@ -83,9 +96,16 @@ int qcom_snd_parse_of(struct snd_soc_card *card)
 			link->no_pcm = 1;
 			link->ignore_pmdown_time = 1;
 		} else {
-			link->platform_of_node = link->cpu_of_node;
-			link->codec_dai_name = "snd-soc-dummy-dai";
-			link->codec_name = "snd-soc-dummy";
+			dlc = devm_kzalloc(dev, sizeof(*dlc), GFP_KERNEL);
+			if (!dlc)
+				return -ENOMEM;
+
+			link->codecs	 = dlc;
+			link->num_codecs = 1;
+
+			link->platforms->of_node = link->cpus->of_node;
+			link->codecs->dai_name = "snd-soc-dummy-dai";
+			link->codecs->name = "snd-soc-dummy";
 			link->dynamic = 1;
 		}
 
@@ -96,14 +116,20 @@ int qcom_snd_parse_of(struct snd_soc_card *card)
 			goto err;
 		}
 
+		link->nonatomic = 1;
 		link->dpcm_playback = 1;
 		link->dpcm_capture = 1;
 		link->stream_name = link->name;
 		link++;
+
+		of_node_put(cpu);
+		of_node_put(codec);
+		of_node_put(platform);
 	}
 
 	return 0;
 err:
+	of_node_put(np);
 	of_node_put(cpu);
 	of_node_put(codec);
 	of_node_put(platform);

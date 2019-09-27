@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * isp.c
  *
@@ -36,10 +37,6 @@
  *	Thara Gopinath <thara@ti.com>
  *	Toni Leinonen <toni.leinonen@nokia.com>
  *	Troy Laramy <t-laramy@ti.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <asm/cacheflush.h>
@@ -1517,7 +1514,7 @@ void omap3isp_print_status(struct isp_device *isp)
  *
  * To solve this problem power management support is split into prepare/complete
  * and suspend/resume operations. The pipelines are stopped in prepare() and the
- * ISP clocks get disabled in suspend(). Similarly, the clocks are reenabled in
+ * ISP clocks get disabled in suspend(). Similarly, the clocks are re-enabled in
  * resume(), and the the pipelines are restarted in complete().
  *
  * TODO: PM dependencies between the ISP and sensors are not modelled explicitly
@@ -2006,6 +2003,8 @@ static int isp_remove(struct platform_device *pdev)
 	media_entity_enum_cleanup(&isp->crashed);
 	v4l2_async_notifier_cleanup(&isp->notifier);
 
+	kfree(isp);
+
 	return 0;
 }
 
@@ -2196,7 +2195,7 @@ static int isp_probe(struct platform_device *pdev)
 	int ret;
 	int i, m;
 
-	isp = devm_kzalloc(&pdev->dev, sizeof(*isp), GFP_KERNEL);
+	isp = kzalloc(sizeof(*isp), GFP_KERNEL);
 	if (!isp) {
 		dev_err(&pdev->dev, "could not allocate memory\n");
 		return -ENOMEM;
@@ -2205,17 +2204,19 @@ static int isp_probe(struct platform_device *pdev)
 	ret = fwnode_property_read_u32(of_fwnode_handle(pdev->dev.of_node),
 				       "ti,phy-type", &isp->phy_type);
 	if (ret)
-		return ret;
+		goto error_release_isp;
 
 	isp->syscon = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
 						      "syscon");
-	if (IS_ERR(isp->syscon))
-		return PTR_ERR(isp->syscon);
+	if (IS_ERR(isp->syscon)) {
+		ret = PTR_ERR(isp->syscon);
+		goto error_release_isp;
+	}
 
 	ret = of_property_read_u32_index(pdev->dev.of_node,
 					 "syscon", 1, &isp->syscon_offset);
 	if (ret)
-		return ret;
+		goto error_release_isp;
 
 	isp->autoidle = autoidle;
 
@@ -2372,6 +2373,8 @@ error_isp:
 error:
 	v4l2_async_notifier_cleanup(&isp->notifier);
 	mutex_destroy(&isp->isp_mutex);
+error_release_isp:
+	kfree(isp);
 
 	return ret;
 }
@@ -2383,7 +2386,7 @@ static const struct dev_pm_ops omap3isp_pm_ops = {
 	.complete = isp_pm_complete,
 };
 
-static struct platform_device_id omap3isp_id_table[] = {
+static const struct platform_device_id omap3isp_id_table[] = {
 	{ "omap3isp", 0 },
 	{ },
 };

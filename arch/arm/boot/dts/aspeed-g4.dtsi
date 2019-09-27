@@ -69,6 +69,26 @@
 				spi-max-frequency = <50000000>;
 				status = "disabled";
 			};
+			flash@1 {
+				reg = < 1 >;
+				compatible = "jedec,spi-nor";
+				status = "disabled";
+			};
+			flash@2 {
+				reg = < 2 >;
+				compatible = "jedec,spi-nor";
+				status = "disabled";
+			};
+			flash@3 {
+				reg = < 3 >;
+				compatible = "jedec,spi-nor";
+				status = "disabled";
+			};
+			flash@4 {
+				reg = < 4 >;
+				compatible = "jedec,spi-nor";
+				status = "disabled";
+			};
 		};
 
 		spi: spi@1e630000 {
@@ -168,6 +188,10 @@
 					compatible = "aspeed,g4-pinctrl";
 				};
 
+				p2a: p2a-control {
+					compatible = "aspeed,ast2400-p2a-ctrl";
+					status = "disabled";
+				};
 			};
 
 			rng: hwrng@1e6e2078 {
@@ -191,11 +215,32 @@
 				reg = <0x1e720000 0x8000>;	// 32K
 			};
 
-			sdhci: sdhci@1e740000 {
-				compatible = "simple-bus";
+			sdmmc: sd-controller@1e740000 {
+				compatible = "aspeed,ast2400-sd-controller";
+				reg = <0x1e740000 0x100>;
 				#address-cells = <1>;
 				#size-cells = <1>;
-				ranges = <0 0x1e740000 0x1000>;
+				ranges = <0 0x1e740000 0x10000>;
+				clocks = <&syscon ASPEED_CLK_GATE_SDCLK>;
+				status = "disabled";
+
+				sdhci0: sdhci@100 {
+					compatible = "aspeed,ast2400-sdhci";
+					reg = <0x100 0x100>;
+					interrupts = <26>;
+					sdhci,auto-cmd12;
+					clocks = <&syscon ASPEED_CLK_SDIO>;
+					status = "disabled";
+				};
+
+				sdhci1: sdhci@200 {
+					compatible = "aspeed,ast2400-sdhci";
+					reg = <0x200 0x100>;
+					interrupts = <26>;
+					sdhci,auto-cmd12;
+					clocks = <&syscon ASPEED_CLK_SDIO>;
+					status = "disabled";
+				};
 			};
 
 			gpio: gpio@1e780000 {
@@ -329,18 +374,11 @@
 						compatible = "aspeed,ast2400-ibt-bmc";
 						reg = <0xc0 0x18>;
 						interrupts = <8>;
+						status = "disabled";
 					};
 
 					sio_regs: regs {
 						compatible = "aspeed,bmc-misc";
-					};
-
-					mbox: mbox@180 {
-						compatible = "aspeed,ast2400-mbox";
-						reg = <0x180 0x5c>;
-						interrupts = <46>;
-						#mbox-cells = <1>;
-						status = "disabled";
 					};
 				};
 			};
@@ -409,38 +447,6 @@
 		addr-timing = <1>;
 		rd-sampling-point = <8>;
 		cmd-timeout-ms = <1000>;
-		status = "disabled";
-	};
-};
-
-&sdhci {
-
-	sdhci_ic: interrupt-controller@0 {
-		#interrupt-cells = <1>;
-		compatible = "aspeed,aspeed-sdhci-irq";
-		reg = <0x0 0x100>;
-		interrupts = <26>;
-		interrupt-controller;
-		clocks = <&syscon ASPEED_CLK_GATE_SDCLK>;
-	};
-
-	sdhci_slot0: sdhci_slot0@100 {
-		compatible = "aspeed,sdhci-ast2400";
-		reg = <0x100 0x100>;
-		interrupts = <0>;
-		interrupt-parent = <&sdhci_ic>;
-		sdhci,auto-cmd12;
-		clocks = <&syscon ASPEED_CLK_SDIO>;
-		status = "disabled";
-	};
-
-	sdhci_slot1: sdhci_slot1@200 {
-		compatible = "aspeed,sdhci-ast2400";
-		reg = <0x200 0x100>;
-		interrupts = <1>;
-		interrupt-parent = <&sdhci_ic>;
-		sdhci,auto-cmd12;
-		clocks = <&syscon ASPEED_CLK_SDIO>;
 		status = "disabled";
 	};
 };

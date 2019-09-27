@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  drivers/net/ethernet/freescale/gianfar_ethtool.c
  *
@@ -10,10 +11,6 @@
  *  Modifier: Sandeep Gopalpet <sandeep.kumar@freescale.com>
  *
  *  Copyright 2003-2006, 2008-2009, 2011 Freescale Semiconductor, Inc.
- *
- *  This software may be used and distributed according to
- *  the terms of the GNU Public License, Version 2, incorporated herein
- *  by reference.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -1492,7 +1489,7 @@ static int gfar_get_ts_info(struct net_device *dev,
 	struct gfar_private *priv = netdev_priv(dev);
 	struct platform_device *ptp_dev;
 	struct device_node *ptp_node;
-	struct qoriq_ptp *ptp = NULL;
+	struct ptp_qoriq *ptp = NULL;
 
 	info->phc_index = -1;
 

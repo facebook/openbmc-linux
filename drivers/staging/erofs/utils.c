@@ -27,34 +27,62 @@ struct page *erofs_allocpage(struct list_head *pool, gfp_t gfp)
 	return page;
 }
 
+#if (EROFS_PCPUBUF_NR_PAGES > 0)
+static struct {
+	u8 data[PAGE_SIZE * EROFS_PCPUBUF_NR_PAGES];
+} ____cacheline_aligned_in_smp erofs_pcpubuf[NR_CPUS];
+
+void *erofs_get_pcpubuf(unsigned int pagenr)
+{
+	preempt_disable();
+	return &erofs_pcpubuf[smp_processor_id()].data[pagenr * PAGE_SIZE];
+}
+#endif
+
 /* global shrink count (for all mounted EROFS instances) */
 static atomic_long_t erofs_global_shrink_cnt;
 
 #ifdef CONFIG_EROFS_FS_ZIP
+#define __erofs_workgroup_get(grp)	atomic_inc(&(grp)->refcount)
+#define __erofs_workgroup_put(grp)	atomic_dec(&(grp)->refcount)
 
-struct erofs_workgroup *erofs_find_workgroup(
-	struct super_block *sb, pgoff_t index, bool *tag)
+static int erofs_workgroup_get(struct erofs_workgroup *grp)
+{
+	int o;
+
+repeat:
+	o = erofs_wait_on_workgroup_freezed(grp);
+	if (unlikely(o <= 0))
+		return -1;
+
+	if (unlikely(atomic_cmpxchg(&grp->refcount, o, o + 1) != o))
+		goto repeat;
+
+	/* decrease refcount paired by erofs_workgroup_put */
+	if (unlikely(o == 1))
+		atomic_long_dec(&erofs_global_shrink_cnt);
+	return 0;
+}
+
+struct erofs_workgroup *erofs_find_workgroup(struct super_block *sb,
+					     pgoff_t index, bool *tag)
 {
 	struct erofs_sb_info *sbi = EROFS_SB(sb);
 	struct erofs_workgroup *grp;
-	int oldcount;
 
 repeat:
 	rcu_read_lock();
 	grp = radix_tree_lookup(&sbi->workstn_tree, index);
-	if (grp != NULL) {
+	if (grp) {
 		*tag = xa_pointer_tag(grp);
 		grp = xa_untag_pointer(grp);
 
-		if (erofs_workgroup_get(grp, &oldcount)) {
+		if (erofs_workgroup_get(grp)) {
 			/* prefer to relax rcu read side */
 			rcu_read_unlock();
 			goto repeat;
 		}
 
-		/* decrease refcount added by erofs_workgroup_put */
-		if (unlikely(oldcount == 1))
-			atomic_long_dec(&erofs_global_shrink_cnt);
 		DBG_BUGON(index != grp->index);
 	}
 	rcu_read_unlock();
@@ -104,8 +132,6 @@ int erofs_register_workgroup(struct super_block *sb,
 	return err;
 }
 
-extern void erofs_workgroup_free_rcu(struct erofs_workgroup *grp);
-
 static void  __erofs_workgroup_free(struct erofs_workgroup *grp)
 {
 	atomic_long_dec(&erofs_global_shrink_cnt);
@@ -131,9 +157,9 @@ static void erofs_workgroup_unfreeze_final(struct erofs_workgroup *grp)
 	__erofs_workgroup_free(grp);
 }
 
-bool erofs_try_to_release_workgroup(struct erofs_sb_info *sbi,
-				    struct erofs_workgroup *grp,
-				    bool cleanup)
+static bool erofs_try_to_release_workgroup(struct erofs_sb_info *sbi,
+					   struct erofs_workgroup *grp,
+					   bool cleanup)
 {
 	/*
 	 * for managed cache enabled, the refcount of workgroups
@@ -172,9 +198,9 @@ bool erofs_try_to_release_workgroup(struct erofs_sb_info *sbi,
 
 #else
 /* for nocache case, no customized reclaim path at all */
-bool erofs_try_to_release_workgroup(struct erofs_sb_info *sbi,
-				    struct erofs_workgroup *grp,
-				    bool cleanup)
+static bool erofs_try_to_release_workgroup(struct erofs_sb_info *sbi,
+					   struct erofs_workgroup *grp,
+					   bool cleanup)
 {
 	int cnt = atomic_read(&grp->refcount);
 
@@ -207,7 +233,7 @@ repeat:
 	erofs_workstn_lock(sbi);
 
 	found = radix_tree_gang_lookup(&sbi->workstn_tree,
-		batch, first_index, PAGEVEC_SIZE);
+				       batch, first_index, PAGEVEC_SIZE);
 
 	for (i = 0; i < found; ++i) {
 		struct erofs_workgroup *grp = xa_untag_pointer(batch[i]);
@@ -256,14 +282,14 @@ void erofs_unregister_super(struct super_block *sb)
 	spin_unlock(&erofs_sb_list_lock);
 }
 
-unsigned long erofs_shrink_count(struct shrinker *shrink,
-				 struct shrink_control *sc)
+static unsigned long erofs_shrink_count(struct shrinker *shrink,
+					struct shrink_control *sc)
 {
 	return atomic_long_read(&erofs_global_shrink_cnt);
 }
 
-unsigned long erofs_shrink_scan(struct shrinker *shrink,
-				struct shrink_control *sc)
+static unsigned long erofs_shrink_scan(struct shrinker *shrink,
+				       struct shrink_control *sc)
 {
 	struct erofs_sb_info *sbi;
 	struct list_head *p;
@@ -318,4 +344,10 @@ unsigned long erofs_shrink_scan(struct shrinker *shrink,
 	spin_unlock(&erofs_sb_list_lock);
 	return freed;
 }
+
+struct shrinker erofs_shrinker_info = {
+	.scan_objects = erofs_shrink_scan,
+	.count_objects = erofs_shrink_count,
+	.seeks = DEFAULT_SEEKS,
+};
 

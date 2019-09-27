@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 
 #include <linux/ceph/ceph_debug.h>
 #include <linux/backing-dev.h>
@@ -738,7 +739,6 @@ int __ceph_open_session(struct ceph_client *client, unsigned long started)
 }
 EXPORT_SYMBOL(__ceph_open_session);
 
-
 int ceph_open_session(struct ceph_client *client)
 {
 	int ret;
@@ -754,14 +754,29 @@ int ceph_open_session(struct ceph_client *client)
 }
 EXPORT_SYMBOL(ceph_open_session);
 
+int ceph_wait_for_latest_osdmap(struct ceph_client *client,
+				unsigned long timeout)
+{
+	u64 newest_epoch;
+	int ret;
+
+	ret = ceph_monc_get_version(&client->monc, "osdmap", &newest_epoch);
+	if (ret)
+		return ret;
+
+	if (client->osdc.osdmap->epoch >= newest_epoch)
+		return 0;
+
+	ceph_osdc_maybe_request_map(&client->osdc);
+	return ceph_monc_wait_osdmap(&client->monc, newest_epoch, timeout);
+}
+EXPORT_SYMBOL(ceph_wait_for_latest_osdmap);
 
 static int __init init_ceph_lib(void)
 {
 	int ret = 0;
 
-	ret = ceph_debugfs_init();
-	if (ret < 0)
-		goto out;
+	ceph_debugfs_init();
 
 	ret = ceph_crypto_init();
 	if (ret < 0)
@@ -786,7 +801,6 @@ out_crypto:
 	ceph_crypto_shutdown();
 out_debugfs:
 	ceph_debugfs_cleanup();
-out:
 	return ret;
 }
 

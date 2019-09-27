@@ -333,8 +333,9 @@ static void i40e_dbg_dump_vsi_seid(struct i40e_pf *pf, int seid)
 		 "    seid = %d, id = %d, uplink_seid = %d\n",
 		 vsi->seid, vsi->id, vsi->uplink_seid);
 	dev_info(&pf->pdev->dev,
-		 "    base_queue = %d, num_queue_pairs = %d, num_desc = %d\n",
-		 vsi->base_queue, vsi->num_queue_pairs, vsi->num_desc);
+		 "    base_queue = %d, num_queue_pairs = %d, num_tx_desc = %d, num_rx_desc = %d\n",
+		 vsi->base_queue, vsi->num_queue_pairs, vsi->num_tx_desc,
+		 vsi->num_rx_desc);
 	dev_info(&pf->pdev->dev, "    type = %i\n", vsi->type);
 	if (vsi->type == I40E_VSI_SRIOV)
 		dev_info(&pf->pdev->dev, "    VF ID = %i\n", vsi->vf_id);
@@ -1321,7 +1322,7 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 		if (strncmp(&cmd_buf[5], "stop", 4) == 0) {
 			int ret;
 
-			ret = i40e_aq_stop_lldp(&pf->hw, false, NULL);
+			ret = i40e_aq_stop_lldp(&pf->hw, false, false, NULL);
 			if (ret) {
 				dev_info(&pf->pdev->dev,
 					 "Stop LLDP AQ command failed =0x%x\n",
@@ -1330,7 +1331,7 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 			}
 			ret = i40e_aq_add_rem_control_packet_filter(&pf->hw,
 						pf->hw.mac.addr,
-						I40E_ETH_P_LLDP, 0,
+						ETH_P_LLDP, 0,
 						pf->vsi[pf->lan_vsi]->seid,
 						0, true, NULL, NULL);
 			if (ret) {
@@ -1348,7 +1349,7 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 
 			ret = i40e_aq_add_rem_control_packet_filter(&pf->hw,
 						pf->hw.mac.addr,
-						I40E_ETH_P_LLDP, 0,
+						ETH_P_LLDP, 0,
 						pf->vsi[pf->lan_vsi]->seid,
 						0, false, NULL, NULL);
 			if (ret) {
@@ -1358,7 +1359,7 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 				/* Continue and start FW LLDP anyways */
 			}
 
-			ret = i40e_aq_start_lldp(&pf->hw, NULL);
+			ret = i40e_aq_start_lldp(&pf->hw, false, NULL);
 			if (ret) {
 				dev_info(&pf->pdev->dev,
 					 "Start LLDP AQ command failed =0x%x\n",
@@ -1642,30 +1643,7 @@ static ssize_t i40e_dbg_netdev_ops_write(struct file *filp,
 		count = buf_tmp - i40e_dbg_netdev_ops_buf + 1;
 	}
 
-	if (strncmp(i40e_dbg_netdev_ops_buf, "tx_timeout", 10) == 0) {
-		cnt = sscanf(&i40e_dbg_netdev_ops_buf[11], "%i", &vsi_seid);
-		if (cnt != 1) {
-			dev_info(&pf->pdev->dev, "tx_timeout <vsi_seid>\n");
-			goto netdev_ops_write_done;
-		}
-		vsi = i40e_dbg_find_vsi(pf, vsi_seid);
-		if (!vsi) {
-			dev_info(&pf->pdev->dev,
-				 "tx_timeout: VSI %d not found\n", vsi_seid);
-		} else if (!vsi->netdev) {
-			dev_info(&pf->pdev->dev, "tx_timeout: no netdev for VSI %d\n",
-				 vsi_seid);
-		} else if (test_bit(__I40E_VSI_DOWN, vsi->state)) {
-			dev_info(&pf->pdev->dev, "tx_timeout: VSI %d not UP\n",
-				 vsi_seid);
-		} else if (rtnl_trylock()) {
-			vsi->netdev->netdev_ops->ndo_tx_timeout(vsi->netdev);
-			rtnl_unlock();
-			dev_info(&pf->pdev->dev, "tx_timeout called\n");
-		} else {
-			dev_info(&pf->pdev->dev, "Could not acquire RTNL - please try again\n");
-		}
-	} else if (strncmp(i40e_dbg_netdev_ops_buf, "change_mtu", 10) == 0) {
+	if (strncmp(i40e_dbg_netdev_ops_buf, "change_mtu", 10) == 0) {
 		int mtu;
 
 		cnt = sscanf(&i40e_dbg_netdev_ops_buf[11], "%i %i",
@@ -1733,7 +1711,6 @@ static ssize_t i40e_dbg_netdev_ops_write(struct file *filp,
 		dev_info(&pf->pdev->dev, "unknown command '%s'\n",
 			 i40e_dbg_netdev_ops_buf);
 		dev_info(&pf->pdev->dev, "available commands\n");
-		dev_info(&pf->pdev->dev, "  tx_timeout <vsi_seid>\n");
 		dev_info(&pf->pdev->dev, "  change_mtu <vsi_seid> <mtu>\n");
 		dev_info(&pf->pdev->dev, "  set_rx_mode <vsi_seid>\n");
 		dev_info(&pf->pdev->dev, "  napi <vsi_seid>\n");

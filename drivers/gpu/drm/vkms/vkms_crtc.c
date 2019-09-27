@@ -2,15 +2,23 @@
 
 #include "vkms_drv.h"
 #include <drm/drm_atomic_helper.h>
-#include <drm/drm_crtc_helper.h>
+#include <drm/drm_probe_helper.h>
 
-static void _vblank_handle(struct vkms_output *output)
+static enum hrtimer_restart vkms_vblank_simulate(struct hrtimer *timer)
 {
+	struct vkms_output *output = container_of(timer, struct vkms_output,
+						  vblank_hrtimer);
 	struct drm_crtc *crtc = &output->crtc;
 	struct vkms_crtc_state *state = to_vkms_crtc_state(crtc->state);
+	u64 ret_overrun;
 	bool ret;
 
 	spin_lock(&output->lock);
+
+	ret_overrun = hrtimer_forward_now(&output->vblank_hrtimer,
+					  output->period_ns);
+	WARN_ON(ret_overrun != 1);
+
 	ret = drm_crtc_handle_vblank(crtc);
 	if (!ret)
 		DRM_ERROR("vkms failure on handling vblank");
@@ -32,18 +40,6 @@ static void _vblank_handle(struct vkms_output *output)
 	}
 
 	spin_unlock(&output->lock);
-}
-
-static enum hrtimer_restart vkms_vblank_simulate(struct hrtimer *timer)
-{
-	struct vkms_output *output = container_of(timer, struct vkms_output,
-						  vblank_hrtimer);
-	int ret_overrun;
-
-	_vblank_handle(output);
-
-	ret_overrun = hrtimer_forward_now(&output->vblank_hrtimer,
-					  output->period_ns);
 
 	return HRTIMER_RESTART;
 }
@@ -78,29 +74,23 @@ bool vkms_get_vblank_timestamp(struct drm_device *dev, unsigned int pipe,
 {
 	struct vkms_device *vkmsdev = drm_device_to_vkms_device(dev);
 	struct vkms_output *output = &vkmsdev->output;
+	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
 
 	*vblank_time = output->vblank_hrtimer.node.expires;
 
+	if (WARN_ON(*vblank_time == vblank->time))
+		return true;
+
+	/*
+	 * To prevent races we roll the hrtimer forward before we do any
+	 * interrupt processing - this is how real hw works (the interrupt is
+	 * only generated after all the vblank registers are updated) and what
+	 * the vblank core expects. Therefore we need to always correct the
+	 * timestampe by one frame.
+	 */
+	*vblank_time -= output->period_ns;
+
 	return true;
-}
-
-static void vkms_atomic_crtc_reset(struct drm_crtc *crtc)
-{
-	struct vkms_crtc_state *vkms_state = NULL;
-
-	if (crtc->state) {
-		vkms_state = to_vkms_crtc_state(crtc->state);
-		__drm_atomic_helper_crtc_destroy_state(crtc->state);
-		kfree(vkms_state);
-		crtc->state = NULL;
-	}
-
-	vkms_state = kzalloc(sizeof(*vkms_state), GFP_KERNEL);
-	if (!vkms_state)
-		return;
-
-	crtc->state = &vkms_state->base;
-	crtc->state->crtc = crtc;
 }
 
 static struct drm_crtc_state *
@@ -135,6 +125,19 @@ static void vkms_atomic_crtc_destroy_state(struct drm_crtc *crtc,
 	}
 }
 
+static void vkms_atomic_crtc_reset(struct drm_crtc *crtc)
+{
+	struct vkms_crtc_state *vkms_state =
+		kzalloc(sizeof(*vkms_state), GFP_KERNEL);
+
+	if (crtc->state)
+		vkms_atomic_crtc_destroy_state(crtc, crtc->state);
+
+	__drm_atomic_helper_crtc_reset(crtc, &vkms_state->base);
+	if (vkms_state)
+		INIT_WORK(&vkms_state->crc_work, vkms_crc_work_handle);
+}
+
 static const struct drm_crtc_funcs vkms_crtc_funcs = {
 	.set_config             = drm_atomic_helper_set_config,
 	.destroy                = drm_crtc_cleanup,
@@ -144,6 +147,7 @@ static const struct drm_crtc_funcs vkms_crtc_funcs = {
 	.atomic_destroy_state   = vkms_atomic_crtc_destroy_state,
 	.enable_vblank		= vkms_enable_vblank,
 	.disable_vblank		= vkms_disable_vblank,
+	.get_crc_sources	= vkms_get_crc_sources,
 	.set_crc_source		= vkms_set_crc_source,
 	.verify_crc_source	= vkms_verify_crc_source,
 };
@@ -219,6 +223,8 @@ int vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 	spin_lock_init(&vkms_out->state_lock);
 
 	vkms_out->crc_workq = alloc_ordered_workqueue("vkms_crc_workq", 0);
+	if (!vkms_out->crc_workq)
+		return -ENOMEM;
 
 	return ret;
 }

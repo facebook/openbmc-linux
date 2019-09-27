@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: MIT */
 #ifndef __NOUVEAU_DRV_H__
 #define __NOUVEAU_DRV_H__
 
@@ -60,8 +60,6 @@
 struct nouveau_channel;
 struct platform_device;
 
-#define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
-
 #include "nouveau_fence.h"
 #include "nouveau_bios.h"
 #include "nouveau_vmm.h"
@@ -96,6 +94,7 @@ struct nouveau_cli {
 	struct nvif_device device;
 	struct nvif_mmu mmu;
 	struct nouveau_vmm vmm;
+	struct nouveau_vmm svm;
 	const struct nvif_mclass *mem;
 
 	struct list_head head;
@@ -181,7 +180,6 @@ struct nouveau_drm {
 	struct nouveau_fbdev *fbcon;
 	struct nvif_object nvsw;
 	struct nvif_object ntfy;
-	struct nvif_notify flip;
 
 	/* nv10-nv40 tiling regions */
 	struct {
@@ -210,6 +208,10 @@ struct nouveau_drm {
 	bool have_disp_power_ref;
 
 	struct dev_pm_domain vga_pm_domain;
+
+	struct nouveau_svm *svm;
+
+	struct nouveau_dmem *dmem;
 };
 
 static inline struct nouveau_drm *

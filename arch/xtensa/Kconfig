@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: GPL-2.0
 config XTENSA
 	def_bool y
+	select ARCH_32BIT_OFF_T
+	select ARCH_HAS_BINFMT_FLAT if !MMU
 	select ARCH_HAS_SYNC_DMA_FOR_CPU
 	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
 	select ARCH_NO_COHERENT_DMA_MMAP if !MMU
+	select ARCH_USE_QUEUED_RWLOCKS
+	select ARCH_USE_QUEUED_SPINLOCKS
 	select ARCH_WANT_FRAME_POINTERS
 	select ARCH_WANT_IPC_PARSE_VERSION
 	select BUILDTIME_EXTABLE_SORT
@@ -42,9 +46,6 @@ config XTENSA
 	  architecture supports all processor configurations and extensions,
 	  with reasonable minimum requirements.  The Xtensa Linux project has
 	  a home page at <http://www.linux-xtensa.org/>.
-
-config RWSEM_XCHGADD_ALGORITHM
-	def_bool y
 
 config GENERIC_HWEIGHT
 	def_bool y
@@ -253,12 +254,26 @@ config MEMMAP_CACHEATTR
 	  region: bits 0..3 -- for addresses 0x00000000..0x1fffffff,
 	  bits 4..7 -- for addresses 0x20000000..0x3fffffff, and so on.
 
-	  Cache attribute values are specific for the MMU type, so e.g.
-	  for region protection MMUs: 2 is cache bypass, 4 is WB cached,
-	  1 is WT cached, f is illegal. For ful MMU: bit 0 makes it executable,
-	  bit 1 makes it writable, bits 2..3 meaning is 0: cache bypass,
-	  1: WB cache, 2: WT cache, 3: special (c and e are illegal, f is
-	  reserved).
+	  Cache attribute values are specific for the MMU type.
+	  For region protection MMUs:
+	    1: WT cached,
+	    2: cache bypass,
+	    4: WB cached,
+	    f: illegal.
+	  For ful MMU:
+	    bit 0: executable,
+	    bit 1: writable,
+	    bits 2..3:
+	      0: cache bypass,
+	      1: WB cache,
+	      2: WT cache,
+	      3: special (c and e are illegal, f is reserved).
+	  For MPU:
+	    0: illegal,
+	    1: WB cache,
+	    2: WB, no-write-allocate cache,
+	    3: WT cache,
+	    4: cache bypass.
 
 config KSEG_PADDR
 	hex "Physical address of the KSEG mapping"
@@ -447,7 +462,6 @@ config USE_OF
 	bool "Flattened Device Tree support"
 	select OF
 	select OF_EARLY_FLATTREE
-	select OF_RESERVED_MEM
 	help
 	  Include support for flattened device tree machine descriptions.
 

@@ -5,15 +5,12 @@
  */
 
 #include "xfs.h"
+#include "xfs_shared.h"
 #include "xfs_format.h"
 #include "xfs_log_format.h"
-#include "xfs_trans_resv.h"
-#include "xfs_mount.h"
 #include "xfs_da_format.h"
 #include "xfs_inode.h"
 #include "xfs_attr.h"
-#include "xfs_attr_leaf.h"
-#include "xfs_acl.h"
 
 #include <linux/posix_acl_xattr.h>
 #include <linux/xattr.h>
@@ -128,6 +125,9 @@ __xfs_xattr_put_listent(
 {
 	char *offset;
 	int arraytop;
+
+	if (context->count < 0 || context->seen_enough)
+		return;
 
 	if (!context->alist)
 		goto compute_size;

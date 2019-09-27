@@ -28,7 +28,7 @@ static void __init kasan_early_panic(const char *reason)
 {
 	sclp_early_printk("The Linux kernel failed to boot with the KernelAddressSanitizer:\n");
 	sclp_early_printk(reason);
-	disabled_wait(0);
+	disabled_wait();
 }
 
 static void * __init kasan_early_alloc_segment(void)
@@ -226,8 +226,6 @@ static void __init kasan_enable_dat(void)
 
 static void __init kasan_early_detect_facilities(void)
 {
-	__stfle(S390_lowcore.stfle_fac_list,
-		ARRAY_SIZE(S390_lowcore.stfle_fac_list));
 	if (test_facility(8)) {
 		has_edat = true;
 		__ctl_set_bit(0, 23);

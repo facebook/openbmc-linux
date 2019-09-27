@@ -8,7 +8,7 @@
  * Copyright(c) 2012 - 2014 Intel Corporation. All rights reserved.
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
  * Copyright(c) 2016 - 2017 Intel Deutschland GmbH
- * Copyright(c) 2018 Intel Corporation
+ * Copyright(c) 2018 - 2019 Intel Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU General Public License as
@@ -31,7 +31,7 @@
  * Copyright(c) 2012 - 2014 Intel Corporation. All rights reserved.
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
  * Copyright(c) 2016 - 2017 Intel Deutschland GmbH
- * Copyright(c) 2018 Intel Corporation
+ * Copyright(c) 2018 - 2019 Intel Corporation
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -83,8 +83,10 @@
 #define IWL_SCAN_ADWELL_MAX_BUDGET_FULL_SCAN 300
 /* adaptive dwell max budget time [TU] for directed scan */
 #define IWL_SCAN_ADWELL_MAX_BUDGET_DIRECTED_SCAN 100
-/* adaptive dwell default APs number */
-#define IWL_SCAN_ADWELL_DEFAULT_N_APS 2
+/* adaptive dwell default high band APs number */
+#define IWL_SCAN_ADWELL_DEFAULT_HB_N_APS 8
+/* adaptive dwell default low band APs number */
+#define IWL_SCAN_ADWELL_DEFAULT_LB_N_APS 2
 /* adaptive dwell default APs number in social channels (1, 6, 11) */
 #define IWL_SCAN_ADWELL_DEFAULT_N_APS_SOCIAL 10
 
@@ -1082,21 +1084,23 @@ static void iwl_mvm_fill_scan_dwell(struct iwl_mvm *mvm,
 	dwell->extended = IWL_SCAN_DWELL_EXTENDED;
 }
 
-static void iwl_mvm_fill_channels(struct iwl_mvm *mvm, u8 *channels)
+static void iwl_mvm_fill_channels(struct iwl_mvm *mvm, u8 *channels,
+				  u32 max_channels)
 {
 	struct ieee80211_supported_band *band;
 	int i, j = 0;
 
 	band = &mvm->nvm_data->bands[NL80211_BAND_2GHZ];
-	for (i = 0; i < band->n_channels; i++, j++)
+	for (i = 0; i < band->n_channels && j < max_channels; i++, j++)
 		channels[j] = band->channels[i].hw_value;
 	band = &mvm->nvm_data->bands[NL80211_BAND_5GHZ];
-	for (i = 0; i < band->n_channels; i++, j++)
+	for (i = 0; i < band->n_channels && j < max_channels; i++, j++)
 		channels[j] = band->channels[i].hw_value;
 }
 
 static void iwl_mvm_fill_scan_config_v1(struct iwl_mvm *mvm, void *config,
-					u32 flags, u8 channel_flags)
+					u32 flags, u8 channel_flags,
+					u32 max_channels)
 {
 	enum iwl_mvm_scan_type type = iwl_mvm_get_scan_type(mvm, NULL);
 	struct iwl_scan_config_v1 *cfg = config;
@@ -1115,11 +1119,12 @@ static void iwl_mvm_fill_scan_config_v1(struct iwl_mvm *mvm, void *config,
 	cfg->bcast_sta_id = mvm->aux_sta.sta_id;
 	cfg->channel_flags = channel_flags;
 
-	iwl_mvm_fill_channels(mvm, cfg->channel_array);
+	iwl_mvm_fill_channels(mvm, cfg->channel_array, max_channels);
 }
 
 static void iwl_mvm_fill_scan_config(struct iwl_mvm *mvm, void *config,
-				     u32 flags, u8 channel_flags)
+				     u32 flags, u8 channel_flags,
+				     u32 max_channels)
 {
 	struct iwl_scan_config *cfg = config;
 
@@ -1162,7 +1167,7 @@ static void iwl_mvm_fill_scan_config(struct iwl_mvm *mvm, void *config,
 	cfg->bcast_sta_id = mvm->aux_sta.sta_id;
 	cfg->channel_flags = channel_flags;
 
-	iwl_mvm_fill_channels(mvm, cfg->channel_array);
+	iwl_mvm_fill_channels(mvm, cfg->channel_array, max_channels);
 }
 
 int iwl_mvm_config_scan(struct iwl_mvm *mvm)
@@ -1181,7 +1186,7 @@ int iwl_mvm_config_scan(struct iwl_mvm *mvm)
 	u8 channel_flags;
 
 	if (WARN_ON(num_channels > mvm->fw->ucode_capa.n_scan_channels))
-		return -ENOBUFS;
+		num_channels = mvm->fw->ucode_capa.n_scan_channels;
 
 	if (iwl_mvm_is_cdb_supported(mvm)) {
 		type = iwl_mvm_get_scan_type_band(mvm, NULL,
@@ -1234,9 +1239,11 @@ int iwl_mvm_config_scan(struct iwl_mvm *mvm)
 			flags |= (iwl_mvm_is_scan_fragmented(hb_type)) ?
 				 SCAN_CONFIG_FLAG_SET_LMAC2_FRAGMENTED :
 				 SCAN_CONFIG_FLAG_CLEAR_LMAC2_FRAGMENTED;
-		iwl_mvm_fill_scan_config(mvm, cfg, flags, channel_flags);
+		iwl_mvm_fill_scan_config(mvm, cfg, flags, channel_flags,
+					 num_channels);
 	} else {
-		iwl_mvm_fill_scan_config_v1(mvm, cfg, flags, channel_flags);
+		iwl_mvm_fill_scan_config_v1(mvm, cfg, flags, channel_flags,
+					    num_channels);
 	}
 
 	cmd.data[0] = cfg;
@@ -1283,7 +1290,11 @@ static void iwl_mvm_scan_umac_dwell(struct iwl_mvm *mvm,
 		cmd->v7.adwell_default_n_aps_social =
 			IWL_SCAN_ADWELL_DEFAULT_N_APS_SOCIAL;
 		cmd->v7.adwell_default_n_aps =
-			IWL_SCAN_ADWELL_DEFAULT_N_APS;
+			IWL_SCAN_ADWELL_DEFAULT_LB_N_APS;
+
+		if (iwl_mvm_is_adwell_hb_ap_num_supported(mvm))
+			cmd->v9.adwell_default_hb_n_aps =
+				IWL_SCAN_ADWELL_DEFAULT_HB_N_APS;
 
 		/* if custom max budget was configured with debugfs */
 		if (IWL_MVM_ADWELL_MAX_BUDGET)
@@ -1580,6 +1591,11 @@ static int iwl_mvm_check_running_scans(struct iwl_mvm *mvm, int type)
 	 * scheduled scan before starting a normal scan.
 	 */
 
+	/* FW supports only a single periodic scan */
+	if ((type == IWL_MVM_SCAN_SCHED || type == IWL_MVM_SCAN_NETDETECT) &&
+	    mvm->scan_status & (IWL_MVM_SCAN_SCHED | IWL_MVM_SCAN_NETDETECT))
+		return -EBUSY;
+
 	if (iwl_mvm_num_scans(mvm) < mvm->max_scans)
 		return 0;
 
@@ -1616,10 +1632,10 @@ static int iwl_mvm_check_running_scans(struct iwl_mvm *mvm, int type)
 		if (mvm->scan_status & IWL_MVM_SCAN_SCHED_MASK)
 			return iwl_mvm_scan_stop(mvm, IWL_MVM_SCAN_SCHED,
 						 true);
-
-		/* fall through, something is wrong if no scan was
-		 * running but we ran out of scans.
+		/* Something is wrong if no scan was running but we
+		 * ran out of scans.
 		 */
+		/* fall through */
 	default:
 		WARN_ON(1);
 		break;
@@ -1976,9 +1992,8 @@ static int iwl_mvm_scan_stop_wait(struct iwl_mvm *mvm, int type)
 		return ret;
 	}
 
-	ret = iwl_wait_notification(&mvm->notif_wait, &wait_scan_done, 1 * HZ);
-
-	return ret;
+	return iwl_wait_notification(&mvm->notif_wait, &wait_scan_done,
+				     1 * HZ);
 }
 
 int iwl_mvm_scan_size(struct iwl_mvm *mvm)

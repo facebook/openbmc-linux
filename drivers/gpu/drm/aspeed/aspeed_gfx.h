@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
-// Copyright 2018 IBM Corporation
+/* SPDX-License-Identifier: GPL-2.0+ */
+/* Copyright 2018 IBM Corporation */
 
-#include <drm/drmP.h>
+#include <drm/drm_device.h>
 #include <drm/drm_simple_kms_helper.h>
 
 struct aspeed_gfx {
@@ -17,7 +17,6 @@ struct aspeed_gfx {
 
 int aspeed_gfx_create_pipe(struct drm_device *drm);
 int aspeed_gfx_create_output(struct drm_device *drm);
-int aspeed_gfx_debugfs_init(struct drm_minor *minor);
 
 #define CRT_CTRL1		0x60 /* CRT Control I */
 #define CRT_CTRL2		0x64 /* CRT Control II */

@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0+
 // Copyright 2018 IBM Corporation
 
-#include <linux/module.h>
-#include <linux/irq.h>
 #include <linux/clk.h>
+#include <linux/dma-mapping.h>
+#include <linux/irq.h>
+#include <linux/mfd/syscon.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_reserved_mem.h>
-#include <linux/reset.h>
+#include <linux/platform_device.h>
 #include <linux/regmap.h>
-#include <linux/mfd/syscon.h>
+#include <linux/reset.h>
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc_helper.h>
@@ -17,16 +19,20 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
+#include <drm/drm_probe_helper.h>
 #include <drm/drm_simple_kms_helper.h>
+#include <drm/drm_vblank.h>
+#include <drm/drm_drv.h>
 
 #include "aspeed_gfx.h"
 
 /**
  * DOC: ASPEED GFX Driver
  *
- * This driver is for the ASPEED BMC SoC's GFX display hardware. This
- * driver runs on the ARM based BMC systems, unlike the ast driver which
- * runs on a host CPU and is is for a PCI graphics device.
+ * This driver is for the ASPEED BMC SoC's 'GFX' display hardware, also called
+ * the 'SOC Display Controller' in the datasheet. This driver runs on the ARM
+ * based BMC systems, unlike the ast driver which runs on a host CPU and is for
+ * a PCIe graphics device.
  *
  * The AST2500 supports a total of 3 output paths:
  *
@@ -46,6 +52,9 @@
  *
  * The driver only supports a simple configuration consisting of a 40MHz
  * pixel clock, fixed by hardware limitations, and the VGA output path.
+ *
+ * The driver was written with the 'AST2500 Software Programming Guide' v17,
+ * which is available under NDA from ASPEED.
  */
 
 static const struct drm_mode_config_funcs aspeed_gfx_mode_config_funcs = {
@@ -169,22 +178,13 @@ static int aspeed_gfx_load(struct drm_device *drm)
 
 	drm_mode_config_reset(drm);
 
-	ret = drm_fb_cma_fbdev_init(drm, 32, 0);
-	if (ret) {
-		dev_err(drm->dev, "Failed to init FB CMA area\n");
-		goto err_cma;
-	}
+	drm_fbdev_generic_setup(drm, 32);
 
 	return 0;
-
-err_cma:
-	drm_irq_uninstall(drm);
-	return ret;
 }
 
 static void aspeed_gfx_unload(struct drm_device *drm)
 {
-	drm_fb_cma_fbdev_fini(drm);
 	drm_kms_helper_poll_fini(drm);
 	drm_mode_config_cleanup(drm);
 
@@ -195,35 +195,22 @@ DEFINE_DRM_GEM_CMA_FOPS(fops);
 
 static struct drm_driver aspeed_gfx_driver = {
 	.driver_features        = DRIVER_GEM | DRIVER_MODESET |
-				DRIVER_PRIME | DRIVER_ATOMIC |
-				DRIVER_HAVE_IRQ,
-	.lastclose              = drm_fb_helper_lastclose,
-	.gem_free_object_unlocked = drm_gem_cma_free_object,
-	.gem_vm_ops             = &drm_gem_cma_vm_ops,
-	.dumb_create            = drm_gem_cma_dumb_create,
-	.prime_handle_to_fd     = drm_gem_prime_handle_to_fd,
-	.prime_fd_to_handle     = drm_gem_prime_fd_to_handle,
-	.gem_prime_export       = drm_gem_prime_export,
-	.gem_prime_import       = drm_gem_prime_import,
-	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
+				DRIVER_PRIME | DRIVER_ATOMIC,
+	.gem_create_object	= drm_cma_gem_create_object_default_funcs,
+	.dumb_create		= drm_gem_cma_dumb_create,
+	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
+	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
 	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
-	.gem_prime_vmap         = drm_gem_cma_prime_vmap,
-	.gem_prime_vunmap       = drm_gem_cma_prime_vunmap,
-	.gem_prime_mmap         = drm_gem_cma_prime_mmap,
+	.gem_prime_mmap		= drm_gem_prime_mmap,
 	.fops = &fops,
 	.name = "aspeed-gfx-drm",
 	.desc = "ASPEED GFX DRM",
 	.date = "20180319",
 	.major = 1,
 	.minor = 0,
-
-#if defined(CONFIG_DEBUG_FS)
-	.debugfs_init = aspeed_gfx_debugfs_init,
-#endif
 };
 
 static const struct of_device_id aspeed_gfx_match[] = {
-	{ .compatible = "aspeed,ast2400-gfx" },
 	{ .compatible = "aspeed,ast2500-gfx" },
 	{ }
 };

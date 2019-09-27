@@ -53,7 +53,7 @@ static int amd_powerplay_create(struct amdgpu_device *adev)
 	mutex_init(&hwmgr->smu_lock);
 	hwmgr->chip_family = adev->family;
 	hwmgr->chip_id = adev->asic_type;
-	hwmgr->feature_mask = adev->powerplay.pp_feature;
+	hwmgr->feature_mask = adev->pm.pp_feature;
 	hwmgr->display_config = &adev->pm.pm_display_cfg;
 	adev->powerplay.pp_handle = hwmgr;
 	adev->powerplay.pp_funcs = &pp_dpm_funcs;
@@ -1304,7 +1304,7 @@ static int pp_notify_smu_enable_pwe(void *handle)
 
 	if (hwmgr->hwmgr_func->smus_notify_pwe == NULL) {
 		pr_info_ratelimited("%s was not implemented.\n", __func__);
-		return -EINVAL;;
+		return -EINVAL;
 	}
 
 	mutex_lock(&hwmgr->smu_lock);
@@ -1341,7 +1341,7 @@ static int pp_set_min_deep_sleep_dcefclk(void *handle, uint32_t clock)
 
 	if (hwmgr->hwmgr_func->set_min_deep_sleep_dcefclk == NULL) {
 		pr_debug("%s was not implemented.\n", __func__);
-		return -EINVAL;;
+		return -EINVAL;
 	}
 
 	mutex_lock(&hwmgr->smu_lock);
@@ -1360,7 +1360,7 @@ static int pp_set_hard_min_dcefclk_by_freq(void *handle, uint32_t clock)
 
 	if (hwmgr->hwmgr_func->set_hard_min_dcefclk_by_freq == NULL) {
 		pr_debug("%s was not implemented.\n", __func__);
-		return -EINVAL;;
+		return -EINVAL;
 	}
 
 	mutex_lock(&hwmgr->smu_lock);
@@ -1379,7 +1379,7 @@ static int pp_set_hard_min_fclk_by_freq(void *handle, uint32_t clock)
 
 	if (hwmgr->hwmgr_func->set_hard_min_fclk_by_freq == NULL) {
 		pr_debug("%s was not implemented.\n", __func__);
-		return -EINVAL;;
+		return -EINVAL;
 	}
 
 	mutex_lock(&hwmgr->smu_lock);
@@ -1399,6 +1399,97 @@ static int pp_set_active_display_count(void *handle, uint32_t count)
 
 	mutex_lock(&hwmgr->smu_lock);
 	ret = phm_set_active_display_count(hwmgr, count);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return ret;
+}
+
+static int pp_get_asic_baco_capability(void *handle, bool *cap)
+{
+	struct pp_hwmgr *hwmgr = handle;
+
+	if (!hwmgr)
+		return -EINVAL;
+
+	if (!hwmgr->pm_en || !hwmgr->hwmgr_func->get_asic_baco_capability)
+		return 0;
+
+	mutex_lock(&hwmgr->smu_lock);
+	hwmgr->hwmgr_func->get_asic_baco_capability(hwmgr, cap);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return 0;
+}
+
+static int pp_get_asic_baco_state(void *handle, int *state)
+{
+	struct pp_hwmgr *hwmgr = handle;
+
+	if (!hwmgr)
+		return -EINVAL;
+
+	if (!hwmgr->pm_en || !hwmgr->hwmgr_func->get_asic_baco_state)
+		return 0;
+
+	mutex_lock(&hwmgr->smu_lock);
+	hwmgr->hwmgr_func->get_asic_baco_state(hwmgr, (enum BACO_STATE *)state);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return 0;
+}
+
+static int pp_set_asic_baco_state(void *handle, int state)
+{
+	struct pp_hwmgr *hwmgr = handle;
+
+	if (!hwmgr)
+		return -EINVAL;
+
+	if (!hwmgr->pm_en || !hwmgr->hwmgr_func->set_asic_baco_state)
+		return 0;
+
+	mutex_lock(&hwmgr->smu_lock);
+	hwmgr->hwmgr_func->set_asic_baco_state(hwmgr, (enum BACO_STATE)state);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return 0;
+}
+
+static int pp_get_ppfeature_status(void *handle, char *buf)
+{
+	struct pp_hwmgr *hwmgr = handle;
+	int ret = 0;
+
+	if (!hwmgr || !hwmgr->pm_en || !buf)
+		return -EINVAL;
+
+	if (hwmgr->hwmgr_func->get_ppfeature_status == NULL) {
+		pr_info_ratelimited("%s was not implemented.\n", __func__);
+		return -EINVAL;
+	}
+
+	mutex_lock(&hwmgr->smu_lock);
+	ret = hwmgr->hwmgr_func->get_ppfeature_status(hwmgr, buf);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return ret;
+}
+
+static int pp_set_ppfeature_status(void *handle, uint64_t ppfeature_masks)
+{
+	struct pp_hwmgr *hwmgr = handle;
+	int ret = 0;
+
+	if (!hwmgr || !hwmgr->pm_en)
+		return -EINVAL;
+
+	if (hwmgr->hwmgr_func->set_ppfeature_status == NULL) {
+		pr_info_ratelimited("%s was not implemented.\n", __func__);
+		return -EINVAL;
+	}
+
+	mutex_lock(&hwmgr->smu_lock);
+	ret = hwmgr->hwmgr_func->set_ppfeature_status(hwmgr, ppfeature_masks);
 	mutex_unlock(&hwmgr->smu_lock);
 
 	return ret;
@@ -1454,4 +1545,9 @@ static const struct amd_pm_funcs pp_dpm_funcs = {
 	.set_min_deep_sleep_dcefclk = pp_set_min_deep_sleep_dcefclk,
 	.set_hard_min_dcefclk_by_freq = pp_set_hard_min_dcefclk_by_freq,
 	.set_hard_min_fclk_by_freq = pp_set_hard_min_fclk_by_freq,
+	.get_asic_baco_capability = pp_get_asic_baco_capability,
+	.get_asic_baco_state = pp_get_asic_baco_state,
+	.set_asic_baco_state = pp_set_asic_baco_state,
+	.get_ppfeature_status = pp_get_ppfeature_status,
+	.set_ppfeature_status = pp_set_ppfeature_status,
 };

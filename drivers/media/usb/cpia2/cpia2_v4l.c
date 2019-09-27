@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /****************************************************************************
  *
  *  Filename: cpia2_v4l.c
@@ -10,16 +11,6 @@
  *     This is a USB driver for CPia2 based video cameras.
  *     The infrastructure of this driver is based on the cpia usb driver by
  *     Jochen Scharrlach and Johannes Erdfeldt.
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
  *
  *  Stripped of 2.4 stuff ready for main kernel submit by
  *		Alan Cox <alan@lxorguk.ukuu.org.uk>
@@ -259,13 +250,6 @@ static int cpia2_querycap(struct file *file, void *fh, struct v4l2_capability *v
 
 	if (usb_make_path(cam->dev, vc->bus_info, sizeof(vc->bus_info)) <0)
 		memset(vc->bus_info,0, sizeof(vc->bus_info));
-
-	vc->device_caps = V4L2_CAP_VIDEO_CAPTURE |
-			   V4L2_CAP_READWRITE |
-			   V4L2_CAP_STREAMING;
-	vc->capabilities = vc->device_caps |
-			   V4L2_CAP_DEVICE_CAPS;
-
 	return 0;
 }
 
@@ -833,7 +817,7 @@ static int cpia2_querybuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 		break;
 	case FRAME_READY:
 		buf->bytesused = cam->buffers[buf->index].length;
-		buf->timestamp = cam->buffers[buf->index].timestamp;
+		buf->timestamp = ns_to_timeval(cam->buffers[buf->index].ts);
 		buf->sequence = cam->buffers[buf->index].seq;
 		buf->flags = V4L2_BUF_FLAG_DONE;
 		break;
@@ -889,12 +873,7 @@ static int find_earliest_filled_buffer(struct camera_data *cam)
 				found = i;
 			} else {
 				/* find which buffer is earlier */
-				struct timeval *tv1, *tv2;
-				tv1 = &cam->buffers[i].timestamp;
-				tv2 = &cam->buffers[found].timestamp;
-				if(tv1->tv_sec < tv2->tv_sec ||
-				   (tv1->tv_sec == tv2->tv_sec &&
-				    tv1->tv_usec < tv2->tv_usec))
+				if (cam->buffers[i].ts < cam->buffers[found].ts)
 					found = i;
 			}
 		}
@@ -945,7 +924,7 @@ static int cpia2_dqbuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 	buf->flags = V4L2_BUF_FLAG_MAPPED | V4L2_BUF_FLAG_DONE
 		| V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 	buf->field = V4L2_FIELD_NONE;
-	buf->timestamp = cam->buffers[buf->index].timestamp;
+	buf->timestamp = ns_to_timeval(cam->buffers[buf->index].ts);
 	buf->sequence = cam->buffers[buf->index].seq;
 	buf->m.offset = cam->buffers[buf->index].data - cam->frame_buffer;
 	buf->length = cam->frame_size;
@@ -1166,6 +1145,8 @@ int cpia2_register_camera(struct camera_data *cam)
 	cam->vdev.lock = &cam->v4l2_lock;
 	cam->vdev.ctrl_handler = hdl;
 	cam->vdev.v4l2_dev = &cam->v4l2_dev;
+	cam->vdev.device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_READWRITE |
+				V4L2_CAP_STREAMING;
 
 	reset_camera_struct_v4l(cam);
 
@@ -1245,8 +1226,7 @@ static int __init cpia2_init(void)
 	LOG("%s v%s\n",
 	    ABOUT, CPIA_VERSION);
 	check_parameters();
-	cpia2_usb_init();
-	return 0;
+	return cpia2_usb_init();
 }
 
 

@@ -1,4 +1,4 @@
-Device tree configuration for the GFX display deivce on the AST2500 SoCs.
+Device tree configuration for the GFX display device on the ASPEED SoCs
 
 Required properties:
   - compatible

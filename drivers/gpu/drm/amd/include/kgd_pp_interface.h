@@ -92,6 +92,9 @@ enum pp_clock_type {
 	PP_SCLK,
 	PP_MCLK,
 	PP_PCIE,
+	PP_SOCCLK,
+	PP_FCLK,
+	PP_DCEFCLK,
 	OD_SCLK,
 	OD_MCLK,
 	OD_VDDC_CURVE,
@@ -106,8 +109,12 @@ enum amd_pp_sensors {
 	AMDGPU_PP_SENSOR_UVD_DCLK,
 	AMDGPU_PP_SENSOR_VCE_ECCLK,
 	AMDGPU_PP_SENSOR_GPU_LOAD,
+	AMDGPU_PP_SENSOR_MEM_LOAD,
 	AMDGPU_PP_SENSOR_GFX_MCLK,
 	AMDGPU_PP_SENSOR_GPU_TEMP,
+	AMDGPU_PP_SENSOR_EDGE_TEMP = AMDGPU_PP_SENSOR_GPU_TEMP,
+	AMDGPU_PP_SENSOR_HOTSPOT_TEMP,
+	AMDGPU_PP_SENSOR_MEM_TEMP,
 	AMDGPU_PP_SENSOR_VCE_POWER,
 	AMDGPU_PP_SENSOR_UVD_POWER,
 	AMDGPU_PP_SENSOR_GPU_POWER,
@@ -116,6 +123,7 @@ enum amd_pp_sensors {
 	AMDGPU_PP_SENSOR_ENABLED_SMC_FEATURES_MASK,
 	AMDGPU_PP_SENSOR_MIN_FAN_RPM,
 	AMDGPU_PP_SENSOR_MAX_FAN_RPM,
+	AMDGPU_PP_SENSOR_VCN_POWER_STATE,
 };
 
 enum amd_pp_task {
@@ -154,6 +162,13 @@ enum PP_OD_DPM_TABLE_COMMAND {
 struct pp_states_info {
 	uint32_t nums;
 	uint32_t states[16];
+};
+
+enum PP_HWMON_TEMP {
+	PP_TEMP_EDGE = 0,
+	PP_TEMP_JUNCTION,
+	PP_TEMP_MEM,
+	PP_TEMP_MAX
 };
 
 #define PP_GROUP_MASK        0xF0000000
@@ -281,6 +296,11 @@ struct amd_pm_funcs {
 	int (*set_hard_min_dcefclk_by_freq)(void *handle, uint32_t clock);
 	int (*set_hard_min_fclk_by_freq)(void *handle, uint32_t clock);
 	int (*set_min_deep_sleep_dcefclk)(void *handle, uint32_t clock);
+	int (*get_asic_baco_capability)(void *handle, bool *cap);
+	int (*get_asic_baco_state)(void *handle, int *state);
+	int (*set_asic_baco_state)(void *handle, int state);
+	int (*get_ppfeature_status)(void *handle, char *buf);
+	int (*set_ppfeature_status)(void *handle, uint64_t ppfeature_masks);
 };
 
 #endif

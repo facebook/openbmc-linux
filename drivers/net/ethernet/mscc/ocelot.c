@@ -22,6 +22,7 @@
 #include <net/switchdev.h>
 
 #include "ocelot.h"
+#include "ocelot_ace.h"
 
 #define TABLE_UPDATE_SLEEP_US 10
 #define TABLE_UPDATE_TIMEOUT_US 100000
@@ -128,6 +129,13 @@ static void ocelot_mact_init(struct ocelot *ocelot)
 
 	/* Clear the MAC table */
 	ocelot_write(ocelot, MACACCESS_CMD_INIT, ANA_TABLES_MACACCESS);
+}
+
+static void ocelot_vcap_enable(struct ocelot *ocelot, struct ocelot_port *port)
+{
+	ocelot_write_gix(ocelot, ANA_PORT_VCAP_S2_CFG_S2_ENA |
+			 ANA_PORT_VCAP_S2_CFG_S2_IP6_CFG(0xa),
+			 ANA_PORT_VCAP_S2_CFG, port->chip_port);
 }
 
 static inline u32 ocelot_vlant_read_vlanaccess(struct ocelot *ocelot)
@@ -593,45 +601,25 @@ static int ocelot_port_xmit(struct sk_buff *skb, struct net_device *dev)
 	return NETDEV_TX_OK;
 }
 
-static void ocelot_mact_mc_reset(struct ocelot_port *port)
+static int ocelot_mc_unsync(struct net_device *dev, const unsigned char *addr)
 {
-	struct ocelot *ocelot = port->ocelot;
-	struct netdev_hw_addr *ha, *n;
+	struct ocelot_port *port = netdev_priv(dev);
 
-	/* Free and forget all the MAC addresses stored in the port private mc
-	 * list. These are mc addresses that were previously added by calling
-	 * ocelot_mact_mc_add().
-	 */
-	list_for_each_entry_safe(ha, n, &port->mc, list) {
-		ocelot_mact_forget(ocelot, ha->addr, port->pvid);
-		list_del(&ha->list);
-		kfree(ha);
-	}
+	return ocelot_mact_forget(port->ocelot, addr, port->pvid);
 }
 
-static int ocelot_mact_mc_add(struct ocelot_port *port,
-			      struct netdev_hw_addr *hw_addr)
+static int ocelot_mc_sync(struct net_device *dev, const unsigned char *addr)
 {
-	struct ocelot *ocelot = port->ocelot;
-	struct netdev_hw_addr *ha = kzalloc(sizeof(*ha), GFP_KERNEL);
+	struct ocelot_port *port = netdev_priv(dev);
 
-	if (!ha)
-		return -ENOMEM;
-
-	memcpy(ha, hw_addr, sizeof(*ha));
-	list_add_tail(&ha->list, &port->mc);
-
-	ocelot_mact_learn(ocelot, PGID_CPU, ha->addr, port->pvid,
-			  ENTRYTYPE_LOCKED);
-
-	return 0;
+	return ocelot_mact_learn(port->ocelot, PGID_CPU, addr, port->pvid,
+				 ENTRYTYPE_LOCKED);
 }
 
 static void ocelot_set_rx_mode(struct net_device *dev)
 {
 	struct ocelot_port *port = netdev_priv(dev);
 	struct ocelot *ocelot = port->ocelot;
-	struct netdev_hw_addr *ha;
 	int i;
 	u32 val;
 
@@ -643,13 +631,7 @@ static void ocelot_set_rx_mode(struct net_device *dev)
 	for (i = ocelot->num_phys_ports + 1; i < PGID_CPU; i++)
 		ocelot_write_rix(ocelot, val, ANA_PGID_PGID, i);
 
-	/* Handle the device multicast addresses. First remove all the
-	 * previously installed addresses and then add the latest ones to the
-	 * mac table.
-	 */
-	ocelot_mact_mc_reset(port);
-	netdev_for_each_mc_addr(ha, dev)
-		ocelot_mact_mc_add(port, ha);
+	__dev_mc_sync(dev, ocelot_mc_sync, ocelot_mc_unsync);
 }
 
 static int ocelot_port_get_phys_port_name(struct net_device *dev,
@@ -721,7 +703,8 @@ static void ocelot_get_stats64(struct net_device *dev,
 
 static int ocelot_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 			  struct net_device *dev, const unsigned char *addr,
-			  u16 vid, u16 flags)
+			  u16 vid, u16 flags,
+			  struct netlink_ext_ack *extack)
 {
 	struct ocelot_port *port = netdev_priv(dev);
 	struct ocelot *ocelot = port->ocelot;
@@ -909,8 +892,27 @@ static int ocelot_set_features(struct net_device *dev,
 	struct ocelot_port *port = netdev_priv(dev);
 	netdev_features_t changed = dev->features ^ features;
 
+	if ((dev->features & NETIF_F_HW_TC) > (features & NETIF_F_HW_TC) &&
+	    port->tc.offload_cnt) {
+		netdev_err(dev,
+			   "Cannot disable HW TC offload while offloads active\n");
+		return -EBUSY;
+	}
+
 	if (changed & NETIF_F_HW_VLAN_CTAG_FILTER)
 		ocelot_vlan_mode(port, features);
+
+	return 0;
+}
+
+static int ocelot_get_port_parent_id(struct net_device *dev,
+				     struct netdev_phys_item_id *ppid)
+{
+	struct ocelot_port *ocelot_port = netdev_priv(dev);
+	struct ocelot *ocelot = ocelot_port->ocelot;
+
+	ppid->id_len = sizeof(ocelot->base_mac);
+	memcpy(&ppid->id, &ocelot->base_mac, ppid->id_len);
 
 	return 0;
 }
@@ -929,6 +931,8 @@ static const struct net_device_ops ocelot_port_netdev_ops = {
 	.ndo_vlan_rx_add_vid		= ocelot_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid		= ocelot_vlan_rx_kill_vid,
 	.ndo_set_features		= ocelot_set_features,
+	.ndo_get_port_parent_id		= ocelot_get_port_parent_id,
+	.ndo_setup_tc			= ocelot_setup_tc,
 };
 
 static void ocelot_get_strings(struct net_device *netdev, u32 sset, u8 *data)
@@ -945,10 +949,8 @@ static void ocelot_get_strings(struct net_device *netdev, u32 sset, u8 *data)
 		       ETH_GSTRING_LEN);
 }
 
-static void ocelot_check_stats(struct work_struct *work)
+static void ocelot_update_stats(struct ocelot *ocelot)
 {
-	struct delayed_work *del_work = to_delayed_work(work);
-	struct ocelot *ocelot = container_of(del_work, struct ocelot, stats_work);
 	int i, j;
 
 	mutex_lock(&ocelot->stats_lock);
@@ -972,11 +974,19 @@ static void ocelot_check_stats(struct work_struct *work)
 		}
 	}
 
-	cancel_delayed_work(&ocelot->stats_work);
+	mutex_unlock(&ocelot->stats_lock);
+}
+
+static void ocelot_check_stats_work(struct work_struct *work)
+{
+	struct delayed_work *del_work = to_delayed_work(work);
+	struct ocelot *ocelot = container_of(del_work, struct ocelot,
+					     stats_work);
+
+	ocelot_update_stats(ocelot);
+
 	queue_delayed_work(ocelot->stats_queue, &ocelot->stats_work,
 			   OCELOT_STATS_CHECK_DELAY);
-
-	mutex_unlock(&ocelot->stats_lock);
 }
 
 static void ocelot_get_ethtool_stats(struct net_device *dev,
@@ -987,7 +997,7 @@ static void ocelot_get_ethtool_stats(struct net_device *dev,
 	int i;
 
 	/* check and update now */
-	ocelot_check_stats(&ocelot->stats_work.work);
+	ocelot_update_stats(ocelot);
 
 	/* Copy all counters */
 	for (i = 0; i < ocelot->num_stats; i++)
@@ -1011,25 +1021,6 @@ static const struct ethtool_ops ocelot_ethtool_ops = {
 	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
 	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
 };
-
-static int ocelot_port_attr_get(struct net_device *dev,
-				struct switchdev_attr *attr)
-{
-	struct ocelot_port *ocelot_port = netdev_priv(dev);
-	struct ocelot *ocelot = ocelot_port->ocelot;
-
-	switch (attr->id) {
-	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
-		attr->u.ppid.id_len = sizeof(ocelot->base_mac);
-		memcpy(&attr->u.ppid.id, &ocelot->base_mac,
-		       attr->u.ppid.id_len);
-		break;
-	default:
-		return -EOPNOTSUPP;
-	}
-
-	return 0;
-}
 
 static int ocelot_port_attr_stp_state_set(struct ocelot_port *ocelot_port,
 					  struct switchdev_trans *trans,
@@ -1329,11 +1320,6 @@ static int ocelot_port_obj_del(struct net_device *dev,
 	return ret;
 }
 
-static const struct switchdev_ops ocelot_port_switchdev_ops = {
-	.switchdev_port_attr_get	= ocelot_port_attr_get,
-	.switchdev_port_attr_set	= ocelot_port_attr_set,
-};
-
 static int ocelot_port_bridge_join(struct ocelot_port *ocelot_port,
 				   struct net_device *bridge)
 {
@@ -1588,6 +1574,28 @@ struct notifier_block ocelot_netdevice_nb __read_mostly = {
 };
 EXPORT_SYMBOL(ocelot_netdevice_nb);
 
+static int ocelot_switchdev_event(struct notifier_block *unused,
+				  unsigned long event, void *ptr)
+{
+	struct net_device *dev = switchdev_notifier_info_to_dev(ptr);
+	int err;
+
+	switch (event) {
+	case SWITCHDEV_PORT_ATTR_SET:
+		err = switchdev_handle_port_attr_set(dev, ptr,
+						     ocelot_netdevice_dev_check,
+						     ocelot_port_attr_set);
+		return notifier_from_errno(err);
+	}
+
+	return NOTIFY_DONE;
+}
+
+struct notifier_block ocelot_switchdev_nb __read_mostly = {
+	.notifier_call = ocelot_switchdev_event,
+};
+EXPORT_SYMBOL(ocelot_switchdev_nb);
+
 static int ocelot_switchdev_blocking_event(struct notifier_block *unused,
 					   unsigned long event, void *ptr)
 {
@@ -1605,6 +1613,11 @@ static int ocelot_switchdev_blocking_event(struct notifier_block *unused,
 		err = switchdev_handle_port_obj_del(dev, ptr,
 						    ocelot_netdevice_dev_check,
 						    ocelot_port_obj_del);
+		return notifier_from_errno(err);
+	case SWITCHDEV_PORT_ATTR_SET:
+		err = switchdev_handle_port_attr_set(dev, ptr,
+						     ocelot_netdevice_dev_check,
+						     ocelot_port_attr_set);
 		return notifier_from_errno(err);
 	}
 
@@ -1634,15 +1647,14 @@ int ocelot_probe_port(struct ocelot *ocelot, u8 port,
 	ocelot_port->regs = regs;
 	ocelot_port->chip_port = port;
 	ocelot_port->phy = phy;
-	INIT_LIST_HEAD(&ocelot_port->mc);
 	ocelot->ports[port] = ocelot_port;
 
 	dev->netdev_ops = &ocelot_port_netdev_ops;
 	dev->ethtool_ops = &ocelot_ethtool_ops;
-	dev->switchdev_ops = &ocelot_port_switchdev_ops;
 
-	dev->hw_features |= NETIF_F_HW_VLAN_CTAG_FILTER | NETIF_F_RXFCS;
-	dev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
+	dev->hw_features |= NETIF_F_HW_VLAN_CTAG_FILTER | NETIF_F_RXFCS |
+		NETIF_F_HW_TC;
+	dev->features |= NETIF_F_HW_VLAN_CTAG_FILTER | NETIF_F_HW_TC;
 
 	memcpy(dev->dev_addr, ocelot->base_mac, ETH_ALEN);
 	dev->dev_addr[ETH_ALEN - 1] += port;
@@ -1657,6 +1669,9 @@ int ocelot_probe_port(struct ocelot *ocelot, u8 port,
 
 	/* Basic L2 initialization */
 	ocelot_vlan_port_apply(ocelot, ocelot_port);
+
+	/* Enable vcap lookups */
+	ocelot_vcap_enable(ocelot, ocelot_port);
 
 	return 0;
 
@@ -1692,6 +1707,7 @@ int ocelot_init(struct ocelot *ocelot)
 
 	ocelot_mact_init(ocelot);
 	ocelot_vlan_init(ocelot);
+	ocelot_ace_init(ocelot);
 
 	for (port = 0; port < ocelot->num_phys_ports; port++) {
 		/* Clear all counters (5 groups) */
@@ -1793,7 +1809,7 @@ int ocelot_init(struct ocelot *ocelot)
 				 ANA_CPUQ_8021_CFG_CPUQ_BPDU_VAL(6),
 				 ANA_CPUQ_8021_CFG, i);
 
-	INIT_DELAYED_WORK(&ocelot->stats_work, ocelot_check_stats);
+	INIT_DELAYED_WORK(&ocelot->stats_work, ocelot_check_stats_work);
 	queue_delayed_work(ocelot->stats_queue, &ocelot->stats_work,
 			   OCELOT_STATS_CHECK_DELAY);
 	return 0;
@@ -1802,8 +1818,10 @@ EXPORT_SYMBOL(ocelot_init);
 
 void ocelot_deinit(struct ocelot *ocelot)
 {
+	cancel_delayed_work(&ocelot->stats_work);
 	destroy_workqueue(ocelot->stats_queue);
 	mutex_destroy(&ocelot->stats_lock);
+	ocelot_ace_deinit();
 }
 EXPORT_SYMBOL(ocelot_deinit);
 

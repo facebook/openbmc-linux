@@ -106,7 +106,7 @@ void mt76_write_mac_initvals(struct mt76x02_dev *dev)
 		{ MT_TX_SW_CFG1,		0x00010000 },
 		{ MT_TX_SW_CFG2,		0x00000000 },
 		{ MT_TXOP_CTRL_CFG,		0x0400583f },
-		{ MT_TX_RTS_CFG,		0x00100020 },
+		{ MT_TX_RTS_CFG,		0x00ffff20 },
 		{ MT_TX_TIMEOUT_CFG,		0x000a2290 },
 		{ MT_TX_RETRY_CFG,		0x47f01f0f },
 		{ MT_EXP_ACK_TIME,		0x002c00dc },
@@ -143,6 +143,7 @@ void mt76_write_mac_initvals(struct mt76x02_dev *dev)
 		{ MT_VHT_HT_FBK_CFG1,		0xedcba980 },
 		{ MT_PROT_AUTO_TX_CFG,		0x00830083 },
 		{ MT_HT_CTRL_CFG,		0x000001ff },
+		{ MT_TX_LINK_CFG,		0x00001020 },
 	};
 	struct mt76_reg_pair prot_vals[] = {
 		{ MT_CCK_PROT_CFG,		DEFAULT_PROT_CFG_CCK },
@@ -164,27 +165,22 @@ void mt76x2_init_txpower(struct mt76x02_dev *dev,
 	struct ieee80211_channel *chan;
 	struct mt76x2_tx_power_info txp;
 	struct mt76_rate_power t = {};
-	int target_power;
 	int i;
 
 	for (i = 0; i < sband->n_channels; i++) {
 		chan = &sband->channels[i];
 
 		mt76x2_get_power_info(dev, &txp, chan);
-
-		target_power = max_t(int, (txp.chain[0].target_power +
-					   txp.chain[0].delta),
-					  (txp.chain[1].target_power +
-					   txp.chain[1].delta));
-
 		mt76x2_get_rate_power(dev, &t, chan);
 
-		chan->max_power = mt76x02_get_max_rate_power(&t) +
-				  target_power;
-		chan->max_power /= 2;
+		chan->orig_mpwr = mt76x02_get_max_rate_power(&t) +
+				  txp.target_power;
+		chan->orig_mpwr = DIV_ROUND_UP(chan->orig_mpwr, 2);
 
 		/* convert to combined output power on 2x2 devices */
-		chan->max_power += 3;
+		chan->orig_mpwr += 3;
+		chan->max_power = min_t(int, chan->max_reg_power,
+					chan->orig_mpwr);
 	}
 }
 EXPORT_SYMBOL_GPL(mt76x2_init_txpower);

@@ -381,6 +381,15 @@ struct ttm_bo_driver {
 	 */
 	int (*access_memory)(struct ttm_buffer_object *bo, unsigned long offset,
 			     void *buf, int len, int write);
+
+	/**
+	 * struct ttm_bo_driver member del_from_lru_notify
+	 *
+	 * @bo: the buffer object deleted from lru
+	 *
+	 * notify driver that a BO was deleted from LRU.
+	 */
+	void (*del_from_lru_notify)(struct ttm_buffer_object *bo);
 };
 
 /**
@@ -411,7 +420,6 @@ extern struct ttm_bo_global {
 	/**
 	 * Protected by ttm_global_mutex.
 	 */
-	unsigned int use_count;
 	struct list_head device_list;
 
 	/**
@@ -588,7 +596,7 @@ int ttm_bo_device_release(struct ttm_bo_device *bdev);
 int ttm_bo_device_init(struct ttm_bo_device *bdev,
 		       struct ttm_bo_driver *driver,
 		       struct address_space *mapping,
-		       uint64_t file_page_offset, bool need_dma32);
+		       bool need_dma32);
 
 /**
  * ttm_bo_unmap_virtual
@@ -759,11 +767,12 @@ static inline int ttm_bo_reserve_slowpath(struct ttm_buffer_object *bo,
  */
 static inline void ttm_bo_unreserve(struct ttm_buffer_object *bo)
 {
-	if (!(bo->mem.placement & TTM_PL_FLAG_NO_EVICT)) {
-		spin_lock(&bo->bdev->glob->lru_lock);
+	spin_lock(&bo->bdev->glob->lru_lock);
+	if (list_empty(&bo->lru))
 		ttm_bo_add_to_lru(bo);
-		spin_unlock(&bo->bdev->glob->lru_lock);
-	}
+	else
+		ttm_bo_move_to_lru_tail(bo, NULL);
+	spin_unlock(&bo->bdev->glob->lru_lock);
 	reservation_object_unlock(bo->resv);
 }
 
@@ -867,7 +876,7 @@ int ttm_bo_pipeline_move(struct ttm_buffer_object *bo,
  *
  * @bo: A pointer to a struct ttm_buffer_object.
  *
- * Pipelined gutting a BO of it's backing store.
+ * Pipelined gutting a BO of its backing store.
  */
 int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo);
 

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0+
 
 #include "vkms_drv.h"
-#include <drm/drm_crtc_helper.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_probe_helper.h>
 
 static void vkms_connector_destroy(struct drm_connector *connector)
 {
-	drm_connector_unregister(connector);
 	drm_connector_cleanup(connector);
 }
 
@@ -71,12 +70,6 @@ int vkms_output_init(struct vkms_device *vkmsdev)
 
 	drm_connector_helper_add(connector, &vkms_conn_helper_funcs);
 
-	ret = drm_connector_register(connector);
-	if (ret) {
-		DRM_ERROR("Failed to register connector\n");
-		goto err_connector_register;
-	}
-
 	ret = drm_encoder_init(dev, encoder, &vkms_encoder_funcs,
 			       DRM_MODE_ENCODER_VIRTUAL, NULL);
 	if (ret) {
@@ -99,9 +92,6 @@ err_attach:
 	drm_encoder_cleanup(encoder);
 
 err_encoder:
-	drm_connector_unregister(connector);
-
-err_connector_register:
 	drm_connector_cleanup(connector);
 
 err_connector:

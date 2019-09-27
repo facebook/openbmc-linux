@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/fb.h>
 #include <linux/module.h>
+#include <linux/pci.h>
 #include <linux/slab.h>
 #include <asm/div64.h>
 #include <drm/amdgpu_drm.h>
@@ -77,7 +78,7 @@
 #define PCIE_BUS_CLK                10000
 #define TCLK                        (PCIE_BUS_CLK / 10)
 
-static const struct profile_mode_setting smu7_profiling[7] =
+static struct profile_mode_setting smu7_profiling[7] =
 					{{0, 0, 0, 0, 0, 0, 0, 0},
 					 {1, 0, 100, 30, 1, 0, 100, 10},
 					 {1, 10, 0, 30, 0, 0, 0, 0},
@@ -3491,14 +3492,14 @@ static int smu7_get_gpu_power(struct pp_hwmgr *hwmgr, u32 *query)
 
 	smum_send_msg_to_smc(hwmgr, PPSMC_MSG_PmStatusLogStart);
 	cgs_write_ind_register(hwmgr->device, CGS_IND_REG__SMC,
-							ixSMU_PM_STATUS_94, 0);
+							ixSMU_PM_STATUS_95, 0);
 
 	for (i = 0; i < 10; i++) {
-		mdelay(1);
+		msleep(500);
 		smum_send_msg_to_smc(hwmgr, PPSMC_MSG_PmStatusLogSample);
 		tmp = cgs_read_ind_register(hwmgr->device,
 						CGS_IND_REG__SMC,
-						ixSMU_PM_STATUS_94);
+						ixSMU_PM_STATUS_95);
 		if (tmp != 0)
 			break;
 	}
@@ -3532,9 +3533,12 @@ static int smu7_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 		*size = 4;
 		return 0;
 	case AMDGPU_PP_SENSOR_GPU_LOAD:
+	case AMDGPU_PP_SENSOR_MEM_LOAD:
 		offset = data->soft_regs_start + smum_get_offsetof(hwmgr,
 								SMU_SoftRegisters,
-								AverageGraphicsActivity);
+								(idx == AMDGPU_PP_SENSOR_GPU_LOAD) ?
+								AverageGraphicsActivity:
+								AverageMemoryActivity);
 
 		activity_percent = cgs_read_ind_register(hwmgr->device, CGS_IND_REG__SMC, offset);
 		activity_percent += 0x80;
@@ -3681,10 +3685,12 @@ static int smu7_request_link_speed_change_before_state_change(
 			data->force_pcie_gen = PP_PCIEGen2;
 			if (current_link_speed == PP_PCIEGen2)
 				break;
+			/* fall through */
 		case PP_PCIEGen2:
 			if (0 == amdgpu_acpi_pcie_performance_request(hwmgr->adev, PCIE_PERF_REQ_GEN2, false))
 				break;
 #endif
+			/* fall through */
 		default:
 			data->force_pcie_gen = smu7_get_current_pcie_speed(hwmgr);
 			break;
@@ -4982,17 +4988,27 @@ static int smu7_set_power_profile_mode(struct pp_hwmgr *hwmgr, long *input, uint
 	mode = input[size];
 	switch (mode) {
 	case PP_SMC_POWER_PROFILE_CUSTOM:
-		if (size < 8)
+		if (size < 8 && size != 0)
 			return -EINVAL;
-
-		tmp.bupdate_sclk = input[0];
-		tmp.sclk_up_hyst = input[1];
-		tmp.sclk_down_hyst = input[2];
-		tmp.sclk_activity = input[3];
-		tmp.bupdate_mclk = input[4];
-		tmp.mclk_up_hyst = input[5];
-		tmp.mclk_down_hyst = input[6];
-		tmp.mclk_activity = input[7];
+		/* If only CUSTOM is passed in, use the saved values. Check
+		 * that we actually have a CUSTOM profile by ensuring that
+		 * the "use sclk" or the "use mclk" bits are set
+		 */
+		tmp = smu7_profiling[PP_SMC_POWER_PROFILE_CUSTOM];
+		if (size == 0) {
+			if (tmp.bupdate_sclk == 0 && tmp.bupdate_mclk == 0)
+				return -EINVAL;
+		} else {
+			tmp.bupdate_sclk = input[0];
+			tmp.sclk_up_hyst = input[1];
+			tmp.sclk_down_hyst = input[2];
+			tmp.sclk_activity = input[3];
+			tmp.bupdate_mclk = input[4];
+			tmp.mclk_up_hyst = input[5];
+			tmp.mclk_down_hyst = input[6];
+			tmp.mclk_activity = input[7];
+			smu7_profiling[PP_SMC_POWER_PROFILE_CUSTOM] = tmp;
+		}
 		if (!smum_update_dpm_settings(hwmgr, &tmp)) {
 			memcpy(&data->current_profile_setting, &tmp, sizeof(struct profile_mode_setting));
 			hwmgr->power_profile_mode = mode;

@@ -12,9 +12,11 @@
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/zalloc.h>
 #include <errno.h>
 #include "perf.h"
 #include "debug.h"
+#include "evlist.h"
 #include "bpf-loader.h"
 #include "bpf-prologue.h"
 #include "probe-event.h"
@@ -24,21 +26,11 @@
 #include "llvm-utils.h"
 #include "c++/clang-c.h"
 
-#define DEFINE_PRINT_FN(name, level) \
-static int libbpf_##name(const char *fmt, ...)	\
-{						\
-	va_list args;				\
-	int ret;				\
-						\
-	va_start(args, fmt);			\
-	ret = veprintf(level, verbose, pr_fmt(fmt), args);\
-	va_end(args);				\
-	return ret;				\
+static int libbpf_perf_print(enum libbpf_print_level level __attribute__((unused)),
+			      const char *fmt, va_list args)
+{
+	return veprintf(1, verbose, pr_fmt(fmt), args);
 }
-
-DEFINE_PRINT_FN(warning, 1)
-DEFINE_PRINT_FN(info, 1)
-DEFINE_PRINT_FN(debug, 1)
 
 struct bpf_prog_priv {
 	bool is_tp;
@@ -59,9 +51,7 @@ bpf__prepare_load_buffer(void *obj_buf, size_t obj_buf_sz, const char *name)
 	struct bpf_object *obj;
 
 	if (!libbpf_initialized) {
-		libbpf_set_print(libbpf_warning,
-				 libbpf_info,
-				 libbpf_debug);
+		libbpf_set_print(libbpf_perf_print);
 		libbpf_initialized = true;
 	}
 
@@ -79,9 +69,7 @@ struct bpf_object *bpf__prepare_load(const char *filename, bool source)
 	struct bpf_object *obj;
 
 	if (!libbpf_initialized) {
-		libbpf_set_print(libbpf_warning,
-				 libbpf_info,
-				 libbpf_debug);
+		libbpf_set_print(libbpf_perf_print);
 		libbpf_initialized = true;
 	}
 
@@ -841,7 +829,7 @@ static void
 bpf_map_op__delete(struct bpf_map_op *op)
 {
 	if (!list_empty(&op->list))
-		list_del(&op->list);
+		list_del_init(&op->list);
 	if (op->key_type == BPF_MAP_KEY_RANGES)
 		parse_events__clear_array(&op->k.array);
 	free(op);
@@ -1503,7 +1491,7 @@ apply_obj_config_object(struct bpf_object *obj)
 	struct bpf_map *map;
 	int err;
 
-	bpf_map__for_each(map, obj) {
+	bpf_object__for_each_map(map, obj) {
 		err = apply_obj_config_map(map);
 		if (err)
 			return err;
@@ -1527,7 +1515,7 @@ int bpf__apply_obj_config(void)
 
 #define bpf__for_each_map(pos, obj, objtmp)	\
 	bpf_object__for_each_safe(obj, objtmp)	\
-		bpf_map__for_each(pos, obj)
+		bpf_object__for_each_map(pos, obj)
 
 #define bpf__for_each_map_named(pos, obj, objtmp, name)	\
 	bpf__for_each_map(pos, obj, objtmp) 		\

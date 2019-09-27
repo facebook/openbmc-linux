@@ -9,6 +9,7 @@
 
 #include <linux/pci.h>
 #include <linux/netdevice.h>
+#include <net/devlink.h>
 #include "bnxt_hsi.h"
 #include "bnxt.h"
 #include "bnxt_vfr.h"
@@ -97,10 +98,13 @@ static int bnxt_hwrm_nvm_req(struct bnxt *bp, u32 param_id, void *msg,
 	if (idx)
 		req->dimensions = cpu_to_le16(1);
 
-	if (req->req_type == cpu_to_le16(HWRM_NVM_SET_VARIABLE))
+	if (req->req_type == cpu_to_le16(HWRM_NVM_SET_VARIABLE)) {
 		memcpy(data_addr, buf, bytesize);
-
-	rc = hwrm_send_message(bp, msg, msg_len, HWRM_CMD_TIMEOUT);
+		rc = hwrm_send_message(bp, msg, msg_len, HWRM_CMD_TIMEOUT);
+	} else {
+		rc = hwrm_send_message_silent(bp, msg, msg_len,
+					      HWRM_CMD_TIMEOUT);
+	}
 	if (!rc && req->req_type == cpu_to_le16(HWRM_NVM_GET_VARIABLE))
 		memcpy(buf, data_addr, bytesize);
 
@@ -188,6 +192,9 @@ static const struct devlink_param bnxt_dl_params[] = {
 			     NULL),
 };
 
+static const struct devlink_param bnxt_dl_port_params[] = {
+};
+
 int bnxt_dl_register(struct bnxt *bp)
 {
 	struct devlink *dl;
@@ -225,8 +232,32 @@ int bnxt_dl_register(struct bnxt *bp)
 		goto err_dl_unreg;
 	}
 
+	devlink_port_attrs_set(&bp->dl_port, DEVLINK_PORT_FLAVOUR_PHYSICAL,
+			       bp->pf.port_id, false, 0,
+			       bp->switch_id, sizeof(bp->switch_id));
+	rc = devlink_port_register(dl, &bp->dl_port, bp->pf.port_id);
+	if (rc) {
+		netdev_err(bp->dev, "devlink_port_register failed");
+		goto err_dl_param_unreg;
+	}
+	devlink_port_type_eth_set(&bp->dl_port, bp->dev);
+
+	rc = devlink_port_params_register(&bp->dl_port, bnxt_dl_port_params,
+					  ARRAY_SIZE(bnxt_dl_port_params));
+	if (rc) {
+		netdev_err(bp->dev, "devlink_port_params_register failed");
+		goto err_dl_port_unreg;
+	}
+
+	devlink_params_publish(dl);
+
 	return 0;
 
+err_dl_port_unreg:
+	devlink_port_unregister(&bp->dl_port);
+err_dl_param_unreg:
+	devlink_params_unregister(dl, bnxt_dl_params,
+				  ARRAY_SIZE(bnxt_dl_params));
 err_dl_unreg:
 	devlink_unregister(dl);
 err_dl_free:
@@ -242,6 +273,9 @@ void bnxt_dl_unregister(struct bnxt *bp)
 	if (!dl)
 		return;
 
+	devlink_port_params_unregister(&bp->dl_port, bnxt_dl_port_params,
+				       ARRAY_SIZE(bnxt_dl_port_params));
+	devlink_port_unregister(&bp->dl_port);
 	devlink_params_unregister(dl, bnxt_dl_params,
 				  ARRAY_SIZE(bnxt_dl_params));
 	devlink_unregister(dl);

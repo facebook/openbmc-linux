@@ -1,16 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright Gavin Shan, IBM Corporation 2016.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 
 #include <net/ncsi.h>
@@ -50,8 +47,8 @@ static int ncsi_validate_rsp_pkt(struct ncsi_request *nr,
 	if (ntohs(h->code) != NCSI_PKT_RSP_C_COMPLETED ||
 	    ntohs(h->reason) != NCSI_PKT_RSP_R_NO_ERROR) {
 		netdev_dbg(nr->ndp->ndev.dev,
-				"NCSI: non zero response/reason code %04xh, %04xh\n",
-				ntohs(h->code), ntohs(h->reason));
+			   "NCSI: non zero response/reason code %04xh, %04xh\n",
+			    ntohs(h->code), ntohs(h->reason));
 		return -EPERM;
 	}
 
@@ -59,18 +56,17 @@ static int ncsi_validate_rsp_pkt(struct ncsi_request *nr,
 	 * sender doesn't support checksum according to NCSI
 	 * specification.
 	 */
-	pchecksum = (__be32 *)((void *)(h + 1) + NCSI_ROUND32(payload) - 4);
+	pchecksum = (__be32 *)((void *)(h + 1) + ALIGN(payload, 4) - 4);
 	if (ntohl(*pchecksum) == 0)
 		return 0;
 
 	checksum = ncsi_calculate_checksum((unsigned char *)h,
-						sizeof(*h) +
-							NCSI_ROUND32(payload) - 4);
+					   sizeof(*h) + payload - 4);
 
 	if (*pchecksum != htonl(checksum)) {
 		netdev_dbg(nr->ndp->ndev.dev,
-		    "NCSI: checksum mismatched; recd: %08x calc: %08x\n",
-		    *pchecksum, htonl(checksum));
+			   "NCSI: checksum mismatched; recd: %08x calc: %08x\n",
+			   *pchecksum, htonl(checksum));
 		return -EINVAL;
 	}
 
@@ -627,7 +623,6 @@ static int ncsi_rsp_handler_oem_mlx_gma(struct ncsi_request *nr)
 
 	/* Get the response header */
 	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
-	memcpy(ndp->mac_addr, &rsp->data[MLX_MAC_ADDR_OFFSET], ETH_ALEN);
 
 	saddr.sa_family = ndev->type;
 	ndev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
@@ -664,11 +659,6 @@ static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 	struct ncsi_rsp_oem_pkt *rsp;
 	struct sockaddr saddr;
 	int ret = 0;
-#ifdef CONFIG_NET_NCSI_MC_MAC_OFFSET
-	int mac_offset = CONFIG_NET_NCSI_MC_MAC_OFFSET;
-#else
-	int mac_offset = 1;
-#endif
 
 	/* Get the response header */
 	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
@@ -676,11 +666,8 @@ static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 	saddr.sa_family = ndev->type;
 	ndev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
 	memcpy(saddr.sa_data, &rsp->data[BCM_MAC_ADDR_OFFSET], ETH_ALEN);
-	/* Management Controller's MAC address is calculated by adding
-	 * the offset to Network Controller's (base) MAC address.
-	 */
-	while (mac_offset-- > 0)
-		eth_addr_inc((u8 *)saddr.sa_data);
+	/* Increase mac address by 1 for BMC's address */
+	eth_addr_inc((u8 *)saddr.sa_data);
 	if (!is_valid_ether_addr((const u8 *)saddr.sa_data))
 		return -ENXIO;
 
@@ -1051,13 +1038,6 @@ static int ncsi_rsp_handler_gpuuid(struct ncsi_request *nr)
 	return 0;
 }
 
-
-static int ncsi_rsp_handler_pldm(struct ncsi_request *nr)
-{
-	return 0;
-}
-
-
 static int ncsi_rsp_handler_netlink(struct ncsi_request *nr)
 {
 	struct ncsi_dev_priv *ndp = nr->ndp;
@@ -1106,15 +1086,13 @@ static struct ncsi_rsp_handler {
 	{ NCSI_PKT_RSP_GVI,    40, ncsi_rsp_handler_gvi     },
 	{ NCSI_PKT_RSP_GC,     32, ncsi_rsp_handler_gc      },
 	{ NCSI_PKT_RSP_GP,     -1, ncsi_rsp_handler_gp      },
-	{ NCSI_PKT_RSP_GCPS,  204, ncsi_rsp_handler_gcps    },
-	{ NCSI_PKT_RSP_GNS,    32, ncsi_rsp_handler_gns     },
-	{ NCSI_PKT_RSP_GNPTS,  48, ncsi_rsp_handler_gnpts   },
+	{ NCSI_PKT_RSP_GCPS,  172, ncsi_rsp_handler_gcps    },
+	{ NCSI_PKT_RSP_GNS,   172, ncsi_rsp_handler_gns     },
+	{ NCSI_PKT_RSP_GNPTS, 172, ncsi_rsp_handler_gnpts   },
 	{ NCSI_PKT_RSP_GPS,     8, ncsi_rsp_handler_gps     },
 	{ NCSI_PKT_RSP_OEM,    -1, ncsi_rsp_handler_oem     },
-	{ NCSI_PKT_RSP_PLDM,   -1, ncsi_rsp_handler_pldm    },
-	{ NCSI_PKT_RSP_GPUUID, 20, ncsi_rsp_handler_gpuuid  },
-	{ NCSI_PKT_RSP_QPNPR,  -1, ncsi_rsp_handler_pldm    },
-	{ NCSI_PKT_RSP_SNPR,   -1, ncsi_rsp_handler_pldm    }
+	{ NCSI_PKT_RSP_PLDM,    0, NULL                     },
+	{ NCSI_PKT_RSP_GPUUID, 20, ncsi_rsp_handler_gpuuid  }
 };
 
 int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,

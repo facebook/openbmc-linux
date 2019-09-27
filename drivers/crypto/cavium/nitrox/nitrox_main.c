@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 #include <linux/aer.h>
 #include <linux/delay.h>
 #include <linux/firmware.h>
@@ -404,9 +405,7 @@ static int nitrox_probe(struct pci_dev *pdev,
 	if (err)
 		goto pf_hw_fail;
 
-	err = nitrox_debugfs_init(ndev);
-	if (err)
-		goto pf_hw_fail;
+	nitrox_debugfs_init(ndev);
 
 	/* clear the statistics */
 	atomic64_set(&ndev->stats.posted, 0);

@@ -11,10 +11,11 @@
 #include <linux/of_gpio.h>
 #include <linux/platform_device.h>
 
-#include <drm/drmP.h>
 #include <drm/drm_atomic_helper.h>
-#include <drm/drm_crtc_helper.h>
+#include <drm/drm_device.h>
 #include <drm/drm_panel.h>
+#include <drm/drm_print.h>
+#include <drm/drm_probe_helper.h>
 
 #include "sti_awg_utils.h"
 #include "sti_drv.h"
@@ -277,8 +278,8 @@ static void sti_dvo_pre_enable(struct drm_bridge *bridge)
 }
 
 static void sti_dvo_set_mode(struct drm_bridge *bridge,
-			     struct drm_display_mode *mode,
-			     struct drm_display_mode *adjusted_mode)
+			     const struct drm_display_mode *mode,
+			     const struct drm_display_mode *adjusted_mode)
 {
 	struct sti_dvo *dvo = bridge->driver_private;
 	struct sti_mixer *mixer = to_sti_mixer(dvo->encoder->crtc);

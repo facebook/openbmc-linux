@@ -5,7 +5,6 @@
 #include "util/evsel.h"
 #include "util/evlist.h"
 #include "util/term.h"
-#include "util/util.h"
 #include "util/cache.h"
 #include "util/symbol.h"
 #include "util/thread.h"
@@ -32,6 +31,7 @@
 
 #include <linux/kernel.h>
 #include <linux/time64.h>
+#include <linux/zalloc.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <poll.h>
@@ -1080,11 +1080,9 @@ static int read_events(struct perf_kvm_stat *kvm)
 		.ordered_events		= true,
 	};
 	struct perf_data file = {
-		.file      = {
-			.path = kvm->file_name,
-		},
-		.mode      = PERF_DATA_MODE_READ,
-		.force     = kvm->force,
+		.path  = kvm->file_name,
+		.mode  = PERF_DATA_MODE_READ,
+		.force = kvm->force,
 	};
 
 	kvm->tool = eops;

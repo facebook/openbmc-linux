@@ -1,10 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright Gavin Shan, IBM Corporation 2016.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include <linux/module.h>
@@ -479,14 +475,6 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_suspend_select;
 		/* Fall through */
 	case ncsi_dev_state_suspend_select:
-#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
-		if (ndp->flags & NCSI_DEV_RESHUFFLE)
-			nd->state = ncsi_dev_state_suspend_gls;
-		else
-			nd->state = ncsi_dev_state_suspend_dcnt;
-		schedule_work(&ndp->work);
-		break;
-#endif
 		ndp->pending_req_num = 1;
 
 		nca.type = NCSI_PKT_CMD_SP;
@@ -566,11 +554,6 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 		}
 		break;
 	case ncsi_dev_state_suspend_deselect:
-#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
-		nd->state = ncsi_dev_state_suspend_done;
-		schedule_work(&ndp->work);
-		break;
-#endif
 		ndp->pending_req_num = 1;
 
 		nca.type = NCSI_PKT_CMD_DP;
@@ -939,11 +922,6 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 	switch (nd->state) {
 	case ncsi_dev_state_config:
 	case ncsi_dev_state_config_sp:
-#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
-		nd->state = ncsi_dev_state_config_cis;
-		schedule_work(&ndp->work);
-		break;
-#endif
 		ndp->pending_req_num = 1;
 
 		/* Select the specific package */
@@ -984,9 +962,6 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 		ret = -1;
 
 #if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
-		if (nc->version.mf_id == NCSI_OEM_MFR_MLX_ID)
-			nd->state = ncsi_dev_state_config_sma;
-
 		nca.type = NCSI_PKT_CMD_OEM;
 		nca.package = np->id;
 		nca.channel = nc->id;
@@ -1005,7 +980,6 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 	case ncsi_dev_state_config_ebf:
 #if IS_ENABLED(CONFIG_IPV6)
 	case ncsi_dev_state_config_egmf:
-	case ncsi_dev_state_config_dgmf:
 #endif
 	case ncsi_dev_state_config_ecnt:
 	case ncsi_dev_state_config_ec:
@@ -1068,12 +1042,6 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 			    (nc->caps[NCSI_CAP_GENERIC].cap &
 			     NCSI_CAP_GENERIC_MC))
 				nd->state = ncsi_dev_state_config_egmf;
-
-			if (nc->version.mf_id == NCSI_OEM_MFR_MLX_ID)
-				nd->state = ncsi_dev_state_config_dgmf;
-		} else if (nd->state == ncsi_dev_state_config_dgmf) {
-			nca.type = NCSI_PKT_CMD_DGMF;
-			nd->state = ncsi_dev_state_config_ecnt;
 		} else if (nd->state == ncsi_dev_state_config_egmf) {
 			nca.type = NCSI_PKT_CMD_EGMF;
 			nca.dwords[0] = nc->caps[NCSI_CAP_MC].cap;
@@ -1312,12 +1280,6 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_probe_deselect;
 		/* Fall through */
 	case ncsi_dev_state_probe_deselect:
-#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
-		ndp->active_package = ncsi_add_package(ndp, 0);
-		nd->state = ncsi_dev_state_probe_cis;
-		schedule_work(&ndp->work);
-		break;
-#endif
 		ndp->pending_req_num = 8;
 
 		/* Deselect all possible packages */
@@ -1401,10 +1363,6 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 			nd->state = ncsi_dev_state_probe_dp;
 		break;
 	case ncsi_dev_state_probe_dp:
-#if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
-		ndp->flags |= NCSI_DEV_PROBED;
-		break;
-#endif
 		ndp->pending_req_num = 1;
 
 		/* Deselect the current package */
@@ -1765,7 +1723,6 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 		ndp->requests[i].ndp = ndp;
 		timer_setup(&ndp->requests[i].timer, ncsi_request_timeout, 0);
 	}
-	memset(ndp->mac_addr, 0xff, sizeof(ndp->mac_addr));
 
 	spin_lock_irqsave(&ncsi_dev_lock, flags);
 #if IS_ENABLED(CONFIG_IPV6)

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 // Copyright 2018 IBM Corporation
 
-#include <drm/drmP.h>
-#include <drm/drm_connector.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_connector.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_probe_helper.h>
 
 #include "aspeed_gfx.h"
 
@@ -18,15 +18,9 @@ drm_connector_helper_funcs aspeed_gfx_connector_helper_funcs = {
 	.get_modes = aspeed_gfx_get_modes,
 };
 
-static void aspeed_gfx_connector_destroy(struct drm_connector *connector)
-{
-	drm_connector_unregister(connector);
-	drm_connector_cleanup(connector);
-}
-
 static const struct drm_connector_funcs aspeed_gfx_connector_funcs = {
 	.fill_modes		= drm_helper_probe_single_connector_modes,
-	.destroy		= aspeed_gfx_connector_destroy,
+	.destroy		= drm_connector_cleanup,
 	.reset			= drm_atomic_helper_connector_reset,
 	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
 	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,

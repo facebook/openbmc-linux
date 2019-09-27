@@ -31,7 +31,7 @@
  */
 #include <linux/list.h>
 #include <linux/slab.h>
-#include <drm/drmP.h>
+
 #include <drm/amdgpu_drm.h>
 #include <drm/drm_cache.h>
 #include "amdgpu.h"
@@ -88,12 +88,14 @@ static void amdgpu_bo_destroy(struct ttm_buffer_object *tbo)
 	if (bo->gem_base.import_attach)
 		drm_prime_gem_destroy(&bo->gem_base, bo->tbo.sg);
 	drm_gem_object_release(&bo->gem_base);
-	amdgpu_bo_unref(&bo->parent);
+	/* in case amdgpu_device_recover_vram got NULL of bo->parent */
 	if (!list_empty(&bo->shadow_list)) {
 		mutex_lock(&adev->shadow_list_lock);
 		list_del_init(&bo->shadow_list);
 		mutex_unlock(&adev->shadow_list_lock);
 	}
+	amdgpu_bo_unref(&bo->parent);
+
 	kfree(bo->metadata);
 	kfree(bo);
 }
@@ -426,12 +428,20 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	size_t acc_size;
 	int r;
 
-	page_align = roundup(bp->byte_align, PAGE_SIZE) >> PAGE_SHIFT;
-	if (bp->domain & (AMDGPU_GEM_DOMAIN_GDS | AMDGPU_GEM_DOMAIN_GWS |
-			  AMDGPU_GEM_DOMAIN_OA))
+	/* Note that GDS/GWS/OA allocates 1 page per byte/resource. */
+	if (bp->domain & (AMDGPU_GEM_DOMAIN_GWS | AMDGPU_GEM_DOMAIN_OA)) {
+		/* GWS and OA don't need any alignment. */
+		page_align = bp->byte_align;
 		size <<= PAGE_SHIFT;
-	else
+	} else if (bp->domain & AMDGPU_GEM_DOMAIN_GDS) {
+		/* Both size and alignment must be a multiple of 4. */
+		page_align = ALIGN(bp->byte_align, 4);
+		size = ALIGN(size, 4) << PAGE_SHIFT;
+	} else {
+		/* Memory should be aligned at least to a page size. */
+		page_align = ALIGN(bp->byte_align, PAGE_SIZE) >> PAGE_SHIFT;
 		size = ALIGN(size, PAGE_SIZE);
+	}
 
 	if (!amdgpu_bo_validate_size(adev, size, bp->domain))
 		return -ENOMEM;
@@ -485,7 +495,11 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 #endif
 
 	bo->tbo.bdev = &adev->mman.bdev;
-	amdgpu_bo_placement_from_domain(bo, bp->domain);
+	if (bp->domain & (AMDGPU_GEM_DOMAIN_GWS | AMDGPU_GEM_DOMAIN_OA |
+			  AMDGPU_GEM_DOMAIN_GDS))
+		amdgpu_bo_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_CPU);
+	else
+		amdgpu_bo_placement_from_domain(bo, bp->domain);
 	if (bp->type == ttm_bo_type_kernel)
 		bo->tbo.priority = 1;
 
@@ -965,6 +979,7 @@ static const char *amdgpu_vram_names[] = {
 	"HBM",
 	"DDR3",
 	"DDR4",
+	"GDDR6",
 };
 
 /**
@@ -1274,6 +1289,30 @@ void amdgpu_bo_fence(struct amdgpu_bo *bo, struct dma_fence *fence,
 		reservation_object_add_shared_fence(resv, fence);
 	else
 		reservation_object_add_excl_fence(resv, fence);
+}
+
+/**
+ * amdgpu_sync_wait_resv - Wait for BO reservation fences
+ *
+ * @bo: buffer object
+ * @owner: fence owner
+ * @intr: Whether the wait is interruptible
+ *
+ * Returns:
+ * 0 on success, errno otherwise.
+ */
+int amdgpu_bo_sync_wait(struct amdgpu_bo *bo, void *owner, bool intr)
+{
+	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	struct amdgpu_sync sync;
+	int r;
+
+	amdgpu_sync_create(&sync);
+	amdgpu_sync_resv(adev, &sync, bo->tbo.resv, owner, false);
+	r = amdgpu_sync_wait(&sync, intr);
+	amdgpu_sync_free(&sync);
+
+	return r;
 }
 
 /**

@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
@@ -56,7 +45,7 @@ static const char * const iommu_ports[] = {
 #define DPU_DEBUGFS_HWMASKNAME "hw_log_mask"
 
 static int dpu_kms_hw_init(struct msm_kms *kms);
-static int _dpu_kms_mmu_destroy(struct dpu_kms *dpu_kms);
+static void _dpu_kms_mmu_destroy(struct dpu_kms *dpu_kms);
 
 static unsigned long dpu_iomap_size(struct platform_device *pdev,
 				    const char *name)
@@ -142,8 +131,6 @@ static void dpu_debugfs_danger_init(struct dpu_kms *dpu_kms,
 		struct dentry *parent)
 {
 	struct dentry *entry = debugfs_create_dir("danger", parent);
-	if (IS_ERR_OR_NULL(entry))
-		return;
 
 	debugfs_create_file("danger_status", 0600, entry,
 			dpu_kms, &dpu_debugfs_danger_stats_fops);
@@ -218,32 +205,29 @@ void dpu_debugfs_setup_regset32(struct dpu_debugfs_regset32 *regset,
 	}
 }
 
-void *dpu_debugfs_create_regset32(const char *name, umode_t mode,
+void dpu_debugfs_create_regset32(const char *name, umode_t mode,
 		void *parent, struct dpu_debugfs_regset32 *regset)
 {
 	if (!name || !regset || !regset->dpu_kms || !regset->blk_len)
-		return NULL;
+		return;
 
 	/* make sure offset is a multiple of 4 */
 	regset->offset = round_down(regset->offset, 4);
 
-	return debugfs_create_file(name, mode, parent,
-			regset, &dpu_fops_regset32);
+	debugfs_create_file(name, mode, parent, regset, &dpu_fops_regset32);
 }
 
-static int _dpu_debugfs_init(struct dpu_kms *dpu_kms)
+static int dpu_kms_debugfs_init(struct msm_kms *kms, struct drm_minor *minor)
 {
+	struct dpu_kms *dpu_kms = to_dpu_kms(kms);
 	void *p = dpu_hw_util_get_log_mask_ptr();
 	struct dentry *entry;
 
 	if (!p)
 		return -EINVAL;
 
-	entry = debugfs_create_dir("debug", dpu_kms->dev->primary->debugfs_root);
-	if (IS_ERR_OR_NULL(entry))
-		return -ENODEV;
+	entry = debugfs_create_dir("debug", minor->debugfs_root);
 
-	/* allow root to be NULL */
 	debugfs_create_x32(DPU_DEBUGFS_HWMASKNAME, 0600, entry, p);
 
 	dpu_debugfs_danger_init(dpu_kms, entry);
@@ -405,35 +389,38 @@ static void dpu_kms_wait_for_commit_done(struct msm_kms *kms,
 	}
 }
 
-static void _dpu_kms_initialize_dsi(struct drm_device *dev,
+static int _dpu_kms_initialize_dsi(struct drm_device *dev,
 				    struct msm_drm_private *priv,
 				    struct dpu_kms *dpu_kms)
 {
 	struct drm_encoder *encoder = NULL;
-	int i, rc;
+	int i, rc = 0;
+
+	if (!(priv->dsi[0] || priv->dsi[1]))
+		return rc;
 
 	/*TODO: Support two independent DSI connectors */
 	encoder = dpu_encoder_init(dev, DRM_MODE_ENCODER_DSI);
-	if (IS_ERR_OR_NULL(encoder)) {
+	if (IS_ERR(encoder)) {
 		DPU_ERROR("encoder init failed for dsi display\n");
-		return;
+		return PTR_ERR(encoder);
 	}
 
 	priv->encoders[priv->num_encoders++] = encoder;
 
 	for (i = 0; i < ARRAY_SIZE(priv->dsi); i++) {
-		if (!priv->dsi[i]) {
-			DPU_DEBUG("invalid msm_dsi for ctrl %d\n", i);
-			return;
-		}
+		if (!priv->dsi[i])
+			continue;
 
 		rc = msm_dsi_modeset_init(priv->dsi[i], dev, encoder);
 		if (rc) {
 			DPU_ERROR("modeset_init failed for dsi[%d], rc = %d\n",
 				i, rc);
-			continue;
+			break;
 		}
 	}
+
+	return rc;
 }
 
 /**
@@ -444,16 +431,16 @@ static void _dpu_kms_initialize_dsi(struct drm_device *dev,
  * @dpu_kms:    Pointer to dpu kms structure
  * Returns:     Zero on success
  */
-static void _dpu_kms_setup_displays(struct drm_device *dev,
+static int _dpu_kms_setup_displays(struct drm_device *dev,
 				    struct msm_drm_private *priv,
 				    struct dpu_kms *dpu_kms)
 {
-	_dpu_kms_initialize_dsi(dev, priv, dpu_kms);
-
 	/**
 	 * Extend this function to initialize other
 	 * types of displays
 	 */
+
+	return _dpu_kms_initialize_dsi(dev, priv, dpu_kms);
 }
 
 static void _dpu_kms_drm_obj_destroy(struct dpu_kms *dpu_kms)
@@ -516,7 +503,9 @@ static int _dpu_kms_drm_obj_init(struct dpu_kms *dpu_kms)
 	 * Create encoder and query display drivers to create
 	 * bridges and connectors
 	 */
-	_dpu_kms_setup_displays(dev, priv, dpu_kms);
+	ret = _dpu_kms_setup_displays(dev, priv, dpu_kms);
+	if (ret)
+		goto fail;
 
 	max_crtc_count = min(catalog->mixer_count, priv->num_encoders);
 
@@ -573,13 +562,6 @@ fail:
 	return ret;
 }
 
-#ifdef CONFIG_DEBUG_FS
-static int dpu_kms_debugfs_init(struct msm_kms *kms, struct drm_minor *minor)
-{
-	return _dpu_debugfs_init(to_dpu_kms(kms));
-}
-#endif
-
 static long dpu_kms_round_pixclk(struct msm_kms *kms, unsigned long rate,
 		struct drm_encoder *encoder)
 {
@@ -626,6 +608,10 @@ static void _dpu_kms_hw_destroy(struct dpu_kms *dpu_kms)
 	if (dpu_kms->vbif[VBIF_RT])
 		devm_iounmap(&dpu_kms->pdev->dev, dpu_kms->vbif[VBIF_RT]);
 	dpu_kms->vbif[VBIF_RT] = NULL;
+
+	if (dpu_kms->hw_mdp)
+		dpu_hw_mdp_destroy(dpu_kms->hw_mdp);
+	dpu_kms->hw_mdp = NULL;
 
 	if (dpu_kms->mmio)
 		devm_iounmap(&dpu_kms->pdev->dev, dpu_kms->mmio);
@@ -716,9 +702,12 @@ static const struct msm_kms_funcs kms_funcs = {
 #endif
 };
 
-static int _dpu_kms_mmu_destroy(struct dpu_kms *dpu_kms)
+static void _dpu_kms_mmu_destroy(struct dpu_kms *dpu_kms)
 {
 	struct msm_mmu *mmu;
+
+	if (!dpu_kms->base.aspace)
+		return;
 
 	mmu = dpu_kms->base.aspace->mmu;
 
@@ -726,7 +715,7 @@ static int _dpu_kms_mmu_destroy(struct dpu_kms *dpu_kms)
 			ARRAY_SIZE(iommu_ports));
 	msm_gem_address_space_put(dpu_kms->base.aspace);
 
-	return 0;
+	dpu_kms->base.aspace = NULL;
 }
 
 static int _dpu_kms_mmu_init(struct dpu_kms *dpu_kms)
@@ -745,25 +734,20 @@ static int _dpu_kms_mmu_init(struct dpu_kms *dpu_kms)
 	aspace = msm_gem_address_space_create(dpu_kms->dev->dev,
 			domain, "dpu1");
 	if (IS_ERR(aspace)) {
-		ret = PTR_ERR(aspace);
-		goto fail;
+		iommu_domain_free(domain);
+		return PTR_ERR(aspace);
 	}
-
-	dpu_kms->base.aspace = aspace;
 
 	ret = aspace->mmu->funcs->attach(aspace->mmu, iommu_ports,
 			ARRAY_SIZE(iommu_ports));
 	if (ret) {
 		DPU_ERROR("failed to attach iommu %d\n", ret);
 		msm_gem_address_space_put(aspace);
-		goto fail;
+		return ret;
 	}
 
+	dpu_kms->base.aspace = aspace;
 	return 0;
-fail:
-	_dpu_kms_mmu_destroy(dpu_kms);
-
-	return ret;
 }
 
 static struct dss_clk *_dpu_kms_get_clk(struct dpu_kms *dpu_kms,
@@ -877,8 +861,7 @@ static int dpu_kms_hw_init(struct msm_kms *kms)
 		goto power_error;
 	}
 
-	rc = dpu_rm_init(&dpu_kms->rm, dpu_kms->catalog, dpu_kms->mmio,
-			dpu_kms->dev);
+	rc = dpu_rm_init(&dpu_kms->rm, dpu_kms->catalog, dpu_kms->mmio);
 	if (rc) {
 		DPU_ERROR("rm init failed: %d\n", rc);
 		goto power_error;
@@ -886,11 +869,10 @@ static int dpu_kms_hw_init(struct msm_kms *kms)
 
 	dpu_kms->rm_init = true;
 
-	dpu_kms->hw_mdp = dpu_rm_get_mdp(&dpu_kms->rm);
-	if (IS_ERR_OR_NULL(dpu_kms->hw_mdp)) {
+	dpu_kms->hw_mdp = dpu_hw_mdptop_init(MDP_TOP, dpu_kms->mmio,
+					     dpu_kms->catalog);
+	if (IS_ERR(dpu_kms->hw_mdp)) {
 		rc = PTR_ERR(dpu_kms->hw_mdp);
-		if (!dpu_kms->hw_mdp)
-			rc = -EINVAL;
 		DPU_ERROR("failed to get hw_mdp: %d\n", rc);
 		dpu_kms->hw_mdp = NULL;
 		goto power_error;
@@ -926,16 +908,6 @@ static int dpu_kms_hw_init(struct msm_kms *kms)
 		goto hw_intr_init_err;
 	}
 
-	/*
-	 * _dpu_kms_drm_obj_init should create the DRM related objects
-	 * i.e. CRTCs, planes, encoders, connectors and so forth
-	 */
-	rc = _dpu_kms_drm_obj_init(dpu_kms);
-	if (rc) {
-		DPU_ERROR("modeset init failed: %d\n", rc);
-		goto drm_obj_init_err;
-	}
-
 	dev->mode_config.min_width = 0;
 	dev->mode_config.min_height = 0;
 
@@ -951,6 +923,16 @@ static int dpu_kms_hw_init(struct msm_kms *kms)
 	 * Support format modifiers for compression etc.
 	 */
 	dev->mode_config.allow_fb_modifiers = true;
+
+	/*
+	 * _dpu_kms_drm_obj_init should create the DRM related objects
+	 * i.e. CRTCs, planes, encoders, connectors and so forth
+	 */
+	rc = _dpu_kms_drm_obj_init(dpu_kms);
+	if (rc) {
+		DPU_ERROR("modeset init failed: %d\n", rc);
+		goto drm_obj_init_err;
+	}
 
 	dpu_vbif_init_memtypes(dpu_kms);
 

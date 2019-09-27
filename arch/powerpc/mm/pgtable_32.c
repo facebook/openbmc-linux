@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * This file contains the routines setting up the linux page tables.
  *  -- paulus
@@ -11,12 +12,6 @@
  *
  *  Derived from "arch/i386/mm/init.c"
  *    Copyright (C) 1991, 1992, 1993, 1994  Linus Torvalds
- *
- *  This program is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; either version
- *  2 of the License, or (at your option) any later version.
- *
  */
 
 #include <linux/kernel.h>
@@ -36,25 +31,12 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 
-#include "mmu_decl.h"
+#include <mm/mmu_decl.h>
 
 unsigned long ioremap_bot;
 EXPORT_SYMBOL(ioremap_bot);	/* aka VMALLOC_END */
 
 extern char etext[], _stext[], _sinittext[], _einittext[];
-
-__ref pte_t *pte_alloc_one_kernel(struct mm_struct *mm)
-{
-	if (!slab_is_available())
-		return memblock_alloc(PTE_FRAG_SIZE, PTE_FRAG_SIZE);
-
-	return (pte_t *)pte_fragment_alloc(mm, 1);
-}
-
-pgtable_t pte_alloc_one(struct mm_struct *mm)
-{
-	return (pgtable_t)pte_fragment_alloc(mm, 0);
-}
 
 void __iomem *
 ioremap(phys_addr_t addr, unsigned long size)
@@ -205,7 +187,29 @@ void iounmap(volatile void __iomem *addr)
 }
 EXPORT_SYMBOL(iounmap);
 
-int map_kernel_page(unsigned long va, phys_addr_t pa, pgprot_t prot)
+static void __init *early_alloc_pgtable(unsigned long size)
+{
+	void *ptr = memblock_alloc(size, size);
+
+	if (!ptr)
+		panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
+		      __func__, size, size);
+
+	return ptr;
+}
+
+static pte_t __init *early_pte_alloc_kernel(pmd_t *pmdp, unsigned long va)
+{
+	if (pmd_none(*pmdp)) {
+		pte_t *ptep = early_alloc_pgtable(PTE_FRAG_SIZE);
+
+		pmd_populate_kernel(&init_mm, pmdp, ptep);
+	}
+	return pte_offset_kernel(pmdp, va);
+}
+
+
+int __ref map_kernel_page(unsigned long va, phys_addr_t pa, pgprot_t prot)
 {
 	pmd_t *pd;
 	pte_t *pg;
@@ -214,7 +218,10 @@ int map_kernel_page(unsigned long va, phys_addr_t pa, pgprot_t prot)
 	/* Use upper 10 bits of VA to index the first level map */
 	pd = pmd_offset(pud_offset(pgd_offset_k(va), va), va);
 	/* Use middle 10 bits of VA to index the second-level map */
-	pg = pte_alloc_kernel(pd, va);
+	if (likely(slab_is_available()))
+		pg = pte_alloc_kernel(pd, va);
+	else
+		pg = early_pte_alloc_kernel(pd, va);
 	if (pg != 0) {
 		err = 0;
 		/* The PTE should never be already set nor present in the
@@ -254,26 +261,20 @@ static void __init __mapin_ram_chunk(unsigned long offset, unsigned long top)
 
 void __init mapin_ram(void)
 {
-	unsigned long s, top;
+	struct memblock_region *reg;
 
-#ifndef CONFIG_WII
-	top = total_lowmem;
-	s = mmu_mapin_ram(top);
-	__mapin_ram_chunk(s, top);
-#else
-	if (!wii_hole_size) {
-		s = mmu_mapin_ram(total_lowmem);
-		__mapin_ram_chunk(s, total_lowmem);
-	} else {
-		top = wii_hole_start;
-		s = mmu_mapin_ram(top);
-		__mapin_ram_chunk(s, top);
+	for_each_memblock(memory, reg) {
+		phys_addr_t base = reg->base;
+		phys_addr_t top = min(base + reg->size, total_lowmem);
 
-		top = memblock_end_of_DRAM();
-		s = wii_mmu_mapin_mem2(top);
-		__mapin_ram_chunk(s, top);
+		if (base >= top)
+			continue;
+		base = mmu_mapin_ram(base, top);
+		if (IS_ENABLED(CONFIG_BDI_SWITCH))
+			__mapin_ram_chunk(reg->base, top);
+		else
+			__mapin_ram_chunk(base, top);
 	}
-#endif
 }
 
 /* Scan the real Linux page tables and return a PTE pointer for
@@ -359,7 +360,10 @@ void mark_initmem_nx(void)
 	unsigned long numpages = PFN_UP((unsigned long)_einittext) -
 				 PFN_DOWN((unsigned long)_sinittext);
 
-	change_page_attr(page, numpages, PAGE_KERNEL);
+	if (v_block_mapped((unsigned long)_stext + 1))
+		mmu_mark_initmem_nx();
+	else
+		change_page_attr(page, numpages, PAGE_KERNEL);
 }
 
 #ifdef CONFIG_STRICT_KERNEL_RWX
@@ -367,6 +371,11 @@ void mark_rodata_ro(void)
 {
 	struct page *page;
 	unsigned long numpages;
+
+	if (v_block_mapped((unsigned long)_sinittext)) {
+		mmu_mark_rodata_ro();
+		return;
+	}
 
 	page = virt_to_page(_stext);
 	numpages = PFN_UP((unsigned long)_etext) -
@@ -382,6 +391,9 @@ void mark_rodata_ro(void)
 		   PFN_DOWN((unsigned long)__start_rodata);
 
 	change_page_attr(page, numpages, PAGE_KERNEL_RO);
+
+	// mark_initmem_nx() should have already run by now
+	ptdump_check_wx();
 }
 #endif
 

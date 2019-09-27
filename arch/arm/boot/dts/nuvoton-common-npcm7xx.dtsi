@@ -2,7 +2,6 @@
 // Copyright (c) 2018 Nuvoton Technology tomer.maimon@nuvoton.com
 // Copyright 2018 Google, Inc.
 
-#include "skeleton.dtsi"
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/clock/nuvoton,npcm7xx-clock.h>
 #include <dt-bindings/gpio/gpio.h>
@@ -11,6 +10,11 @@
 	#address-cells = <1>;
 	#size-cells = <1>;
 	interrupt-parent = <&gic>;
+
+	memory {
+		device_type = "memory";
+		reg = <0 0>;
+	};
 
 	/* external reference clock */
 	clk_refclk: clk-refclk {
@@ -339,6 +343,16 @@
 					interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
 					status = "disabled";
 				};
+			};
+
+			peci: peci-bus@100000 {
+				compatible = "nuvoton,npcm750-peci";
+				reg = <0x100000 0x200>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&clk NPCM7XX_CLK_APB3>;
+				status = "disabled";
 			};
 
 			spi0: spi@200000 {

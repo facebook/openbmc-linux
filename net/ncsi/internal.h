@@ -1,10 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * Copyright Gavin Shan, IBM Corporation 2016.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #ifndef __NCSI_INTERNAL_H__
@@ -189,7 +185,6 @@ struct ncsi_package;
 #define NCSI_TO_CHANNEL(p, c)	(((p) << NCSI_PACKAGE_SHIFT) | (c))
 #define NCSI_MAX_PACKAGE	8
 #define NCSI_MAX_CHANNEL	32
-#define NCSI_ROUND32(x)    (((x) + 3) & ~3) /* Round to 32 bit boundary */
 
 struct ncsi_channel {
 	unsigned char               id;
@@ -271,7 +266,6 @@ enum {
 	ncsi_dev_state_config_ebf,
 #if IS_ENABLED(CONFIG_IPV6)
 	ncsi_dev_state_config_egmf,
-	ncsi_dev_state_config_dgmf,
 #endif
 	ncsi_dev_state_config_ecnt,
 	ncsi_dev_state_config_ec,
@@ -323,7 +317,6 @@ struct ncsi_dev_priv {
 
 	bool                multi_package;   /* Enable multiple packages   */
 	u32                 package_whitelist; /* Packages to configure    */
-	unsigned char       mac_addr[6];
 };
 
 struct ncsi_cmd_arg {

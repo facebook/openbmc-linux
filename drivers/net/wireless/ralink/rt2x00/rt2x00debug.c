@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
 	Copyright (C) 2004 - 2009 Ivo van Doorn <IvDoorn@gmail.com>
 	<http://rt2x00.serialmonkey.com>
 
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
 /*
@@ -63,6 +52,7 @@ struct rt2x00debug_intf {
 	 *   - chipset file
 	 *   - device state flags file
 	 *   - device capability flags file
+	 *   - hardware restart file
 	 *   - register folder
 	 *     - csr offset/value files
 	 *     - eeprom offset/value files
@@ -79,6 +69,7 @@ struct rt2x00debug_intf {
 	struct dentry *chipset_entry;
 	struct dentry *dev_flags;
 	struct dentry *cap_flags;
+	struct dentry *restart_hw;
 	struct dentry *register_folder;
 	struct dentry *csr_off_entry;
 	struct dentry *csr_val_entry;
@@ -577,6 +568,34 @@ static const struct file_operations rt2x00debug_fop_cap_flags = {
 	.llseek		= default_llseek,
 };
 
+static ssize_t rt2x00debug_write_restart_hw(struct file *file,
+					    const char __user *buf,
+					    size_t length,
+					    loff_t *offset)
+{
+	struct rt2x00debug_intf *intf =	file->private_data;
+	struct rt2x00_dev *rt2x00dev = intf->rt2x00dev;
+	static unsigned long last_reset;
+
+	if (!rt2x00_has_cap_restart_hw(rt2x00dev))
+		return -EOPNOTSUPP;
+
+	if (time_before(jiffies, last_reset + msecs_to_jiffies(2000)))
+		return -EBUSY;
+
+	last_reset = jiffies;
+
+	ieee80211_restart_hw(rt2x00dev->hw);
+	return length;
+}
+
+static const struct file_operations rt2x00debug_restart_hw = {
+	.owner = THIS_MODULE,
+	.write = rt2x00debug_write_restart_hw,
+	.open = simple_open,
+	.llseek = generic_file_llseek,
+};
+
 static struct dentry *rt2x00debug_create_file_driver(const char *name,
 						     struct rt2x00debug_intf
 						     *intf,
@@ -656,36 +675,28 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
 	intf->driver_folder =
 	    debugfs_create_dir(intf->rt2x00dev->ops->name,
 			       rt2x00dev->hw->wiphy->debugfsdir);
-	if (IS_ERR(intf->driver_folder) || !intf->driver_folder)
-		goto exit;
 
 	intf->driver_entry =
 	    rt2x00debug_create_file_driver("driver", intf, &intf->driver_blob);
-	if (IS_ERR(intf->driver_entry) || !intf->driver_entry)
-		goto exit;
 
 	intf->chipset_entry =
 	    rt2x00debug_create_file_chipset("chipset",
 					    intf, &intf->chipset_blob);
-	if (IS_ERR(intf->chipset_entry) || !intf->chipset_entry)
-		goto exit;
 
 	intf->dev_flags = debugfs_create_file("dev_flags", 0400,
 					      intf->driver_folder, intf,
 					      &rt2x00debug_fop_dev_flags);
-	if (IS_ERR(intf->dev_flags) || !intf->dev_flags)
-		goto exit;
 
 	intf->cap_flags = debugfs_create_file("cap_flags", 0400,
 					      intf->driver_folder, intf,
 					      &rt2x00debug_fop_cap_flags);
-	if (IS_ERR(intf->cap_flags) || !intf->cap_flags)
-		goto exit;
+
+	intf->restart_hw = debugfs_create_file("restart_hw", 0200,
+					       intf->driver_folder, intf,
+					       &rt2x00debug_restart_hw);
 
 	intf->register_folder =
 	    debugfs_create_dir("register", intf->driver_folder);
-	if (IS_ERR(intf->register_folder) || !intf->register_folder)
-		goto exit;
 
 #define RT2X00DEBUGFS_CREATE_REGISTER_ENTRY(__intf, __name)		\
 ({									\
@@ -695,9 +706,6 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
 					   0600,			\
 					   (__intf)->register_folder,	\
 					   &(__intf)->offset_##__name);	\
-		if (IS_ERR((__intf)->__name##_off_entry) ||		\
-		    !(__intf)->__name##_off_entry)			\
-			goto exit;					\
 									\
 		(__intf)->__name##_val_entry =				\
 			debugfs_create_file(__stringify(__name) "_value", \
@@ -705,9 +713,6 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
 					    (__intf)->register_folder,	\
 					    (__intf),			\
 					    &rt2x00debug_fop_##__name); \
-		if (IS_ERR((__intf)->__name##_val_entry) ||		\
-		    !(__intf)->__name##_val_entry)			\
-			goto exit;					\
 	}								\
 })
 
@@ -721,15 +726,10 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
 
 	intf->queue_folder =
 	    debugfs_create_dir("queue", intf->driver_folder);
-	if (IS_ERR(intf->queue_folder) || !intf->queue_folder)
-		goto exit;
 
 	intf->queue_frame_dump_entry =
 		debugfs_create_file("dump", 0400, intf->queue_folder,
 				    intf, &rt2x00debug_fop_queue_dump);
-	if (IS_ERR(intf->queue_frame_dump_entry)
-		|| !intf->queue_frame_dump_entry)
-		goto exit;
 
 	skb_queue_head_init(&intf->frame_dump_skbqueue);
 	init_waitqueue_head(&intf->frame_dump_waitqueue);
@@ -747,10 +747,6 @@ void rt2x00debug_register(struct rt2x00_dev *rt2x00dev)
 #endif
 
 	return;
-
-exit:
-	rt2x00debug_deregister(rt2x00dev);
-	rt2x00_err(rt2x00dev, "Failed to register debug handler\n");
 }
 
 void rt2x00debug_deregister(struct rt2x00_dev *rt2x00dev)
@@ -780,6 +776,7 @@ void rt2x00debug_deregister(struct rt2x00_dev *rt2x00dev)
 	debugfs_remove(intf->csr_off_entry);
 	debugfs_remove(intf->register_folder);
 	debugfs_remove(intf->dev_flags);
+	debugfs_remove(intf->restart_hw);
 	debugfs_remove(intf->cap_flags);
 	debugfs_remove(intf->chipset_entry);
 	debugfs_remove(intf->driver_entry);

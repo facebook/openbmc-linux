@@ -202,10 +202,6 @@
 	status = "okay";
 };
 
-&mbox {
-	status = "okay";
-};
-
 &lpc_ctrl {
 	status = "okay";
 	memory-region = <&flash_memory>;

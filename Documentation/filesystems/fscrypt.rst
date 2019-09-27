@@ -191,7 +191,9 @@ Currently, the following pairs of encryption modes are supported:
 If unsure, you should use the (AES-256-XTS, AES-256-CTS-CBC) pair.
 
 AES-128-CBC was added only for low-powered embedded devices with
-crypto accelerators such as CAAM or CESA that do not support XTS.
+crypto accelerators such as CAAM or CESA that do not support XTS.  To
+use AES-128-CBC, CONFIG_CRYPTO_SHA256 (or another SHA-256
+implementation) must be enabled so that ESSIV can be used.
 
 Adiantum is a (primarily) stream cipher-based mode that is fast even
 on CPUs without dedicated crypto instructions.  It's also a true
@@ -343,9 +345,9 @@ FS_IOC_SET_ENCRYPTION_POLICY can fail with the following errors:
 - ``ENOTEMPTY``: the file is unencrypted and is a nonempty directory
 - ``ENOTTY``: this type of filesystem does not implement encryption
 - ``EOPNOTSUPP``: the kernel was not configured with encryption
-  support for this filesystem, or the filesystem superblock has not
+  support for filesystems, or the filesystem superblock has not
   had encryption enabled on it.  (For example, to use encryption on an
-  ext4 filesystem, CONFIG_EXT4_ENCRYPTION must be enabled in the
+  ext4 filesystem, CONFIG_FS_ENCRYPTION must be enabled in the
   kernel config, and the superblock must have had the "encrypt"
   feature flag enabled using ``tune2fs -O encrypt`` or ``mkfs.ext4 -O
   encrypt``.)
@@ -451,9 +453,17 @@ astute users may notice some differences in behavior:
 - Unencrypted files, or files encrypted with a different encryption
   policy (i.e. different key, modes, or flags), cannot be renamed or
   linked into an encrypted directory; see `Encryption policy
-  enforcement`_.  Attempts to do so will fail with EPERM.  However,
+  enforcement`_.  Attempts to do so will fail with EXDEV.  However,
   encrypted files can be renamed within an encrypted directory, or
   into an unencrypted directory.
+
+  Note: "moving" an unencrypted file into an encrypted directory, e.g.
+  with the `mv` program, is implemented in userspace by a copy
+  followed by a delete.  Be aware that the original unencrypted data
+  may remain recoverable from free space on the disk; prefer to keep
+  all files encrypted from the very beginning.  The `shred` program
+  may be used to overwrite the source files but isn't guaranteed to be
+  effective on all filesystems and storage devices.
 
 - Direct I/O is not supported on encrypted files.  Attempts to use
   direct I/O on such files will fall back to buffered I/O.
@@ -541,7 +551,7 @@ not be encrypted.
 Except for those special files, it is forbidden to have unencrypted
 files, or files encrypted with a different encryption policy, in an
 encrypted directory tree.  Attempts to link or rename such a file into
-an encrypted directory will fail with EPERM.  This is also enforced
+an encrypted directory will fail with EXDEV.  This is also enforced
 during ->lookup() to provide limited protection against offline
 attacks that try to disable or downgrade encryption in known locations
 where applications may later write sensitive data.  It is recommended
@@ -639,3 +649,42 @@ Note that the precise way that filenames are presented to userspace
 without the key is subject to change in the future.  It is only meant
 as a way to temporarily present valid filenames so that commands like
 ``rm -r`` work as expected on encrypted directories.
+
+Tests
+=====
+
+To test fscrypt, use xfstests, which is Linux's de facto standard
+filesystem test suite.  First, run all the tests in the "encrypt"
+group on the relevant filesystem(s).  For example, to test ext4 and
+f2fs encryption using `kvm-xfstests
+<https://github.com/tytso/xfstests-bld/blob/master/Documentation/kvm-quickstart.md>`_::
+
+    kvm-xfstests -c ext4,f2fs -g encrypt
+
+UBIFS encryption can also be tested this way, but it should be done in
+a separate command, and it takes some time for kvm-xfstests to set up
+emulated UBI volumes::
+
+    kvm-xfstests -c ubifs -g encrypt
+
+No tests should fail.  However, tests that use non-default encryption
+modes (e.g. generic/549 and generic/550) will be skipped if the needed
+algorithms were not built into the kernel's crypto API.  Also, tests
+that access the raw block device (e.g. generic/399, generic/548,
+generic/549, generic/550) will be skipped on UBIFS.
+
+Besides running the "encrypt" group tests, for ext4 and f2fs it's also
+possible to run most xfstests with the "test_dummy_encryption" mount
+option.  This option causes all new files to be automatically
+encrypted with a dummy key, without having to make any API calls.
+This tests the encrypted I/O paths more thoroughly.  To do this with
+kvm-xfstests, use the "encrypt" filesystem configuration::
+
+    kvm-xfstests -c ext4/encrypt,f2fs/encrypt -g auto
+
+Because this runs many more tests than "-g encrypt" does, it takes
+much longer to run; so also consider using `gce-xfstests
+<https://github.com/tytso/xfstests-bld/blob/master/Documentation/gce-xfstests.md>`_
+instead of kvm-xfstests::
+
+    gce-xfstests -c ext4/encrypt,f2fs/encrypt -g auto

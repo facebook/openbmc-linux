@@ -1,12 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * ASPEED Static Memory Controller driver
  *
  * Copyright (c) 2015-2016, IBM Corporation.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/bug.h>
@@ -796,8 +792,7 @@ static bool aspeed_smc_check_reads(struct aspeed_smc_chip *chip,
 	int i;
 
 	for (i = 0; i < 10; i++) {
-		aspeed_smc_read_from_ahb(test_buf, chip->ahb_base,
-					 CALIBRATE_BUF_SIZE);
+		memcpy_fromio(test_buf, chip->ahb_base, CALIBRATE_BUF_SIZE);
 		if (memcmp(test_buf, golden_buf, CALIBRATE_BUF_SIZE) != 0)
 			return false;
 	}
@@ -882,6 +877,32 @@ static const uint32_t aspeed_smc_hclk_divs[] = {
 };
 #define ASPEED_SMC_HCLK_DIV(i) (aspeed_smc_hclk_divs[(i) - 1] << 8)
 
+static u32 aspeed_smc_default_read(struct aspeed_smc_chip *chip)
+{
+	/*
+	 * Keep the 4Byte address mode on the AST2400 SPI controller.
+	 * Other controllers set the 4Byte mode in the CE Control
+	 * Register
+	 */
+	u32 ctl_mask = chip->controller->info == &spi_2400_info ?
+		 CONTROL_IO_ADDRESS_4B : 0;
+	u8 cmd = chip->nor.flags & SNOR_F_4B_OPCODES ? SPINOR_OP_READ_4B :
+		SPINOR_OP_READ;
+
+	/*
+	 * Use the "read command" mode to customize the opcode. In
+	 * normal command mode, the value is necessarily READ (0x3) on
+	 * the AST2400/2500 SoCs.
+	 */
+	return (chip->ctl_val[smc_read] & ctl_mask) |
+		(0x00 << 28) | /* Single bit */
+		(0x00 << 24) | /* CE# max */
+		(cmd  << 16) | /* use read mode to support 4B opcode */
+		(0x00 <<  8) | /* HCLK/16 */
+		(0x00 <<  6) | /* no dummy cycle */
+		(0x01);        /* read mode */
+}
+
 static int aspeed_smc_optimize_read(struct aspeed_smc_chip *chip,
 				     u32 max_freq)
 {
@@ -898,18 +919,11 @@ static int aspeed_smc_optimize_read(struct aspeed_smc_chip *chip,
 	/* We start with the dumbest setting (keep 4Byte bit) and read
 	 * some data
 	 */
-	chip->ctl_val[smc_read] = (chip->ctl_val[smc_read] & 0x2000) |
-		(0x00 << 28) | /* Single bit */
-		(0x00 << 24) | /* CE# max */
-		(0x03 << 16) | /* use normal reads */
-		(0x00 <<  8) | /* HCLK/16 */
-		(0x00 <<  6) | /* no dummy cycle */
-		(0x00);        /* normal read */
+	chip->ctl_val[smc_read] = aspeed_smc_default_read(chip);
 
 	writel(chip->ctl_val[smc_read], chip->ctl);
 
-	aspeed_smc_read_from_ahb(golden_buf, chip->ahb_base,
-				 CALIBRATE_BUF_SIZE);
+	memcpy_fromio(golden_buf, chip->ahb_base, CALIBRATE_BUF_SIZE);
 
 	/* Establish our read mode with freq field set to 0 (HCLK/16) */
 	chip->ctl_val[smc_read] = save_read_val & 0xfffff0ff;

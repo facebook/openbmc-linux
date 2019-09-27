@@ -1438,7 +1438,7 @@ bind_err:
 static struct bnx2fc_interface *
 bnx2fc_interface_create(struct bnx2fc_hba *hba,
 			struct net_device *netdev,
-			enum fip_state fip_mode)
+			enum fip_mode fip_mode)
 {
 	struct fcoe_ctlr_device *ctlr_dev;
 	struct bnx2fc_interface *interface;
@@ -2971,7 +2971,8 @@ static struct scsi_host_template bnx2fc_shost_template = {
 	.this_id		= -1,
 	.cmd_per_lun		= 3,
 	.sg_tablesize		= BNX2FC_MAX_BDS_PER_CMD,
-	.max_sectors		= 1024,
+	.dma_boundary           = 0x7fff,
+	.max_sectors		= 0x3fbf,
 	.track_queue_depth	= 1,
 	.slave_configure	= bnx2fc_slave_configure,
 	.shost_attrs		= bnx2fc_host_attrs,

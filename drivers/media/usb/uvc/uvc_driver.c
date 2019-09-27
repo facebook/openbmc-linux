@@ -1,14 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *      uvc_driver.c  --  USB Video Class driver
  *
  *      Copyright (C) 2005-2010
  *          Laurent Pinchart (laurent.pinchart@ideasonboard.com)
- *
- *      This program is free software; you can redistribute it and/or modify
- *      it under the terms of the GNU General Public License as published by
- *      the Free Software Foundation; either version 2 of the License, or
- *      (at your option) any later version.
- *
  */
 
 #include <linux/atomic.h>
@@ -2183,7 +2178,7 @@ static int uvc_probe(struct usb_interface *intf,
 	if (udev->serial)
 		strscpy(dev->mdev.serial, udev->serial,
 			sizeof(dev->mdev.serial));
-	strscpy(dev->mdev.bus_info, udev->devpath, sizeof(dev->mdev.bus_info));
+	usb_make_path(udev, dev->mdev.bus_info, sizeof(dev->mdev.bus_info));
 	dev->mdev.hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
 	media_device_init(&dev->mdev);
 
