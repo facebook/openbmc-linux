@@ -1114,12 +1114,13 @@ static int aspeed_smc_optimize_read(struct aspeed_smc_chip *chip,
 
 #define TIMING_DELAY_DI         BIT(3)
 #define TIMING_DELAY_HCYCLE_MAX     5
+#define TIMING_REG_AST2600(chip)					\
+	((chip)->controller->regs + (chip)->controller->info->timing +	\
+	 (chip)->cs * 4)
 
 static int aspeed_smc_calibrate_reads_ast2600(struct aspeed_smc_chip *chip, u32 hdiv,
 					      const u8 *golden_buf, u8 *test_buf)
 {
-	struct aspeed_smc_controller *controller = chip->controller;
-	const struct aspeed_smc_info *info = controller->info;
 	int hcycle;
 	u32 shift = (hdiv - 2) << 3;
 	u32 mask = ~(0xfu << shift);
@@ -1133,7 +1134,7 @@ static int aspeed_smc_calibrate_reads_ast2600(struct aspeed_smc_chip *chip, u32 
 		fread_timing_val |= hcycle << shift;
 
 		/* no DI input delay first  */
-		writel(fread_timing_val, controller->regs + info->timing);
+		writel(fread_timing_val, TIMING_REG_AST2600(chip));
 		pass = aspeed_smc_check_reads(chip, golden_buf, test_buf);
 		dev_dbg(chip->nor.dev,
 			"  * [%08x] %d HCLK delay, DI delay none : %s",
@@ -1149,7 +1150,7 @@ static int aspeed_smc_calibrate_reads_ast2600(struct aspeed_smc_chip *chip, u32 
 			fread_timing_val &= ~(0xf << (4 + shift));
 			fread_timing_val |= delay_ns << (4 + shift);
 
-			writel(fread_timing_val, controller->regs + info->timing);
+			writel(fread_timing_val, TIMING_REG_AST2600(chip));
 			pass = aspeed_smc_check_reads(chip, golden_buf, test_buf);
 			dev_dbg(chip->nor.dev,
 				"  * [%08x] %d HCLK delay, DI delay %d.%dns : %s",
