@@ -347,8 +347,12 @@ static u32 aspeed_smc_segment_end_ast2600(
 static u32 aspeed_smc_segment_reg_ast2600(
 	struct aspeed_smc_controller *controller, u32 start, u32 end)
 {
-    return ((start & AST2600_SEG_ADDR_MASK) >> 16) |
-	    ((end - 1) & AST2600_SEG_ADDR_MASK);
+	/* disable zero size segments */
+	if (start == end)
+		return 0;
+
+	return ((start & AST2600_SEG_ADDR_MASK) >> 16) |
+		((end - 1) & AST2600_SEG_ADDR_MASK);
 }
 
 /*
