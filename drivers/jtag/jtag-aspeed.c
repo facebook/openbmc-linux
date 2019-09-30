@@ -603,6 +603,8 @@ static int aspeed_jtag_xfer(struct jtag *jtag, struct jtag_xfer *xfer,
     static const u8 sm_pause_update[] = {1, 1};
     struct aspeed_jtag *aspeed_jtag = jtag_priv(jtag);
     unsigned long *data = (unsigned long *)xfer_data;
+
+#ifdef DEBUG
     unsigned long remain_xfer = xfer->length;
     char dbg_str[256];
     int pos = 0;
@@ -618,6 +620,7 @@ static int aspeed_jtag_xfer(struct jtag *jtag, struct jtag_xfer *xfer,
         xfer->direction == JTAG_READ_XFER ? "READ" : "WRITE",
         aspeed_jtag->mode & JTAG_XFER_HW_MODE ? "HW" : "SW",
         xfer->endstate, remain_xfer, dbg_str);
+#endif
 
     if (!(aspeed_jtag->mode & JTAG_XFER_HW_MODE)) {
         /* SW mode */
