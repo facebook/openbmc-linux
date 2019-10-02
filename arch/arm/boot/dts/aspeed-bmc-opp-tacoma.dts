@@ -298,15 +298,7 @@
 	};
 };
 
-&i2c6 {
-	status = "okay";
-};
-
 &i2c7 {
-	status = "okay";
-};
-
-&i2c8 {
 	status = "okay";
 };
 
@@ -445,14 +437,6 @@
 };
 
 &i2c13 {
-	status = "okay";
-};
-
-&i2c14 {
-	status = "okay";
-};
-
-&i2c15 {
 	status = "okay";
 };
 
