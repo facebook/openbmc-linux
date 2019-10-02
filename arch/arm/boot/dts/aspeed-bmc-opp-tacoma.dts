@@ -455,3 +455,7 @@
 &i2c15 {
 	status = "okay";
 };
+
+&ibt {
+	status = "okay";
+};
