@@ -29,19 +29,37 @@
 	};
 };
 
+&wdt1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_wdtrst1_default>;
+	aspeed,reset-type = "soc";
+	aspeed,external-signal;
+	aspeed,ext-push-pull;
+	aspeed,ext-active-high;
+	aspeed,ext-pulse-duration = <256>;
+};
+
 &fmc {
 	status = "okay";
+	// Main writable SPI flash
 	flash@0 {
 		status = "okay";
 		m25p,fast-read;
-		label = "spi0.0";
-#include "facebook-bmc-flash0-layout.dtsi"
+		reg = < 1 >;
+		label = "spi0.1";
+#include "facebook-bmc-flash1-layout.dtsi"
 	};
+	// Golden BMC read-only image
 	flash@1 {
 		status = "okay";
 		m25p,fast-read;
-		label = "spi0.1";
-#include "facebook-bmc-flash1-layout.dtsi"
+		reg = < 0 >;
+		label = "spi0.0";
+#include "facebook-bmc-flash0-layout.dtsi"
+	};
+	flash@2 {
+		spi-max-frequency = <12000000>;
 	};
 };
 
@@ -56,15 +74,24 @@
 	};
 };
 
+&ibt {
+	status = "disabled";
+};
+
+&lpc_ctrl {
+	// Enable LPC clock
+	status = "okay";
+};
+
 &lpc_snoop {
 	status = "okay";
 	snoop-ports = <0x80>;
 };
 
-&lpc_ctrl {
-	// Enable lpc clock
+&rtc {
 	status = "okay";
 };
+
 
 &uart1 {
 	// Host Console
@@ -106,7 +133,12 @@
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_rmii1_default>;
+	no-hw-checksum;
 	use-ncsi;
+};
+
+&peci0 {
+	status = "okay";
 };
 
 &adc {
@@ -121,6 +153,7 @@
 &i2c1 {
 	status = "okay";
 	//X24 Riser
+	multi-master;
 };
 
 &i2c2 {
@@ -136,6 +169,7 @@
 &i2c4 {
 	status = "okay";
 	// BMC Debug Header
+	multi-master;
 };
 
 &i2c5 {
@@ -181,6 +215,7 @@
 &i2c9 {
 	status = "okay";
 	//USB Debug Connector
+	multi-master;
 };
 
 &pwm_tacho {
