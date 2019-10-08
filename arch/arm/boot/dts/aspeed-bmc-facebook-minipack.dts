@@ -102,6 +102,19 @@
 		m25p,fast-read;
 		label = "bmc";
 #include "facebook-bmc-flash-layout.dtsi"
+
+		/*
+		 * Minipack is installed with 64MB flashes.
+		 */
+		partitions {
+			data0@1c00000 {
+				reg = <0x1c00000 0x2400000>;
+			};
+
+			flash0@0 {
+				reg = <0x0 0x4000000>;
+			};
+		};
 	};
 
 	flash@1 {
@@ -115,7 +128,7 @@
 			#size-cells = <1>;
 
 			flash1@0 {
-				reg = <0x0 0x2000000>;
+				reg = <0x0 0x4000000>;
 				label = "flash1";
 			};
 		};
