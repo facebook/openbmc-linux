@@ -271,11 +271,11 @@ static int aspeed_kcs_probe(struct platform_device *pdev)
 	dev_set_drvdata(dev, kcs_bmc);
 
 	aspeed_kcs_set_address(kcs_bmc, addr);
-	aspeed_kcs_enable_channel(kcs_bmc, true);
 	rc = aspeed_kcs_config_irq(kcs_bmc, pdev);
 	if (rc)
 		return rc;
 
+	aspeed_kcs_enable_channel(kcs_bmc, true);
 	rc = misc_register(&kcs_bmc->miscdev);
 	if (rc) {
 		dev_err(dev, "Unable to register device\n");
