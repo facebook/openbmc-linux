@@ -197,6 +197,16 @@
 		compatible = "atmel,24c64";
 		reg = <0x54>;
 	};
+
+	// I/O Expander
+	pca9539@76 {
+		compatible = "nxp,pca9539";
+		reg = <0x76>;
+	};
+	pca9539@77 {
+		compatible = "nxp,pca9539";
+		reg = <0x77>;
+	};
 };
 
 &i2c5 {
@@ -221,7 +231,7 @@
 
 &i2c13 {
 	status = "okay";
-	i2c-switch@71 {		
+	i2c-switch@71 {
 		compatible = "nxp,pca9548";
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -231,19 +241,19 @@
 			#size-cells = <0>;
 			reg = <0>;
 		};
-  
+
 		imux17: i2c@1 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <1>;
 		};
-		
+
 		imux18: i2c@2 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
 		};
-  
+
 		imux19: i2c@3 {
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -261,25 +271,25 @@
 				reg = <0x4f>;
 			};
 		};
-  
+
 		imux20: i2c@4 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <4>;
 		};
-  
+
 		imux21: i2c@5 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <5>;
 		};
-  
+
 		imux22: i2c@6 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <6>;
 		};
-  
+
 		imux23: i2c@7 {
 			#address-cells = <1>;
 			#size-cells = <0>;
