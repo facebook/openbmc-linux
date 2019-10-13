@@ -450,7 +450,7 @@
 
 	pin_gpio_f4 {
 		gpios = <ASPEED_GPIO(F, 4) GPIO_ACTIVE_HIGH>;
-		both;
+		input;
 		line-name = "CPU_CATERR_MSMI";
 	};
 
@@ -486,6 +486,12 @@
 
 	pin_gpio_g6 {
 		gpios = <ASPEED_GPIO(G, 6) GPIO_ACTIVE_HIGH>;
+		input;
+		line-name = "BMC_CPLD_BOARD_TYPE";
+	};
+
+	pin_gpio_g7 {
+		gpios = <ASPEED_GPIO(G, 7) GPIO_ACTIVE_HIGH>;
 		input;
 		line-name = "BMC_CPLD_BOARD_REV_ID2";
 	};
