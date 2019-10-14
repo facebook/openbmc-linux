@@ -3,6 +3,7 @@
 // FSI master driver for AST2600
 
 #include <linux/clk.h>
+#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/fsi.h>
 #include <linux/io.h>
@@ -28,6 +29,7 @@
 #define FSI_MCENP0		0x20		/* C: Clear enable */
 #define FSI_MAEB		0x70		/* R: Error address */
 #define FSI_MVER		0x74		/* R: master version/type */
+#define FSI_MSTAP0		0xd0		/* R: Port status */
 #define FSI_MRESP0		0xd0		/* W: Port reset */
 #define FSI_MESRB0		0x1d0		/* R: Master error status */
 #define FSI_MRESB0		0x1d0		/* W: Reset bridge */
@@ -68,11 +70,23 @@
 
 #define FSI_LINK_ENABLE_SETUP_TIME	10	/* in mS */
 
+#define FSI_NUM_DEBUGFS_ENTRIES		14
+
+struct fsi_master_aspeed;
+
+struct fsi_master_aspeed_debugfs_entry {
+	struct fsi_master_aspeed *aspeed;
+	uint32_t addr;
+};
+
 struct fsi_master_aspeed {
 	struct fsi_master	master;
 	struct device		*dev;
 	void __iomem		*base;
 	struct clk		*clk;
+
+	struct dentry		*debugfs_dir;
+	struct fsi_master_aspeed_debugfs_entry debugfs[FSI_NUM_DEBUGFS_ENTRIES];
 };
 
 #define to_fsi_master_aspeed(m) \
@@ -428,6 +442,35 @@ static int aspeed_master_init(struct fsi_master_aspeed *aspeed)
 	return 0;
 }
 
+static int fsi_master_aspeed_debugfs_get(void *data, u64 *val)
+{
+	int rc;
+	u32 out;
+	struct fsi_master_aspeed_debugfs_entry *entry = data;
+
+	rc = opb_read(entry->aspeed->base, ctrl_base + entry->addr, 4, &out);
+	if (rc)
+		return rc;
+
+	*val = (u64)be32_to_cpu(out);
+	return 0;
+}
+static int fsi_master_aspeed_debugfs_set(void *data, u64 val)
+{
+	u32 rc;
+	u32 in = cpu_to_be32((u32)(val & 0xFFFFFFFFULL));
+	struct fsi_master_aspeed_debugfs_entry *entry = data;
+
+	rc = opb_write(entry->aspeed->base, ctrl_base + entry->addr, in, 4);
+	if (rc)
+		return rc;
+
+	return 0;
+}
+DEFINE_DEBUGFS_ATTRIBUTE(fsi_master_aspeed_debugfs_ops,
+			 fsi_master_aspeed_debugfs_get,
+			 fsi_master_aspeed_debugfs_set, "0x%08llx\n");
+
 static int fsi_master_aspeed_probe(struct platform_device *pdev)
 {
 	struct fsi_master_aspeed *aspeed;
@@ -499,6 +542,96 @@ static int fsi_master_aspeed_probe(struct platform_device *pdev)
 
 	aspeed_master_init(aspeed);
 
+	aspeed->debugfs_dir = debugfs_create_dir("fsi-master-aspeed", NULL);
+	if (aspeed->debugfs_dir) {
+		int idx = 0;
+		struct fsi_master_aspeed_debugfs_entry *etrs = aspeed->debugfs;
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MMODE;
+		debugfs_create_file("mmode", 0644, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MDLYR;
+		debugfs_create_file("mdlyr", 0644, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MCRSP;
+		debugfs_create_file("mcrsp0", 0644, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MENP0;
+		debugfs_create_file("menp0", 0644, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MLEVP0;
+		debugfs_create_file("mlevp0", 0444, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MSENP0;
+		debugfs_create_file("msenp0", 0200, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MCENP0;
+		debugfs_create_file("mcenp0", 0200, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MAEB;
+		debugfs_create_file("maeb", 0444, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MVER;
+		debugfs_create_file("mver", 0444, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MSTAP0;
+		debugfs_create_file("mstap0", 0444, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MRESP0;
+		debugfs_create_file("mresp0", 0200, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MESRB0;
+		debugfs_create_file("mesrb0", 0444, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MRESB0;
+		debugfs_create_file("mresb0", 0200, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MECTRL;
+		debugfs_create_file("mectrl", 0644, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+	}
+
 	rc = fsi_master_register(&aspeed->master);
 	if (rc)
 		goto err_release;
@@ -521,6 +654,8 @@ err_release:
 static int fsi_master_aspeed_remove(struct platform_device *pdev)
 {
 	struct fsi_master_aspeed *aspeed = platform_get_drvdata(pdev);
+
+	debugfs_remove_recursive(aspeed->debugfs_dir);
 
 	fsi_master_unregister(&aspeed->master);
 	clk_disable_unprepare(aspeed->clk);
