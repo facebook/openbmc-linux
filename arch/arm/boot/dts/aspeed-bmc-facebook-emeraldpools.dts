@@ -125,6 +125,39 @@
 
 &i2c7 {
 	status = "okay";
+	// GPIO expander to OAM
+	pca9555@20 {
+		compatible = "nxp,pca9555";
+		reg = <0x20>;
+	};
+	pca9555@21 {
+		compatible = "nxp,pca9555";
+		reg = <0x21>;
+	};
+	pca9555@22 {
+		compatible = "nxp,pca9555";
+		reg = <0x22>;
+	};
+	pca9555@23 {
+		compatible = "nxp,pca9555";
+		reg = <0x23>;
+	};
+	pca9555@24 {
+		compatible = "nxp,pca9555";
+		reg = <0x24>;
+	};
+	pca9555@25 {
+		compatible = "nxp,pca9555";
+		reg = <0x25>;
+	};
+	pca9555@26 {
+		compatible = "nxp,pca9555";
+		reg = <0x26>;
+	};
+	pca9555@27 {
+		compatible = "nxp,pca9555";
+		reg = <0x27>;
+	};
 };
 
 &i2c8 {
