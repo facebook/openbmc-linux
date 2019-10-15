@@ -56,14 +56,14 @@
 	flash@0 {
 		status = "okay";
 		m25p,fast-read;
-		label = "bmc";
+		label = "spi0.0";
 #include "facebook-bmc-flash-layout.dtsi"
 	};
 
 	flash@1 {
 		status = "okay";
 		m25p,fast-read;
-		label = "2nd-bmc";
+		label = "spi0.1";
 
 		partitions {
 			compatible = "fixed-partitions";
