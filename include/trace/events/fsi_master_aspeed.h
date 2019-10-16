@@ -9,10 +9,9 @@
 #include <linux/tracepoint.h>
 
 TRACE_EVENT(fsi_master_aspeed_opb_read,
-	TP_PROTO(void __iomem *base, uint32_t addr, size_t size, uint32_t result, uint32_t status, uint32_t irq_status),
-	TP_ARGS(base, addr, size, result, status, irq_status),
+	TP_PROTO(uint32_t addr, size_t size, uint32_t result, uint32_t status, uint32_t irq_status),
+	TP_ARGS(addr, size, result, status, irq_status),
 	TP_STRUCT__entry(
-		__field(void *,    base)
 		__field(uint32_t,  addr)
 		__field(size_t,    size)
 		__field(uint32_t,  result)
@@ -20,24 +19,22 @@ TRACE_EVENT(fsi_master_aspeed_opb_read,
 		__field(uint32_t,  irq_status)
 		),
 	TP_fast_assign(
-		__entry->base = base;
 		__entry->addr = addr;
 		__entry->size = size;
 		__entry->result = result;
 		__entry->status = status;
 		__entry->irq_status = irq_status;
 		),
-	TP_printk("fsi: opb read: base %p addr %08x size %zu: result %08x status: %08x irq_status: %08x",
-		__entry->base, __entry->addr, __entry->size, __entry->result,
+	TP_printk("fsi: opb read: addr %08x size %zu: result %08x status: %08x irq_status: %08x",
+		__entry->addr, __entry->size, __entry->result,
 		__entry->status, __entry->irq_status
 	   )
 );
 
 TRACE_EVENT(fsi_master_aspeed_opb_write,
-	TP_PROTO(void __iomem *base, uint32_t addr, uint32_t val, size_t size, uint32_t status, uint32_t irq_status),
-	TP_ARGS(base, addr, val, size, status, irq_status),
+	TP_PROTO(uint32_t addr, uint32_t val, size_t size, uint32_t status, uint32_t irq_status),
+	TP_ARGS(addr, val, size, status, irq_status),
 	TP_STRUCT__entry(
-		__field(void *,    base)
 		__field(uint32_t,    addr)
 		__field(uint32_t,    val)
 		__field(size_t,    size)
@@ -45,15 +42,14 @@ TRACE_EVENT(fsi_master_aspeed_opb_write,
 		__field(uint32_t,  irq_status)
 		),
 	TP_fast_assign(
-		__entry->base = base;
 		__entry->addr = addr;
 		__entry->val = val;
 		__entry->size = size;
 		__entry->status = status;
 		__entry->irq_status = irq_status;
 		),
-	TP_printk("fsi: opb write: base %p addr %08x val %08x size %zu status: %08x irq_status: %08x",
-		__entry->base, __entry->addr, __entry->val, __entry->size,
+	TP_printk("fsi: opb write: addr %08x val %08x size %zu status: %08x irq_status: %08x",
+		__entry->addr, __entry->val, __entry->size,
 		__entry->status, __entry->irq_status
 		)
 	);

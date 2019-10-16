@@ -190,8 +190,7 @@ static u32 opb_write(void __iomem *base, uint32_t addr, uint32_t val,
 
 	status = readl(base + OPB0_STATUS);
 
-	trace_fsi_master_aspeed_opb_write(base, addr, val, size,
-			status, reg);
+	trace_fsi_master_aspeed_opb_write(addr, val, size, status, reg);
 
 	/* Return error when poll timed out */
 	if (ret)
@@ -227,7 +226,7 @@ static int opb_read(void __iomem *base, uint32_t addr, size_t size, u32 *out)
 
 	result = readl(base + OPB0_FSI_DATA_R);
 
-	trace_fsi_master_aspeed_opb_read(base, addr, size, result,
+	trace_fsi_master_aspeed_opb_read(addr, size, result,
 			readl(base + OPB0_STATUS),
 			reg);
 
