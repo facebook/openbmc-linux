@@ -1380,12 +1380,14 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
 	bool sram_enabled = true;
 	struct clk *parent_clk;
 	int irq, ret;
+	struct resource *res;
 
 	bus = devm_kzalloc(&pdev->dev, sizeof(*bus), GFP_KERNEL);
 	if (!bus)
 		return -ENOMEM;
 
-	bus->base = devm_platform_ioremap_resource(pdev, 0);
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	bus->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(bus->base))
 		return PTR_ERR(bus->base);
 
@@ -1481,8 +1483,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
 	}
 
 	if (!bus->dma_buf && sram_enabled) {
-		struct resource *res = platform_get_resource(pdev,
-							     IORESOURCE_MEM, 1);
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 
 		bus->buf_base = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(bus->buf_base) || resource_size(res) < 2) {
