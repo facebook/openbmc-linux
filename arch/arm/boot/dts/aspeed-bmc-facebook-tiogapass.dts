@@ -10,12 +10,12 @@
 	model = "Facebook TiogaPass BMC";
 	compatible = "facebook,tiogapass-bmc", "aspeed,ast2500";
 	aliases {
-		serial0 = &uart1;
-		serial4 = &uart5;
+		serial0 = &uart5;
+		serial1 = &uart1;
 	};
 	chosen {
 		stdout-path = &uart5;
-		bootargs = "console=ttyS4,115200 earlyprintk";
+		bootargs = "debug console=ttyS4,57600n8 root=/dev/ram rw";
 	};
 
 	memory@80000000 {
@@ -95,6 +95,7 @@
 
 &uart1 {
 	// Host Console
+	resets = <>;
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_txd1_default
@@ -103,6 +104,7 @@
 
 &uart2 {
 	// SoL Host Console
+	resets = <>;
 	status = "okay";
 };
 
