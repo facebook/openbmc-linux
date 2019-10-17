@@ -421,7 +421,7 @@ static int aspeed_master_init(struct fsi_master_aspeed *aspeed)
 	reg = cpu_to_be32(FSI_MECTRL_EOAE | FSI_MECTRL_P8_AUTO_TERM);
 	opb_write(aspeed->base, ctrl_base + FSI_MECTRL, reg, 4);
 
-	reg = cpu_to_be32(FSI_MMODE_EIP | FSI_MMODE_ECRC | FSI_MMODE_EPC
+	reg = cpu_to_be32(FSI_MMODE_ECRC | FSI_MMODE_EPC
 			| fsi_mmode_crs0(0x7f) | fsi_mmode_crs1(0x7f)
 			| FSI_MMODE_P8_TO_LSB);
 	opb_write(aspeed->base, ctrl_base + FSI_MMODE, reg, 4);
