@@ -83,6 +83,36 @@
 		m25p,fast-read;
 		label = "spi0.0";
 #include "facebook-bmc-flash-layout.dtsi"
+
+		/*
+		 * Wedge400/Wedge400-C is installed with 128MB flashes.
+		 */
+		partitions {
+			data0@1c00000 {
+				reg = <0x1c00000 0x6400000>;
+			};
+
+			flash0@0 {
+				reg = <0x0 0x8000000>;
+			};
+		};
+	};
+
+	flash@1 {
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			flash1@0 {
+				reg = <0x0 0x8000000>;
+				label = "flash1";
+			};
+		};
 	};
 };
 
