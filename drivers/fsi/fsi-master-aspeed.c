@@ -33,6 +33,9 @@
 #define FSI_MRESP0		0xd0		/* W: Port reset */
 #define FSI_MESRB0		0x1d0		/* R: Master error status */
 #define FSI_MRESB0		0x1d0		/* W: Reset bridge */
+#define FSI_MSCSB0	 	0x1d4		/* R: Master sub command stack */
+#define FSI_MATRB0	 	0x1d8		/* R: Master address trace */
+#define FSI_MDTRB0	 	0x1dc		/* R: Master data trace */
 #define FSI_MECTRL		0x2e0		/* W: Error control */
 
 /* MMODE: Mode control */
@@ -70,7 +73,7 @@
 
 #define FSI_LINK_ENABLE_SETUP_TIME	10	/* in mS */
 
-#define FSI_NUM_DEBUGFS_ENTRIES		14
+#define FSI_NUM_DEBUGFS_ENTRIES		17
 
 struct fsi_master_aspeed;
 
@@ -678,6 +681,24 @@ static int fsi_master_aspeed_probe(struct platform_device *pdev)
 		etrs[idx].aspeed = aspeed;
 		etrs[idx].addr = FSI_MRESB0;
 		debugfs_create_file("mresb0", 0200, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MSCSB0;
+		debugfs_create_file("mscsb0", 0200, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MATRB0;
+		debugfs_create_file("matrb0", 0200, aspeed->debugfs_dir,
+				    &etrs[idx++],
+				    &fsi_master_aspeed_debugfs_ops);
+
+		etrs[idx].aspeed = aspeed;
+		etrs[idx].addr = FSI_MDTRB0;
+		debugfs_create_file("mdtrb0", 0200, aspeed->debugfs_dir,
 				    &etrs[idx++],
 				    &fsi_master_aspeed_debugfs_ops);
 
