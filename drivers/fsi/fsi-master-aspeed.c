@@ -220,7 +220,7 @@ static int opb_read(void __iomem *base, uint32_t addr, size_t size, u32 *out)
 
 	ret = readl_poll_timeout(base + OPB_IRQ_STATUS, reg,
 			   (reg & OPB0_XFER_ACK_EN) != 0,
-			   0, 100);
+			   0, 10000);
 
 	status = readl(base + OPB0_STATUS);
 
