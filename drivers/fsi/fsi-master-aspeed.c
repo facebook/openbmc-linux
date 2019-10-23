@@ -483,6 +483,50 @@ DEFINE_DEBUGFS_ATTRIBUTE(fsi_master_aspeed_debugfs_ops,
 			 fsi_master_aspeed_debugfs_get,
 			 fsi_master_aspeed_debugfs_set, "0x%08llx\n");
 
+static int fsi_master_aspeed_clock_debugfs_get(void *data, u64 *val)
+{
+	struct fsi_master_aspeed *aspeed = data;
+	u32 out;
+	int rc;
+
+	rc = opb_read(aspeed->base, ctrl_base, 4, &out);
+	if (rc)
+		return rc;
+
+	*val = (u64)((be32_to_cpu(out) >> 18) & 0x3ff);
+
+	return 0;
+}
+
+static int fsi_master_aspeed_clock_debugfs_set(void *data, u64 val)
+{
+	struct fsi_master_aspeed *aspeed = data;
+	u32 reg, rc;
+	__be32 raw;
+
+	if (val > 0x3ff)
+		return -EINVAL;
+
+	rc = opb_read(aspeed->base, ctrl_base, 4, &raw);
+	if (rc)
+		return rc;
+
+	reg = be32_to_cpu(raw);
+
+	reg &= ~(0x3ff << 18);
+	reg |= (val & 0x3ff) << 18;
+
+	rc = opb_write(aspeed->base, ctrl_base, cpu_to_be32(reg), 4);
+	if (rc)
+		return rc;
+
+	return 0;
+}
+DEFINE_DEBUGFS_ATTRIBUTE(fsi_master_aspeed_clock_debugfs_ops,
+			 fsi_master_aspeed_clock_debugfs_get,
+			 fsi_master_aspeed_clock_debugfs_set, "0x%llx\n");
+
+
 static int fsi_master_aspeed_probe(struct platform_device *pdev)
 {
 	struct fsi_master_aspeed *aspeed;
@@ -642,6 +686,9 @@ static int fsi_master_aspeed_probe(struct platform_device *pdev)
 		debugfs_create_file("mectrl", 0644, aspeed->debugfs_dir,
 				    &etrs[idx++],
 				    &fsi_master_aspeed_debugfs_ops);
+
+		debugfs_create_file("clock_div", 0644, aspeed->debugfs_dir,
+				aspeed, &fsi_master_aspeed_clock_debugfs_ops);
 	}
 
 	rc = fsi_master_register(&aspeed->master);
