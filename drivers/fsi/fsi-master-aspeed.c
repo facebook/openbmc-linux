@@ -182,7 +182,6 @@ static u32 opb_write(void __iomem *base, uint32_t addr, uint32_t val,
 	/* TODO: implement other sizes, see 0x18 */
 	WARN_ON(size != 4);
 
-	writel(0x1, base + OPB0_SELECT);
 	writel(CMD_WRITE, base + OPB0_RW);
 	writel(XFER_WORD, base + OPB0_XFER_SIZE);
 	writel(addr, base + OPB0_FSI_ADDR);
@@ -217,7 +216,6 @@ static int opb_read(void __iomem *base, uint32_t addr, size_t size, u32 *out)
 	/* TODO: implement other sizes, see 0x18 */
 	WARN_ON(size != 4);
 
-	writel(0x1, base + OPB0_SELECT);
 	writel(CMD_READ, base + OPB0_RW);
 	writel(XFER_WORD, base + OPB0_XFER_SIZE);
 	writel(addr, base + OPB0_FSI_ADDR);
@@ -579,6 +577,13 @@ static int fsi_master_aspeed_probe(struct platform_device *pdev)
 	/* Set write data order */
 	writel(0x0011bb1b, aspeed->base + OPB0_W_ENDIAN);
 	writel(0xffaa5500, aspeed->base + 0x50);
+
+	/*
+	 * Select OPB0 for all operations.
+	 * Will need to be reworked when enabling DMA or anything that uses
+	 * OPB1.
+	 */
+	writel(0x1, aspeed->base + OPB0_SELECT);
 
 	rc = opb_read(aspeed->base, ctrl_base + FSI_MVER, 4, &raw);
 	if (rc) {
