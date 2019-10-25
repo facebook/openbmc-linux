@@ -189,7 +189,7 @@ static u32 opb_write(void __iomem *base, uint32_t addr, uint32_t val,
 
 	ret = readl_poll_timeout(base + OPB_IRQ_STATUS, reg,
 				(reg & OPB0_XFER_ACK_EN) != 0,
-				1, 10000);
+				0, 10000);
 
 	status = readl(base + OPB0_STATUS);
 
