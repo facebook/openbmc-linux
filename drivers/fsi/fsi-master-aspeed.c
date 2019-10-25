@@ -41,6 +41,7 @@
 /* MMODE: Mode control */
 #define FSI_MMODE_EIP		0x80000000	/* Enable interrupt polling */
 #define FSI_MMODE_ECRC		0x40000000	/* Enable error recovery */
+#define FSI_MMODE_RELA		0x20000000	/* Enable relative address commands */
 #define FSI_MMODE_EPC		0x10000000	/* Enable parity checking */
 #define FSI_MMODE_P8_TO_LSB	0x00000010	/* Timeout value LSB */
 						/*   MSB=1, LSB=0 is 0.8 ms */
@@ -426,7 +427,7 @@ static int aspeed_master_init(struct fsi_master_aspeed *aspeed)
 	reg = cpu_to_be32(FSI_MECTRL_EOAE | FSI_MECTRL_P8_AUTO_TERM);
 	opb_write(aspeed->base, ctrl_base + FSI_MECTRL, reg, 4);
 
-	reg = cpu_to_be32(FSI_MMODE_ECRC | FSI_MMODE_EPC
+	reg = cpu_to_be32(FSI_MMODE_ECRC | FSI_MMODE_EPC | FSI_MMODE_RELA
 			| fsi_mmode_crs0(DEFAULT_DIVISOR)
 			| fsi_mmode_crs1(DEFAULT_DIVISOR)
 			| FSI_MMODE_P8_TO_LSB);
