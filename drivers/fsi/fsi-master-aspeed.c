@@ -287,19 +287,16 @@ static int aspeed_master_read(struct fsi_master *master, int link,
 {
 	struct fsi_master_aspeed *aspeed = to_fsi_master_aspeed(master);
 	int ret;
-	u32 data;
 
 	if (id != 0)
 		return -EINVAL;
 
 	addr += link * FSI_HUB_LINK_SIZE;
-	ret = opb_read(aspeed->base, fsi_base + addr, size, &data);
+	ret = opb_read(aspeed->base, fsi_base + addr, size, val);
 
 	ret = check_errors(aspeed, ret);
 	if (ret)
 		return ret;
-
-	memcpy(val, &data, size);
 
 	return 0;
 }
