@@ -14,6 +14,7 @@
 		 * the legacy applications.
 		 */
 		serial0 = &uart5;
+		serial1 = &uart1;
 	};
 
 	chosen {
@@ -57,6 +58,14 @@
 		m25p,fast-read;
 		label = "pnor";
 	};
+};
+
+&uart1 {
+	// OAM Console
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_txd1_default
+		     &pinctrl_rxd1_default>;
 };
 
 &uart5 {
@@ -219,3 +228,4 @@
 &vhub {
 	status = "okay";
 };
+
