@@ -830,6 +830,13 @@ have_ifp:
 						  &ifp->addr, np);
 					goto out;
 				}
+				if (!memcmp(eth_hdr(skb)->h_source, dev->dev_addr, ETH_ALEN)) {
+					ND_PRINTK(2, notice,
+							  "%s: IPv6 DAD from %pM for address %pI6c ignored\n",
+							  dev->name, eth_hdr(skb)->h_source, &ifp->addr);
+					goto out;
+				}
+
 				/*
 				 * We are colliding with another node
 				 * who is doing DAD
@@ -988,6 +995,13 @@ static void ndisc_recv_na(struct sk_buff *skb)
 	if (ifp) {
 		if (skb->pkt_type != PACKET_LOOPBACK
 		    && (ifp->flags & IFA_F_TENTATIVE)) {
+				if (!memcmp(eth_hdr(skb)->h_source, dev->dev_addr, ETH_ALEN)) {
+					ND_PRINTK(2, notice,
+							  "%s: %pM advertised our address %pI6c ignored\n",
+							  dev->name, eth_hdr(skb)->h_source, &ifp->addr);
+					in6_ifa_put(ifp);
+					return;
+				}
 				addrconf_dad_failure(skb, ifp);
 				return;
 		}
