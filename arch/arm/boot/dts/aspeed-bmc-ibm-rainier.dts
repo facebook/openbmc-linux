@@ -412,7 +412,7 @@
 	};
 
 	eeprom@50 {
-		compatible = "atmel,24c64";
+		compatible = "atmel,24c128";
 		reg = <0x50>;
 	};
 };
@@ -461,7 +461,7 @@
 	};
 
 	eeprom@50 {
-		compatible = "atmel,24c64";
+		compatible = "atmel,24c128";
 		reg = <0x50>;
 	};
 };
