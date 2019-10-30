@@ -9,12 +9,15 @@
 	model = "Facebook YosemiteV3 BMC";
 	compatible = "facebook,yosemitev3-bmc", "aspeed,ast2500";
 	aliases {
-		serial0 = &uart1;
-		serial4 = &uart5;
+		serial0 = &uart5;
+                serial1 = &uart1;
+                serial2 = &uart2;
+                serial3 = &uart3;
+                serial4 = &uart4;
 	};
 	chosen {
 		stdout-path = &uart5;
-		bootargs = "console=ttyS4,57600n8 root=/dev/ram rw";
+		bootargs = "debug console=ttyS4,57600n8 root=/dev/ram rw";
 	};
 
 	memory@80000000 {
