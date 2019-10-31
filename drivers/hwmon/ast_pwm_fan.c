@@ -77,6 +77,8 @@ struct ast_pwm_tacho_data {
 
 struct ast_pwm_tacho_data *ast_pwm_tacho;
 
+static DEFINE_MUTEX(rpm_lock);
+
 static u8 ast_get_pwm_type(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 pwm_ch);
 static u8 ast_get_pwm_en(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 pwm_ch);
 static u8 ast_get_tacho_type_division(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 pwm_type);
@@ -712,6 +714,7 @@ ast_get_tacho_rpm(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 tacho_ch)
 	if(!tacho_type_en)
 		return 0;
 
+	mutex_lock(&rpm_lock);
 	do {
 		//write 0
 		ast_pwm_tacho_write(ast_pwm_tacho, 0, AST_PTCR_TRIGGER);
@@ -720,19 +723,22 @@ ast_get_tacho_rpm(struct ast_pwm_tacho_data *ast_pwm_tacho, u8 tacho_ch)
 		ast_pwm_tacho_write(ast_pwm_tacho, 0x1 << tacho_ch, AST_PTCR_TRIGGER);
 
 		//Wait for a while after specifying which channel will be used
-    //(which is done by the register write above), so that Aspeed SoC
-    //have enough time to configure its internal mux.
-    msleep(10);
+		//(which is done by the register write above), so that Aspeed SoC
+		//have enough time to configure its internal mux.
+		msleep(10);
 
 		//Wait ready
 		while (!((raw_data = ast_pwm_tacho_read(ast_pwm_tacho, AST_PTCR_RESULT)) & (0x1 << RESULT_STATUS))) {
 			timeout++;
-			if(timeout > 25)
+			if (timeout > 25) {
+				mutex_unlock(&rpm_lock);
 				return 0;
+			}
 		};
 
 		raw_data &= RESULT_VALUE_MASK;
 	} while (!raw_data && ((++tries) < 2));
+	mutex_unlock(&rpm_lock);
 	if (!raw_data)
 		return 0;
 
