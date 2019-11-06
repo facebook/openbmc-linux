@@ -15,6 +15,10 @@
 		 */
 		serial0 = &uart5;
 		serial1 = &uart1;
+
+		i2c16 = &imux16;
+		i2c17 = &imux17;
+		i2c18 = &imux18;
 	};
 
 	chosen {
@@ -103,6 +107,42 @@
 
 &i2c5 {
 	status = "okay";
+	i2c-switch@70 {
+		compatible = "nxp,pca9546i";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x70>;
+		imux16: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+			ltc4282@53 {
+				compatible = "lltc,ltc4282";
+				reg = <0x53>;
+			};
+		};
+
+		imux17: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+			ltc4282@40 {
+				compatible = "lltc,ltc4282";
+				reg = <0x40>;
+			};
+		};
+
+		imux18: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+			ltc4282@43 {
+				compatible = "lltc,ltc4282";
+				reg = <0x43>;
+			};
+		};
+	};
+
 };
 
 &i2c6 {
