@@ -3,6 +3,7 @@
 /dts-v1/;
 
 #include "aspeed-g5.dtsi"
+#include <dt-bindings/leds/leds-pca955x.h>
 
 / {
 	model = "Facebook Emerald Pools BMC";
@@ -107,6 +108,7 @@
 
 &i2c5 {
 	status = "okay";
+	// Muxer emulated by CPLD
 	i2c-switch@70 {
 		compatible = "nxp,pca9546i";
 		#address-cells = <1>;
@@ -116,9 +118,49 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0>;
+			// P12V Hot swap controller
 			ltc4282@53 {
 				compatible = "lltc,ltc4282";
 				reg = <0x53>;
+			};
+			// ADC for monitoring vicor temperature
+			tla2024@48 {
+				compatible = "ti,tla2024";
+				reg = <0x48>;
+				vin@0 {
+					single-channel = <0>;
+				};
+				vin@1 {
+					single-channel = <1>;
+				};
+				vin@2 {
+					single-channel = <2>;
+				};
+				vin@3 {
+					single-channel = <3>;
+				};
+			};
+			// ADC for monitoring vicor temperature
+			tla2024@49 {
+				compatible = "ti,tla2024";
+				reg = <0x49>;
+				vin@0 {
+					single-channel = <0>;
+				};
+				vin@1 {
+					single-channel = <1>;
+				};
+				vin@2 {
+					single-channel = <2>;
+				};
+				vin@3 {
+					single-channel = <3>;
+				};
+			};
+			// PDB FRUID
+			eeprom@54 {
+				compatible = "atmel,24c64";
+				reg = <0x54>;
 			};
 		};
 
@@ -126,9 +168,15 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <1>;
+			// P12V Hot swap controller
 			ltc4282@40 {
 				compatible = "lltc,ltc4282";
 				reg = <0x40>;
+			};
+			// PDB Outlet temperature
+			tmp421@4c {
+				compatible = "ti,tmp421";
+				reg = <0x4c>;
 			};
 		};
 
@@ -136,9 +184,103 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
+			// P12V Hot swap controller
 			ltc4282@43 {
 				compatible = "lltc,ltc4282";
 				reg = <0x43>;
+			};
+			// LED driver
+			pca9552@67 {
+				compatible = "nxp,pca9552";
+				reg = <0x67>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				gpio-controller;
+				#gpio-cells = <2>;
+				gpio-line-names = "GPIO0", "GPIO1", "GPIO2", "GPIO3",
+				                  "GPIO4", "GPIO5", "GPIO6", "GPIO7";
+				// Fan present
+				gpio@0 {
+					reg = <0>;
+					type = <PCA955X_TYPE_GPIO>;
+				};
+				gpio@1 {
+					reg = <1>;
+					type = <PCA955X_TYPE_GPIO>;
+				};
+				gpio@2 {
+					reg = <2>;
+					type = <PCA955X_TYPE_GPIO>;
+				};
+				gpio@3 {
+					reg = <3>;
+					type = <PCA955X_TYPE_GPIO>;
+				};
+				// Fan power
+				gpio@4 {
+					reg = <4>;
+					type = <PCA955X_TYPE_GPIO>;
+				};
+				gpio@5 {
+					reg = <5>;
+					type = <PCA955X_TYPE_GPIO>;
+				};
+				gpio@6 {
+					reg = <6>;
+					type = <PCA955X_TYPE_GPIO>;
+				};
+				gpio@7 {
+					reg = <7>;
+					type = <PCA955X_TYPE_GPIO>;
+				};
+				// Fan OK LED
+				led@8 {
+					label = "fan0_ok";
+					reg = <8>;
+					type = <PCA955X_TYPE_LED>;
+				};
+				led@9 {
+					label = "fan1_ok";
+					reg = <9>;
+					type = <PCA955X_TYPE_LED>;
+				};
+				led@10 {
+					label = "fan2_ok";
+					reg = <10>;
+					type = <PCA955X_TYPE_LED>;
+				};
+				led@11 {
+					label = "fan3_ok";
+					reg = <11>;
+					type = <PCA955X_TYPE_LED>;
+				};
+				// Fan fail LED
+				led@12 {
+					label = "fan0_fail";
+					reg = <12>;
+					type = <PCA955X_TYPE_LED>;
+				};
+				led@13 {
+					label = "fan1_fail";
+					reg = <13>;
+					type = <PCA955X_TYPE_LED>;
+				};
+				led@14 {
+					label = "fan2_fail";
+					reg = <14>;
+					type = <PCA955X_TYPE_LED>;
+				};
+				led@15 {
+					label = "fan3_fail";
+					reg = <15>;
+					type = <PCA955X_TYPE_LED>;
+				};
+			};
+			// ADC for monitoring fan voltage/current
+			adc128@1d {
+				compatible = "ti,adc128d818";
+				reg = <0x1d>;
+				ti,mode = /bits/ 8 <1>;
 			};
 		};
 	};
@@ -147,7 +289,7 @@
 
 &i2c6 {
 	status = "okay";
-	// Baseboard FRU
+	// Baseboard FRUID
 	eeprom@54 {
 		compatible = "atmel,24c64";
 		reg = <0x54>;
@@ -169,6 +311,11 @@
 	tmp422@4e {
 		compatible = "ti,tmp422";
 		reg = <0x4e>;
+	};
+	// RTC
+	rtc@51 {
+		compatible = "nxp,pcf85263";
+		reg = <0x51>;
 	};
 };
 
