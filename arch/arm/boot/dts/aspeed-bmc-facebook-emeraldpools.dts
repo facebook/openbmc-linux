@@ -110,7 +110,7 @@
 	status = "okay";
 	// Muxer emulated by CPLD
 	i2c-switch@70 {
-		compatible = "nxp,pca9546i";
+		compatible = "nxp,pca9546";
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
