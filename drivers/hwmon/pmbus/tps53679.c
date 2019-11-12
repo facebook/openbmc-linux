@@ -28,6 +28,7 @@
 #define TPS53679_PROT_IMVP8_5MV		0x05 /* IMVP8 mode, 5-mV DAC */
 #define TPS53679_PROT_VR13_5MV		0x07 /* VR13.0 mode, 5-mV DAC */
 #define TPS53679_PAGE_NUM		2
+#define TPS53688_ID    (1)
 
 static int tps53679_identify(struct i2c_client *client,
 			     struct pmbus_driver_info *info)
@@ -77,14 +78,38 @@ static struct pmbus_driver_info tps53679_info = {
 	.identify = tps53679_identify,
 };
 
+static struct pmbus_driver_info tps53688_info = {
+	.pages = TPS53679_PAGE_NUM,
+	.format[PSC_VOLTAGE_IN] = linear,
+	.format[PSC_VOLTAGE_OUT] = vid,
+	.format[PSC_TEMPERATURE] = linear,
+	.format[PSC_CURRENT_OUT] = linear,
+	.format[PSC_POWER] = linear,
+	.func[0] = PMBUS_HAVE_VIN | PMBUS_HAVE_VOUT | PMBUS_HAVE_STATUS_VOUT |
+		PMBUS_HAVE_IOUT | PMBUS_HAVE_STATUS_IOUT |
+		PMBUS_HAVE_TEMP | PMBUS_HAVE_STATUS_TEMP | PMBUS_HAVE_TEMP2 |
+		PMBUS_HAVE_POUT,
+	.func[1] = PMBUS_HAVE_VIN | PMBUS_HAVE_VOUT | PMBUS_HAVE_STATUS_VOUT |
+		PMBUS_HAVE_IOUT | PMBUS_HAVE_STATUS_IOUT |
+		PMBUS_HAVE_TEMP | PMBUS_HAVE_STATUS_TEMP | PMBUS_HAVE_TEMP2 |
+		PMBUS_HAVE_POUT,
+	.identify = tps53679_identify,
+};
+
+
 static int tps53679_probe(struct i2c_client *client,
 			  const struct i2c_device_id *id)
 {
-	return pmbus_do_probe(client, id, &tps53679_info);
+  if ((id->driver_data) & TPS53688_ID) {
+	return pmbus_do_probe(client, id, &tps53688_info);
+  } else {
+	return pmbus_do_probe(client, id, &tps53679_info); 
+  }
 }
 
 static const struct i2c_device_id tps53679_id[] = {
 	{"tps53679", 0},
+	{"tps53688", TPS53688_ID},
 	{}
 };
 
@@ -92,6 +117,7 @@ MODULE_DEVICE_TABLE(i2c, tps53679_id);
 
 static const struct of_device_id tps53679_of_match[] = {
 	{.compatible = "ti,tps53679"},
+	{.compatible = "ti,tps53688"},
 	{}
 };
 MODULE_DEVICE_TABLE(of, tps53679_of_match);
