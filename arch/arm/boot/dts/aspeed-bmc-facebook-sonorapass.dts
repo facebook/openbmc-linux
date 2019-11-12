@@ -15,6 +15,15 @@
 		 */
 		serial0 = &uart5;
 		serial1 = &uart1;
+
+		i2c16 = &imux16;
+		i2c17 = &imux17;
+		i2c18 = &imux18;
+		i2c19 = &imux19;
+		i2c20 = &imux20;
+		i2c21 = &imux21;
+		i2c22 = &imux22;
+		i2c23 = &imux23;
 	};
 
 	chosen {
@@ -28,8 +37,9 @@
 
 	iio-hwmon {
 		compatible = "iio-hwmon";
-		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
-				<&adc 4>, <&adc 5>, <&adc 6>, <&adc 7>;
+		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>, <&adc 4>,
+					<&adc 5>, <&adc 6>, <&adc 7>,<&adc 8>, <&adc 9>,
+					<&adc 10>, <&adc 11>,<&adc 12>,<&adc 13>, <&adc 14>;
 	};
 };
 
@@ -47,18 +57,20 @@
 &fmc {
 	status = "okay";
 	flash@0 {
-		status = "okay";
-		m25p,fast-read;
-		label = "spi0.0";
-		spi-max-frequency = <12000000>;
-#include "facebook-bmc-flash0-layout.dtsi"
-	};
-	flash@1 {
+		reg = < 1 >;
 		status = "okay";
 		m25p,fast-read;
 		label = "spi0.1";
 		spi-max-frequency = <12000000>;
 #include "facebook-bmc-flash1-layout.dtsi"
+	};
+	flash@1 {
+		reg = < 0 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.0";
+		spi-max-frequency = <12000000>;
+#include "facebook-bmc-flash0-layout.dtsi"
 	};
 	flash@2 {
 		spi-max-frequency = <12000000>;
@@ -88,6 +100,10 @@
 &lpc_snoop {
 	status = "okay";
 	snoop-ports = <0x80>;
+};
+
+&gpio {
+	aspeed,skip-init-cmdsrc;
 };
 
 &rtc {
@@ -152,6 +168,7 @@
 };
 
 &i2c0 {
+	multi-master;
 	status = "okay";
 };
 
@@ -160,6 +177,7 @@
 };
 
 &i2c2 {
+	multi-master;
 	status = "okay";
 };
 
@@ -169,9 +187,14 @@
 
 &i2c4 {
 	status = "okay";
+	eeprom@54 {
+		compatible = "st,24c64";
+		reg = <0x54>;
+	};
 };
 
 &i2c5 {
+	multi-master;
 	status = "okay";
 };
 
@@ -189,6 +212,71 @@
 
 &i2c13 {
 	status = "okay";
+	i2c-switch@71 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x71>;
+		imux16: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+
+		imux17: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+
+		imux18: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+
+		imux19: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+			tmp421@4c {
+				compatible = "ti,tmp421";
+				reg = <0x4c>;
+			};
+			tmp421@4e {
+				compatible = "ti,tmp421";
+				reg = <0x4e>;
+			};
+			tmp421@4f {
+				compatible = "ti,tmp421";
+				reg = <0x4f>;
+			};
+		};
+
+		imux20: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+		};
+
+		imux21: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+		};
+
+		imux22: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+		};
+
+		imux23: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+		};
+	};
 };
 
 &sdhci_slot0 {
