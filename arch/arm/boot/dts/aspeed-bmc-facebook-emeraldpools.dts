@@ -197,8 +197,7 @@
 				#size-cells = <0>;
 				gpio-controller;
 				#gpio-cells = <2>;
-				gpio-line-names = "GPIO0", "GPIO1", "GPIO2", "GPIO3",
-				                  "GPIO4", "GPIO5", "GPIO6", "GPIO7";
+
 				// Fan present
 				gpio@0 {
 					reg = <0>;
@@ -235,45 +234,37 @@
 				};
 				// Fan OK LED
 				led@8 {
-					label = "fan0_ok";
 					reg = <8>;
-					type = <PCA955X_TYPE_LED>;
+					type = <PCA955X_TYPE_GPIO>;
 				};
 				led@9 {
-					label = "fan1_ok";
 					reg = <9>;
-					type = <PCA955X_TYPE_LED>;
+					type = <PCA955X_TYPE_GPIO>;
 				};
 				led@10 {
-					label = "fan2_ok";
 					reg = <10>;
-					type = <PCA955X_TYPE_LED>;
+					type = <PCA955X_TYPE_GPIO>;
 				};
 				led@11 {
-					label = "fan3_ok";
 					reg = <11>;
-					type = <PCA955X_TYPE_LED>;
+					type = <PCA955X_TYPE_GPIO>;
 				};
 				// Fan fail LED
 				led@12 {
-					label = "fan0_fail";
 					reg = <12>;
-					type = <PCA955X_TYPE_LED>;
+					type = <PCA955X_TYPE_GPIO>;
 				};
 				led@13 {
-					label = "fan1_fail";
 					reg = <13>;
-					type = <PCA955X_TYPE_LED>;
+					type = <PCA955X_TYPE_GPIO>;
 				};
 				led@14 {
-					label = "fan2_fail";
 					reg = <14>;
-					type = <PCA955X_TYPE_LED>;
+					type = <PCA955X_TYPE_GPIO>;
 				};
 				led@15 {
-					label = "fan3_fail";
 					reg = <15>;
-					type = <PCA955X_TYPE_LED>;
+					type = <PCA955X_TYPE_GPIO>;
 				};
 			};
 			// ADC for monitoring fan voltage/current
