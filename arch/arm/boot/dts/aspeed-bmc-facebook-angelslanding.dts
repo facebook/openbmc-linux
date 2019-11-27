@@ -270,6 +270,12 @@
 
 &i2c13 {
 	status = "okay";
+ 	// BSM FRU
+	eeprom@56 {
+		compatible = "atmel,24c64";
+		reg = <0x56>;
+	};
+
 	i2c-switch@71 {
 		compatible = "nxp,pca9548";
 		#address-cells = <1>;
