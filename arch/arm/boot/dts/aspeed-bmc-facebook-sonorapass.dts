@@ -191,6 +191,16 @@
 		compatible = "st,24c64";
 		reg = <0x54>;
 	};
+
+	// I/O Expander
+	pca9539@76 {
+		compatible = "nxp,pca9539";
+		reg = <0x76>;
+	};
+	pca9539@77 {
+		compatible = "nxp,pca9539";
+		reg = <0x77>;
+	};
 };
 
 &i2c5 {
