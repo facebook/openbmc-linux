@@ -218,6 +218,11 @@
 
 &i2c8 {
 	status = "okay";
+	//BSM FRU
+	eeprom@56 {
+		compatible = "atmel,24c64";
+		reg = <0x56>;
+	};
 };
 
 &i2c13 {
