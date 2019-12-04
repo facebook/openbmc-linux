@@ -212,6 +212,7 @@
 	tps53688@76 {
 		compatible = "ti,tps53688";
 		reg = <0x76>;
+	};
 };
 
 &i2c2 {
