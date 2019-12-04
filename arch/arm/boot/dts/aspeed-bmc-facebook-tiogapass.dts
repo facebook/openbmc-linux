@@ -147,6 +147,10 @@
 	status = "okay";
 };
 
+&jtag {
+	status = "okay";
+};
+
 &i2c0 {
 	status = "okay";
 	//Airmax Conn B, CPU0 PIROM, CPU1 PIROM
