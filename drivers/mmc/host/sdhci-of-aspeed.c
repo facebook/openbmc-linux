@@ -131,6 +131,10 @@ static int sdhci_aspeed_probe(struct platform_device *pdev)
 
 	pltfm_host->clk = devm_clk_get(&pdev->dev, NULL);
 
+	if (of_property_read_bool(np, "aspeed,sdhci-disable-dma")) {
+		host->quirks |= (SDHCI_QUIRK_BROKEN_DMA | SDHCI_QUIRK_BROKEN_ADMA);
+	}
+
 	pnode = of_parse_phandle(np, "interrupt-parent", 0);
 	if (pnode)
 		memcpy(sdhci_irq, pnode->data, sizeof(struct aspeed_sdhci_irq));

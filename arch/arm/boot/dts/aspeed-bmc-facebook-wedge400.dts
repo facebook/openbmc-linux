@@ -409,6 +409,7 @@
 
 &sdhci_slot1 {
 	status = "okay";
+	aspeed,sdhci-disable-dma;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd2_default>;
 };
