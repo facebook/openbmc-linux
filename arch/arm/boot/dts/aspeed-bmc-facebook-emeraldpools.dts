@@ -361,6 +361,11 @@
 &i2c13 {
 	multi-master;
 	status = "okay";
+	// BSM FRUID
+	eeprom@56 {
+		compatible = "atmel,24c64";
+		reg = <0x56>;
+	};
 };
 
 &pwm_tacho {
