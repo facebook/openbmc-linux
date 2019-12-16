@@ -173,6 +173,10 @@ static int aspeed_sdhci_probe(struct platform_device *pdev)
 
 	sdhci_get_of_property(pdev);
 
+	if (device_property_present(&pdev->dev, "aspeed,sdhci-disable-dma"))
+		host->quirks |= (SDHCI_QUIRK_BROKEN_DMA |
+				 SDHCI_QUIRK_BROKEN_ADMA);
+
 	pltfm_host->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(pltfm_host->clk))
 		return PTR_ERR(pltfm_host->clk);
