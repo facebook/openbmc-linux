@@ -356,6 +356,10 @@
 	status = "okay";
 };
 
+&sdhci1 {
+	aspeed,sdhci-disable-dma;
+};
+
 &gpio {
 	pin_gpio_a3 {
 		gpios = <&gpio ASPEED_GPIO(A, 3) GPIO_ACTIVE_LOW>;
