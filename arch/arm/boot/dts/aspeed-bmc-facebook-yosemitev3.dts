@@ -114,6 +114,7 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_rmii1_default>;
+	no-hw-checksum;
 	use-ncsi;
 };
 
