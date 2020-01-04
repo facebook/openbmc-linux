@@ -68,6 +68,11 @@ enum {
 	NCSI_MODE_MAX
 };
 
+enum {
+	MLX_MC_RBT_SUPPORT  = 0x01, /* MC supports RBT         */
+	MLX_MC_RBT_AVL      = 0x08, /* RBT medium is available */
+};
+
 /* OEM Vendor Manufacture ID */
 #define NCSI_OEM_MFR_MLX_ID             0x8119
 #define NCSI_OEM_MFR_BCM_ID             0x113d
@@ -76,9 +81,15 @@ enum {
 /* Mellanox specific OEM Command */
 #define NCSI_OEM_MLX_CMD_GMA            0x00   /* CMD ID for Get MAC */
 #define NCSI_OEM_MLX_CMD_GMA_PARAM      0x1b   /* Parameter for GMA  */
+#define NCSI_OEM_MLX_CMD_SMA            0x01   /* CMD ID for Set MC Affinity */
+#define NCSI_OEM_MLX_CMD_SMA_PARAM      0x07   /* Parameter for SMA          */
 /* OEM Command payload lengths*/
 #define NCSI_OEM_BCM_CMD_GMA_LEN        12
 #define NCSI_OEM_MLX_CMD_GMA_LEN        8
+#define NCSI_OEM_MLX_CMD_SMA_LEN        60
+/* Offset in OEM request */
+#define MLX_SMA_MAC_ADDR_OFFSET         8      /* Set MC Affinity: MC MAC address */
+#define MLX_SMA_MED_SUPPORT_OFFSET      14     /* Set MC Affinity: Supported medium */
 /* Mac address offset in OEM response */
 #define BCM_MAC_ADDR_OFFSET             28
 #define MLX_MAC_ADDR_OFFSET             8
@@ -256,6 +267,8 @@ enum {
 	ncsi_dev_state_probe_deselect	= 0x0201,
 	ncsi_dev_state_probe_package,
 	ncsi_dev_state_probe_channel,
+	ncsi_dev_state_probe_mlx_gma,
+	ncsi_dev_state_probe_mlx_sma,
 	ncsi_dev_state_probe_cis,
 	ncsi_dev_state_probe_gvi,
 	ncsi_dev_state_probe_gc,
@@ -324,6 +337,7 @@ struct ncsi_dev_priv {
 	bool                multi_package;   /* Enable multiple packages   */
 	u32                 package_whitelist; /* Packages to configure    */
 	unsigned char       mac_addr[6];
+	bool                mlx_multi_host;
 };
 
 struct ncsi_cmd_arg {

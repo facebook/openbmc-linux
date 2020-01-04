@@ -12,6 +12,8 @@
 #include <linux/init.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
 
 #include <net/ncsi.h>
 #include <net/net_namespace.h>
@@ -789,6 +791,32 @@ static int ncsi_gma_handler(struct ncsi_cmd_arg *nca, unsigned int mf_id)
 	return nch->handler(nca);
 }
 
+static int ncsi_oem_sma_mlx(struct ncsi_cmd_arg *nca)
+{
+	union {
+		u8 data_u8[NCSI_OEM_MLX_CMD_SMA_LEN];
+		u32 data_u32[NCSI_OEM_MLX_CMD_SMA_LEN / sizeof(u32)];
+	} u;
+	int ret = 0;
+
+	memset(&u, 0, sizeof(u));
+	u.data_u32[0] = ntohl(NCSI_OEM_MFR_MLX_ID);
+	u.data_u8[5] = NCSI_OEM_MLX_CMD_SMA;
+	u.data_u8[6] = NCSI_OEM_MLX_CMD_SMA_PARAM;
+	memcpy(&u.data_u8[MLX_SMA_MAC_ADDR_OFFSET], nca->ndp->mac_addr, ETH_ALEN);
+	u.data_u8[MLX_SMA_MED_SUPPORT_OFFSET] = (MLX_MC_RBT_AVL | MLX_MC_RBT_SUPPORT);
+
+	nca->payload = NCSI_OEM_MLX_CMD_SMA_LEN;
+	nca->data = u.data_u8;
+
+	ret = ncsi_xmit_cmd(nca);
+	if (ret)
+		netdev_err(nca->ndp->ndev.dev,
+			   "NCSI: Failed to transmit cmd 0x%x during probe\n",
+			   nca->type);
+	return ret;
+}
+
 #endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
 
 /* Determine if a given channel from the channel_queue should be used for Tx */
@@ -1315,6 +1343,9 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 #if IS_ENABLED(CONFIG_NCSI_SKIP_SEL_PKG)
 		ndp->active_package = ncsi_add_package(ndp, 0);
 		nd->state = ncsi_dev_state_probe_cis;
+		if (ndp->mlx_multi_host) {
+			nd->state = ncsi_dev_state_probe_mlx_gma;
+		}
 		schedule_work(&ndp->work);
 		break;
 #endif
@@ -1354,7 +1385,34 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 			break;
 		}
 		nd->state = ncsi_dev_state_probe_cis;
+		if (ndp->mlx_multi_host) {
+			nd->state = ncsi_dev_state_probe_mlx_gma;
+		}
 		schedule_work(&ndp->work);
+		break;
+	case ncsi_dev_state_probe_mlx_gma:
+		ndp->pending_req_num = 1;
+
+		nca.type = NCSI_PKT_CMD_OEM;
+		nca.package = ndp->active_package->id;
+		nca.channel = 0;
+		ret = ncsi_oem_gma_handler_mlx(&nca);
+		if (ret)
+			goto error;
+
+		nd->state = ncsi_dev_state_probe_mlx_sma;
+		break;
+	case ncsi_dev_state_probe_mlx_sma:
+		ndp->pending_req_num = 1;
+
+		nca.type = NCSI_PKT_CMD_OEM;
+		nca.package = ndp->active_package->id;
+		nca.channel = 0;
+		ret = ncsi_oem_sma_mlx(&nca);
+		if (ret)
+			goto error;
+
+		nd->state = ncsi_dev_state_probe_cis;
 		break;
 	case ncsi_dev_state_probe_cis:
 		ndp->pending_req_num = NCSI_RESERVED_CHANNEL;
@@ -1733,6 +1791,8 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 {
 	struct ncsi_dev_priv *ndp;
 	struct ncsi_dev *nd;
+	struct platform_device *pdev;
+	struct device_node *np;
 	unsigned long flags;
 	int i;
 
@@ -1784,6 +1844,12 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 
 	/* Set up generic netlink interface */
 	ncsi_init_netlink(dev);
+
+	if (dev->dev.parent && (pdev = to_platform_device(dev->dev.parent))) {
+		np = pdev->dev.of_node;
+		if (np && of_get_property(np, "mlx,multi-host", NULL))
+			ndp->mlx_multi_host = true;
+	}
 
 	return nd;
 }
