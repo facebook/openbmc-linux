@@ -355,6 +355,7 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to allocate spi_master\n");
 		return -ENOMEM;
 	}
+	master->flags = SPI_MASTER_HALF_DUPLEX;
 	master->mode_bits = ASPEED_SUPP_MODES;
 	master->bits_per_word_mask = SPI_BPW_MASK(8) | SPI_BPW_MASK(16);
 	master->dev.of_node = pdev->dev.of_node;
