@@ -266,6 +266,7 @@
 &i2c8 {
 	multi-master;
 	status = "okay";
+  bus-frequency = <400000>;
 };
 
 &i2c13 {
