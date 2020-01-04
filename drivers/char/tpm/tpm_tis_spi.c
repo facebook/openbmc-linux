@@ -54,6 +54,14 @@ static inline struct tpm_tis_spi_phy *to_tpm_tis_spi_phy(struct tpm_tis_data *da
 	return container_of(data, struct tpm_tis_spi_phy, priv);
 }
 
+#define tpm_tis_spi_prepare_header(buf, in, len, addr)		\
+	do {							\
+		buf[0] = (in ? 0x80 : 0) | (len - 1);		\
+		buf[1] = 0xd4;					\
+		buf[2] = addr >> 8;				\
+		buf[3] = addr & 0xff;				\
+	} while(0)
+
 static int tpm_tis_spi_prepare_transfer(struct tpm_tis_spi_phy *phy)
 {
 	int ret = 0;
@@ -97,6 +105,73 @@ exit:
 
 }
 
+static int tpm_tis_spi_prepare_transfer_halfduplex(struct tpm_tis_spi_phy *phy)
+{
+	int ret = 0;
+	int i;
+	struct spi_message m;
+	struct spi_transfer spi_xfer;
+	u8 tpm_state[4];
+
+	// perform DID_VID op to get the SPI wait state.
+	// We rely on (addr & 0xff) being zero here so we can switch
+	// to a read on the 4th byte to get the wait state.
+	tpm_tis_spi_prepare_header(tpm_state, true, 4, TPM_DID_VID(0));
+
+	memset(&spi_xfer, 0, sizeof(spi_xfer));
+	spi_xfer.tx_buf = tpm_state;
+	spi_xfer.len = 3;
+	spi_xfer.cs_change = 1;
+
+	spi_message_init_with_transfers(&m, &spi_xfer, 1);
+	ret = spi_sync_locked(phy->spi_device, &m);
+	if (ret < 0)
+		goto exit;
+
+	// read SPI wait states
+	for (i = 0; i < TPM_RETRY+1; i++) {
+		spi_xfer.tx_buf = NULL;
+		spi_xfer.rx_buf = tpm_state;
+		spi_xfer.len = 1;
+
+		spi_message_init_with_transfers(&m, &spi_xfer, 1);
+
+		ret = spi_sync_locked(phy->spi_device, &m);
+		if (ret < 0)
+			goto exit;
+		if (tpm_state[0] & 0x01)
+			break;
+	}
+
+	if (i == TPM_RETRY+1) {
+		ret = -ETIMEDOUT;
+		goto exit;
+	}
+
+	// finish up reading DID_VID (4 bytes)
+	spi_xfer.len = 4;
+	spi_xfer.cs_change = 0; // Release CS to complete transaction.
+	spi_message_init_with_transfers(&m, &spi_xfer, 1);
+	ret = spi_sync_locked(phy->spi_device, &m);
+	if (ret < 0)
+		goto exit;
+
+	// send full address header.
+	// hold CS on this so we can complete the transaction in caller.
+	spi_xfer.rx_buf = NULL;
+	spi_xfer.tx_buf = phy->iobuf;
+	spi_xfer.len = 4;
+	spi_xfer.cs_change = 1;
+
+	spi_message_init_with_transfers(&m, &spi_xfer, 1);
+	ret = spi_sync_locked(phy->spi_device, &m);
+	if (ret < 0)
+		goto exit;
+
+exit:
+	return ret;
+}
+
 static int tpm_tis_spi_transfer(struct tpm_tis_data *data, u32 addr, u16 len,
 				u8 *in, const u8 *out)
 {
@@ -115,12 +190,12 @@ static int tpm_tis_spi_transfer(struct tpm_tis_data *data, u32 addr, u16 len,
 	while (len) {
 		transfer_len = min_t(u16, len, MAX_SPI_FRAMESIZE);
 
-		phy->iobuf[0] = (in ? 0x80 : 0) | (transfer_len - 1);
-		phy->iobuf[1] = 0xd4;
-		phy->iobuf[2] = addr >> 8;
-		phy->iobuf[3] = addr;
+		tpm_tis_spi_prepare_header(phy->iobuf, in, transfer_len, addr);
 
-		ret = tpm_tis_spi_prepare_transfer(phy);
+		if (phy->spi_device->master->flags & SPI_MASTER_HALF_DUPLEX)
+			ret = tpm_tis_spi_prepare_transfer_halfduplex(phy);
+		else
+			ret = tpm_tis_spi_prepare_transfer(phy);
 		if (ret < 0)
 			goto exit;
 
