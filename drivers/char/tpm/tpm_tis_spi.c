@@ -80,8 +80,7 @@ static int tpm_tis_spi_transfer(struct tpm_tis_data *data, u32 addr, u16 len,
 		spi_xfer.len = 4;
 		spi_xfer.cs_change = 1;
 
-		spi_message_init(&m);
-		spi_message_add_tail(&spi_xfer, &m);
+		spi_message_init_with_transfers(&m, &spi_xfer, 1);
 		ret = spi_sync_locked(phy->spi_device, &m);
 		if (ret < 0)
 			goto exit;
@@ -92,8 +91,7 @@ static int tpm_tis_spi_transfer(struct tpm_tis_data *data, u32 addr, u16 len,
 
 			for (i = 0; i < TPM_RETRY; i++) {
 				spi_xfer.len = 1;
-				spi_message_init(&m);
-				spi_message_add_tail(&spi_xfer, &m);
+				spi_message_init_with_transfers(&m, &spi_xfer, 1);
 				ret = spi_sync_locked(phy->spi_device, &m);
 				if (ret < 0)
 					goto exit;
@@ -119,8 +117,7 @@ static int tpm_tis_spi_transfer(struct tpm_tis_data *data, u32 addr, u16 len,
 			out += transfer_len;
 		}
 
-		spi_message_init(&m);
-		spi_message_add_tail(&spi_xfer, &m);
+		spi_message_init_with_transfers(&m, &spi_xfer, 1);
 		ret = spi_sync_locked(phy->spi_device, &m);
 		if (ret < 0)
 			goto exit;
