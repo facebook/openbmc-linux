@@ -285,6 +285,21 @@ static int aspeed_spi_xfer_one_msg(struct spi_master *master,
 	return 0;
 }
 
+static int aspeed_spi_xfer_one(struct spi_master *master,
+			       struct spi_device *slave,
+			       struct spi_transfer *xfer)
+{
+	unsigned long flags;
+	struct aspeed_spi_priv *priv = spi_master_get_devdata(master);
+	u8 cs = slave->chip_select;
+
+	spin_lock_irqsave(&priv->lock, flags);
+	aspeed_spi_do_xfer(priv, xfer, cs);
+	spin_unlock_irqrestore(&priv->lock, flags);
+
+	return 0;
+}
+
 static void aspeed_spi_init_hw(struct aspeed_spi_priv *priv, u16 num_cs)
 {
 	u16 cs;
@@ -373,6 +388,7 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 	master->num_chipselect = ASPEED_SPI_CS_NUM;
 	master->setup = aspeed_spi_setup;
 	master->set_cs = aspeed_spi_set_cs;
+	master->transfer_one = aspeed_spi_xfer_one;
 	master->transfer_one_message = aspeed_spi_xfer_one_msg;
 
 	priv = spi_master_get_devdata(master);
