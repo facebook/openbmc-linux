@@ -228,6 +228,17 @@ aspeed_spi_setup(struct spi_device *slave)
 	return 0;
 }
 
+static void aspeed_spi_set_cs(struct spi_device *slave, bool level)
+{
+	u8 cs = slave->chip_select;
+	struct aspeed_spi_priv *priv = spi_master_get_devdata(slave->master);
+
+	if (level)
+		aspeed_deactivate_cs(priv, cs);
+	else
+		aspeed_activate_cs(priv, cs);
+}
+
 static void aspeed_spi_do_xfer(struct aspeed_spi_priv *priv,
 			       struct spi_transfer *xfer, u32 cs)
 {
@@ -361,6 +372,7 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 	master->dev.of_node = pdev->dev.of_node;
 	master->num_chipselect = ASPEED_SPI_CS_NUM;
 	master->setup = aspeed_spi_setup;
+	master->set_cs = aspeed_spi_set_cs;
 	master->transfer_one_message = aspeed_spi_xfer_one_msg;
 
 	priv = spi_master_get_devdata(master);
