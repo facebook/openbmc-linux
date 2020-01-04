@@ -190,10 +190,6 @@ aspeed_spi_setup(struct spi_device *slave)
 	u32 div, val, ctrl_reg, freq;
 	struct aspeed_spi_priv *priv = spi_master_get_devdata(slave->master);
 
-	if (cs >= ASPEED_SPI_CS_NUM) {
-		dev_err(&slave->dev, "invalid chip_select %u\n", cs);
-		return -EINVAL;
-	}
 	if (cs == 0 && slave->mode & SPI_CS_HIGH) {
 		dev_err(&slave->dev,
 			"chip_select %u cannot be active-high\n", cs);
@@ -254,17 +250,11 @@ static void aspeed_spi_do_xfer(struct aspeed_spi_priv *priv,
 static int aspeed_spi_xfer_one_msg(struct spi_master *master,
 				   struct spi_message *msg)
 {
-	u8 cs;
 	unsigned long flags;
 	struct spi_transfer *xfer;
 	struct spi_device *slave = msg->spi;
 	struct aspeed_spi_priv *priv = spi_master_get_devdata(master);
-
-	cs = slave->chip_select;
-	if (cs >= ASPEED_SPI_CS_NUM) {
-		dev_err(&slave->dev, "invalid chip_select %u\n", cs);
-		return -EINVAL;
-	}
+	u8 cs = slave->chip_select;
 
 	spin_lock_irqsave(&priv->lock, flags);
 
