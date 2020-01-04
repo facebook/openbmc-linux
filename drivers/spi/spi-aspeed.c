@@ -258,33 +258,6 @@ static void aspeed_spi_do_xfer(struct aspeed_spi_priv *priv,
 	}
 }
 
-static int aspeed_spi_xfer_one_msg(struct spi_master *master,
-				   struct spi_message *msg)
-{
-	unsigned long flags;
-	struct spi_transfer *xfer;
-	struct spi_device *slave = msg->spi;
-	struct aspeed_spi_priv *priv = spi_master_get_devdata(master);
-	u8 cs = slave->chip_select;
-
-	spin_lock_irqsave(&priv->lock, flags);
-
-	msg->actual_length = 0;
-	aspeed_activate_cs(priv, cs);
-	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
-		aspeed_spi_do_xfer(priv, xfer, cs);
-		msg->actual_length += xfer->len;
-	}
-	aspeed_deactivate_cs(priv, cs);
-
-	msg->status = 0;
-	msg->complete(msg->context);
-	spin_unlock_irqrestore(&priv->lock, flags);
-
-	spi_finalize_current_message(master);
-	return 0;
-}
-
 static int aspeed_spi_xfer_one(struct spi_master *master,
 			       struct spi_device *slave,
 			       struct spi_transfer *xfer)
@@ -389,7 +362,6 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 	master->setup = aspeed_spi_setup;
 	master->set_cs = aspeed_spi_set_cs;
 	master->transfer_one = aspeed_spi_xfer_one;
-	master->transfer_one_message = aspeed_spi_xfer_one_msg;
 
 	priv = spi_master_get_devdata(master);
 	priv->dev = &pdev->dev;
