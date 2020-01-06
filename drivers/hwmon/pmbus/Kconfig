@@ -153,6 +153,15 @@ config SENSORS_MAX8688
 	  This driver can also be built as a module. If so, the module will
 	  be called max8688.
 
+config SENSORS_MPQ8645P
+	tristate "Monolithic MPQ8645P"
+	help
+	  If you say yes here you get hardware monitoring support for Monolithic
+	  MPQ8645P.
+
+	  This driver can also be built as a module. If so, the module will
+	  be called mpq8645p.
+
 config SENSORS_PXE1211C
 	tristate "Infineon pxe1211c"
 	help
