@@ -10,10 +10,10 @@
 	compatible = "facebook,yosemitev3-bmc", "aspeed,ast2500";
 	aliases {
 		serial0 = &uart5;
-                serial1 = &uart1;
-                serial2 = &uart2;
-                serial3 = &uart3;
-                serial4 = &uart4;
+		serial1 = &uart1;
+		serial2 = &uart2;
+		serial3 = &uart3;
+		serial4 = &uart4;
 	};
 	chosen {
 		stdout-path = &uart5;
@@ -32,31 +32,29 @@
 };
 
 &fmc {
-        status = "okay";
-        flash@0 {
-                reg = < 1 >;
-                status = "okay";
-                m25p,fast-read;
-                label = "spi0.1";
-                spi-max-frequency = <12000000>;
+	status = "okay";
+	flash@0 {
+		reg = < 1 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
 #include "facebook-bmc-flash1-layout.dtsi"
-        };
-        flash@1 {
-                reg = < 0 >;
-                status = "okay";
-                m25p,fast-read;
-                label = "spi0.0";
-                spi-max-frequency = <12000000>;
+	};
+	flash@1 {
+		reg = < 0 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.0";
 #include "facebook-bmc-flash0-layout.dtsi"
-        };
+	};
 };
 
 &ehci0 {
-        status = "okay";
+	status = "okay";
 };
 
 &ehci1 {
-        status = "okay";
+	status = "okay";
 };
 
 &spi1 {
@@ -71,7 +69,7 @@
 };
 
 &ibt {
-        status = "disabled";
+	status = "disabled";
 };
 
 &rtc {
@@ -87,23 +85,23 @@
 
 &uart2 {
 	status = "okay";
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_txd2_default
-                     &pinctrl_txd2_default>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_txd2_default
+		     &pinctrl_txd2_default>;
 };
 
 &uart3 {
 	status = "okay";
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_txd3_default
-                     &pinctrl_txd3_default>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_txd3_default
+		     &pinctrl_txd3_default>;
 };
 
 &uart4 {
-        status = "okay";
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_txd4_default
-                     &pinctrl_txd4_default>;
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_txd4_default
+		     &pinctrl_txd4_default>;
 };
 
 &uart5 {
@@ -116,6 +114,7 @@
 	pinctrl-0 = <&pinctrl_rmii1_default>;
 	no-hw-checksum;
 	use-ncsi;
+	mlx,multi-host;
 };
 
 &adc {
@@ -163,19 +162,19 @@
 };
 
 &i2c10 {
-        status = "okay";
+	status = "okay";
 };
 
 &i2c11 {
-        status = "okay";
+	status = "okay";
 };
 
 &i2c12 {
-        status = "okay";
+	status = "okay";
 };
 
 &i2c13 {
-        status = "okay";
+	status = "okay";
 };
 
 &sdhci_slot1 {
@@ -186,27 +185,26 @@
 };
 
 &pwm_tacho {
-        status = "okay";
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default &pinctrl_pwm2_default &pinctrl_pwm3_default>;
-        fan@0 {
-                reg = <0x00>;
-                aspeed,fan-tach-ch = /bits/ 8 <0x00 0x01>;
-        };
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default &pinctrl_pwm2_default &pinctrl_pwm3_default>;
+	fan@0 {
+		reg = <0x00>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x00 0x01>;
+	};
 
-        fan@1 {
-                reg = <0x01>;
-                aspeed,fan-tach-ch = /bits/ 8 <0x02 0x03>;
-        };
+	fan@1 {
+		reg = <0x01>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x02 0x03>;
+	};
 
-        fan@2 {
-                reg = <0x02>;
-                aspeed,fan-tach-ch = /bits/ 8 <0x04 0x05>;
-        };
-    
-        fan@3 {
-                reg = <0x03>;
-                aspeed,fan-tach-ch = /bits/ 8 <0x06 0x07>;
-        };
+	fan@2 {
+		reg = <0x02>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x04 0x05>;
+	};
+
+	fan@3 {
+		reg = <0x03>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x06 0x07>;
+	};
 };
-
