@@ -80,7 +80,9 @@
 
 &spi1 {
 	status = "okay";
-	compatible = "aspeed,ast2500-spi-master";
+
+    //Revert to aspeed-smc driver for now to re-enable BIOS MTD device
+	//compatible = "aspeed,ast2500-spi-master";
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_spi1_default &pinctrl_spi1cs1_default>;
