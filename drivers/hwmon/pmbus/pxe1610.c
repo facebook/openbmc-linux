@@ -118,6 +118,7 @@ static const struct i2c_device_id pxe1610_id[] = {
 	{"pxe1610", 0},
 	{"pxe1110", 0},
 	{"pxm1310", 0},
+	{"pxe1211", 0},
 	{}
 };
 
