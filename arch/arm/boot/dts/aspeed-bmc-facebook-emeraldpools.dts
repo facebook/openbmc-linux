@@ -4,6 +4,7 @@
 
 #include "aspeed-g5.dtsi"
 #include <dt-bindings/leds/leds-pca955x.h>
+#include <dt-bindings/gpio/aspeed-gpio.h>
 
 / {
 	model = "Facebook Emerald Pools BMC";
@@ -36,6 +37,25 @@
 		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
 					<&adc 4>, <&adc 7>, <&adc 8>;
 	};
+
+	spi_gpio: spi-gpio {
+		status = "okay";
+		compatible = "spi-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gpio-sck = <&gpio ASPEED_GPIO(I, 5) GPIO_ACTIVE_HIGH>;
+		gpio-mosi = <&gpio ASPEED_GPIO(I, 6) GPIO_ACTIVE_HIGH>;
+		gpio-miso = <&gpio ASPEED_GPIO(I, 7) GPIO_ACTIVE_HIGH>;
+		num-chipselects = <1>;
+		cs-gpios = <&gpio ASPEED_GPIO(I, 4) GPIO_ACTIVE_LOW>;
+
+		tpmdev@0 {
+			compatible = "tcg,tpm_tis-spi";
+			spi-max-frequency = <33000000>;
+			reg = <0>;
+		};
+	};
 };
 
 &fmc {
@@ -51,17 +71,6 @@
 		m25p,fast-read;
 		label = "spi0.1";
 #include "facebook-bmc-flash1-layout.dtsi"
-	};
-};
-
-&spi1 {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi1_default>;
-	flash@0 {
-		status = "okay";
-		m25p,fast-read;
-		label = "pnor";
 	};
 };
 
