@@ -431,6 +431,19 @@
 			type = <PCA955X_TYPE_GPIO>;
 		};
 	};
+
+	// ADC128 for monitoring fan voltage/current
+	adc128@1d {
+		compatible = "ti,adc128d818";
+		reg = <0x1d>;
+		ti,mode = /bits/ 8 <1>;
+	};
+
+	adc128@1f {
+		compatible = "ti,adc128d818";
+		reg = <0x1f>;
+		ti,mode = /bits/ 8 <1>;
+	};
 };
 
 &i2c13 {
