@@ -95,6 +95,7 @@ void ast_vhub_free_request(struct usb_ep *u_ep, struct usb_request *u_req)
 
 static irqreturn_t ast_vhub_irq(int irq, void *data)
 {
+	u32 i;
 	struct ast_vhub *vhub = data;
 	irqreturn_t iret = IRQ_NONE;
 	u32 istat;
@@ -119,7 +120,7 @@ static irqreturn_t ast_vhub_irq(int irq, void *data)
 
 	/* Handle generic EPs first */
 	if (istat & VHUB_IRQ_EP_POOL_ACK_STALL) {
-		u32 i, ep_acks = readl(vhub->regs + AST_VHUB_EP_ACK_ISR);
+		u32 ep_acks = readl(vhub->regs + AST_VHUB_EP_ACK_ISR);
 		writel(ep_acks, vhub->regs + AST_VHUB_EP_ACK_ISR);
 
 		for (i = 0; ep_acks && i < AST_VHUB_NUM_GEN_EPs; i++) {
@@ -132,21 +133,10 @@ static irqreturn_t ast_vhub_irq(int irq, void *data)
 	}
 
 	/* Handle device interrupts */
-	if (istat & (VHUB_IRQ_DEVICE1 |
-		     VHUB_IRQ_DEVICE2 |
-		     VHUB_IRQ_DEVICE3 |
-		     VHUB_IRQ_DEVICE4 |
-		     VHUB_IRQ_DEVICE5)) {
-		if (istat & VHUB_IRQ_DEVICE1)
-			ast_vhub_dev_irq(&vhub->ports[0].dev);
-		if (istat & VHUB_IRQ_DEVICE2)
-			ast_vhub_dev_irq(&vhub->ports[1].dev);
-		if (istat & VHUB_IRQ_DEVICE3)
-			ast_vhub_dev_irq(&vhub->ports[2].dev);
-		if (istat & VHUB_IRQ_DEVICE4)
-			ast_vhub_dev_irq(&vhub->ports[3].dev);
-		if (istat & VHUB_IRQ_DEVICE5)
-			ast_vhub_dev_irq(&vhub->ports[4].dev);
+	for (i = 0; i < AST_VHUB_NUM_PORTS; i++) {
+		u32 dev_irq = VHUB_IRQ_DEVICE1 << i;
+		if (istat & dev_irq)
+			ast_vhub_dev_irq(&vhub->ports[i].dev);
 	}
 
 	/* Handle top-level vHub EP0 interrupts */
@@ -405,6 +395,9 @@ static const struct of_device_id ast_vhub_dt_ids[] = {
 	},
 	{
 		.compatible = "aspeed,ast2500-usb-vhub",
+	},
+	{
+		.compatible = "aspeed,ast2600-usb-vhub",
 	},
 	{ }
 };

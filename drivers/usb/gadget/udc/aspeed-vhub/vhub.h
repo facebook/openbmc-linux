@@ -4,6 +4,23 @@
 
 /*****************************
  *                           *
+ * Maximum devices/endpoints *
+ *                           *
+ *****************************/
+
+#ifdef CONFIG_MACH_ASPEED_G6
+#define AST_VHUB_NUM_GEN_EPs	21	/* Generic non-0 EPs */
+#define AST_VHUB_NUM_PORTS	7	/* vHub ports */
+#else
+#define AST_VHUB_NUM_GEN_EPs	15	/* Generic non-0 EPs */
+#define AST_VHUB_NUM_PORTS	5	/* vHub ports */
+#endif
+
+#define AST_VHUB_GEN_EPS_MASK	((1 << AST_VHUB_NUM_GEN_EPs) - 1)
+#define AST_VHUB_PORTS_MASK	((1 << AST_VHUB_NUM_PORTS) - 1)
+
+/*****************************
+ *                           *
  * VHUB register definitions *
  *                           *
  *****************************/
@@ -51,6 +68,8 @@
 #define VHUB_IRQ_USB_CMD_DEADLOCK		(1 << 18)
 #define VHUB_IRQ_EP_POOL_NAK			(1 << 17)
 #define VHUB_IRQ_EP_POOL_ACK_STALL		(1 << 16)
+#define VHUB_IRQ_DEVICE7			(1 << 15)
+#define VHUB_IRQ_DEVICE6			(1 << 14)
 #define VHUB_IRQ_DEVICE5			(1 << 13)
 #define VHUB_IRQ_DEVICE4			(1 << 12)
 #define VHUB_IRQ_DEVICE3			(1 << 11)
@@ -70,23 +89,22 @@
 /* SW reset reg */
 #define VHUB_SW_RESET_EP_POOL			(1 << 9)
 #define VHUB_SW_RESET_DMA_CONTROLLER		(1 << 8)
+#define VHUB_SW_RESET_DEVICE7			(1 << 7)
+#define VHUB_SW_RESET_DEVICE6			(1 << 6)
 #define VHUB_SW_RESET_DEVICE5			(1 << 5)
 #define VHUB_SW_RESET_DEVICE4			(1 << 4)
 #define VHUB_SW_RESET_DEVICE3			(1 << 3)
 #define VHUB_SW_RESET_DEVICE2			(1 << 2)
 #define VHUB_SW_RESET_DEVICE1			(1 << 1)
 #define VHUB_SW_RESET_ROOT_HUB			(1 << 0)
+#define VHUB_SW_RESET_DEV_MASK			(AST_VHUB_PORTS_MASK << 1)
 #define VHUB_SW_RESET_ALL			(VHUB_SW_RESET_EP_POOL | \
 						 VHUB_SW_RESET_DMA_CONTROLLER | \
-						 VHUB_SW_RESET_DEVICE5 | \
-						 VHUB_SW_RESET_DEVICE4 | \
-						 VHUB_SW_RESET_DEVICE3 | \
-						 VHUB_SW_RESET_DEVICE2 | \
-						 VHUB_SW_RESET_DEVICE1 | \
+						 VHUB_SW_RESET_DEV_MASK | \
 						 VHUB_SW_RESET_ROOT_HUB)
 /* EP ACK/NACK IRQ masks */
 #define VHUB_EP_IRQ(n)				(1 << (n))
-#define VHUB_EP_IRQ_ALL				0x7fff	/* 15 EPs */
+#define VHUB_EP_IRQ_ALL				AST_VHUB_GEN_EPS_MASK
 
 /* USB status reg */
 #define VHUB_USBSTS_HISPEED			(1 << 27)
@@ -210,8 +228,6 @@
  *                                      *
  ****************************************/
 
-#define AST_VHUB_NUM_GEN_EPs	15	/* Generic non-0 EPs */
-#define AST_VHUB_NUM_PORTS	5	/* vHub ports */
 #define AST_VHUB_EP0_MAX_PACKET	64	/* EP0's max packet size */
 #define AST_VHUB_EPn_MAX_PACKET	1024	/* Generic EPs max packet size */
 #define AST_VHUB_DESCS_COUNT	256	/* Use 256 descriptor mode (valid
