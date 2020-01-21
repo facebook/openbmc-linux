@@ -79,12 +79,24 @@
 
 &spi1 {
 	status = "okay";
+
+    //Revert to aspeed-smc driver for now to re-enable BIOS MTD device
+	compatible = "aspeed,ast2500-spi-master";
+
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi1_default>;
+	pinctrl-0 = <&pinctrl_spi1_default &pinctrl_spi1cs1_default>;
+
 	flash@0 {
 		status = "okay";
 		m25p,fast-read;
 		label = "pnor";
+		spi-max-frequency = <12000000>;
+	};
+	tpm@1 {
+		reg = < 1 >;
+		compatible = "tcg,tpm_tis-spi";
+		spi-max-frequency = <12000000>;
+		status = "okay";
 	};
 };
 
