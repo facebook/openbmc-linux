@@ -120,6 +120,12 @@ static ssize_t mpq8645p_write_reg(struct i2c_client *client, u8 index, u16 val)
 	switch (index) {
 	case MPQ8645P_RESTORE_USER_ALL:
 		return mpq8645p_restore_user(client);
+	case MPQ8645P_VOUT_COMMAND:
+		return i2c_smbus_write_word_data(client, PMBUS_VOUT_COMMAND, val);
+	case MPQ8645P_IOUT_OC_FAULT_LIMIT:
+		return i2c_smbus_write_word_data(client, PMBUS_IOUT_OC_FAULT_LIMIT, val);
+	case MPQ8645P_IOUT_OC_WARN_LIMIT:
+		return i2c_smbus_write_word_data(client, PMBUS_IOUT_OC_WARN_LIMIT, val);
 	case MPQ8645P_MFR_CTRL_COMP:
 		return i2c_smbus_write_byte_data(client, MPQ8645P_REG_MFR_CTRL_COMP, (u8)val);
 	case MPQ8645P_MFR_CTRL_VOUT:
