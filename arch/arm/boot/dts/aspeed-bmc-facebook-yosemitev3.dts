@@ -139,18 +139,22 @@
 };
 
 &i2c0 {
+	multi-master;
 	status = "okay";
 };
 
 &i2c1 {
+	multi-master;
 	status = "okay";
 };
 
 &i2c2 {
+	multi-master;
 	status = "okay";
 };
 
 &i2c3 {
+	multi-master;
 	status = "okay";
 };
 
