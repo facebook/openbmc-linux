@@ -42,10 +42,11 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     struct jtag *jtag = file->private_data;
     struct jtag_run_test_idle idle;
     struct jtag_xfer xfer;
+    struct run_cycle_param jtag_run_cycle;
     u8 *xfer_data;
     u32 data_size;
     u32 value;
-    int err;
+    int err = 0;
 
     if (!arg)
         return -EINVAL;
@@ -146,6 +147,7 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         if (err)
             err = -EFAULT;
         break;
+
     case JTAG_SIOCMODE:
         if (!jtag->ops->mode_set)
             return  -EOPNOTSUPP;
@@ -158,9 +160,21 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         err = jtag->ops->mode_set(jtag, value);
         break;
 
+    case JTAG_RUN_CYCLE:
+        if (copy_from_user(&jtag_run_cycle,(void __user*)arg, sizeof(struct run_cycle_param))){
+          err = -EFAULT;
+          break;
+        }else{
+          jtag->ops->run_cycle(jtag, &jtag_run_cycle);
+        }
+
+        if (copy_to_user((void __user*)(arg), &jtag_run_cycle, sizeof(struct run_cycle_param)))
+          err = -EFAULT;
+        break;
     default:
         return -EINVAL;
     }
+
     return err;
 }
 

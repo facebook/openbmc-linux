@@ -794,6 +794,25 @@ int aspeed_jtag_deinit(struct platform_device *pdev,
 #define JTAG_SW_MODE_VAL_MASK \
 	(ASPEED_JTAG_SW_MODE_TDIO|ASPEED_JTAG_SW_MODE_TCK|ASPEED_JTAG_SW_MODE_TMS)
 
+static void aspeed_jtag_run_cycle(struct jtag *jtag, struct run_cycle_param *run_cycle)
+{
+    int tdo = 0;
+    int read_val = 0;
+    struct aspeed_jtag *aspeed_jtag = jtag_priv(jtag);
+	  u32 old_val = aspeed_jtag_read(aspeed_jtag, ASPEED_JTAG_SW);
+    u32 val = 0;
+
+    // Write TDI, TMS and TCK
+    g_sw_tdi = run_cycle->tdi ? ASPEED_JTAG_SW_MODE_TDIO : 0;
+    g_sw_tms = run_cycle->tms ? ASPEED_JTAG_SW_MODE_TMS : 0;
+    g_sw_tck = run_cycle->tck ? ASPEED_JTAG_SW_MODE_TCK : 0;
+    val = (old_val & ~JTAG_SW_MODE_VAL_MASK) | (g_sw_tdi|g_sw_tck|g_sw_tms);
+    aspeed_jtag_write(aspeed_jtag, val, ASPEED_JTAG_SW);
+    read_val = aspeed_jtag_read(aspeed_jtag, ASPEED_JTAG_SW);
+    tdo = read_val & ASPEED_JTAG_SW_MODE_TDIO;
+    run_cycle->tdo = tdo ? 1 : 0;
+}
+
 static ssize_t show_tdo(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
@@ -858,7 +877,7 @@ static ssize_t show_sts(struct device *dev,
 {
   struct jtag *jtag = dev_get_drvdata(dev);
   struct aspeed_jtag *ast_jtag = jtag_priv(jtag);
-	
+
   if ((ast_jtag->status >= 0) && (ast_jtag->status < 3)) {
     return sprintf(buf, "%s\n", end_status_str[ast_jtag->status]);
   } else {
@@ -870,7 +889,7 @@ static DEVICE_ATTR(sts, S_IRUGO, show_sts, NULL);
 
 static ssize_t show_frequency(struct device *dev,
 	struct device_attribute *attr, char *buf)
-{    
+{
 	u32 frq;
 	struct jtag *jtag = dev_get_drvdata(dev);
 
@@ -916,7 +935,8 @@ static const struct jtag_ops aspeed_jtag_ops = {
     .status_get = aspeed_jtag_status_get,
     .idle = aspeed_jtag_idle,
     .xfer = aspeed_jtag_xfer,
-    .mode_set = aspeed_jtag_mode_set
+    .mode_set = aspeed_jtag_mode_set,
+    .run_cycle = aspeed_jtag_run_cycle
 };
 
 static int aspeed_jtag_probe(struct platform_device *pdev)
