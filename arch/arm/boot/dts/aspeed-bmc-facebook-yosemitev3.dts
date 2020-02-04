@@ -104,21 +104,21 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_txd2_default
-		     &pinctrl_txd2_default>;
+		     &pinctrl_rxd2_default>;
 };
 
 &uart3 {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_txd3_default
-		     &pinctrl_txd3_default>;
+		     &pinctrl_rxd3_default>;
 };
 
 &uart4 {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_txd4_default
-		     &pinctrl_txd4_default>;
+		     &pinctrl_rxd4_default>;
 };
 
 &uart5 {
