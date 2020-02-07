@@ -611,10 +611,16 @@
 	fan@0 {
 		reg = <0x00>;
 		aspeed,fan-tach-ch = /bits/ 8 <0x00 0x01 0x02 0x03 0x04 0x05 0x06 0x07>;
+		aspeed,pwm-typem-tach-mode = /bits/ 8 <0x00>;       // 00b: falling
+		aspeed,pwm-typem-tach-unit = /bits/ 16 <0x1000>;    // 4096
+		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x00>;    // div 4
 	};
 
 	fan@1 {
 		reg = <0x01>;
 		aspeed,fan-tach-ch = /bits/ 8 <0x08 0x09 0x0a 0x0b 0x0c 0x0d 0x0e 0x0f>;
+		aspeed,pwm-typem-tach-mode = /bits/ 8 <0x00>;
+		aspeed,pwm-typem-tach-unit = /bits/ 16 <0x1000>;
+		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x00>;
 	};
 };
