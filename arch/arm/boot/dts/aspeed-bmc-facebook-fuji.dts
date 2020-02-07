@@ -30,7 +30,6 @@
 
 &wdt1 {
 	status = "okay";
-	aspeed,reset-type = "system";
 };
 
 &mdio1 {
