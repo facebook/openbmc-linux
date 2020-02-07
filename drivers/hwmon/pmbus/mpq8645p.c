@@ -41,9 +41,9 @@
 #define MPQ8645P_REG_MFR_CTRL            0xEA
 
 enum {
-	MPQ8645P_REVISION = 0,
-	MPQ8645P_RESTORE_USER_ALL,
+	MPQ8645P_RESTORE_USER_ALL = 0,
 	MPQ8645P_VOUT_COMMAND,
+	MPQ8645P_VOUT_SCALE_LOOP,
 	MPQ8645P_IOUT_OC_FAULT_LIMIT,
 	MPQ8645P_IOUT_OC_WARN_LIMIT,
 	MPQ8645P_MFR_REVISION,
@@ -122,6 +122,8 @@ static ssize_t mpq8645p_write_reg(struct i2c_client *client, u8 index, u16 val)
 		return mpq8645p_restore_user(client);
 	case MPQ8645P_VOUT_COMMAND:
 		return i2c_smbus_write_word_data(client, PMBUS_VOUT_COMMAND, val);
+	case MPQ8645P_VOUT_SCALE_LOOP:
+		return i2c_smbus_write_word_data(client, PMBUS_VOUT_SCALE_LOOP, val);
 	case MPQ8645P_IOUT_OC_FAULT_LIMIT:
 		return i2c_smbus_write_word_data(client, PMBUS_IOUT_OC_FAULT_LIMIT, val);
 	case MPQ8645P_IOUT_OC_WARN_LIMIT:
@@ -145,6 +147,8 @@ static ssize_t mpq8645p_read_reg(struct i2c_client *client, u8 index)
 	switch (index) {
 	case MPQ8645P_VOUT_COMMAND:
 		return i2c_smbus_read_word_data(client, PMBUS_VOUT_COMMAND);
+	case MPQ8645P_VOUT_SCALE_LOOP:
+		return i2c_smbus_read_word_data(client, PMBUS_VOUT_SCALE_LOOP);
 	case MPQ8645P_IOUT_OC_FAULT_LIMIT:
 		return i2c_smbus_read_word_data(client, PMBUS_IOUT_OC_FAULT_LIMIT);
 	case MPQ8645P_IOUT_OC_WARN_LIMIT:
@@ -208,6 +212,7 @@ static ssize_t mpq8645p_debugfs_read(struct file *file, char __user *buf,
 	mutex_lock(&pdata->lock);
 	switch (index) {
 	case MPQ8645P_VOUT_COMMAND:
+	case MPQ8645P_VOUT_SCALE_LOOP:
 	case MPQ8645P_IOUT_OC_FAULT_LIMIT:
 	case MPQ8645P_IOUT_OC_WARN_LIMIT:
 		rc =  mpq8645p_read_reg(client, index);
@@ -339,11 +344,13 @@ static int mpq8645p_probe(struct i2c_client *client,
 	}
 
 	debugfs_create_file("fw_version", 0444, mpq8645p_dir,
-			    &pdata->index[MPQ8645P_REVISION], &mpq8645p_ver_ops);
+			    &pdata->index[MPQ8645P_MFR_REVISION], &mpq8645p_ver_ops);
 	debugfs_create_file("restore", 0644, mpq8645p_dir,
 			    &pdata->index[MPQ8645P_RESTORE_USER_ALL], &mpq8645p_reg_ops);
 	debugfs_create_file("vout_command", 0644, mpq8645p_dir,
 			    &pdata->index[MPQ8645P_VOUT_COMMAND], &mpq8645p_reg_ops);
+	debugfs_create_file("vout_scale_loop", 0644, mpq8645p_dir,
+			    &pdata->index[MPQ8645P_VOUT_SCALE_LOOP], &mpq8645p_reg_ops);
 	debugfs_create_file("oc_fault_limit", 0644, mpq8645p_dir,
 			    &pdata->index[MPQ8645P_IOUT_OC_FAULT_LIMIT], &mpq8645p_reg_ops);
 	debugfs_create_file("oc_warn_limit", 0644, mpq8645p_dir,
