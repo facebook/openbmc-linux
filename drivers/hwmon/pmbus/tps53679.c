@@ -100,11 +100,17 @@ static struct pmbus_driver_info tps53688_info = {
 static int tps53679_probe(struct i2c_client *client,
 			  const struct i2c_device_id *id)
 {
-  if ((id->driver_data) & TPS53688_ID) {
-	return pmbus_do_probe(client, id, &tps53688_info);
-  } else {
-	return pmbus_do_probe(client, id, &tps53679_info); 
-  }
+	struct pmbus_driver_info *info;
+
+	if ((id->driver_data) & TPS53688_ID) {
+		info = devm_kmemdup(&client->dev, &tps53688_info, sizeof(*info), GFP_KERNEL);
+	} else {
+		info = devm_kmemdup(&client->dev, &tps53679_info, sizeof(*info), GFP_KERNEL);
+	}
+	if (!info)
+		return -ENOMEM;
+
+	return pmbus_do_probe(client, id, info);
 }
 
 static const struct i2c_device_id tps53679_id[] = {
