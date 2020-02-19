@@ -545,6 +545,13 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 
 		break;
 	case ncsi_dev_state_suspend_dc:
+		if ( ndp->cmd_retry++ < NCSI_CMD_RETRY_MAX ) {
+			printk("Resend DCNT cmd...retry:%d\n", ndp->cmd_retry);
+			nd->state = ncsi_dev_state_suspend_dcnt;
+			schedule_work(&ndp->work);
+			break;
+		}
+
 		ndp->pending_req_num = 1;
 
 		nca.type = NCSI_PKT_CMD_DC;
@@ -1811,6 +1818,7 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 	nd->dev = dev;
 	nd->handler = handler;
 	ndp->pending_req_num = 0;
+	ndp->cmd_retry = 0;
 	INIT_LIST_HEAD(&ndp->channel_queue);
 	INIT_LIST_HEAD(&ndp->vlan_vids);
 	INIT_WORK(&ndp->work, ncsi_dev_work);
@@ -1985,6 +1993,7 @@ int ncsi_reset_dev(struct ncsi_dev *nd)
 	ndp->flags |= NCSI_DEV_RESET;
 	ndp->active_channel = active;
 	ndp->active_package = active->package;
+	ndp->cmd_retry = 0;
 	spin_unlock_irqrestore(&ndp->lock, flags);
 
 	nd->state = ncsi_dev_state_suspend;

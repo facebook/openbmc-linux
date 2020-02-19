@@ -312,6 +312,8 @@ struct ncsi_dev_priv {
 #define NCSI_DEV_HWA		2            /* Enabled HW arbitration     */
 #define NCSI_DEV_RESHUFFLE	4
 #define NCSI_DEV_RESET		8            /* Reset state of NC          */
+#define NCSI_CMD_RETRY_MAX      3
+	unsigned int        cmd_retry;       /* Retry command              */
 	unsigned int        gma_flag;        /* OEM GMA flag               */
 	spinlock_t          lock;            /* Protect the NCSI device    */
 #if IS_ENABLED(CONFIG_IPV6)

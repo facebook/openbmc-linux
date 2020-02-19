@@ -253,6 +253,7 @@ static int ncsi_rsp_handler_dcnt(struct ncsi_request *nr)
 	rsp = (struct ncsi_rsp_pkt *)skb_network_header(nr->rsp);
 	ncsi_find_package_and_channel(ndp, rsp->rsp.common.channel,
 				      NULL, &nc);
+	ndp->cmd_retry = NCSI_CMD_RETRY_MAX;
 	if (!nc)
 		return -ENODEV;
 
