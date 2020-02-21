@@ -129,25 +129,29 @@
 
 &i2c0 {
 	multi-master;
-        bus-frequency = <1000000>;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
 &i2c1 {
 	multi-master;
-        bus-frequency = <1000000>;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
 &i2c2 {
 	multi-master;
-        bus-frequency = <1000000>;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
 &i2c3 {
 	multi-master;
-        bus-frequency = <1000000>;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
