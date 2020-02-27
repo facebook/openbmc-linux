@@ -261,6 +261,9 @@ case "$arg" in
 		echo "$output_file" | grep -q "\.lz4$" \
                 && [ -x "`which lz4 2> /dev/null`" ] \
                 && compr="lz4 -l -9 -f"
+		echo "$output_file" | grep -q "\.zst$" \
+                && [ -x "`which zstd 2> /dev/null`" ] \
+                && compr="zstd -19 -f"
 		echo "$output_file" | grep -q "\.cpio$" && compr="cat"
 		shift
 		;;
