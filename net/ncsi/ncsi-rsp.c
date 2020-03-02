@@ -1157,7 +1157,9 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 			   hdr->type);
 		return -ENOENT;
 	}
-
+#ifdef CONFIG_ENABLE_NCSI_TRACE
+	printk("##1: recv packet with type 0x%02x id 0x%02x\n", hdr->type, hdr->id);
+#endif
 	/* Associate with the request */
 	spin_lock_irqsave(&ndp->lock, flags);
 	nr = &ndp->requests[hdr->id];

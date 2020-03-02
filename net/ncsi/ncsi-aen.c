@@ -223,7 +223,9 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb)
 			break;
 		}
 	}
-
+#ifdef CONFIG_ENABLE_NCSI_TRACE
+  printk("-- $$1: received AEN 0x%02x\n", h->type);
+#endif
 	if (!nah) {
 		netdev_warn(ndp->ndev.dev, "Invalid AEN (0x%x) received\n",
 			    h->type);

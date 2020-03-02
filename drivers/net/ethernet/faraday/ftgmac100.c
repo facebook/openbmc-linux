@@ -467,6 +467,9 @@ static bool ftgmac100_rx_packet(struct ftgmac100 *priv, int *processed)
 	unsigned int pointer, size;
 	u32 status, csum_vlan;
 	dma_addr_t map;
+#ifdef CONFIG_ENABLE_NCSI_TRACE
+	unsigned char *rxbuff;
+#endif
 
 	/* Grab next RX descriptor */
 	pointer = priv->rx_pointer;
@@ -571,6 +574,12 @@ static bool ftgmac100_rx_packet(struct ftgmac100 *priv, int *processed)
 	netdev->stats.rx_packets++;
 	netdev->stats.rx_bytes += size;
 
+#ifdef CONFIG_ENABLE_NCSI_TRACE
+	rxbuff = skb_mac_header(skb);
+	if (rxbuff[12]==0x88 && rxbuff[13]==0xf8) {
+	  printk("== ncsi: %02x %02x\n", rxbuff[18], rxbuff[17]);
+	}
+#endif
 	/* push packet to protocol stack */
 	if (skb->ip_summed == CHECKSUM_NONE)
 		netif_receive_skb(skb);

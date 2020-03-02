@@ -30,3 +30,9 @@ config NCSI_SKIP_SEL_PKG
 	---help---
 	  Workaround that some NICs may stop responding after receiving
 	  NCSI Select/Deselect Package command.
+config ENABLE_NCSI_TRACE
+	bool "enable NC-SI trace"
+	depends on NET_NCSI
+	---help---
+	  Enable debug kernel message for NC-SI to trace cmd/rsp/AENs
+	  For debugging packet drop

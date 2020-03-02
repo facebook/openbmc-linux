@@ -397,6 +397,8 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 		ncsi_free_request(nr);
 		return ret;
 	}
-
+#ifdef CONFIG_ENABLE_NCSI_TRACE
+  printk("@@1: send packet with type 0x%02x id 0x%02x\n", type, nca->id);
+#endif
 	return 0;
 }
