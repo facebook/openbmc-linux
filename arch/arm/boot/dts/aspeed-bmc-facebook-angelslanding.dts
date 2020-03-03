@@ -72,9 +72,6 @@
 		spi-max-frequency = <12000000>;
 #include "facebook-bmc-flash0-layout.dtsi"
 	};
-	flash@2 {
-		spi-max-frequency = <12000000>;
-	};
 };
 
 &spi1 {
@@ -174,7 +171,7 @@
 };
 
 &ehci1 {
-  status = "okay";
+	status = "okay";
 };
 
 &adc {
@@ -183,6 +180,7 @@
 
 &i2c0 {
 	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
@@ -231,6 +229,7 @@
 
 &i2c2 {
 	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
@@ -260,11 +259,13 @@
 
 &i2c5 {
 	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
 &i2c6 {
 	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
@@ -275,8 +276,9 @@
 
 &i2c8 {
 	multi-master;
+	bus-frequency = <400000>;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
-  bus-frequency = <400000>;
 };
 
 &i2c13 {
