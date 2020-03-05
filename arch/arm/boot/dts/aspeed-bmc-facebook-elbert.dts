@@ -28,6 +28,7 @@
 	};
 };
 
+/*ELBERTTODO 447406 REVIEW KERNEL SPI*/
 &spi2 {
 	status = "okay";
 	compatible = "aspeed,ast2500-spi-master";
@@ -52,20 +53,18 @@
 		     &pinctrl_rxd2_default>;
 };
 
+
 &mac0 {
 	status = "okay";
-	use-ncsi;
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rmii1_default>;
-	clocks = <&syscon ASPEED_CLK_GATE_MAC1CLK>,
-		 <&syscon ASPEED_CLK_GATE_MAC1RCLK>;
-	clock-names = "MACCLK", "RCLK";
+	pinctrl-0 = <&pinctrl_rgmii1_default>;
 };
 
 &mac1 {
 	status = "disabled";
 };
 
+/*ELBERTTODO SCD SMBus MUX*/
 &i2c0 {
 	status = "okay";
 };
@@ -76,13 +75,14 @@
 
 &i2c2 {
 	status = "okay";
-
-	i2c-switch@75 {
-		compatible = "nxp,pca9548";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0x75>;
-	};
+        /** ELBERTTODO SCD MUX
+        i2c-switch@75 {
+                compatible = "nxp,pca9548";
+                #address-cells = <1>;
+                #size-cells = <0>;
+                reg = <0x75>;
+        };
+        **/
 };
 
 &i2c3 {
@@ -95,6 +95,14 @@
 
 &i2c5 {
 	status = "okay";
+        /** ELBERTTODO SCD MUX
+        i2c-switch@75 {
+                compatible = "nxp,pca9548";
+                #address-cells = <1>;
+                #size-cells = <0>;
+                reg = <0x75>;
+        };
+        **/
 };
 
 &i2c6 {
