@@ -340,6 +340,8 @@ struct ncsi_dev_priv {
 	u32                 package_whitelist; /* Packages to configure    */
 	unsigned char       mac_addr[6];
 	bool                mlx_multi_host;
+	unsigned char       max_package;     /* Num of packages to probe   */
+	unsigned char       max_channel;     /* Num of channels to probe   */
 };
 
 struct ncsi_cmd_arg {
