@@ -11,6 +11,7 @@
 
 	aliases {
 		serial0 = &uart5;
+		mmc0 = &emmc;
 	};
 
 	chosen {
@@ -32,6 +33,28 @@
 	status = "okay";
 };
 
+&emmc_controller {
+	status = "okay";
+};
+
+&emmc {
+	status = "okay";
+
+	non-removable;
+	max-frequency = <100000000>;
+	/* AST2600 A0 only support PIO mode */
+	sdhci-caps-mask = <0x0 0x580000>;
+#if 1
+	bus-width = <4>;
+#else
+	bus-width = <8>;
+	pinctrl-0 = <&pinctrl_emmc_default
+			&pinctrl_emmcdat4_default
+			&pinctrl_emmcdat5_default
+			&pinctrl_emmcdat6_default
+			&pinctrl_emmcdat7_default>;
+#endif
+};
 &mdio1 {
 	status = "okay";
 
