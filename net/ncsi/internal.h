@@ -245,6 +245,24 @@ struct ncsi_package {
 	struct ncsi_channel  *preferred_channel; /* Primary channel      */
 };
 
+struct ncsi_cmd_arg {
+	struct ncsi_dev_priv *ndp;        /* Associated NCSI device        */
+	unsigned char        type;        /* Command in the NCSI packet    */
+	unsigned char        id;          /* Request ID (sequence number)  */
+	unsigned char        package;     /* Destination package ID        */
+	unsigned char        channel;     /* Detination channel ID or 0x1f */
+	unsigned short       payload;     /* Command packet payload length */
+	unsigned int         req_flags;   /* NCSI request properties       */
+	union {
+		unsigned char  bytes[16]; /* Command packet specific data  */
+		unsigned short words[8];
+		unsigned int   dwords[4];
+	};
+	unsigned char        *data;       /* NCSI OEM data                 */
+	struct genl_info     *info;       /* Netlink information           */
+	int                  rexmit;      /* Retransmit when timeout       */
+};
+
 struct ncsi_request {
 	unsigned char        id;      /* Request ID - 0 to 255           */
 	bool                 used;    /* Request that has been assigned  */
@@ -259,6 +277,7 @@ struct ncsi_request {
 	u32                  snd_seq;     /* netlink sending sequence number */
 	u32                  snd_portid;  /* netlink portid of sender        */
 	struct nlmsghdr      nlhdr;       /* netlink message header          */
+	struct ncsi_cmd_arg  nca;
 };
 
 enum {
@@ -342,23 +361,7 @@ struct ncsi_dev_priv {
 	bool                mlx_multi_host;
 	unsigned char       max_package;     /* Num of packages to probe   */
 	unsigned char       max_channel;     /* Num of channels to probe   */
-};
-
-struct ncsi_cmd_arg {
-	struct ncsi_dev_priv *ndp;        /* Associated NCSI device        */
-	unsigned char        type;        /* Command in the NCSI packet    */
-	unsigned char        id;          /* Request ID (sequence number)  */
-	unsigned char        package;     /* Destination package ID        */
-	unsigned char        channel;     /* Detination channel ID or 0x1f */
-	unsigned short       payload;     /* Command packet payload length */
-	unsigned int         req_flags;   /* NCSI request properties       */
-	union {
-		unsigned char  bytes[16]; /* Command packet specific data  */
-		unsigned short words[8];
-		unsigned int   dwords[4];
-	};
-	unsigned char        *data;       /* NCSI OEM data                 */
-	struct genl_info     *info;       /* Netlink information           */
+	unsigned char       rexmit;          /* Retransmit when timeout    */
 };
 
 extern struct list_head ncsi_dev_list;

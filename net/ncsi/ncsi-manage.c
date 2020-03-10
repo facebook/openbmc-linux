@@ -436,6 +436,12 @@ static void ncsi_request_timeout(struct timer_list *t)
 	struct ncsi_channel *nc;
 	unsigned long flags;
 
+	if ((nr->flags == NCSI_REQ_FLAG_EVENT_DRIVEN) && (nr->nca.rexmit-- > 0)) {
+		netdev_warn(ndp->ndev.dev, "NCSI: retransmit cmd 0x%x\n", nr->nca.type);
+		ndp->pending_req_num++;
+		ncsi_xmit_cmd(&nr->nca);
+	}
+
 	/* If the request already had associated response,
 	 * let the response handler to release it.
 	 */
@@ -476,6 +482,7 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 	nc = ndp->active_channel;
 	nca.ndp = ndp;
 	nca.req_flags = NCSI_REQ_FLAG_EVENT_DRIVEN;
+	nca.rexmit = ndp->rexmit;
 	switch (nd->state) {
 	case ncsi_dev_state_suspend:
 		nd->state = ncsi_dev_state_suspend_select;
@@ -971,6 +978,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 
 	nca.ndp = ndp;
 	nca.req_flags = NCSI_REQ_FLAG_EVENT_DRIVEN;
+	nca.rexmit = ndp->rexmit;
 	switch (nd->state) {
 	case ncsi_dev_state_config:
 	case ncsi_dev_state_config_sp:
@@ -1342,6 +1350,7 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 
 	nca.ndp = ndp;
 	nca.req_flags = NCSI_REQ_FLAG_EVENT_DRIVEN;
+	nca.rexmit = ndp->rexmit;
 	switch (nd->state) {
 	case ncsi_dev_state_probe:
 		nd->state = ncsi_dev_state_probe_deselect;
@@ -1476,6 +1485,7 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		nca.type = NCSI_PKT_CMD_DP;
 		nca.package = ndp->package_probe_id;
 		nca.channel = NCSI_RESERVED_CHANNEL;
+		nca.rexmit = 0;
 		ret = ncsi_xmit_cmd(&nca);
 		if (ret)
 			goto error;
@@ -1870,6 +1880,10 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 			if (!of_property_read_u32(np, "ncsi-channel", &property) &&
 				(property < NCSI_RESERVED_CHANNEL)) {
 				ndp->max_channel = (u8)property;
+			}
+
+			if (!of_property_read_u32(np, "ncsi-rexmit", &property)) {
+				ndp->rexmit = (u8)property;
 			}
 		}
 	}

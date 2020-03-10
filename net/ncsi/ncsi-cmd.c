@@ -383,6 +383,10 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	eth_broadcast_addr(eh->h_dest);
 	memcpy(eh->h_source, nca->ndp->mac_addr, ETH_ALEN);
 
+	if ((nr->flags == NCSI_REQ_FLAG_EVENT_DRIVEN) && (nca->rexmit > 0)) {
+		memcpy(&nr->nca, nca, sizeof(*nca));
+	}
+
 	/* Start the timer for the request that might not have
 	 * corresponding response. Given NCSI is an internal
 	 * connection a 1 second delay should be sufficient.
