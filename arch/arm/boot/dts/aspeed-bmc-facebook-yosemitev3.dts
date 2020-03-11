@@ -121,6 +121,9 @@
 	no-hw-checksum;
 	use-ncsi;
 	mlx,multi-host;
+	ncsi-package = <1>;
+	ncsi-channel = <2>;
+	ncsi-rexmit = <1>;
 };
 
 &adc {
