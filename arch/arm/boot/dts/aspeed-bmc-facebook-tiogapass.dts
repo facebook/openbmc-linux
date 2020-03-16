@@ -66,11 +66,12 @@
 &spi1 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi1_default>;
+	compatible = "aspeed,ast2500-spi-master";
+	pinctrl-0 = <&pinctrl_spi1_default &pinctrl_spi1cs1_default>;
 	flash@0 {
 		status = "okay";
 		m25p,fast-read;
-		label = "pnor";
+		label = "bios0";
 	};
 };
 
