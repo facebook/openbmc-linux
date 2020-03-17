@@ -3958,6 +3958,16 @@ static const struct flash_info *spi_nor_match_id(const char *name)
 	return NULL;
 }
 
+static void spi_nor_debugfs_init(struct spi_nor *nor,
+				 const struct flash_info *info)
+{
+	struct mtd_info *mtd = &nor->mtd;
+
+	mtd->dbg.partname = info->name;
+	mtd->dbg.partid = devm_kasprintf(nor->dev, GFP_KERNEL, "spi-nor:%*phN",
+					 info->id_len, info->id);
+}
+
 int spi_nor_scan(struct spi_nor *nor, const char *name,
 		 const struct spi_nor_hwcaps *hwcaps)
 {
@@ -4011,6 +4021,8 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 	}
 
 	nor->info = info;
+
+	spi_nor_debugfs_init(nor, info);
 
 	mutex_init(&nor->lock);
 
