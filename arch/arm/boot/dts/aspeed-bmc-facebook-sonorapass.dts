@@ -79,10 +79,7 @@
 		m25p,fast-read;
 		label = "spi0.0";
 		spi-max-frequency = <12000000>;
-#include "facebook-bmc-flash0-layout.dtsi"
-	};
-	flash@2 {
-		spi-max-frequency = <12000000>;
+#include "facebook-bmc-pfr-flash0-layout.dtsi"
 	};
 };
 

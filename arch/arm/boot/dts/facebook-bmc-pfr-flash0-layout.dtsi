@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2018 Facebook Inc.
+
+partitions {
+	compatible = "fixed-partitions";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	rom@0 {
+		reg = <0x0 0x60000>;
+		label = "rom";
+	};
+	envro@60000 {
+		reg = <0x60000 0x20000>;
+		label = "envro";
+	};
+	u-bootro@80000 {
+		reg = <0x80000 0x60000>;
+		label = "u-bootro";
+	};
+	fitro@e0000 {
+		reg = <0xe0000 0x1b20000>;
+		label = "fitro";
+	};
+	dataro@1c00000 {
+		reg = <0x1c00000 0xde0000>;
+		label = "dataro";
+	};
+	pfm@29e0000 {
+		reg = <0x29e0000 0x20000>;
+		label = "pfm";
+	};
+	rc@2a00000 {
+		reg = <0x2a00000 0x2000000>;
+		label = "rc";
+	};
+	stg-bmc@4a00000 {
+		reg = <0x4a00000 0x2000000>;
+		label = "stg-bmc";
+	};
+	stg-pch@6a00000 {
+		reg = <0x6a00000 0x1000000>;
+		label = "stg-pch";
+	};
+	stg-cpld@7a00000 {
+		reg = <0x7a00000 0x100000>;
+		label = "stg-cpld";
+	};
+	stg-cpld@7f00000 {
+		reg = <0x7f00000 0x100000>;
+		label = "stg-cpldrc";
+	};
+	flash0@0 {
+		reg = <0x0 0x8000000>;
+		label = "flash0";
+	};
+};
