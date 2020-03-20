@@ -1,0 +1,236 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2018 Facebook Inc.
+/dts-v1/;
+
+#include "aspeed-g5.dtsi"
+#include <dt-bindings/gpio/aspeed-gpio.h>
+
+/ {
+	model = "Facebook YosemiteV2 BMC";
+	compatible = "facebook,yosemitev2-bmc", "aspeed,ast2500";
+	aliases {
+		serial0 = &uart5;
+		serial1 = &uart1;
+		serial2 = &uart2;
+		serial3 = &uart3;
+		serial4 = &uart4;
+	};
+	chosen {
+		stdout-path = &uart5;
+		bootargs = "debug console=ttyS0,57600n8 root=/dev/ram rw";
+	};
+
+	memory@80000000 {
+		reg = <0x80000000 0x20000000>;
+	};
+
+	iio-hwmon {
+		compatible = "iio-hwmon";
+		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
+		              <&adc 4>, <&adc 5>, <&adc 6>, <&adc 7>,
+		              <&adc 8>, <&adc 9>, <&adc 10>, <&adc 11>,
+		              <&adc 12>, <&adc 13>, <&adc 14>, <&adc 15>;
+	};
+};
+
+&fmc {
+	status = "okay";
+	flash@0 {
+		reg = < 1 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
+#include "facebook-bmc-flash1-layout.dtsi"
+	};
+	flash@1 {
+		reg = < 0 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.0";
+#include "facebook-bmc-flash0-layout.dtsi"
+	};
+};
+
+&ibt {
+	status = "disabled";
+};
+
+&rtc {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_txd1_default
+		     &pinctrl_rxd1_default>;
+};
+
+&uart2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_txd2_default
+		     &pinctrl_rxd2_default>;
+};
+
+&uart3 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_txd3_default
+		     &pinctrl_rxd3_default>;
+};
+
+&uart4 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_txd4_default
+		     &pinctrl_rxd4_default>;
+};
+
+&uart5 {
+	status = "okay";
+};
+
+&mac0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_rmii1_default>;
+	no-hw-checksum;
+	use-ncsi;
+	mlx,multi-host;
+};
+
+&adc {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&i2c1 {
+	// To BIC server board 0x40
+	multi-master;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+&i2c3 {
+	// To BIC server board 0x40
+	multi-master;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
+	status = "okay";
+};
+
+&i2c4 {
+	
+	status = "okay";
+};
+
+&i2c5 {
+	// To BIC server board 0x40
+	multi-master;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
+	status = "okay";
+};
+
+&i2c6 {
+	status = "okay";
+};
+
+&i2c7 {
+	// To BIC server board 0x40
+	multi-master;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
+	status = "okay";
+};
+
+&i2c8 {
+	status = "okay";
+	// EEPROM, 0xA2
+	eeprom@51 {
+		compatible = "st,24c128";
+		reg = <0x51>;
+    };
+};
+
+&i2c9 {
+	status = "okay";
+	// TPM (0x40)
+	tpm@20 {
+		compatible = "infineon,slb9645tt";
+		reg = <0x20>;
+	};
+	// INLET TEMP Sensor (0x9C)
+	tmp421@4e {
+		compatible = "ti,tmp421";
+		reg = <0x4e>;
+	};
+	// OUTLET TEMP Sensor (0x9E)
+	tmp421@4f {
+		compatible = "ti,tmp421";
+		reg = <0x4f>;
+	};
+};
+
+&i2c10 {
+	status = "okay";
+	// ADM1278, 0x20 (8BIT) -> ML HSC
+	adm1278@40 {
+		compatible = "adi,adm1278";
+		reg = <0x40>;
+	};
+};
+
+&i2c11 {
+	status = "okay";
+	bus-frequency = <400000>;
+	// Mezz C connector -> OCP MEZZ
+	tmp421@1f {
+		compatible = "ti,tmp421";
+		reg = <0x1f>;
+	};
+};
+
+&i2c12 {
+	status = "okay";
+	// Mezz C connector -> OCP MEZZ EEPROM
+	eeprom@51 {
+		compatible = "st,24c64";
+		reg = <0x51>;
+	};
+};
+
+&i2c13 {
+	//USB Connector
+	status = "okay";
+};
+
+&pwm_tacho {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default>;
+	fan@0 {
+		reg = <0x00>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x00>;
+		aspeed,pwm-typem-tach-mode = /bits/ 8 <0x00>;       // 00b: falling
+		aspeed,pwm-typem-tach-unit = /bits/ 16 <0x1000>;    // 4096
+		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x00>;    // div 4
+	};
+
+	fan@1 {
+		reg = <0x01>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x01>;
+		aspeed,pwm-typem-tach-mode = /bits/ 8 <0x00>;       // 00b: falling
+		aspeed,pwm-typem-tach-unit = /bits/ 16 <0x1000>;    // 4096
+		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x00>;    // div 4
+	};
+};
