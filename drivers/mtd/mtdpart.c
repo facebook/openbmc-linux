@@ -551,6 +551,9 @@ static struct mtd_part *allocate_partition(struct mtd_info *parent,
 	slave->mtd.ecc_strength = parent->ecc_strength;
 	slave->mtd.bitflip_threshold = parent->bitflip_threshold;
 
+	slave->mtd.dbg.partname = parent->dbg.partname;
+	slave->mtd.dbg.partid = parent->dbg.partid;
+
 	if (parent->_block_isbad) {
 		uint64_t offs = 0;
 
