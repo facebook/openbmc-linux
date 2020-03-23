@@ -4,6 +4,7 @@
 /dts-v1/;
 
 #include "aspeed-g6.dtsi"
+#include <dt-bindings/gpio/aspeed-gpio.h>
 
 / {
 	model = "Facebook Fuji BMC";
@@ -31,6 +32,16 @@
 
 &wdt1 {
 	status = "okay";
+};
+
+&i2c7 {
+	status = "okay";
+
+	tpm_i2c_ptp@2e {
+		compatible = "tcg,tpm_i2c_ptp";
+		reg = <0x2e>;
+		tpm-pirq = <&gpio0 ASPEED_GPIO(Z, 2) GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &ehci0 {
@@ -64,6 +75,7 @@
 			&pinctrl_emmcdat7_default>;
 #endif
 };
+
 &mdio1 {
 	status = "okay";
 
