@@ -218,7 +218,7 @@
 	};
 
 	i2c-switch@73 {
-		compatible = "nxp,pca9846";
+		compatible = "nxp,pca9546";
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x73>;
@@ -312,7 +312,7 @@
 	};
 
 	i2c-switch@73 {
-		compatible = "nxp,pca9846";
+		compatible = "nxp,pca9546";
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x73>;
