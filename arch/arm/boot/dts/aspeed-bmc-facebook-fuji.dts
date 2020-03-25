@@ -1281,3 +1281,419 @@
 		};
 	};
 };
+
+&gpio0 {
+	pin_gpio_b2 {
+		gpios = <&gpio0 ASPEED_GPIO(B, 2) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "GPO1";
+	};
+
+	pin_gpio_f0 {
+		gpios = <&gpio0 ASPEED_GPIO(F, 0) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_JTAG_MUX_IN";
+	};
+
+	pin_gpio_f1 {
+		gpios = <&gpio0 ASPEED_GPIO(F, 1) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "BMC_UART_SEL_0";
+	};
+
+	pin_gpio_f2 {
+		gpios = <&gpio0 ASPEED_GPIO(F, 2) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "BMC_FCM_1_SEL";
+	};
+
+	pin_gpio_f3 {
+		gpios = <&gpio0 ASPEED_GPIO(F, 3) GPIO_ACTIVE_HIGH>;
+		input;
+		line-name = "FCM_2_CARD_PRESENT";
+	};
+
+	pin_gpio_f4 {
+		gpios = <&gpio0 ASPEED_GPIO(F, 4) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "FCM_1_CARD_PRESENT";
+	};
+
+	pin_gpio_f5 {
+		gpios = <&gpio0 ASPEED_GPIO(F, 5) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_SCM_CPLD_JTAG_EN_N";
+	};
+
+	pin_gpio_f6 {
+		gpios = <&gpio0 ASPEED_GPIO(F, 6) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "FCM_2_CPLD_JTAG_EN_N";
+	};
+
+	pin_gpio_f7 {
+		gpios = <&gpio0 ASPEED_GPIO(F, 7) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "BMC_FCM_2_SEL";
+	};
+
+	pin_gpio_g0 {
+		gpios = <&gpio0 ASPEED_GPIO(G, 0) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "FCM_1_CPLD_JTAG_EN_N";
+	};
+
+	pin_gpio_g1 {
+		gpios = <&gpio0 ASPEED_GPIO(G, 7) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "BMC_GPIO63";
+	};
+
+	pin_gpio_g2 {
+		gpios = <&gpio0 ASPEED_GPIO(G, 2) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "UCD90160A_CNTRL";
+	};
+
+	pin_gpio_g3 {
+		gpios = <&gpio0 ASPEED_GPIO(G, 3) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "BMC_UART_SEL_3";
+	};
+
+	pin_gpio_g4 {
+		gpios = <&gpio0 ASPEED_GPIO(G, 4) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "SYS_CPLD_JTAG_EN_N";
+	};
+
+	pin_gpio_g6 {
+		gpios = <&gpio0 ASPEED_GPIO(G, 6) GPIO_ACTIVE_HIGH>;
+		output;
+		line-name = "BMC_I2C_SEL";
+	};
+
+	pin_gpio_g7 {
+		gpios = <&gpio0 ASPEED_GPIO(G, 7) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_GPIO53";
+	};
+
+	pin_gpio_h0 {
+		gpios = <&gpio0 ASPEED_GPIO(H, 0) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "GPIO5_SGPMCK";
+	};
+
+	pin_gpio_h1 {
+		gpios = <&gpio0 ASPEED_GPIO(H, 1) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "GPIO0_SGPMLD";
+	};
+
+	pin_gpio_h2 {
+		gpios = <&gpio0 ASPEED_GPIO(H, 2) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "GPIO3_SGPMO";
+	};
+
+	pin_gpio_h3 {
+		gpios = <&gpio0 ASPEED_GPIO(H, 3) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "GPIO1_SGPMI";
+	};
+
+	pin_gpio_i5 {
+		gpios = <&gpio0 ASPEED_GPIO(I, 5) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "FPGA_BMC_CONFIG_DONE";
+	};
+
+	pin_gpio_i7 {
+		gpios = <&gpio0 ASPEED_GPIO(I, 7) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "FPGA_NSTATUS";
+	};
+
+	pin_gpio_l6 {
+		gpios = <&gpio0 ASPEED_GPIO(L, 6) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "VGAHS_GPIO2";
+	};
+
+	pin_gpio_l7 {
+		gpios = <&gpio0 ASPEED_GPIO(L, 7) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "VGAVS_GPIO4";
+	};
+
+	pin_gpio_m0 {
+		gpios = <&gpio0 ASPEED_GPIO(M, 0) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "BMC_UART1_NCTS";
+	};
+
+	pin_gpio_m2 {
+		gpios = <&gpio0 ASPEED_GPIO(M, 2) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "BMC_UART1_NDSR";
+	};
+
+	pin_gpio_m3 {
+		gpios = <&gpio0 ASPEED_GPIO(M, 3) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_UART_SEL_1";
+	};
+
+	pin_gpio_m4 {
+		gpios = <&gpio0 ASPEED_GPIO(M, 4) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_UART1_NDTR";
+	};
+
+	pin_gpio_m5 {
+		gpios = <&gpio0 ASPEED_GPIO(M, 5) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_UART1_NRTS";
+	};
+
+	pin_gpio_n0 {
+		gpios = <&gpio0 ASPEED_GPIO(N, 0) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "TEMP_SENSOR_ALERT";
+	};
+
+	pin_gpio_n1 {
+		gpios = <&gpio0 ASPEED_GPIO(N, 1) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "RESERVED_GPIO67";
+	};
+
+	pin_gpio_n2 {
+		gpios = <&gpio0 ASPEED_GPIO(N, 2) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "CPU_RST#";
+	};
+
+	pin_gpio_p0 {
+		gpios = <&gpio0 ASPEED_GPIO(P, 0) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_UART_SEL_2";
+	};
+
+	pin_gpio_p2 {
+		gpios = <&gpio0 ASPEED_GPIO(P, 2) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "GPIO85_PASSTHRU1_IN";
+	};
+
+	pin_gpio_p3 {
+		gpios = <&gpio0 ASPEED_GPIO(P, 3) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "GPIO45_PASSTHRU1_OUT";
+	};
+
+	pin_gpio_p4 {
+		gpios = <&gpio0 ASPEED_GPIO(P, 4) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "GPIO109_PASSTHRU2_IN";
+	};
+
+	pin_gpio_p5 {
+		gpios = <&gpio0 ASPEED_GPIO(P, 5) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "GPIO21_PASSTHRU2_OUT";
+	};
+
+	pin_gpio_p6 {
+		gpios = <&gpio0 ASPEED_GPIO(P, 6) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_GPIO61";
+	};
+
+	pin_gpio_v0 {
+		gpios = <&gpio0 ASPEED_GPIO(V, 0) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "GPIO37_INDICATOR#";
+	};
+
+	pin_gpio_v1 {
+		gpios = <&gpio0 ASPEED_GPIO(V, 1) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "UCD90160A_2_GPI1";
+	};
+
+	pin_gpio_v2 {
+		gpios = <&gpio0 ASPEED_GPIO(V, 2) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "UCD90160A_1_GPI1";
+	};
+
+	pin_gpio_v3 {
+		gpios = <&gpio0 ASPEED_GPIO(V, 3) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "PWRMONITOR_BMC";
+	};
+
+	pin_gpio_v4 {
+		gpios = <&gpio0 ASPEED_GPIO(V, 4) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "BMC_PWRGD";
+	};
+
+	pin_gpio_v5 {
+		gpios = <&gpio0 ASPEED_GPIO(V, 5) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "FPGA_DEV_CLR_N";
+	};
+
+	pin_gpio_v6 {
+		gpios = <&gpio0 ASPEED_GPIO(V, 6) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "FPGA_DEV_OE";
+	};
+
+	pin_gpio_v7 {
+		gpios = <&gpio0 ASPEED_GPIO(V, 7) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "FPGA_CONFIG_SEL";
+	};
+
+	pin_gpio_x0 {
+		gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_TPM_SPI_CS_N";
+	};
+
+	pin_gpio_x1 {
+		gpios = <&gpio0 ASPEED_GPIO(X, 1) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "SPI2CS1#_GPIO86";
+	};
+
+	pin_gpio_x2 {
+		gpios = <&gpio0 ASPEED_GPIO(X, 2) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "SPI2CS2#_GPIO84";
+	};
+
+	pin_gpio_x3 {
+		gpios = <&gpio0 ASPEED_GPIO(X, 3) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "SPI2CK_GPIO78";
+	};
+
+	pin_gpio_x4 {
+		gpios = <&gpio0 ASPEED_GPIO(X, 4) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "SPI2MOSI_GPIO82";
+	};
+
+	pin_gpio_x5 {
+		gpios = <&gpio0 ASPEED_GPIO(X, 5) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "SPI2MISO_GPIO80";
+	};
+
+	pin_gpio_x6 {
+		gpios = <&gpio0 ASPEED_GPIO(X, 6) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_FPGA_JTAG_EN";
+	};
+
+	pin_gpio_x7 {
+		gpios = <&gpio0 ASPEED_GPIO(X, 7) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "BMC_TPM_SPI_PIRQ_N";
+	};
+
+	pin_gpio_y0 {
+		gpios = <&gpio0 ASPEED_GPIO(Y, 0) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "WDTRST1_GPIO59";
+	};
+
+	pin_gpio_y1 {
+		gpios = <&gpio0 ASPEED_GPIO(Y, 1) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "WDTRST2_GPIO51";
+	};
+
+	pin_gpio_y2 {
+		gpios = <&gpio0 ASPEED_GPIO(Y, 2) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_GPIO57";
+	};
+
+	pin_gpio_y3 {
+		gpios = <&gpio0 ASPEED_GPIO(Y, 3) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "BMC_GPIO55";
+	};
+
+	pin_gpio_y4 {
+		gpios = <&gpio0 ASPEED_GPIO(Y, 4) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "FWSPI_IO2_GPIO41";
+	};
+
+	pin_gpio_y5 {
+		gpios = <&gpio0 ASPEED_GPIO(Y, 5) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "FWSPI_IO3_GPIO43";
+	};
+
+	pin_gpio_y7 {
+		gpios = <&gpio0 ASPEED_GPIO(Y, 7) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "GPIO35_FWSPIWP#";
+	};
+
+	pin_gpio_z0 {
+		gpios = <&gpio0 ASPEED_GPIO(Z, 0) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "SPI1CS1#_GPIO124";
+	};
+
+	pin_gpio_z1 {
+		gpios = <&gpio0 ASPEED_GPIO(Z, 1) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "I2C_TPM_PP";
+	};
+
+	pin_gpio_z2 {
+		gpios = <&gpio0 ASPEED_GPIO(Z, 2) GPIO_ACTIVE_HIGH>;
+		input;
+		line-name = "I2C_TPM_INT_N";
+	};
+
+	pin_gpio_z3 {
+		gpios = <&gpio0 ASPEED_GPIO(Z, 3) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "SPI1CK_GPIO122";
+	};
+
+	pin_gpio_z4 {
+		gpios = <&gpio0 ASPEED_GPIO(Z, 4) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "SPI1MOSI_IO0_GPO3";
+	};
+
+	pin_gpio_z5 {
+		gpios = <&gpio0 ASPEED_GPIO(Z, 5) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "SPI1MISO_IO1_GPO4";
+	};
+
+	pin_gpio_z6 {
+		gpios = <&gpio0 ASPEED_GPIO(Z, 6) GPIO_ACTIVE_LOW>;
+		output;
+		line-name = "GPO5_SPI1_IO2";
+	};
+
+	pin_gpio_z7 {
+		gpios = <&gpio0 ASPEED_GPIO(Z, 7) GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "GPIO120_SPI1_IO3";
+	};
+};
