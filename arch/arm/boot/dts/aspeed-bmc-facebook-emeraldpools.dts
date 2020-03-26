@@ -72,6 +72,21 @@
 	};
 };
 
+&spi2 {
+	status = "okay";
+	compatible = "aspeed,ast2500-spi-master";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi2ck_default &pinctrl_spi2cs0_default &pinctrl_spi2miso_default &pinctrl_spi2mosi_default>;
+
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		spi-max-frequency = <12000000>;
+		label = "switch0";
+	};
+};
+
 &uart1 {
 	// OAM Console
 	status = "okay";
