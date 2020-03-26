@@ -97,6 +97,28 @@ config TCG_TIS_I2C_NUVOTON
 	  To compile this driver as a module, choose M here; the module
 	  will be called tpm_i2c_nuvoton.
 
+config TCG_TIS_I2C_PTP
+	tristate "TPM Interface Specification 1.2/2.0 Interface (I2C - PTP)"
+	depends on I2C
+	select CRC_CCITT
+	---help---
+	  If you have a TPM security chip with an I2C interface that impelements
+	  the TPM I2C interface protocol defined by the PTP say Yes and it will be
+	  accessible from within Linux.
+	  To compile this driver as a module, choose M here; the module
+	  will be called tpm_i2c_ptp.
+
+config TCG_TIS_I2C_PTP_MAX_SIZE
+	prompt "Max I2C Buffer Size"
+	depends on TCG_TIS_I2C_PTP
+	int
+	default 32
+	help
+	  Set the maximal I2C buffer size. This will alter the default value. A
+	  different size can be set by using a module parameter (i2c_max_size)
+	  as well. If no parameter is provided when loading, this is the value
+	  that will be used.
+
 config TCG_NSC
 	tristate "National Semiconductor TPM Interface"
 	depends on X86
