@@ -231,6 +231,11 @@
 		compatible = "ti,tps53688";
 		reg = <0x76>;
 	};
+
+	pxe1110@4A {
+		compatible = "infineon,pxe1110c";
+		reg = <0x4a>;
+	};
 };
 
 &i2c2 {
