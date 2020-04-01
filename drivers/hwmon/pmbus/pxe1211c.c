@@ -72,6 +72,13 @@ static int pxe1211c_probe(struct i2c_client *client,
 							| I2C_FUNC_SMBUS_READ_BLOCK_DATA))
 		return -ENODEV;
 
+	ret = i2c_smbus_write_byte_data(client, PMBUS_PAGE, 0x00);
+	if (ret < 0)
+	{
+		dev_err(&client->dev, "Failed to set PMBUS_PAGE 0x0\n");
+		return ret;
+	}
+
 	ret = i2c_smbus_read_block_data(client, PMBUS_MFR_ID, buf);
 	if (ret < 0)
 	{
@@ -112,13 +119,23 @@ static int pxe1211c_probe(struct i2c_client *client,
 
 static const struct i2c_device_id pxe1211c_id[] = {
 	{"pxe1211c", 0},
+	{"pxe1110c", 1},
 	{}};
 
 MODULE_DEVICE_TABLE(i2c, pxe1211c_id);
 
+static const struct of_device_id pxe1211_of_match[] = {
+	{.compatible = "infineon,pxe1211c"},
+	{.compatible = "infineon,pxe1110c"},
+	{}
+};
+MODULE_DEVICE_TABLE(of, pxe1211_of_match);
+
+
 static struct i2c_driver pxe1211c_driver = {
 	.driver = {
 		.name = "pxe1211c",
+		.of_match_table = of_match_ptr(pxe1211_of_match),
 	},
 	.probe = pxe1211c_probe,
 	.remove = pmbus_do_remove,
