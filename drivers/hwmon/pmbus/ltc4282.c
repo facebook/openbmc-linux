@@ -209,7 +209,7 @@ static struct ltc4282_data *ltc4282_update_adc(struct device *dev, int reg)
 	switch (reg) {
 	case ltc4282_reg_vin:
 		val = i2c_smbus_read_byte_data(client, LTC4282_ADJUST);
-		val |= VOLTAGE_SELECT;
+		val &= (~VOLTAGE_SELECT);
 		i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
 		if (val | RESOLUTION_16_BIT)
 			msleep(1100);
@@ -220,7 +220,7 @@ static struct ltc4282_data *ltc4282_update_adc(struct device *dev, int reg)
 		break;
 	case ltc4282_reg_vout:
 		val = i2c_smbus_read_byte_data(client, LTC4282_ADJUST);
-		val &= (~VOLTAGE_SELECT);
+		val |= VOLTAGE_SELECT;
 		i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
 		if (val | RESOLUTION_16_BIT)
 			msleep(1100);
