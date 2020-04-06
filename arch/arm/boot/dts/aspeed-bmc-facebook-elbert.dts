@@ -56,8 +56,16 @@
 
 &mac0 {
 	status = "okay";
+
+	phy-mode = "rgmii";
+
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rgmii1_default &pinctrl_mdio1_default>;
+	pinctrl-0 = <&pinctrl_rgmii1_default>;
+
+	fixed-link {
+		speed = <100>;
+		full-duplex;
+	};
 };
 
 &mac1 {
