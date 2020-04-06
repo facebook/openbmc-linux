@@ -11,7 +11,7 @@
 	compatible = "facebook,fuji-bmc", "aspeed,ast2600";
 
 	aliases {
-		serial0 = &uart5;
+		serial0 = &uart1;
 
 		/*
 		 * I2C switch 2-0070, pca9548, total 8 child channels
@@ -210,9 +210,8 @@
 	};
 };
 
-&uart5 {
-	/* Workaround for AST2600 A0 */
-	compatible = "snps,dw-apb-uart";
+&uart1 {
+	status = "okay";
 };
 
 &wdt1 {
