@@ -1186,7 +1186,7 @@
 	status = "okay";
 };
 
-&ehci0 {
+&vhub {
 	status = "okay";
 };
 
