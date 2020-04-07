@@ -74,6 +74,18 @@ config TCG_TIS_SPI_CR50
 	  If you have a H1 secure module running Cr50 firmware on SPI bus,
 	  say Yes and it will be accessible from within Linux.
 
+config TCG_TIS_I2C
+	tristate "TPM I2C Interface Specification"
+	depends on I2C
+	depends on CRC_CCITT
+	select TCG_TIS_CORE
+	---help---
+	  If you have a TPM security chip which is connected to a regular
+	  I2C master (i.e. most embedded platforms) that is compliant with the
+	  TCG TPM I2C Interface Specification say Yes and it will be accessible from
+	  within Linux. To compile this driver as a module, choose  M here;
+	  the module will be called tpm_tis_i2c.
+
 config TCG_TIS_I2C_ATMEL
 	tristate "TPM Interface Specification 1.2 Interface (I2C - Atmel)"
 	depends on I2C
