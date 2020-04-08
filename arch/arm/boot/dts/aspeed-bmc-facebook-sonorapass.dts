@@ -201,6 +201,10 @@
 
 &i2c1 {
 	status = "okay";
+	pxe1110@4A {
+		compatible = "infineon,pxe1110c";
+		reg = <0x4a>;
+	};
 };
 
 &i2c2 {
