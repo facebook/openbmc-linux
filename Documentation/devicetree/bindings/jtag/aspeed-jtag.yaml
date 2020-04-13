@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: https://urldefense.proofpoint.com/v2/url?u=http-3A__devicetree.org_schemas_jtag_aspeed-2Djtag.yaml-23&d=DwIBAg&c=5VD0RTtNlTh3ycd41b3MUw&r=iYElT7HC77pRZ3byVvW8ng&m=vGWCsGcOo2XBzrFEoF2nIS4gWviJ18aq1W4UxkRbmXA&s=5LDPQjHKBcLkVCSOxFNx3oLtdKgpW5T1u56Km9Lch5s&e=
+$schema: https://urldefense.proofpoint.com/v2/url?u=http-3A__devicetree.org_meta-2Dschemas_core.yaml-23&d=DwIBAg&c=5VD0RTtNlTh3ycd41b3MUw&r=iYElT7HC77pRZ3byVvW8ng&m=vGWCsGcOo2XBzrFEoF2nIS4gWviJ18aq1W4UxkRbmXA&s=r89VV7bcxrO-vDJsqHLKtJVbs-nZVmROiBZlM8YHtiQ&e=
+
+title: Aspeed JTAG driver for ast2400 and ast2500 SoC
+
+description:
+  Driver adds support of Aspeed 2500/2400 series SOC JTAG master controller.
+  Driver implements the following jtag ops
+    freq_get
+    freq_set
+    status_get
+    status_set
+    xfer
+    mode_set
+    bitbang
+    enable
+    disable
+
+  It has been tested on Mellanox system with BMC equipped with
+  Aspeed 2520 SoC for programming CPLD devices.
+
+  It has also been tested on Intel system using Aspeed 25xx SoC
+  for JTAG communication.
+
+maintainers:
+  - Oleksandr Shamray <oleksandrs@mellanox.com>
+  - Jiri Pirko <jiri@mellanox.com>
+  - Ernesto Corona<ernesto.corona@intel.com>
+
+properties:
+  compatible:
+    oneOf:
+      - items:
+          - enum:
+              - aspeed,ast2400-jtag
+              - aspeed,ast2500-jtag
+
+
+  reg:
+    items:
+      - description: JTAG Master controller register range
+
+  interrupts:
+    maxItems: 1
+
+  clocks:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - clocks
+
+examples:
+  - |
+    #include <dt-bindings/clock/aspeed-clock.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+
+      jtag: jtag@1e6e4000 {
+          compatible = "aspeed,ast2500-jtag";
+          reg = <0x1e6e4000 0x1c>;
+          clocks = <&syscon ASPEED_CLK_APB>;
+          resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
+          interrupts = <43>;
+      };
+
+...
