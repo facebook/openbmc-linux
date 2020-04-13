@@ -1510,10 +1510,7 @@ static void omap_hsmmc_init_card(struct mmc_host *mmc, struct mmc_card *card)
 {
 	struct omap_hsmmc_host *host = mmc_priv(mmc);
 
-	if (mmc_pdata(host)->init_card)
-		mmc_pdata(host)->init_card(card);
-	else if (card->type == MMC_TYPE_SDIO ||
-		 card->type == MMC_TYPE_SD_COMBO) {
+	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
 		struct device_node *np = mmc_dev(mmc)->of_node;
 
 		/*
@@ -1606,12 +1603,6 @@ static int omap_hsmmc_configure_wake_irq(struct omap_hsmmc_host *host)
 		struct pinctrl *p = devm_pinctrl_get(host->dev);
 		if (IS_ERR(p)) {
 			ret = PTR_ERR(p);
-			goto err_free_irq;
-		}
-		if (IS_ERR(pinctrl_lookup_state(p, PINCTRL_STATE_DEFAULT))) {
-			dev_info(host->dev, "missing default pinctrl state\n");
-			devm_pinctrl_put(p);
-			ret = -EINVAL;
 			goto err_free_irq;
 		}
 
@@ -2156,14 +2147,14 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 	if ((host->mmc->caps & MMC_CAP_SDIO_IRQ) &&
 	    (host->flags & HSMMC_SDIO_IRQ_ENABLED)) {
 
-		pinctrl_pm_select_default_state(host->dev);
+		pinctrl_select_default_state(host->dev);
 
 		/* irq lost, if pinmux incorrect */
 		OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
 		OMAP_HSMMC_WRITE(host->base, ISE, CIRQ_EN);
 		OMAP_HSMMC_WRITE(host->base, IE, CIRQ_EN);
 	} else {
-		pinctrl_pm_select_default_state(host->dev);
+		pinctrl_select_default_state(host->dev);
 	}
 	spin_unlock_irqrestore(&host->irq_lock, flags);
 	return 0;

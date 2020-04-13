@@ -90,7 +90,7 @@ struct ftgmac100 {
 	struct mii_bus *mii_bus;
 	struct clk *clk;
 
-	/* 2600 RMII clock gate */
+	/* AST2500/AST2600 RMII ref clock gate */
 	struct clk *rclk;
 
 	/* Link management */
@@ -1536,16 +1536,7 @@ static int ftgmac100_stop(struct net_device *netdev)
 	return 0;
 }
 
-/* optional */
-static int ftgmac100_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
-{
-	if (!netdev->phydev)
-		return -ENXIO;
-
-	return phy_mii_ioctl(netdev->phydev, ifr, cmd);
-}
-
-static void ftgmac100_tx_timeout(struct net_device *netdev)
+static void ftgmac100_tx_timeout(struct net_device *netdev, unsigned int txqueue)
 {
 	struct ftgmac100 *priv = netdev_priv(netdev);
 
@@ -1597,7 +1588,7 @@ static const struct net_device_ops ftgmac100_netdev_ops = {
 	.ndo_start_xmit		= ftgmac100_hard_start_xmit,
 	.ndo_set_mac_address	= ftgmac100_set_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_do_ioctl		= ftgmac100_do_ioctl,
+	.ndo_do_ioctl		= phy_do_ioctl,
 	.ndo_tx_timeout		= ftgmac100_tx_timeout,
 	.ndo_set_rx_mode	= ftgmac100_set_rx_mode,
 	.ndo_set_features	= ftgmac100_set_features,
@@ -1612,7 +1603,7 @@ static int ftgmac100_setup_mdio(struct net_device *netdev)
 {
 	struct ftgmac100 *priv = netdev_priv(netdev);
 	struct platform_device *pdev = to_platform_device(priv->dev);
-	int phy_intf = PHY_INTERFACE_MODE_RGMII;
+	phy_interface_t phy_intf = PHY_INTERFACE_MODE_RGMII;
 	struct device_node *np = pdev->dev.of_node;
 	int i, err = 0;
 	u32 reg;
@@ -1637,8 +1628,8 @@ static int ftgmac100_setup_mdio(struct net_device *netdev)
 	/* Get PHY mode from device-tree */
 	if (np) {
 		/* Default to RGMII. It's a gigabit part after all */
-		phy_intf = of_get_phy_mode(np);
-		if (phy_intf < 0)
+		err = of_get_phy_mode(np, &phy_intf);
+		if (err)
 			phy_intf = PHY_INTERFACE_MODE_RGMII;
 
 		/* Aspeed only supports these. I don't know about other IP
@@ -1723,27 +1714,38 @@ static void ftgmac100_ncsi_handler(struct ncsi_dev *nd)
 static int ftgmac100_setup_clk(struct ftgmac100 *priv)
 {
 	struct clk *clk;
+	int rc;
 
 	clk = devm_clk_get(priv->dev, NULL /* MACCLK */);
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
 	priv->clk = clk;
-	clk_prepare_enable(priv->clk);
+	rc = clk_prepare_enable(priv->clk);
+	if (rc)
+		return rc;
 
 	/* Aspeed specifies a 100MHz clock is required for up to
 	 * 1000Mbit link speeds. As NCSI is limited to 100Mbit, 25MHz
 	 * is sufficient
 	 */
-	clk_set_rate(priv->clk, priv->use_ncsi ? FTGMAC_25MHZ :
-			FTGMAC_100MHZ);
+	rc = clk_set_rate(priv->clk, priv->use_ncsi ? FTGMAC_25MHZ :
+			  FTGMAC_100MHZ);
+	if (rc)
+		goto cleanup_clk;
 
 	/* RCLK is for RMII, typically used for NCSI. Optional because its not
-	 * necessary if it's the 2400 MAC or the MAC is configured for RGMII
+	 * necessary if it's the AST2400 MAC, or the MAC is configured for
+	 * RGMII, or the controller is not an ASPEED-based controller.
 	 */
 	priv->rclk = devm_clk_get_optional(priv->dev, "RCLK");
-	clk_prepare_enable(priv->rclk);
+	rc = clk_prepare_enable(priv->rclk);
+	if (!rc)
+		return 0;
 
-	return 0;
+cleanup_clk:
+	clk_disable_unprepare(priv->clk);
+
+	return rc;
 }
 
 static int ftgmac100_probe(struct platform_device *pdev)
@@ -1847,7 +1849,7 @@ static int ftgmac100_probe(struct platform_device *pdev)
 		}
 
 		/* Indicate that we support PAUSE frames (see comment in
-		 * Documentation/networking/phy.txt)
+		 * Documentation/networking/phy.rst)
 		 */
 		phy_support_asym_pause(phy);
 
@@ -1902,8 +1904,7 @@ static int ftgmac100_probe(struct platform_device *pdev)
 	return 0;
 
 err_register_netdev:
-	if (priv->rclk)
-		clk_disable_unprepare(priv->rclk);
+	clk_disable_unprepare(priv->rclk);
 	clk_disable_unprepare(priv->clk);
 err_ncsi_dev:
 	ftgmac100_destroy_mdio(netdev);
@@ -1927,8 +1928,7 @@ static int ftgmac100_remove(struct platform_device *pdev)
 
 	unregister_netdev(netdev);
 
-	if (priv->rclk)
-		clk_disable_unprepare(priv->rclk);
+	clk_disable_unprepare(priv->rclk);
 	clk_disable_unprepare(priv->clk);
 
 	/* There's a small chance the reset task will have been re-queued,

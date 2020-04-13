@@ -16,15 +16,6 @@ config DEVMEM
 	  memory.
 	  When in doubt, say "Y".
 
-config DEVMEM_BOOTPARAM
-	bool "mem.devmem boot parameter"
-	depends on DEVMEM
-	default n
-	help
-	  This option adds a 'mem.devmem' kernel parameter which activates
-	  the /dev/mem device when enabled.
-	  When in doubt, say "N".
-
 config DEVKMEM
 	bool "/dev/kmem virtual device support"
 	# On arm64, VMALLOC_START < PAGE_OFFSET, which confuses kmem read/write
@@ -448,8 +439,8 @@ config RAW_DRIVER
 	  Once bound, I/O against /dev/raw/rawN uses efficient zero-copy I/O.
 	  See the raw(8) manpage for more details.
 
-          Applications should preferably open the device (eg /dev/hda1)
-          with the O_DIRECT flag.
+	  Applications should preferably open the device (eg /dev/hda1)
+	  with the O_DIRECT flag.
 
 config MAX_RAW_DEVS
 	int "Maximum number of RAW devices to support (1-65536)"

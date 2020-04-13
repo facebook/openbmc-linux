@@ -38,11 +38,6 @@
 #define TIMER_CR		(0x30)
 
 /*
-  Control register set to clear for ast2600 only.
- */
-#define TIMER_CR_CLR		(0x3c)
-
-/*
  * Control register (TMC30) bit fields for fttmr010/gemini/moxart timers.
  */
 #define TIMER_1_CR_ENABLE	BIT(0)
@@ -102,7 +97,6 @@ struct fttmr010 {
 	bool is_aspeed;
 	u32 t1_enable_val;
 	struct clock_event_device clkevt;
-	int (*timer_shutdown)(struct clock_event_device *evt);
 #ifdef CONFIG_ARM
 	struct delay_timer delay_timer;
 #endif
@@ -146,7 +140,9 @@ static int fttmr010_timer_set_next_event(unsigned long cycles,
 	u32 cr;
 
 	/* Stop */
-	fttmr010->timer_shutdown(evt);
+	cr = readl(fttmr010->base + TIMER_CR);
+	cr &= ~fttmr010->t1_enable_val;
+	writel(cr, fttmr010->base + TIMER_CR);
 
 	if (fttmr010->is_aspeed) {
 		/*
@@ -164,16 +160,6 @@ static int fttmr010_timer_set_next_event(unsigned long cycles,
 	cr = readl(fttmr010->base + TIMER_CR);
 	cr |= fttmr010->t1_enable_val;
 	writel(cr, fttmr010->base + TIMER_CR);
-
-	return 0;
-}
-
-static int ast2600_timer_shutdown(struct clock_event_device *evt)
-{
-	struct fttmr010 *fttmr010 = to_fttmr010(evt);
-
-	/* Stop */
-	writel(fttmr010->t1_enable_val, fttmr010->base + TIMER_CR_CLR);
 
 	return 0;
 }
@@ -197,7 +183,9 @@ static int fttmr010_timer_set_oneshot(struct clock_event_device *evt)
 	u32 cr;
 
 	/* Stop */
-	fttmr010->timer_shutdown(evt);
+	cr = readl(fttmr010->base + TIMER_CR);
+	cr &= ~fttmr010->t1_enable_val;
+	writel(cr, fttmr010->base + TIMER_CR);
 
 	/* Setup counter start from 0 or ~0 */
 	writel(0, fttmr010->base + TIMER1_COUNT);
@@ -223,7 +211,9 @@ static int fttmr010_timer_set_periodic(struct clock_event_device *evt)
 	u32 cr;
 
 	/* Stop */
-	fttmr010->timer_shutdown(evt);
+	cr = readl(fttmr010->base + TIMER_CR);
+	cr &= ~fttmr010->t1_enable_val;
+	writel(cr, fttmr010->base + TIMER_CR);
 
 	/* Setup timer to fire at 1/HZ intervals. */
 	if (fttmr010->is_aspeed) {
@@ -259,21 +249,7 @@ static irqreturn_t fttmr010_timer_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t ast2600_timer_interrupt(int irq, void *dev_id)
-{
-	struct clock_event_device *evt = dev_id;
-	struct fttmr010 *fttmr010 = to_fttmr010(evt);
-
-	writel(0x1, fttmr010->base + TIMER_INTR_STATE);
-
-	evt->event_handler(evt);
-	return IRQ_HANDLED;
-}
-
-static int __init fttmr010_common_init(struct device_node *np,
-		bool is_aspeed,
-		int (*timer_shutdown)(struct clock_event_device *),
-		irq_handler_t handler)
+static int __init fttmr010_common_init(struct device_node *np, bool is_aspeed)
 {
 	struct fttmr010 *fttmr010;
 	int irq;
@@ -374,8 +350,6 @@ static int __init fttmr010_common_init(struct device_node *np,
 				     fttmr010->tick_rate);
 	}
 
-	fttmr010->timer_shutdown = timer_shutdown;
-
 	/*
 	 * Setup clockevent timer (interrupt-driven) on timer 1.
 	 */
@@ -383,7 +357,7 @@ static int __init fttmr010_common_init(struct device_node *np,
 	writel(0, fttmr010->base + TIMER1_LOAD);
 	writel(0, fttmr010->base + TIMER1_MATCH1);
 	writel(0, fttmr010->base + TIMER1_MATCH2);
-	ret = request_irq(irq, handler, IRQF_TIMER,
+	ret = request_irq(irq, fttmr010_timer_interrupt, IRQF_TIMER,
 			  "FTTMR010-TIMER1", &fttmr010->clkevt);
 	if (ret) {
 		pr_err("FTTMR010-TIMER1 no IRQ\n");
@@ -396,10 +370,10 @@ static int __init fttmr010_common_init(struct device_node *np,
 	fttmr010->clkevt.features = CLOCK_EVT_FEAT_PERIODIC |
 		CLOCK_EVT_FEAT_ONESHOT;
 	fttmr010->clkevt.set_next_event = fttmr010_timer_set_next_event;
-	fttmr010->clkevt.set_state_shutdown = fttmr010->timer_shutdown;
+	fttmr010->clkevt.set_state_shutdown = fttmr010_timer_shutdown;
 	fttmr010->clkevt.set_state_periodic = fttmr010_timer_set_periodic;
 	fttmr010->clkevt.set_state_oneshot = fttmr010_timer_set_oneshot;
-	fttmr010->clkevt.tick_resume = fttmr010->timer_shutdown;
+	fttmr010->clkevt.tick_resume = fttmr010_timer_shutdown;
 	fttmr010->clkevt.cpumask = cpumask_of(0);
 	fttmr010->clkevt.irq = irq;
 	clockevents_config_and_register(&fttmr010->clkevt,
@@ -430,25 +404,14 @@ out_disable_clock:
 	return ret;
 }
 
-static __init int ast2600_timer_init(struct device_node *np)
-{
-	return fttmr010_common_init(np, true,
-			ast2600_timer_shutdown,
-			ast2600_timer_interrupt);
-}
-
 static __init int aspeed_timer_init(struct device_node *np)
 {
-	return fttmr010_common_init(np, true,
-			fttmr010_timer_shutdown,
-			fttmr010_timer_interrupt);
+	return fttmr010_common_init(np, true);
 }
 
 static __init int fttmr010_timer_init(struct device_node *np)
 {
-	return fttmr010_common_init(np, false,
-			fttmr010_timer_shutdown,
-			fttmr010_timer_interrupt);
+	return fttmr010_common_init(np, false);
 }
 
 TIMER_OF_DECLARE(fttmr010, "faraday,fttmr010", fttmr010_timer_init);
@@ -456,4 +419,3 @@ TIMER_OF_DECLARE(gemini, "cortina,gemini-timer", fttmr010_timer_init);
 TIMER_OF_DECLARE(moxart, "moxa,moxart-timer", fttmr010_timer_init);
 TIMER_OF_DECLARE(ast2400, "aspeed,ast2400-timer", aspeed_timer_init);
 TIMER_OF_DECLARE(ast2500, "aspeed,ast2500-timer", aspeed_timer_init);
-TIMER_OF_DECLARE(ast2600, "aspeed,ast2600-timer", ast2600_timer_init);

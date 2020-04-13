@@ -155,17 +155,9 @@ int pmbus_set_page(struct i2c_client *client, int page)
 		return 0;
 
 	if (!(data->info->func[page] & PMBUS_PAGE_VIRTUAL)) {
-		dev_dbg(&client->dev, "Want page %u, %u cached\n", page,
-			data->currpage);
-
 		rv = i2c_smbus_write_byte_data(client, PMBUS_PAGE, page);
-		if (rv) {
-			rv = i2c_smbus_write_byte_data(client, PMBUS_PAGE,
-						       page);
-			dev_dbg(&client->dev,
-				"Failed to set page %u, performed one-shot retry %s: %d\n",
-				page, rv ? "and failed" : "with success", rv);
-		}
+		if (rv < 0)
+			return rv;
 
 		rv = i2c_smbus_read_byte_data(client, PMBUS_PAGE);
 		if (rv < 0)
@@ -441,15 +433,15 @@ static int pmbus_get_fan_rate(struct i2c_client *client, int page, int id,
 		return s->data;
 	}
 
-	config = _pmbus_read_byte_data(client, page,
-				       pmbus_fan_config_registers[id]);
+	config = pmbus_read_byte_data(client, page,
+				      pmbus_fan_config_registers[id]);
 	if (config < 0)
 		return config;
 
 	have_rpm = !!(config & pmbus_fan_rpm_mask[id]);
 	if (want_rpm == have_rpm)
-		return _pmbus_read_word_data(client, page,
-					     pmbus_fan_command_registers[id]);
+		return pmbus_read_word_data(client, page,
+					    pmbus_fan_command_registers[id]);
 
 	/* Can't sensibly map between RPM and PWM, just return zero */
 	return 0;
@@ -704,7 +696,7 @@ static long pmbus_reg2data_vid(struct pmbus_data *data,
 	long val = sensor->data;
 	long rv = 0;
 
-	switch (data->info->vrm_version) {
+	switch (data->info->vrm_version[sensor->page]) {
 	case vr11:
 		if (val >= 0x02 && val <= 0xb2)
 			rv = DIV_ROUND_CLOSEST(160000 - (val - 2) * 625, 100);
@@ -716,6 +708,14 @@ static long pmbus_reg2data_vid(struct pmbus_data *data,
 	case vr13:
 		if (val >= 0x01)
 			rv = 500 + (val - 1) * 10;
+		break;
+	case imvp9:
+		if (val >= 0x01)
+			rv = 200 + (val - 1) * 10;
+		break;
+	case amd625mv:
+		if (val >= 0x0 && val <= 0xd8)
+			rv = DIV_ROUND_CLOSEST(155000 - val * 625, 100);
 		break;
 	}
 	return rv;
@@ -1095,6 +1095,9 @@ static struct pmbus_sensor *pmbus_add_sensor(struct pmbus_data *data,
 	else
 		snprintf(sensor->name, sizeof(sensor->name), "%s%d",
 			 name, seq);
+
+	if (data->flags & PMBUS_WRITE_PROTECTED)
+		readonly = true;
 
 	sensor->page = page;
 	sensor->reg = reg;
@@ -2148,6 +2151,15 @@ static int pmbus_init_common(struct i2c_client *client, struct pmbus_data *data,
 	ret = i2c_smbus_read_byte_data(client, PMBUS_CAPABILITY);
 	if (ret >= 0 && (ret & PB_CAPABILITY_ERROR_CHECK))
 		client->flags |= I2C_CLIENT_PEC;
+
+	/*
+	 * Check if the chip is write protected. If it is, we can not clear
+	 * faults, and we should not try it. Also, in that case, writes into
+	 * limit registers need to be disabled.
+	 */
+	ret = i2c_smbus_read_byte_data(client, PMBUS_WRITE_PROTECT);
+	if (ret > 0 && (ret & PB_WP_ANY))
+		data->flags |= PMBUS_WRITE_PROTECTED | PMBUS_SKIP_STATUS_CHECK;
 
 	if (data->info->pages)
 		pmbus_clear_faults(client);

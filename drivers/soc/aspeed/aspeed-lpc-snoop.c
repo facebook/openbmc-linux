@@ -97,13 +97,13 @@ static ssize_t snoop_file_read(struct file *file, char __user *buffer,
 	return ret ? ret : copied;
 }
 
-static unsigned int snoop_file_poll(struct file *file,
+static __poll_t snoop_file_poll(struct file *file,
 				    struct poll_table_struct *pt)
 {
 	struct aspeed_lpc_snoop_channel *chan = snoop_file_to_chan(file);
 
 	poll_wait(file, &chan->wq, pt);
-	return !kfifo_is_empty(&chan->fifo) ? POLLIN : 0;
+	return !kfifo_is_empty(&chan->fifo) ? EPOLLIN : 0;
 }
 
 static const struct file_operations snoop_fops = {
@@ -324,8 +324,6 @@ static const struct of_device_id aspeed_lpc_snoop_match[] = {
 	{ .compatible = "aspeed,ast2400-lpc-snoop",
 	  .data = &ast2400_model_data },
 	{ .compatible = "aspeed,ast2500-lpc-snoop",
-	  .data = &ast2500_model_data },
-	{ .compatible = "aspeed,ast2600-lpc-snoop",
 	  .data = &ast2500_model_data },
 	{ },
 };

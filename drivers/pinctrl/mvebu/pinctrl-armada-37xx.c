@@ -15,7 +15,6 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
-#include <linux/of_irq.h>
 #include <linux/pinctrl/pinconf-generic.h>
 #include <linux/pinctrl/pinconf.h>
 #include <linux/pinctrl/pinctrl.h>
@@ -722,6 +721,8 @@ static int armada_37xx_irqchip_register(struct platform_device *pdev,
 	struct device_node *np = info->dev->of_node;
 	struct gpio_chip *gc = &info->gpio_chip;
 	struct irq_chip *irqchip = &info->irq_chip;
+	struct gpio_irq_chip *girq = &gc->irq;
+	struct device *dev = &pdev->dev;
 	struct resource res;
 	int ret = -ENODEV, i, nr_irq_parent;
 
@@ -731,20 +732,29 @@ static int armada_37xx_irqchip_register(struct platform_device *pdev,
 			ret = 0;
 			break;
 		}
-	};
-	if (ret)
+	}
+	if (ret) {
+		dev_err(dev, "no gpio-controller child node\n");
 		return ret;
+	}
 
-	nr_irq_parent = of_irq_count(np);
+	nr_irq_parent = platform_irq_count(pdev);
+	if (nr_irq_parent < 0) {
+		if (nr_irq_parent != -EPROBE_DEFER)
+			dev_err(dev, "Couldn't determine irq count: %pe\n",
+				ERR_PTR(nr_irq_parent));
+		return nr_irq_parent;
+	}
+
 	spin_lock_init(&info->irq_lock);
 
 	if (!nr_irq_parent) {
-		dev_err(&pdev->dev, "Invalid or no IRQ\n");
+		dev_err(dev, "invalid or no IRQ\n");
 		return 0;
 	}
 
 	if (of_address_to_resource(info->dev->of_node, 1, &res)) {
-		dev_err(info->dev, "cannot find IO resource\n");
+		dev_err(dev, "cannot find IO resource\n");
 		return -ENOENT;
 	}
 
@@ -759,27 +769,27 @@ static int armada_37xx_irqchip_register(struct platform_device *pdev,
 	irqchip->irq_set_type = armada_37xx_irq_set_type;
 	irqchip->irq_startup = armada_37xx_irq_startup;
 	irqchip->name = info->data->name;
-	ret = gpiochip_irqchip_add(gc, irqchip, 0,
-				   handle_edge_irq, IRQ_TYPE_NONE);
-	if (ret) {
-		dev_info(&pdev->dev, "could not add irqchip\n");
-		return ret;
-	}
-
+	girq->chip = irqchip;
+	girq->parent_handler = armada_37xx_irq_handler;
 	/*
 	 * Many interrupts are connected to the parent interrupt
 	 * controller. But we do not take advantage of this and use
 	 * the chained irq with all of them.
 	 */
+	girq->num_parents = nr_irq_parent;
+	girq->parents = devm_kcalloc(&pdev->dev, nr_irq_parent,
+				     sizeof(*girq->parents), GFP_KERNEL);
+	if (!girq->parents)
+		return -ENOMEM;
 	for (i = 0; i < nr_irq_parent; i++) {
-		int irq = irq_of_parse_and_map(np, i);
+		int irq = platform_get_irq(pdev, i);
 
 		if (irq < 0)
 			continue;
-
-		gpiochip_set_chained_irqchip(gc, irqchip, irq,
-					     armada_37xx_irq_handler);
+		girq->parents[i] = irq;
 	}
+	girq->default_type = IRQ_TYPE_NONE;
+	girq->handler = handle_edge_irq;
 
 	return 0;
 }
@@ -796,7 +806,7 @@ static int armada_37xx_gpiochip_register(struct platform_device *pdev,
 			ret = 0;
 			break;
 		}
-	};
+	}
 	if (ret)
 		return ret;
 
@@ -809,10 +819,10 @@ static int armada_37xx_gpiochip_register(struct platform_device *pdev,
 	gc->of_node = np;
 	gc->label = info->data->name;
 
-	ret = devm_gpiochip_add_data(&pdev->dev, gc, info);
+	ret = armada_37xx_irqchip_register(pdev, info);
 	if (ret)
 		return ret;
-	ret = armada_37xx_irqchip_register(pdev, info);
+	ret = devm_gpiochip_add_data(&pdev->dev, gc, info);
 	if (ret)
 		return ret;
 

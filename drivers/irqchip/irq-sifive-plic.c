@@ -154,15 +154,37 @@ static struct irq_chip plic_chip = {
 static int plic_irqdomain_map(struct irq_domain *d, unsigned int irq,
 			      irq_hw_number_t hwirq)
 {
-	irq_set_chip_and_handler(irq, &plic_chip, handle_fasteoi_irq);
-	irq_set_chip_data(irq, NULL);
+	irq_domain_set_info(d, irq, hwirq, &plic_chip, d->host_data,
+			    handle_fasteoi_irq, NULL, NULL);
 	irq_set_noprobe(irq);
 	return 0;
 }
 
+static int plic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+				 unsigned int nr_irqs, void *arg)
+{
+	int i, ret;
+	irq_hw_number_t hwirq;
+	unsigned int type;
+	struct irq_fwspec *fwspec = arg;
+
+	ret = irq_domain_translate_onecell(domain, fwspec, &hwirq, &type);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < nr_irqs; i++) {
+		ret = plic_irqdomain_map(domain, virq + i, hwirq + i);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static const struct irq_domain_ops plic_irqdomain_ops = {
-	.map		= plic_irqdomain_map,
-	.xlate		= irq_domain_xlate_onecell,
+	.translate	= irq_domain_translate_onecell,
+	.alloc		= plic_irq_domain_alloc,
+	.free		= irq_domain_free_irqs_top,
 };
 
 static struct irq_domain *plic_irqdomain;
@@ -181,7 +203,7 @@ static void plic_handle_irq(struct pt_regs *regs)
 
 	WARN_ON_ONCE(!handler->present);
 
-	csr_clear(sie, SIE_SEIE);
+	csr_clear(CSR_IE, IE_EIE);
 	while ((hwirq = readl(claim))) {
 		int irq = irq_find_mapping(plic_irqdomain, hwirq);
 
@@ -191,7 +213,7 @@ static void plic_handle_irq(struct pt_regs *regs)
 		else
 			generic_handle_irq(irq);
 	}
-	csr_set(sie, SIE_SEIE);
+	csr_set(CSR_IE, IE_EIE);
 }
 
 /*
@@ -252,8 +274,11 @@ static int __init plic_init(struct device_node *node,
 			continue;
 		}
 
-		/* skip contexts other than supervisor external interrupt */
-		if (parent.args[0] != IRQ_S_EXT)
+		/*
+		 * Skip contexts other than external interrupts for our
+		 * privilege level.
+		 */
+		if (parent.args[0] != RV_IRQ_EXT)
 			continue;
 
 		hartid = plic_find_hart_id(parent.np);

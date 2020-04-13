@@ -245,49 +245,6 @@
 			status = "disabled";
 		};
 
-		ehci0: usb@1e6a1000 {
-			compatible = "aspeed,ast2600-ehci", "generic-ehci";
-			reg = <0x1e6a1000 0x100>;
-			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_usb2ah_default>;
-			status = "disabled";
-		};
-
-		ehci1: usb@1e6a3000 {
-			compatible = "aspeed,ast2600-ehci", "generic-ehci";
-			reg = <0x1e6a3000 0x100>;
-			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&syscon ASPEED_CLK_GATE_USBPORT2CLK>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_usb2bh_default>;
-			status = "disabled";
-		};
-
-		uhci: usb@1e6b0000 {
-			compatible = "aspeed,ast2600-uhci", "generic-uhci";
-			reg = <0x1e6b0000 0x100>;
-			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-			#ports = <2>;
-			clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
-			status = "disabled";
-			/*
-			 * No default pinmux, it will follow EHCI, use an explicit pinmux
-			 * override if you don't enable EHCI
-			 */
-		};
-
-		vhub: usb-vhub@1e6a0000 {
-			compatible = "aspeed,ast2600-usb-vhub";
-			reg = <0x1e6a0000 0x350>;
-			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_usb2ad_default>;
-			status = "disabled";
-		};
-
 		apb {
 			compatible = "simple-bus";
 			#address-cells = <1>;
@@ -318,26 +275,6 @@
 				reg = <0x1e6e2524 0x4>;
 				period = <1>;
 				quality = <100>;
-			};
-
-			adc0: adc@1e6e9000 {
-				compatible = "aspeed,ast2600-adc";
-				reg = <0x1e6e9000 0x100>;
-				clocks = <&syscon ASPEED_CLK_APB2>;
-				resets = <&syscon ASPEED_RESET_ADC>;
-				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-				#io-channel-cells = <1>;
-				status = "disabled";
-			};
-
-			adc1: adc@1e6e9100 {
-				compatible = "aspeed,ast2600-adc";
-				reg = <0x1e6e9100 0x100>;
-				clocks = <&syscon ASPEED_CLK_APB2>;
-				resets = <&syscon ASPEED_RESET_ADC>;
-				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-				#io-channel-cells = <1>;
-				status = "disabled";
 			};
 
 			gpio0: gpio@1e780000 {
@@ -428,17 +365,10 @@
 				status = "disabled";
 			};
 
-			wdt4: watchdog@1e7850C0 {
+			wdt4: watchdog@1e7850c0 {
 				compatible = "aspeed,ast2600-wdt";
 				reg = <0x1e7850C0 0x40>;
 				status = "disabled";
-			};
-
-			peci: bus@1e78b000 {
-				compatible = "simple-bus";
-				#address-cells = <1>;
-				#size-cells = <1>;
-				ranges = <0x0 0x1e78b000 0x100>;
 			};
 
 			lpc: lpc@1e789000 {
@@ -524,10 +454,6 @@
 						reg = <0xc0 0x18>;
 						interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
 						status = "disabled";
-					};
-
-					sio_regs: regs {
-						compatible = "aspeed,bmc-misc";
 					};
 				};
 			};
@@ -673,24 +599,6 @@
 };
 
 #include "aspeed-g6-pinctrl.dtsi"
-
-&peci {
-	peci0: peci-bus@0 {
-		compatible = "aspeed,ast2600-peci";
-		reg = <0x0 0x100>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&syscon ASPEED_CLK_GATE_REF0CLK>;
-		resets = <&syscon ASPEED_RESET_PECI>;
-		clock-frequency = <24000000>;
-		msg-timing = <1>;
-		addr-timing = <1>;
-		rd-sampling-point = <8>;
-		cmd-timeout-ms = <1000>;
-		status = "disabled";
-	};
-};
 
 &i2c {
 	i2c0: i2c-bus@80 {

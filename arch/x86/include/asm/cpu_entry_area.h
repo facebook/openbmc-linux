@@ -6,6 +6,7 @@
 #include <linux/percpu-defs.h>
 #include <asm/processor.h>
 #include <asm/intel_ds.h>
+#include <asm/pgtable_areas.h>
 
 #ifdef CONFIG_X86_64
 
@@ -65,6 +66,13 @@ enum exception_stack_ordering {
 
 #endif
 
+#ifdef CONFIG_X86_32
+struct doublefault_stack {
+	unsigned long stack[(PAGE_SIZE - sizeof(struct x86_hw_tss)) / sizeof(unsigned long)];
+	struct x86_hw_tss tss;
+} __aligned(PAGE_SIZE);
+#endif
+
 /*
  * cpu_entry_area is a percpu region that contains things needed by the CPU
  * and early entry/exit code.  Real types aren't used for all fields here
@@ -85,6 +93,11 @@ struct cpu_entry_area {
 	char guard_entry_stack[PAGE_SIZE];
 #endif
 	struct entry_stack_page entry_stack_page;
+
+#ifdef CONFIG_X86_32
+	char guard_doublefault_stack[PAGE_SIZE];
+	struct doublefault_stack doublefault_stack;
+#endif
 
 	/*
 	 * On x86_64, the TSS is mapped RO.  On x86_32, it's mapped RW because
@@ -121,15 +134,6 @@ DECLARE_PER_CPU(struct cea_exception_stacks *, cea_exception_stacks);
 
 extern void setup_cpu_entry_areas(void);
 extern void cea_set_pte(void *cea_vaddr, phys_addr_t pa, pgprot_t flags);
-
-/* Single page reserved for the readonly IDT mapping: */
-#define	CPU_ENTRY_AREA_RO_IDT		CPU_ENTRY_AREA_BASE
-#define CPU_ENTRY_AREA_PER_CPU		(CPU_ENTRY_AREA_RO_IDT + PAGE_SIZE)
-
-#define CPU_ENTRY_AREA_RO_IDT_VADDR	((void *)CPU_ENTRY_AREA_RO_IDT)
-
-#define CPU_ENTRY_AREA_MAP_SIZE			\
-	(CPU_ENTRY_AREA_PER_CPU + CPU_ENTRY_AREA_ARRAY_SIZE - CPU_ENTRY_AREA_BASE)
 
 extern struct cpu_entry_area *get_cpu_entry_area(int cpu);
 

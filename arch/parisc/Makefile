@@ -34,6 +34,13 @@ CC_ARCHES	= hppa hppa2.0 hppa1.1
 LD_BFD		:= elf32-hppa-linux
 endif
 
+# select defconfig based on actual architecture
+ifeq ($(shell uname -m),parisc64)
+	KBUILD_DEFCONFIG := generic-64bit_defconfig
+else
+	KBUILD_DEFCONFIG := generic-32bit_defconfig
+endif
+
 export LD_BFD
 
 ifneq ($(SUBARCH),$(UTS_MACHINE))
@@ -60,7 +67,6 @@ KBUILD_CFLAGS += -DCC_USING_PATCHABLE_FUNCTION_ENTRY=1 \
 		 -DFTRACE_PATCHABLE_FUNCTION_SIZE=$(NOP_COUNT)
 
 CC_FLAGS_FTRACE := -fpatchable-function-entry=$(NOP_COUNT),$(shell echo $$(($(NOP_COUNT)-1)))
-KBUILD_LDS_MODULE += $(srctree)/arch/parisc/kernel/module.lds
 endif
 
 OBJCOPY_FLAGS =-O binary -R .note -R .comment -S

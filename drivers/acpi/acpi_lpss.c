@@ -69,10 +69,6 @@ ACPI_MODULE_NAME("acpi_lpss");
 #define LPSS_SAVE_CTX			BIT(4)
 #define LPSS_NO_D3_DELAY		BIT(5)
 
-/* Crystal Cove PMIC shares same ACPI ID between different platforms */
-#define BYT_CRC_HRV			2
-#define CHT_CRC_HRV			3
-
 struct lpss_private_data;
 
 struct lpss_device_desc {
@@ -158,7 +154,7 @@ static void lpss_deassert_reset(struct lpss_private_data *pdata)
  */
 static struct pwm_lookup byt_pwm_lookup[] = {
 	PWM_LOOKUP_WITH_MODULE("80860F09:00", 0, "0000:00:02.0",
-			       "pwm_backlight", 0, PWM_POLARITY_NORMAL,
+			       "pwm_soc_backlight", 0, PWM_POLARITY_NORMAL,
 			       "pwm-lpss-platform"),
 };
 
@@ -170,8 +166,7 @@ static void byt_pwm_setup(struct lpss_private_data *pdata)
 	if (!adev->pnp.unique_id || strcmp(adev->pnp.unique_id, "1"))
 		return;
 
-	if (!acpi_dev_present("INT33FD", NULL, BYT_CRC_HRV))
-		pwm_add_table(byt_pwm_lookup, ARRAY_SIZE(byt_pwm_lookup));
+	pwm_add_table(byt_pwm_lookup, ARRAY_SIZE(byt_pwm_lookup));
 }
 
 #define LPSS_I2C_ENABLE			0x6c
@@ -204,7 +199,7 @@ static void byt_i2c_setup(struct lpss_private_data *pdata)
 /* BSW PWM used for backlight control by the i915 driver */
 static struct pwm_lookup bsw_pwm_lookup[] = {
 	PWM_LOOKUP_WITH_MODULE("80862288:00", 0, "0000:00:02.0",
-			       "pwm_backlight", 0, PWM_POLARITY_NORMAL,
+			       "pwm_soc_backlight", 0, PWM_POLARITY_NORMAL,
 			       "pwm-lpss-platform"),
 };
 
@@ -499,31 +494,16 @@ static const struct lpss_device_links lpss_device_links[] = {
 	{"80860F41", "7", "LNXVIDEO", NULL, DL_FLAG_PM_RUNTIME},
 };
 
-static bool hid_uid_match(struct acpi_device *adev,
-			  const char *hid2, const char *uid2)
-{
-	const char *hid1 = acpi_device_hid(adev);
-	const char *uid1 = acpi_device_uid(adev);
-
-	if (strcmp(hid1, hid2))
-		return false;
-
-	if (!uid2)
-		return true;
-
-	return uid1 && !strcmp(uid1, uid2);
-}
-
 static bool acpi_lpss_is_supplier(struct acpi_device *adev,
 				  const struct lpss_device_links *link)
 {
-	return hid_uid_match(adev, link->supplier_hid, link->supplier_uid);
+	return acpi_dev_hid_uid_match(adev, link->supplier_hid, link->supplier_uid);
 }
 
 static bool acpi_lpss_is_consumer(struct acpi_device *adev,
 				  const struct lpss_device_links *link)
 {
-	return hid_uid_match(adev, link->consumer_hid, link->consumer_uid);
+	return acpi_dev_hid_uid_match(adev, link->consumer_hid, link->consumer_uid);
 }
 
 struct hid_uid {
@@ -539,7 +519,7 @@ static int match_hid_uid(struct device *dev, const void *data)
 	if (!adev)
 		return 0;
 
-	return hid_uid_match(adev, id->hid, id->uid);
+	return acpi_dev_hid_uid_match(adev, id->hid, id->uid);
 }
 
 static struct device *acpi_lpss_find_device(const char *hid, const char *uid)

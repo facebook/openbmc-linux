@@ -5,14 +5,6 @@ config SOC_ASPEED
 	def_bool y
 	depends on ARCH_ASPEED || COMPILE_TEST
 
-config ASPEED_BMC_MISC
-	bool "Miscellaneous ASPEED BMC interfaces"
-	depends on ARCH_ASPEED || COMPILE_TEST
-	default ARCH_ASPEED
-	help
-	  Say yes to expose VGA and LPC scratch registers, and other
-	  miscellaneous control interfaces specific to the ASPEED BMC SoCs
-
 config ASPEED_LPC_CTRL
 	depends on SOC_ASPEED && REGMAP && MFD_SYSCON
 	tristate "Aspeed ast2400/2500 HOST LPC to BMC bridge control"

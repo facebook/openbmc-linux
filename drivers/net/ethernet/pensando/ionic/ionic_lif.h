@@ -37,6 +37,7 @@ struct ionic_rx_stats {
 	u64 csum_complete;
 	u64 csum_error;
 	u64 buffers_posted;
+	u64 dropped;
 };
 
 #define IONIC_QCQ_F_INITED		BIT(0)
@@ -175,7 +176,9 @@ struct ionic_lif {
 	unsigned long *dbid_inuse;
 	unsigned int dbid_count;
 	struct dentry *dentry;
-	u32 rx_coalesce_usecs;
+	u32 rx_coalesce_usecs;		/* what the user asked for */
+	u32 rx_coalesce_hw;		/* what the hw is using */
+
 	u32 flags;
 	struct work_struct tx_timeout_work;
 };
@@ -187,15 +190,10 @@ struct ionic_lif {
 #define lif_to_txq(lif, i)	(&lif_to_txqcq((lif), i)->q)
 #define lif_to_rxq(lif, i)	(&lif_to_txqcq((lif), i)->q)
 
+/* return 0 if successfully set the bit, else non-zero */
 static inline int ionic_wait_for_bit(struct ionic_lif *lif, int bitname)
 {
-	unsigned long tlimit = jiffies + HZ;
-
-	while (test_and_set_bit(bitname, lif->state) &&
-	       time_before(jiffies, tlimit))
-		usleep_range(100, 200);
-
-	return test_bit(bitname, lif->state);
+	return wait_on_bit_lock(lif->state, bitname, TASK_INTERRUPTIBLE);
 }
 
 static inline u32 ionic_coal_usec_to_hw(struct ionic *ionic, u32 usecs)

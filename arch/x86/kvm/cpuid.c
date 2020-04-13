@@ -62,7 +62,7 @@ u64 kvm_supported_xcr0(void)
 	return xcr0;
 }
 
-#define F(x) bit(X86_FEATURE_##x)
+#define F feature_bit
 
 int kvm_update_cpuid(struct kvm_vcpu *vcpu)
 {
@@ -281,8 +281,9 @@ out:
 	return r;
 }
 
-static void cpuid_mask(u32 *word, int wordnum)
+static __always_inline void cpuid_mask(u32 *word, int wordnum)
 {
+	reverse_cpuid_check(wordnum);
 	*word &= boot_cpu_data.x86_capability[wordnum];
 }
 
@@ -352,6 +353,7 @@ static inline void do_cpuid_7_mask(struct kvm_cpuid_entry2 *entry, int index)
 	unsigned f_umip = kvm_x86_ops->umip_emulated() ? F(UMIP) : 0;
 	unsigned f_intel_pt = kvm_x86_ops->pt_supported() ? F(INTEL_PT) : 0;
 	unsigned f_la57;
+	unsigned f_pku = kvm_x86_ops->pku_supported() ? F(PKU) : 0;
 
 	/* cpuid 7.0.ebx */
 	const u32 kvm_cpuid_7_0_ebx_x86_features =
@@ -363,7 +365,7 @@ static inline void do_cpuid_7_mask(struct kvm_cpuid_entry2 *entry, int index)
 
 	/* cpuid 7.0.ecx*/
 	const u32 kvm_cpuid_7_0_ecx_x86_features =
-		F(AVX512VBMI) | F(LA57) | F(PKU) | 0 /*OSPKE*/ | F(RDPID) |
+		F(AVX512VBMI) | F(LA57) | 0 /*PKU*/ | 0 /*OSPKE*/ | F(RDPID) |
 		F(AVX512_VPOPCNTDQ) | F(UMIP) | F(AVX512_VBMI2) | F(GFNI) |
 		F(VAES) | F(VPCLMULQDQ) | F(AVX512_VNNI) | F(AVX512_BITALG) |
 		F(CLDEMOTE) | F(MOVDIRI) | F(MOVDIR64B) | 0 /*WAITPKG*/;
@@ -392,6 +394,7 @@ static inline void do_cpuid_7_mask(struct kvm_cpuid_entry2 *entry, int index)
 		/* Set LA57 based on hardware capability. */
 		entry->ecx |= f_la57;
 		entry->ecx |= f_umip;
+		entry->ecx |= f_pku;
 		/* PKU is not yet implemented for shadow paging. */
 		if (!tdp_enabled || !boot_cpu_has(X86_FEATURE_OSPKE))
 			entry->ecx &= ~F(PKU);
@@ -780,6 +783,11 @@ static inline int __do_cpuid_func(struct kvm_cpuid_entry2 *entry, u32 function,
 	case 0x8000001a:
 	case 0x8000001e:
 		break;
+	/* Support memory encryption cpuid if host supports it */
+	case 0x8000001F:
+		if (!boot_cpu_has(X86_FEATURE_SEV))
+			entry->eax = entry->ebx = entry->ecx = entry->edx = 0;
+		break;
 	/*Add support for Centaur's CPUID instruction*/
 	case 0xC0000000:
 		/*Just support up to 0xC0000004 now*/
@@ -820,8 +828,6 @@ static int do_cpuid_func(struct kvm_cpuid_entry2 *entry, u32 func,
 
 	return __do_cpuid_func(entry, func, nent, maxnent);
 }
-
-#undef F
 
 struct kvm_cpuid_param {
 	u32 func;
@@ -1020,6 +1026,12 @@ bool kvm_cpuid(struct kvm_vcpu *vcpu, u32 *eax, u32 *ebx,
 		*ebx = entry->ebx;
 		*ecx = entry->ecx;
 		*edx = entry->edx;
+		if (function == 7 && index == 0) {
+			u64 data;
+		        if (!__kvm_get_msr(vcpu, MSR_IA32_TSX_CTRL, &data, true) &&
+			    (data & TSX_CTRL_CPUID_CLEAR))
+				*ebx &= ~(F(RTM) | F(HLE));
+		}
 	} else {
 		*eax = *ebx = *ecx = *edx = 0;
 		/*

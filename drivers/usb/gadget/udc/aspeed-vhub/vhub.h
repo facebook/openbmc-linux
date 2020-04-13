@@ -76,9 +76,17 @@
 #define VHUB_SW_RESET_DEVICE2			(1 << 2)
 #define VHUB_SW_RESET_DEVICE1			(1 << 1)
 #define VHUB_SW_RESET_ROOT_HUB			(1 << 0)
-
+#define VHUB_SW_RESET_ALL			(VHUB_SW_RESET_EP_POOL | \
+						 VHUB_SW_RESET_DMA_CONTROLLER | \
+						 VHUB_SW_RESET_DEVICE5 | \
+						 VHUB_SW_RESET_DEVICE4 | \
+						 VHUB_SW_RESET_DEVICE3 | \
+						 VHUB_SW_RESET_DEVICE2 | \
+						 VHUB_SW_RESET_DEVICE1 | \
+						 VHUB_SW_RESET_ROOT_HUB)
 /* EP ACK/NACK IRQ masks */
 #define VHUB_EP_IRQ(n)				(1 << (n))
+#define VHUB_EP_IRQ_ALL				0x7fff	/* 15 EPs */
 
 /* USB status reg */
 #define VHUB_USBSTS_HISPEED			(1 << 27)
@@ -202,6 +210,8 @@
  *                                      *
  ****************************************/
 
+#define AST_VHUB_NUM_GEN_EPs	15	/* Generic non-0 EPs */
+#define AST_VHUB_NUM_PORTS	5	/* vHub ports */
 #define AST_VHUB_EP0_MAX_PACKET	64	/* EP0's max packet size */
 #define AST_VHUB_EPn_MAX_PACKET	1024	/* Generic EPs max packet size */
 #define AST_VHUB_DESCS_COUNT	256	/* Use 256 descriptor mode (valid
@@ -348,8 +358,7 @@ struct ast_vhub_dev {
 
 	/* Endpoint structures */
 	struct ast_vhub_ep		ep0;
-	struct ast_vhub_ep		**epns;
-	u32				max_epns;
+	struct ast_vhub_ep		*epns[AST_VHUB_NUM_GEN_EPs];
 
 };
 #define to_ast_dev(__g) container_of(__g, struct ast_vhub_dev, gadget)
@@ -384,12 +393,10 @@ struct ast_vhub {
 	bool				ep1_stalled : 1;
 
 	/* Per-port info */
-	struct ast_vhub_port		*ports;
-	u32				max_ports;
+	struct ast_vhub_port		ports[AST_VHUB_NUM_PORTS];
 
 	/* Generic EP data structures */
-	struct ast_vhub_ep		*epns;
-	u32				max_epns;
+	struct ast_vhub_ep		epns[AST_VHUB_NUM_GEN_EPs];
 
 	/* Upstream bus is suspended ? */
 	bool				suspended : 1;
