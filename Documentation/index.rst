@@ -111,6 +111,7 @@ needed).
    iio/index
    isdn/index
    infiniband/index
+   jtag/index
    leds/index
    netlabel/index
    networking/index
