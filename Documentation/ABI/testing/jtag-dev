@@ -1,0 +1,23 @@
+What:		/dev/jtag[0-9]+
+Date:		July 2018
+KernelVersion:	4.20
+Contact:	oleksandrs@mellanox.com
+Description:
+		The misc device files /dev/jtag* are the interface
+		between JTAG master interface and userspace.
+
+		The ioctl(2)-based ABI is defined and documented in
+		[include/uapi]<linux/jtag.h>.
+
+		The following file operations are supported:
+
+		open(2)
+		Opens and allocates file descriptor.
+
+		ioctl(2)
+		Initiate various actions.
+		See the inline documentation in [include/uapi]<linux/jtag.h>
+		for descriptions of all ioctls.
+
+Users:
+		userspace tools which wants to access to JTAG bus
