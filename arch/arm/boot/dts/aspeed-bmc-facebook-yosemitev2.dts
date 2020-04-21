@@ -33,6 +33,13 @@
 	};
 };
 
+&wdt1 {
+	status = "okay";
+	aspeed,reset-type = "soc";
+	aspeed,ext-active-high;
+	aspeed,ext-pulse-duration = <256>;
+};
+
 &fmc {
 	status = "okay";
 	flash@0 {
@@ -94,7 +101,7 @@
 &mac0 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rmii1_default>;
+	pinctrl-0 = <&pinctrl_mdio1_default>;
 	no-hw-checksum;
 	use-ncsi;
 	mlx,multi-host;
