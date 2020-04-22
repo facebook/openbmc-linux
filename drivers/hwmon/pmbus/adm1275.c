@@ -65,6 +65,7 @@ enum chips { adm1075, adm1272, adm1275, adm1276, adm1278, adm1293, adm1294 };
 #define ADM1275_IOUT_WARN2_LIMIT	0xd7
 #define ADM1275_DEVICE_CONFIG		0xd8
 
+#define ADM1272_FAST_GATE_DIS		BIT(12)
 #define ADM1275_IOUT_WARN2_SELECT	BIT(4)
 
 #define ADM1276_PEAK_PIN		0xda
@@ -409,14 +410,6 @@ static int adm1275_probe(struct i2c_client *client,
 			   "Device mismatch: Configured %s, detected %s\n",
 			   id->name, mid->name);
 
-	config = i2c_smbus_read_byte_data(client, ADM1275_PMON_CONFIG);
-	if (config < 0)
-		return config;
-
-	device_config = i2c_smbus_read_byte_data(client, ADM1275_DEVICE_CONFIG);
-	if (device_config < 0)
-		return device_config;
-
 	data = devm_kzalloc(&client->dev, sizeof(struct adm1275_data),
 			    GFP_KERNEL);
 	if (!data)
@@ -444,6 +437,27 @@ static int adm1275_probe(struct i2c_client *client,
 	info->read_word_data = adm1275_read_word_data;
 	info->read_byte_data = adm1275_read_byte_data;
 	info->write_word_data = adm1275_write_word_data;
+
+	switch (data->id) {
+	case adm1272:
+	case adm1278:
+	case adm1293:
+	case adm1294:
+		config = i2c_smbus_read_word_data(client, ADM1275_PMON_CONFIG);
+		device_config = i2c_smbus_read_word_data(client, ADM1275_DEVICE_CONFIG);
+		break;
+	case adm1075:
+	case adm1275:
+	case adm1276:
+	default:
+		config = i2c_smbus_read_byte_data(client, ADM1275_PMON_CONFIG);
+		device_config = i2c_smbus_read_byte_data(client, ADM1275_DEVICE_CONFIG);
+		break;
+	}
+	if (config < 0)
+		return config;
+	if (device_config < 0)
+		return device_config;
 
 	switch (data->id) {
 	case adm1075:
@@ -508,7 +522,7 @@ static int adm1275_probe(struct i2c_client *client,
 		/* Enable VOUT if not enabled (it is disabled by default) */
 		if (!(config & ADM1278_VOUT_EN)) {
 			config |= ADM1278_VOUT_EN;
-			ret = i2c_smbus_write_byte_data(client,
+			ret = i2c_smbus_write_word_data(client,
 							ADM1275_PMON_CONFIG,
 							config);
 			if (ret < 0) {
@@ -523,6 +537,18 @@ static int adm1275_probe(struct i2c_client *client,
 				PMBUS_HAVE_TEMP | PMBUS_HAVE_STATUS_TEMP;
 		if (config & ADM1278_VIN_EN)
 			info->func[0] |= PMBUS_HAVE_VIN;
+
+		if (of_property_read_bool(client->dev.of_node, "fast-gate-disable")) {
+			device_config |= ADM1272_FAST_GATE_DIS;
+			ret = i2c_smbus_write_word_data(client,
+							ADM1275_DEVICE_CONFIG,
+							device_config);
+			if (ret < 0) {
+				dev_err(&client->dev,
+					"Failed to disable fast-gate\n");
+				return -ENODEV;
+			}
+		}
 		break;
 	case adm1275:
 		if (device_config & ADM1275_IOUT_WARN2_SELECT)
@@ -578,7 +604,7 @@ static int adm1275_probe(struct i2c_client *client,
 		/* Enable VOUT if not enabled (it is disabled by default) */
 		if (!(config & ADM1278_VOUT_EN)) {
 			config |= ADM1278_VOUT_EN;
-			ret = i2c_smbus_write_byte_data(client,
+			ret = i2c_smbus_write_word_data(client,
 							ADM1275_PMON_CONFIG,
 							config);
 			if (ret < 0) {
