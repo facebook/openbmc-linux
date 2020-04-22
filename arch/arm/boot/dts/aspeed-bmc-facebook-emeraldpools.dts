@@ -141,6 +141,39 @@
 
 &i2c5 {
 	status = "okay";
+	// Voltage regulators
+	VDD@0x30 {
+		compatible = "mps,mpq8645p";
+		reg = <0x30>;
+	};
+	VDD@0x31 {
+		compatible = "mps,mpq8645p";
+		reg = <0x31>;
+	};
+	VDD@0x32 {
+		compatible = "mps,mpq8645p";
+		reg = <0x32>;
+	};
+	VDD@0x33 {
+		compatible = "mps,mpq8645p";
+		reg = <0x33>;
+	};
+	AVD@0x34 {
+		compatible = "mps,mpq8645p";
+		reg = <0x34>;
+	};
+	AVD@0x35 {
+		compatible = "mps,mpq8645p";
+		reg = <0x35>;
+	};
+	AVD@0x36 {
+		compatible = "mps,mpq8645p";
+		reg = <0x36>;
+	};
+	AVD@0x3b {
+		compatible = "mps,mpq8645p";
+		reg = <0x3b>;
+	};
 	// Muxer emulated by CPLD
 	i2c-switch@70 {
 		compatible = "nxp,pca9546";
@@ -155,6 +188,13 @@
 			ltc4282@53 {
 				compatible = "lltc,ltc4282";
 				reg = <0x53>;
+			};
+			// P48V Hot swap controller
+			adm1272@13 {
+				compatible = "adi,adm1272";
+				reg = <0x13>;
+				shunt-resistor-micro-ohms = <300>;
+				fast-gate-disable;
 			};
 			// ADC for monitoring vicor temperature
 			tla2024@48 {
@@ -205,6 +245,13 @@
 			ltc4282@40 {
 				compatible = "lltc,ltc4282";
 				reg = <0x40>;
+			};
+			// P48V Hot swap controller
+			adm1272@10 {
+				compatible = "adi,adm1272";
+				reg = <0x10>;
+				shunt-resistor-micro-ohms = <300>;
+				fast-gate-disable;
 			};
 			// PDB Outlet temperature
 			tmp421@4c {
