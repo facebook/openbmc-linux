@@ -627,6 +627,17 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
 
 	spin_lock(&bus->lock);
 	irq_received = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
+
+	/*
+	 * On the AST2600, interrupts have been observed with no interrupt
+	 * status bits set. In this case, the handler should return IRQ_NONE
+	 * immediately to prevent driver state machine corruption.
+	 */
+	if (!irq_received) {
+		spin_unlock(&bus->lock);
+		return IRQ_NONE;
+	}
+
 	/* Ack all interrupts except for Rx done */
 	writel(irq_received & ~ASPEED_I2CD_INTR_RX_DONE,
 	       bus->base + ASPEED_I2C_INTR_STS_REG);

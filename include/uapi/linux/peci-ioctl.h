@@ -1,5 +1,5 @@
-/* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright (c) 2018-2019 Intel Corporation */
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
+/* Copyright (c) 2018-2020 Intel Corporation */
 
 #ifndef __PECI_IOCTL_H
 #define __PECI_IOCTL_H

@@ -37,4 +37,12 @@ config ASPEED_P2A_CTRL
 	  ioctl()s, the driver also provides an interface for userspace mappings to
 	  a pre-defined region.
 
+config ASPEED_XDMA
+	tristate "Aspeed XDMA Engine Driver"
+	depends on SOC_ASPEED && REGMAP && MFD_SYSCON && HAS_DMA
+	help
+	  Enable support for the Aspeed XDMA Engine found on the Aspeed AST2XXX
+	  SOCs. The XDMA engine can perform automatic PCI DMA operations
+	  between the AST2XXX (acting as a BMC) and a host processor.
+
 endmenu

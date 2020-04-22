@@ -260,7 +260,7 @@ static int create_dimm_temp_label(struct peci_dimmtemp *priv, int chan)
 	rank = chan / priv->gen_info->dimm_idx_max;
 	idx = chan % priv->gen_info->dimm_idx_max;
 
-	sprintf(priv->dimmtemp_label[chan], "DIMM %c%d", 'A' + rank, idx);
+	sprintf(priv->dimmtemp_label[chan], "DIMM %c%d", 'A' + rank, idx + 1);
 
 	return 0;
 }

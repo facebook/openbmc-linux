@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 #include <dt-bindings/clock/aspeed-clock.h>
+#include <dt-bindings/interrupt-controller/aspeed-scu-ic.h>
 
 / {
 	model = "Aspeed BMC";
@@ -48,7 +49,7 @@
 	};
 
 	edac: sdram@1e6e0000 {
-		compatible = "aspeed,ast2500-sdram-edac";
+		compatible = "aspeed,ast2500-sdram-edac", "syscon";
 		reg = <0x1e6e0000 0x174>;
 		interrupts = <0>;
 		status = "disabled";
@@ -221,6 +222,13 @@
 				#clock-cells = <1>;
 				#reset-cells = <1>;
 
+				scu_ic: interrupt-controller@18 {
+					#interrupt-cells = <1>;
+					compatible = "aspeed,ast2500-scu-ic";
+					interrupts = <21>;
+					interrupt-controller;
+				};
+
 				pinctrl: pinctrl {
 					compatible = "aspeed,ast2500-pinctrl";
 					aspeed,external-nodes = <&gfx &lhc>;
@@ -252,6 +260,18 @@
 				resets = <&syscon ASPEED_RESET_CRT1>;
 				status = "disabled";
 				interrupts = <0x19>;
+			};
+
+			xdma: xdma@1e6e7000 {
+				compatible = "aspeed,ast2500-xdma";
+				reg = <0x1e6e7000 0x100>;
+				clocks = <&syscon ASPEED_CLK_GATE_BCLK>;
+				resets = <&syscon ASPEED_RESET_XDMA>;
+				interrupts-extended = <&vic 6>, <&scu_ic ASPEED_AST2500_SCU_IC_PCIE_RESET_LO_TO_HI>;
+				pcie-device = "bmc";
+				aspeed,scu = <&syscon>;
+				sdmc = <&edac>;
+				status = "disabled";
 			};
 
 			adc: adc@1e6e9000 {

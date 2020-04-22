@@ -454,6 +454,13 @@ config XILINX_SDFEC
 
 	  If unsure, say N.
 
+config MCTP_LPC
+	tristate "MCTP LPC binding implementation for ASPEED BMCs"
+	depends on REGMAP
+	help
+	  Implements the MCTP LPC binding via KCS LPC IO cycles for control and
+          LPC FWH cycles for data
+
 config MISC_RTSX
 	tristate
 	default MISC_RTSX_PCI || MISC_RTSX_USB
