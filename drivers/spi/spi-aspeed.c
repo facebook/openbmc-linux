@@ -83,7 +83,6 @@ struct aspeed_spi_priv {
 	struct spi_master *master;
 	struct device *dev;
 	unsigned long ahb_clk_freq;
-	spinlock_t lock;
 
 	/*
 	 * Slave device addresses.
@@ -262,13 +261,10 @@ static int aspeed_spi_xfer_one(struct spi_master *master,
 			       struct spi_device *slave,
 			       struct spi_transfer *xfer)
 {
-	unsigned long flags;
 	struct aspeed_spi_priv *priv = spi_master_get_devdata(master);
 	u8 cs = slave->chip_select;
 
-	spin_lock_irqsave(&priv->lock, flags);
 	aspeed_spi_do_xfer(priv, xfer, cs);
-	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return 0;
 }
@@ -371,7 +367,6 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 	priv->slave_base = slave_base;
 	priv->slave_mem_size = slave_mem_size;
 	priv->ahb_clk_freq = ahb_clk_freq;
-	spin_lock_init(&priv->lock);
 	platform_set_drvdata(pdev, priv);
 	error = aspeed_spi_init_slave_buf(priv, res, master->num_chipselect);
 	if (error != 0)
