@@ -374,3 +374,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd1_default>;
 };
+
+&sram {
+  compatible = "mmio-sram", "syscon";
+};
