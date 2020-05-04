@@ -22,6 +22,8 @@
 
 #define DEVICE_NAME	"aspeed-smc"
 
+#define SNOR_F_4B_OPCODES       BIT(6)
+
 /*
  * The driver only support SPI flash
  */
@@ -1032,7 +1034,7 @@ static u32 aspeed_smc_default_read(struct aspeed_smc_chip *chip)
 	 */
 	u32 ctl_mask = chip->controller->info == &spi_2400_info ?
 		 CONTROL_IO_ADDRESS_4B : 0;
-	u8 cmd = chip->nor.flags & SNOR_F_4B_OPCODES ? SPINOR_OP_READ_4B :
+	u8 cmd = chip->nor.addr_width == 4 ? SPINOR_OP_READ_4B :
 		SPINOR_OP_READ;
 
 	/*
