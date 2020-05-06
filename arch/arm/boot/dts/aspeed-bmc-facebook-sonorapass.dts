@@ -600,6 +600,7 @@
 	bus-width = <8>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd1_default>;
+	broken-cd;
 };
 
 &pwm_tacho {

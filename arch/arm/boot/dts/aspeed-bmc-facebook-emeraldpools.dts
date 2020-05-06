@@ -477,6 +477,7 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd2_default>;
+	cd-gpio = <&gpio ASPEED_GPIO(V, 0) GPIO_ACTIVE_LOW>;
 };
 
 &vhub {
