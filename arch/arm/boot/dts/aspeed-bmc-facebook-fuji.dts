@@ -1220,20 +1220,20 @@
 &mdio1 {
 	status = "okay";
 
-	ethphy1: ethernet-phy@0 {
+	ethphy3: ethernet-phy@13 {
 		compatible = "ethernet-phy-ieee802.3-c22";
-		reg = <0>;
+		reg = <0x0d>;
 	};
 };
 
-&mac1 {
+&mac3 {
 	status = "okay";
 
 	phy-mode = "rgmii";
-	phy-handle = <&ethphy1>;
+	phy-handle = <&ethphy3>;
 
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rgmii2_default>;
+	pinctrl-0 = <&pinctrl_rgmii4_default>;
 };
 
 &rtc {
