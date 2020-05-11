@@ -252,6 +252,15 @@
 				quality = <100>;
 			};
 
+			jtag: jtag@1e6e4000 {
+				compatible = "aspeed,ast2500-jtag";
+				reg = <0x1e6e4000 0x1c 0x1e6e2004 0x04>;
+				clocks = <&syscon ASPEED_CLK_APB>;
+				resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
+				interrupts = <43>;
+				status = "disabled";
+			};
+
 			gfx: display@1e6e6000 {
 				compatible = "aspeed,ast2500-gfx", "syscon";
 				reg = <0x1e6e6000 0x1000>;
