@@ -77,7 +77,7 @@
 
 #define noDEBUG_AEN
 // special  channel/cmd  used for register AEN handler with kernel
-#define REG_AEN_CH  0xfa
+#define REG_AEN_CH  0x1a
 #define REG_AEN_CMD 0xce
 
 #ifdef DEBUG_AEN
