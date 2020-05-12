@@ -194,10 +194,6 @@
 
 &i2c11 {
 	status = "okay";
-	ltc4282@44 {
-		compatible = "lltc,ltc4282";
-		reg = <0x44>;
-	};
 };
 
 &i2c12 {
