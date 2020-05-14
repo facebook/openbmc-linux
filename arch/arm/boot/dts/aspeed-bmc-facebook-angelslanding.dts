@@ -192,46 +192,6 @@
 
 &i2c1 {
 	status = "okay";
-	tps53688@60 {
-		compatible = "ti,tps53688";
-		reg = <0x60>;
-	};
-
-	tps53688@62 {
-		compatible = "ti,tps53688";
-		reg = <0x62>;
-	};
-
-	tps53688@66 {
-		compatible = "ti,tps53688";
-		reg = <0x66>;
-	};
-
-	tps53688@68 {
-		compatible = "ti,tps53688";
-		reg = <0x68>;
-	};
-
-	tps53688@6c {
-		compatible = "ti,tps53688";
-		reg = <0x6c>;
-	};
-
-	tps53688@70 {
-		compatible = "ti,tps53688";
-		reg = <0x70>;
-	};
-
-	tps53688@72 {
-		compatible = "ti,tps53688";
-		reg = <0x72>;
-	};
-
-	tps53688@76 {
-		compatible = "ti,tps53688";
-		reg = <0x76>;
-	};
-
 	pxe1110@4A {
 		compatible = "infineon,pxe1110c";
 		reg = <0x4a>;
