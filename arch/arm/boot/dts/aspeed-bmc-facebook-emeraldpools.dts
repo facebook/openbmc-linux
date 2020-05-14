@@ -193,7 +193,6 @@
 			adm1272@13 {
 				compatible = "adi,adm1272";
 				reg = <0x13>;
-				shunt-resistor-micro-ohms = <300>;
 				fast-gate-disable;
 			};
 			// ADC for monitoring vicor temperature
@@ -250,7 +249,6 @@
 			adm1272@10 {
 				compatible = "adi,adm1272";
 				reg = <0x10>;
-				shunt-resistor-micro-ohms = <300>;
 				fast-gate-disable;
 			};
 			// PDB Outlet temperature
