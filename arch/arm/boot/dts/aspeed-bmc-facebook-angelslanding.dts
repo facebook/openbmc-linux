@@ -211,12 +211,6 @@
 
 &i2c4 {
 	status = "okay";
-	// Baseboard FRU
-	eeprom@54 {
-		compatible = "atmel,24c64";
-		reg = <0x54>;
-	};
-
 	// I/O Expander
 	pca9539@76 {
 		compatible = "nxp,pca9539";
