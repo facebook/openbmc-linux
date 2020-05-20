@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/bitops.h>
+#include <linux/hwmon-sysfs.h>
 #include "pmbus.h"
 
 enum chips { adm1075, adm1272, adm1275, adm1276, adm1278, adm1293, adm1294 };
@@ -64,6 +65,7 @@ enum chips { adm1075, adm1272, adm1275, adm1276, adm1278, adm1293, adm1294 };
 #define ADM1278_PEAK_TEMP		0xd7
 #define ADM1275_IOUT_WARN2_LIMIT	0xd7
 #define ADM1275_DEVICE_CONFIG		0xd8
+#define ADM1275_POWER_CYCLE		0xd9
 
 #define ADM1272_FAST_GATE_DIS		BIT(12)
 #define ADM1275_IOUT_WARN2_SELECT	BIT(4)
@@ -350,6 +352,31 @@ static int adm1275_read_byte_data(struct i2c_client *client, int page, int reg)
 	return ret;
 }
 
+static ssize_t adm1275_power_cycle(struct device *dev,
+		struct device_attribute *dev_attr,
+		const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev->parent);
+	long val;
+	int res;
+
+	res = kstrtoul(buf, 10, &val);
+	if (res)
+		return res;
+	if (val == 1) {
+		i2c_smbus_write_byte(client, ADM1275_POWER_CYCLE);
+	}
+
+	return count;
+}
+static SENSOR_DEVICE_ATTR(power_cycle, 0200, NULL, adm1275_power_cycle, 0);
+
+static struct attribute *power_cycle_attrs[] =  {
+	&sensor_dev_attr_power_cycle.dev_attr.attr,
+	NULL
+};
+ATTRIBUTE_GROUPS(power_cycle);
+
 static const struct i2c_device_id adm1275_id[] = {
 	{ "adm1075", adm1075 },
 	{ "adm1272", adm1272 },
@@ -437,6 +464,9 @@ static int adm1275_probe(struct i2c_client *client,
 	info->read_word_data = adm1275_read_word_data;
 	info->read_byte_data = adm1275_read_byte_data;
 	info->write_word_data = adm1275_write_word_data;
+
+	if (data->id != adm1293 && data->id != adm1294)
+		info->groups = power_cycle_groups;
 
 	switch (data->id) {
 	case adm1272:
