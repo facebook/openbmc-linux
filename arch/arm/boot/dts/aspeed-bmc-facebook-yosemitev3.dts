@@ -208,8 +208,9 @@
 	//Slot Register Set for slot1
 	status = "okay";
 	pinctrl-names = "default";
-	sdhci-caps-mask = <0x0 0x580000>;
 	pinctrl-0 = <&pinctrl_sd2_default>;
+	sdhci-caps-mask = <0x0 0x580000>;
+	broken-cd;
 };
 
 &pwm_tacho {
