@@ -102,6 +102,13 @@
 	/*AA0-AA7*/	"","","","","","","","",
 	/*AB0-AB7*/	"","","","","","","","",
 	/*AC0-AC7*/	"","","","","","","","";
+
+	pin_mclr_vpp {
+		gpio-hog;
+		gpios = <ASPEED_GPIO(P, 7) GPIO_OPEN_DRAIN>;
+		output-high;
+		line-name = "mclr_vpp";
+	};
 };
 
 &emmc_controller {
@@ -663,13 +670,6 @@
 		label = "bmc";
 		spi-max-frequency = <50000000>;
 #include "openbmc-flash-layout-128.dtsi"
-	};
-
-	flash@1 {
-		status = "okay";
-		m25p,fast-read;
-		label = "alt-bmc";
-		spi-max-frequency = <50000000>;
 	};
 };
 
