@@ -665,22 +665,22 @@
 &i2c11 {
 	status = "okay";
 
-	i2c-switch@73 {
+	i2c-switch@77 {
 		compatible = "nxp,pca9548";
 		#address-cells = <1>;
 		#size-cells = <0>;
-		reg = <0x76>;
+		reg = <0x77>;
 
 		imux40: i2c@0 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0>;
 
-			i2c-switch@77 {
+			i2c-switch@76 {
 				compatible = "nxp,pca9548";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				reg = <0x77>;
+				reg = <0x76>;
 
 				imux80: i2c@0 {
 					#address-cells = <1>;
@@ -738,11 +738,11 @@
 			#size-cells = <0>;
 			reg = <1>;
 
-			i2c-switch@77 {
+			i2c-switch@76 {
 				compatible = "nxp,pca9548";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				reg = <0x77>;
+				reg = <0x76>;
 
 				imux88: i2c@0 {
 					#address-cells = <1>;
@@ -800,11 +800,11 @@
 			#size-cells = <0>;
 			reg = <2>;
 
-			i2c-switch@77 {
+			i2c-switch@76 {
 				compatible = "nxp,pca9548";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				reg = <0x77>;
+				reg = <0x76>;
 
 				imux96: i2c@0 {
 					#address-cells = <1>;
@@ -862,11 +862,11 @@
 			#size-cells = <0>;
 			reg = <3>;
 
-			i2c-switch@77 {
+			i2c-switch@76 {
 				compatible = "nxp,pca9548";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				reg = <0x77>;
+				reg = <0x76>;
 
 				imux104: i2c@0 {
 					#address-cells = <1>;
@@ -924,11 +924,11 @@
 			#size-cells = <0>;
 			reg = <4>;
 
-			i2c-switch@77 {
+			i2c-switch@76 {
 				compatible = "nxp,pca9548";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				reg = <0x77>;
+				reg = <0x76>;
 
 				imux112: i2c@0 {
 					#address-cells = <1>;
@@ -986,11 +986,11 @@
 			#size-cells = <0>;
 			reg = <5>;
 
-			i2c-switch@77 {
+			i2c-switch@76 {
 				compatible = "nxp,pca9548";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				reg = <0x77>;
+				reg = <0x76>;
 
 				imux120: i2c@0 {
 					#address-cells = <1>;
@@ -1048,11 +1048,11 @@
 			#size-cells = <0>;
 			reg = <6>;
 
-			i2c-switch@77 {
+			i2c-switch@76 {
 				compatible = "nxp,pca9548";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				reg = <0x77>;
+				reg = <0x76>;
 
 				imux128: i2c@0 {
 					#address-cells = <1>;
@@ -1110,11 +1110,11 @@
 			#size-cells = <0>;
 			reg = <7>;
 
-			i2c-switch@77 {
+			i2c-switch@76 {
 				compatible = "nxp,pca9548";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				reg = <0x77>;
+				reg = <0x76>;
 
 				imux136: i2c@0 {
 					#address-cells = <1>;
