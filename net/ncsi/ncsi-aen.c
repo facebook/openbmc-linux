@@ -18,6 +18,7 @@
 #include <net/sock.h>
 
 #include "internal.h"
+#include "ncsi-netlink.h"
 #include "ncsi-pkt.h"
 
 static int ncsi_validate_aen_pkt(struct ncsi_aen_pkt_hdr *h,
@@ -198,6 +199,19 @@ static int ncsi_aen_handler_hncdsc(struct ncsi_dev_priv *ndp,
 	return 0;
 }
 
+static int ncsi_aen_handler_oem(struct ncsi_dev_priv *ndp,
+          struct ncsi_aen_pkt_hdr *h)
+{
+	struct ncsi_channel *nc;
+	/* Find the NCSI channel */
+	ncsi_find_package_and_channel(ndp, h->common.channel, NULL, &nc);
+	if (!nc)
+		return -ENODEV;
+	netdev_dbg(ndp->ndev.dev, "NCSI: OEM AEN 0x%x received\n",
+			h->type);
+	return 0;
+}
+
 static struct ncsi_aen_handler {
 	unsigned char type;
 	int           payload;
@@ -206,7 +220,12 @@ static struct ncsi_aen_handler {
 } ncsi_aen_handlers[] = {
 	{ NCSI_PKT_AEN_LSC,    12, ncsi_aen_handler_lsc    },
 	{ NCSI_PKT_AEN_CR,      4, ncsi_aen_handler_cr     },
-	{ NCSI_PKT_AEN_HNCDSC,  8, ncsi_aen_handler_hncdsc }
+	{ NCSI_PKT_AEN_HNCDSC,  8, ncsi_aen_handler_hncdsc },
+	{ NCSI_PKT_AEN_OEM0,   12, ncsi_aen_handler_oem },
+	{ NCSI_PKT_AEN_OEM1,   12, ncsi_aen_handler_oem },
+	{ NCSI_PKT_AEN_OEM2,   12, ncsi_aen_handler_oem },
+	{ NCSI_PKT_AEN_OEM3,   12, ncsi_aen_handler_oem },
+	{ NCSI_PKT_AEN_OEM4,   12, ncsi_aen_handler_oem }
 };
 
 int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb)
@@ -245,6 +264,8 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb)
 		netdev_err(ndp->ndev.dev,
 			   "NCSI: Handler for AEN type 0x%x returned %d\n",
 			   h->type, ret);
+
+    ncsi_generate_aen_netlink_event(ndp, h);
 out:
 	consume_skb(skb);
 	return ret;

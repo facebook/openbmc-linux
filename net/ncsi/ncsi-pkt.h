@@ -357,6 +357,13 @@ struct ncsi_aen_hncdsc_pkt {
 	unsigned char           pad[18];
 };
 
+
+/* AEN: Generic AEN  */
+struct ncsi_aen_generic_pkt {
+	struct ncsi_aen_pkt_hdr aen;      /* AEN header */
+	__be32                  data[64]; /* payload     */
+};
+
 /* NCSI packet revision */
 #define NCSI_PKT_REVISION	0x01
 
@@ -447,5 +454,10 @@ struct ncsi_aen_hncdsc_pkt {
 #define NCSI_PKT_AEN_LSC	0x00 /* Link status change       */
 #define NCSI_PKT_AEN_CR		0x01 /* Configuration required   */
 #define NCSI_PKT_AEN_HNCDSC	0x02 /* HNC driver status change */
+#define NCSI_PKT_AEN_OEM0	0x80 /* OEM AENs */
+#define NCSI_PKT_AEN_OEM1	0x81
+#define NCSI_PKT_AEN_OEM2	0x82
+#define NCSI_PKT_AEN_OEM3	0x83
+#define NCSI_PKT_AEN_OEM4	0x84
 
 #endif /* __NCSI_PKT_H__ */

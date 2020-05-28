@@ -24,6 +24,12 @@
 
 static struct genl_family ncsi_genl_family;
 
+static const struct genl_multicast_group ncsi_multicast_group[] = {
+	{
+		.name = NCSI_GENL_AEN_MCGROUP,
+	},
+};
+
 static const struct nla_policy ncsi_genl_policy[NCSI_ATTR_MAX + 1] = {
 	[NCSI_ATTR_IFINDEX] =		{ .type = NLA_U32 },
 	[NCSI_ATTR_PACKAGE_LIST] =	{ .type = NLA_NESTED },
@@ -716,6 +722,69 @@ static int ncsi_set_channel_mask_nl(struct sk_buff *msg,
 	return 0;
 }
 
+int ncsi_generate_aen_netlink_event(struct ncsi_dev_priv *ndp,  struct ncsi_aen_pkt_hdr *h)
+{
+	struct sk_buff *skb;
+	struct ncsi_package *np;
+	struct ncsi_channel *nc;
+	void *hdr;
+	int ret = 0;
+	int aen_size = 0;
+
+	ncsi_find_package_and_channel(ndp, h->common.channel,
+			&np, &nc);
+
+	/* calculate aen packet size */
+	aen_size = sizeof(struct ncsi_pkt_hdr) + ntohs(h->common.length);
+
+	if (aen_size > sizeof(struct ncsi_aen_generic_pkt))
+	{
+		return -ENOMEM;
+	}
+
+	/* allocate memory */
+	//skb = genlmsg_new(size, GFP_KERNEL);
+	skb = genlmsg_new(NLMSG_DEFAULT_SIZE, GFP_ATOMIC);
+	if (!skb)
+		return -ENOMEM;
+
+	/* add the genetlink message header */
+	hdr = genlmsg_put(skb, 0, 0, &ncsi_genl_family, 0,
+		NCSI_CMD_SEND_AEN);
+	if (!hdr) {
+		nlmsg_free(skb);
+		return -ENOMEM;
+	}
+
+	/* fill the data */
+	nla_put_u32(skb, NCSI_ATTR_IFINDEX, ndp->ndev.dev->ifindex);
+	if (np)
+		nla_put_u32(skb, NCSI_ATTR_PACKAGE_ID, np->id);
+	if (nc)
+		nla_put_u32(skb, NCSI_ATTR_CHANNEL_ID, nc->id);
+	else
+		nla_put_u32(skb, NCSI_ATTR_CHANNEL_ID, NCSI_RESERVED_CHANNEL);
+	ret = nla_put(skb, NCSI_ATTR_DATA, aen_size, (void *)h);
+	if (ret)
+		goto free_msg;
+
+	genlmsg_end(skb, hdr);
+	ret = genlmsg_multicast_allns(&ncsi_genl_family, skb, 0, 0, GFP_ATOMIC);
+#ifdef CONFIG_ENABLE_NCSI_TRACE
+	printk("-- $$11: ncsi_generate_aen_netlink_event done, size = %d, ret = %d\n",
+			aen_size, ret);
+#endif
+	/* We don't care if no one is listening */
+	if (ret == -ESRCH)
+		ret = 0;
+	return ret;
+
+free_msg:
+	nlmsg_free(skb);
+	return -1;
+}
+
+
 static const struct genl_ops ncsi_ops[] = {
 	{
 		.cmd = NCSI_CMD_PKG_INFO,
@@ -763,6 +832,8 @@ static struct genl_family ncsi_genl_family __ro_after_init = {
 	.module = THIS_MODULE,
 	.ops = ncsi_ops,
 	.n_ops = ARRAY_SIZE(ncsi_ops),
+	.mcgrps		= ncsi_multicast_group,
+	.n_mcgrps	= ARRAY_SIZE(ncsi_multicast_group),
 };
 
 int ncsi_init_netlink(struct net_device *dev)
