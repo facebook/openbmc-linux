@@ -263,9 +263,13 @@
 			#size-cells = <0>;
 			reg = <2>;
 			// P12V Hot swap controller
-			adm1278@43 {
+			adm1278@42 {
 				compatible = "adi,adm1278";
 				reg = <0x42>;
+			};
+			ltc4282@43 {
+				compatible = "lltc,ltc4282";
+				reg = <0x43>;
 			};
 			// LED driver
 			pca9552@67 {
