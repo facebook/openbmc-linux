@@ -21,9 +21,9 @@ partitions {
 		reg = <0x80000 0x1b80000>;
 		label = "fit";
 	};
-	data@1c00000 {
+	data0@1c00000 {
 		reg = <0x1c00000 0xde0000>;
-		label = "data";
+		label = "data0";
 	};
 	pfm@29e0000 {
 		reg = <0x29e0000 0x20000>;
