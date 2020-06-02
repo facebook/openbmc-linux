@@ -886,6 +886,7 @@ static int aspeed_smc_optimize_read(struct aspeed_smc_chip *chip,
 				     u32 max_freq)
 {
 	u8 *golden_buf, *test_buf;
+	u8 cmd = (chip->nor.flags & SNOR_F_4B_OPCODES) ? SPINOR_OP_READ_4B : SPINOR_OP_READ;
 	int i, rc, best_div = -1;
 	u32 save_read_val = chip->ctl_val[smc_read];
 	u32 ahb_freq = chip->controller->clk_frequency;
@@ -901,10 +902,10 @@ static int aspeed_smc_optimize_read(struct aspeed_smc_chip *chip,
 	chip->ctl_val[smc_read] = (chip->ctl_val[smc_read] & 0x2000) |
 		(0x00 << 28) | /* Single bit */
 		(0x00 << 24) | /* CE# max */
-		(0x03 << 16) | /* use normal reads */
+		(cmd  << 16) | /* READ or READ4B */
 		(0x00 <<  8) | /* HCLK/16 */
 		(0x00 <<  6) | /* no dummy cycle */
-		(0x00);        /* normal read */
+		(0x01);        /* read command */
 
 	writel(chip->ctl_val[smc_read], chip->ctl);
 
