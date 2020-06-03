@@ -434,12 +434,25 @@ static void ncsi_request_timeout(struct timer_list *t)
 	struct ncsi_cmd_pkt *cmd;
 	struct ncsi_package *np;
 	struct ncsi_channel *nc;
+	struct ncsi_cmd_oem_pkt *oem_cmd;
+	u8 *oem_data = NULL;
 	unsigned long flags;
 
 	if ((nr->flags == NCSI_REQ_FLAG_EVENT_DRIVEN) && (nr->nca.rexmit-- > 0)) {
 		netdev_warn(ndp->ndev.dev, "NCSI: retransmit cmd 0x%x\n", nr->nca.type);
+		if (nr->nca.type == NCSI_PKT_CMD_OEM) {
+			if (!(oem_data = kzalloc(nr->nca.payload, GFP_ATOMIC))) {
+				netdev_err(ndp->ndev.dev, "NCSI: allocate oem_data failed\n");
+				return;
+			}
+			oem_cmd = (struct ncsi_cmd_oem_pkt *)skb_network_header(nr->cmd);
+			memcpy(oem_data, &oem_cmd->mfr_id, nr->nca.payload);
+			nr->nca.data = oem_data;
+		}
 		ndp->pending_req_num++;
 		ncsi_xmit_cmd(&nr->nca);
+		if (oem_data)
+			kfree(oem_data);
 	}
 
 	/* If the request already had associated response,
