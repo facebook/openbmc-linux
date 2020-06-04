@@ -631,7 +631,18 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
 	writel(irq_received & ~ASPEED_I2CD_INTR_RX_DONE,
 	       bus->base + ASPEED_I2C_INTR_STS_REG);
 	readl(bus->base + ASPEED_I2C_INTR_STS_REG);
-	irq_remaining = irq_received;
+
+	/*
+	 * AST2600 chip may set Interrupt Status Register I2CD10[25:24]
+	 * to report current slave parking status (defined in I2CS24)
+	 * even though the new register mode is off: ASPEED confirmed
+	 * the bits should be ignored in legacy register mode.
+	 *
+	 * Given Interrupt Status Register I2CD10[31:16] is never handled
+	 * in the handler (for AST2400/AST2500/AST2600), let's just clear
+	 * the bits.
+	 */
+	irq_remaining = irq_received & 0xffff;
 
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 	/*
