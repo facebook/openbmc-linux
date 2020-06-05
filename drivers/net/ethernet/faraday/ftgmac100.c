@@ -97,6 +97,7 @@ struct ftgmac100 {
 	int cur_speed;
 	int cur_duplex;
 	bool use_ncsi;
+	bool use_fixed_phy;
 
 	/* Multicast filter settings */
 	u32 maht0;
@@ -1449,6 +1450,9 @@ static int ftgmac100_open(struct net_device *netdev)
 	if (priv->use_ncsi) {
 		priv->cur_duplex = DUPLEX_FULL;
 		priv->cur_speed = SPEED_100;
+	} else if (priv->use_fixed_phy) {
+		priv->cur_duplex = netdev->phydev->duplex;
+		priv->cur_speed = netdev->phydev->speed;
 	} else {
 		priv->cur_duplex = 0;
 		priv->cur_speed = 0;
@@ -1838,7 +1842,9 @@ static int ftgmac100_probe(struct platform_device *pdev)
 		priv->ndev = ncsi_register_dev(netdev, ftgmac100_ncsi_handler);
 		if (!priv->ndev)
 			goto err_ncsi_dev;
-	} else if (np && of_get_property(np, "phy-handle", NULL)) {
+	} else if (np && (
+		  of_get_property(np, "phy-handle", NULL) ||
+		  (priv->use_fixed_phy = of_phy_is_fixed_link(pdev->dev.of_node)))) {
 		struct phy_device *phy;
 
 		phy = of_phy_get_and_connect(priv->netdev, np,
