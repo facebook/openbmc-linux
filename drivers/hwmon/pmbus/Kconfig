@@ -219,6 +219,15 @@ config SENSORS_UCD9200
 	  This driver can also be built as a module. If so, the module will
 	  be called ucd9200.
 
+config SENSORS_XDPE132G5C
+	tristate "Infineon XDPE132G5C"
+	help
+	  If you say yes here you get hardware monitoring support for the
+	  Infineon XDPE132G5C controller.
+
+	  This driver can also be built as a module. If so, the module will
+	  be called xdpe132g5c.
+
 config SENSORS_ZL6100
 	tristate "Intersil ZL6100 and compatibles"
 	help
