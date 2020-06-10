@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 #include <dt-bindings/clock/aspeed-clock.h>
+#include <dt-bindings/interrupt-controller/aspeed-scu-ic.h>
 
 / {
 	model = "Aspeed BMC";
@@ -209,7 +210,7 @@
 			ranges;
 
 			edac: memory-controller@1e6e0000 {
-				compatible = "aspeed,ast2500-sdram-edac";
+				compatible = "aspeed,ast2500-sdram-edac", "syscon";
 				reg = <0x1e6e0000 0x174>;
 				interrupts = <0>;
 				status = "disabled";
@@ -230,10 +231,21 @@
 					status = "disabled";
 				};
 
+				scu_ic: interrupt-controller@18 {
+					#interrupt-cells = <1>;
+					compatible = "aspeed,ast2500-scu-ic";
+					interrupts = <21>;
+					interrupt-controller;
+				};
+
 				pinctrl: pinctrl@80 {
 					compatible = "aspeed,ast2500-pinctrl";
 					reg = <0x80 0x18>, <0xa0 0x10>;
 					aspeed,external-nodes = <&gfx>, <&lhc>;
+				};
+
+				vga_scratch: scratch {
+					compatible = "aspeed,bmc-misc";
 				};
 			};
 
@@ -261,6 +273,18 @@
 				resets = <&syscon ASPEED_RESET_CRT1>;
 				status = "disabled";
 				interrupts = <0x19>;
+			};
+
+			xdma: xdma@1e6e7000 {
+				compatible = "aspeed,ast2500-xdma";
+				reg = <0x1e6e7000 0x100>;
+				clocks = <&syscon ASPEED_CLK_GATE_BCLK>;
+				resets = <&syscon ASPEED_RESET_XDMA>;
+				interrupts-extended = <&vic 6>, <&scu_ic ASPEED_AST2500_SCU_IC_PCIE_RESET_LO_TO_HI>;
+				aspeed,pcie-device = "bmc";
+				aspeed,scu = <&syscon>;
+				sdmc = <&edac>;
+				status = "disabled";
 			};
 
 			adc: adc@1e6e9000 {
@@ -503,7 +527,18 @@
 						interrupts = <8>;
 						status = "disabled";
 					};
+
+					sio_regs: regs {
+						compatible = "aspeed,bmc-misc";
+					};
 				};
+			};
+
+			peci: bus@1e78b000 {
+				compatible = "simple-bus";
+				#address-cells = <1>;
+				#size-cells = <1>;
+				ranges = <0x0 0x1e78b000 0x60>;
 			};
 
 			uart2: serial@1e78d000 {
@@ -546,6 +581,24 @@
 				ranges = <0 0x1e78a000 0x1000>;
 			};
 		};
+	};
+};
+
+&peci {
+	peci0: peci-bus@0 {
+		compatible = "aspeed,ast2500-peci";
+		reg = <0x0 0x60>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		interrupts = <15>;
+		clocks = <&syscon ASPEED_CLK_GATE_REFCLK>;
+		resets = <&syscon ASPEED_RESET_PECI>;
+		clock-frequency = <24000000>;
+		msg-timing = <1>;
+		addr-timing = <1>;
+		rd-sampling-point = <8>;
+		cmd-timeout-ms = <1000>;
+		status = "disabled";
 	};
 };
 
@@ -1624,5 +1677,136 @@
 	pinctrl_wdtrst2_default: wdtrst2_default {
 		function = "WDTRST2";
 		groups = "WDTRST2";
+	};
+};
+
+&vga_scratch {
+	dac_mux {
+		offset = <0x2c>;
+		bit-mask = <0x3>;
+		bit-shift = <16>;
+	};
+	vga0 {
+		offset = <0x50>;
+		bit-mask = <0xffffffff>;
+		bit-shift = <0>;
+	};
+	vga1 {
+		offset = <0x54>;
+		bit-mask = <0xffffffff>;
+		bit-shift = <0>;
+	};
+	vga2 {
+		offset = <0x58>;
+		bit-mask = <0xffffffff>;
+		bit-shift = <0>;
+	};
+	vga3 {
+		offset = <0x5c>;
+		bit-mask = <0xffffffff>;
+		bit-shift = <0>;
+	};
+	vga4 {
+		offset = <0x60>;
+		bit-mask = <0xffffffff>;
+		bit-shift = <0>;
+	};
+	vga5 {
+		offset = <0x64>;
+		bit-mask = <0xffffffff>;
+		bit-shift = <0>;
+	};
+	vga6 {
+		offset = <0x68>;
+		bit-mask = <0xffffffff>;
+		bit-shift = <0>;
+	};
+	vga7 {
+		offset = <0x6c>;
+		bit-mask = <0xffffffff>;
+		bit-shift = <0>;
+	};
+};
+
+&sio_regs {
+	sio_2b {
+		offset = <0xf0>;
+		bit-mask = <0xff>;
+		bit-shift = <24>;
+	};
+	sio_2a {
+		offset = <0xf0>;
+		bit-mask = <0xff>;
+		bit-shift = <16>;
+	};
+	sio_29 {
+		offset = <0xf0>;
+		bit-mask = <0xff>;
+		bit-shift = <8>;
+	};
+	sio_28 {
+		offset = <0xf0>;
+		bit-mask = <0xff>;
+		bit-shift = <0>;
+	};
+	sio_2f {
+		offset = <0xf4>;
+		bit-mask = <0xff>;
+		bit-shift = <24>;
+	};
+	sio_2e {
+		offset = <0xf4>;
+		bit-mask = <0xff>;
+		bit-shift = <16>;
+	};
+	sio_2d {
+		offset = <0xf4>;
+		bit-mask = <0xff>;
+		bit-shift = <8>;
+	};
+	sio_2c {
+		offset = <0xf4>;
+		bit-mask = <0xff>;
+		bit-shift = <0>;
+	};
+	sio_23 {
+		offset = <0xf8>;
+		bit-mask = <0xff>;
+		bit-shift = <24>;
+	};
+	sio_22 {
+		offset = <0xf8>;
+		bit-mask = <0xff>;
+		bit-shift = <16>;
+	};
+	sio_21 {
+		offset = <0xf8>;
+		bit-mask = <0xff>;
+		bit-shift = <8>;
+	};
+	sio_20 {
+		offset = <0xf8>;
+		bit-mask = <0xff>;
+		bit-shift = <0>;
+	};
+	sio_27 {
+		offset = <0xfc>;
+		bit-mask = <0xff>;
+		bit-shift = <24>;
+	};
+	sio_26 {
+		offset = <0xfc>;
+		bit-mask = <0xff>;
+		bit-shift = <16>;
+	};
+	sio_25 {
+		offset = <0xfc>;
+		bit-mask = <0xff>;
+		bit-shift = <8>;
+	};
+	sio_24 {
+		offset = <0xfc>;
+		bit-mask = <0xff>;
+		bit-shift = <0>;
 	};
 };

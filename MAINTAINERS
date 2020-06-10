@@ -2744,6 +2744,14 @@ S:	Maintained
 F:	drivers/media/platform/aspeed-video.c
 F:	Documentation/devicetree/bindings/media/aspeed-video.txt
 
+ASPEED XDMA ENGINE DRIVER
+M:	Eddie James <eajames@linux.ibm.com>
+L:	linux-aspeed@lists.ozlabs.org (moderated for non-subscribers)
+S:	Maintained
+F:	Documentation/devicetree/bindings/soc/aspeed/xdma.txt
+F:	drivers/soc/aspeed/aspeed-xdma.c
+F:	include/uapi/linux/aspeed-xdma.h
+
 ASUS NOTEBOOKS AND EEEPC ACPI/WMI EXTRAS DRIVERS
 M:	Corentin Chary <corentin.chary@gmail.com>
 L:	acpi4asus-user@lists.sourceforge.net
@@ -6079,6 +6087,12 @@ L:	linux-edac@vger.kernel.org
 S:	Maintained
 F:	drivers/edac/mpc85xx_edac.[ch]
 
+EDAC-NPCM7XX
+M:	George Hung <george.hung@quantatw.com>
+S:	Maintained
+F:	drivers/edac/npcm7xx_edac.c
+F:	Documentation/devicetree/bindings/edac/npcm7xx-sdram-edac.txt
+
 EDAC-PASEMI
 M:	Egor Martovetsky <egor@pasemi.com>
 L:	linux-edac@vger.kernel.org
@@ -6857,6 +6871,13 @@ L:	openbmc@lists.ozlabs.org (moderated for non-subscribers)
 S:	Maintained
 F:	drivers/i2c/busses/i2c-fsi.c
 F:	Documentation/devicetree/bindings/i2c/i2c-fsi.txt
+
+FSI-ATTACHED SPI DRIVER
+M:	Eddie James <eajames@linux.ibm.com>
+L:	linux-spi@vger.kernel.org
+S:	Maintained
+F:	drivers/spi/spi-fsi.c
+F:	Documentation/devicetree/bindings/fsi/ibm,fsi2spi.yaml
 
 FSNOTIFY: FILESYSTEM NOTIFICATION INFRASTRUCTURE
 M:	Jan Kara <jack@suse.cz>

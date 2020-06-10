@@ -10,6 +10,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/moduleparam.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
@@ -36,6 +37,7 @@
 # include <linux/efi.h>
 #endif
 
+#define DEVMEM_MINOR	1
 #define DEVPORT_MINOR	4
 
 static inline unsigned long size_inside_page(unsigned long start,
@@ -937,6 +939,12 @@ static char *mem_devnode(struct device *dev, umode_t *mode)
 	return NULL;
 }
 
+#ifdef CONFIG_DEVMEM_BOOTPARAM
+static bool devmem;
+module_param(devmem, bool, 0444);
+MODULE_PARM_DESC(devmem, "kernel parameter to activate /dev/mem");
+#endif
+
 static struct class *mem_class;
 
 static int __init chr_dev_init(void)
@@ -955,6 +963,10 @@ static int __init chr_dev_init(void)
 		if (!devlist[minor].name)
 			continue;
 
+#ifdef CONFIG_DEVMEM_BOOTPARAM
+		if (minor == DEVMEM_MINOR && !devmem)
+			continue;
+#endif
 		/*
 		 * Create /dev/port?
 		 */

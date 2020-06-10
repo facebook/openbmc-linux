@@ -155,9 +155,17 @@ int pmbus_set_page(struct i2c_client *client, int page)
 		return 0;
 
 	if (!(data->info->func[page] & PMBUS_PAGE_VIRTUAL)) {
+		dev_dbg(&client->dev, "Want page %u, %u cached\n", page,
+			data->currpage);
+
 		rv = i2c_smbus_write_byte_data(client, PMBUS_PAGE, page);
-		if (rv < 0)
-			return rv;
+		if (rv) {
+			rv = i2c_smbus_write_byte_data(client, PMBUS_PAGE,
+						       page);
+			dev_dbg(&client->dev,
+				"Failed to set page %u, performed one-shot retry %s: %d\n",
+				page, rv ? "and failed" : "with success", rv);
+		}
 
 		rv = i2c_smbus_read_byte_data(client, PMBUS_PAGE);
 		if (rv < 0)
@@ -433,15 +441,15 @@ static int pmbus_get_fan_rate(struct i2c_client *client, int page, int id,
 		return s->data;
 	}
 
-	config = pmbus_read_byte_data(client, page,
-				      pmbus_fan_config_registers[id]);
+	config = _pmbus_read_byte_data(client, page,
+				       pmbus_fan_config_registers[id]);
 	if (config < 0)
 		return config;
 
 	have_rpm = !!(config & pmbus_fan_rpm_mask[id]);
 	if (want_rpm == have_rpm)
-		return pmbus_read_word_data(client, page,
-					    pmbus_fan_command_registers[id]);
+		return _pmbus_read_word_data(client, page,
+					     pmbus_fan_command_registers[id]);
 
 	/* Can't sensibly map between RPM and PWM, just return zero */
 	return 0;

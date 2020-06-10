@@ -453,6 +453,13 @@ config XILINX_SDFEC
 
 	  If unsure, say N.
 
+config MCTP_LPC
+	tristate "MCTP LPC binding implementation for ASPEED BMCs"
+	depends on REGMAP
+	help
+	  Implements the MCTP LPC binding via KCS LPC IO cycles for control and
+          LPC FWH cycles for data
+
 config MISC_RTSX
 	tristate
 	default MISC_RTSX_PCI || MISC_RTSX_USB
@@ -464,6 +471,21 @@ config PVPANIC
 	  This driver provides support for the pvpanic device.  pvpanic is
 	  a paravirtualized device provided by QEMU; it lets a virtual machine
 	  (guest) communicate panic events to the host.
+
+config NPCM7XX_LPC_BPC
+	tristate "NPCM7xx LPC BIOS Post Code support"
+	depends on (ARCH_NPCM7XX || COMPILE_TEST)
+	help
+	  Provides a NPCM7xx driver to control the LPC BIOS Post Code
+	  interface which allows the BMC to monitoring and save
+	  the data written by the host to an arbitrary LPC I/O port.
+
+config NPCM7XX_PCI_MBOX
+	tristate "NPCM7xx PCI Mailbox Controller"
+	depends on (ARCH_NPCM7XX || COMPILE_TEST) && REGMAP && MFD_SYSCON
+	help
+	  Expose the NPCM750/730/715/705 PCI MBOX registers found on
+	  Nuvoton SOCs to userspace.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

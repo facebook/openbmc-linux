@@ -5,6 +5,14 @@ config SOC_ASPEED
 	def_bool y
 	depends on ARCH_ASPEED || COMPILE_TEST
 
+config ASPEED_BMC_MISC
+	bool "Miscellaneous ASPEED BMC interfaces"
+	depends on ARCH_ASPEED || COMPILE_TEST
+	default ARCH_ASPEED
+	help
+	  Say yes to expose VGA and LPC scratch registers, and other
+	  miscellaneous control interfaces specific to the ASPEED BMC SoCs
+
 config ASPEED_LPC_CTRL
 	depends on SOC_ASPEED && REGMAP && MFD_SYSCON
 	tristate "Aspeed ast2400/2500 HOST LPC to BMC bridge control"
@@ -28,5 +36,13 @@ config ASPEED_P2A_CTRL
 	  Control Aspeed ast2400/2500 HOST P2A VGA MMIO to BMC mappings through
 	  ioctl()s, the driver also provides an interface for userspace mappings to
 	  a pre-defined region.
+
+config ASPEED_XDMA
+	tristate "Aspeed XDMA Engine Driver"
+	depends on SOC_ASPEED && REGMAP && MFD_SYSCON && HAS_DMA
+	help
+	  Enable support for the Aspeed XDMA Engine found on the Aspeed AST2XXX
+	  SOCs. The XDMA engine can perform automatic PCI DMA operations
+	  between the AST2XXX (acting as a BMC) and a host processor.
 
 endmenu

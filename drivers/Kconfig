@@ -230,4 +230,6 @@ source "drivers/counter/Kconfig"
 
 source "drivers/jtag/Kconfig"
 
+source "drivers/peci/Kconfig"
+
 endmenu
