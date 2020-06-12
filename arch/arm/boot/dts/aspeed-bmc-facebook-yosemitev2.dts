@@ -218,6 +218,8 @@
 
 &i2c13 {
 	//USB Connector
+	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
