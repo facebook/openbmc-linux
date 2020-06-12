@@ -90,18 +90,15 @@
  * Both firmware flashes are 64MB on Minipack BMC.
  */
 &fmc_flash0 {
-	partitions {
-		data0@1c00000 {
-			reg = <0x1c00000 0x2400000>;
-		};
-		flash0@0 {
-			reg = <0x0 0x4000000>;
-		};
-	};
+#include "facebook-bmc-flash-layout-64.dtsi"
 };
 
 &fmc_flash1 {
 	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
 		flash1@0 {
 			reg = <0x0 0x4000000>;
 		};
