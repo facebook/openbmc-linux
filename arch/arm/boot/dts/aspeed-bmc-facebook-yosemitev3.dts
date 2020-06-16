@@ -53,14 +53,8 @@
 
 &uhci {
 	status = "okay";
-};
-
-&ehci0 {
-	status = "okay";
-};
-
-&ehci1 {
-	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usb2ah_default>;
 };
 
 &spi2 {
