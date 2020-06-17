@@ -450,6 +450,10 @@
 		compatible = "atmel,24c64";
 		reg = <0x56>;
 	};
+	pca9555@20 {
+		compatible = "nxp,pca9555";
+		reg = <0x20>;
+	};
 };
 
 &pwm_tacho {
