@@ -119,21 +119,25 @@
 
 &i2c0 {
 	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
 &i2c1 {
 	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
 &i2c2 {
 	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
 &i2c3 {
 	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
@@ -444,6 +448,7 @@
 
 &i2c13 {
 	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 	// BSM FRUID
 	eeprom@56 {
