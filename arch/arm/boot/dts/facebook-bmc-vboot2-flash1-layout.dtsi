@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2018 Facebook Inc.
+
+partitions {
+	compatible = "fixed-partitions";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	romx@0 {
+		reg = <0x0 0x40000>;
+		label = "romx";
+	};
+	/* Don't expose recovery u-boot, as it is not used
+	recovery-uboot@40000 {
+		reg = <0x40000 0x90000>;
+		label = "recovery-uboot"
+	};
+	*/
+	env@D0000 {
+		reg = <0xD0000 0x20000>;
+		label = "env";
+	};
+	meta@F0000 {
+		reg = <0xF0000 0x10000>;
+		label = "meta";
+	};
+	u-boot-fit@100000 {
+		reg = <0x100000 0xA0000>;
+		label = "u-boot-fit";
+	};
+	fit@1A0000 {
+		reg = <0x1A0000 0x1A60000>;
+		label = "fit";
+	};
+	data0@1C00000 {
+		reg = <0x1C00000 0x400000>;
+		label = "data0";
+	};
+	/*
+	 * Although the master partition can be created by enabling
+	 * MTD_PARTITIONED_MASTER option, below "flash1" and "flash1rw" partition is
+	 * explicitly created to avoid breaking legacy applications.
+	 */
+	flash1@0 {
+		reg = <0x0 0x2000000>;
+		label = "flash1";
+	};
+	flash1rw@10000 {
+		reg = <0x10000 0x1ff0000>;
+		label = "flash1rw";
+	};
+};

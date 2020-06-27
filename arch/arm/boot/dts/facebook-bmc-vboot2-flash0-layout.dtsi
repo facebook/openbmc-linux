@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2018 Facebook Inc.
+
+partitions {
+	compatible = "fixed-partitions";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	rom@0 {
+		reg = <0x0 0x40000>;
+		label = "rom";
+	};
+	recovery-uboot@40000 {
+		reg = <0x40000 0x90000>;
+		label = "recovery-uboot";
+	};
+	envro@D0000 {
+		reg = <0xD0000 0x20000>;
+		label = "envro";
+	};
+	metaro@F0000 {
+		reg = <0xF0000 0x10000>;
+		label = "metaro";
+	};
+	/* Don't expose envro, u-boot-fit as it is not used
+	u-boot-fit@100000 {
+		reg = <0x100000 0xA0000>;
+		label = "u-boot-fit";
+	};
+	*/
+	fitro@1A0000 {
+		reg = <0x1A0000 0x1A60000>;
+		label = "fitro";
+	};
+
+	/*
+	 * "data0" partition is used by several Facebook BMC platforms
+	 * as persistent data store.
+	 */
+	data0ro@1c00000 {
+		reg = <0x1c00000 0x400000>;
+		label = "data0ro";
+	};
+	flash0@0 {
+		reg = <0x0 0x2000000>;
+		label = "flash0";
+	};
+};
