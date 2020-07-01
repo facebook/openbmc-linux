@@ -49,6 +49,7 @@
 		i2c36 = &imux36;
 		i2c37 = &imux37;
 
+		spi1 = &spi1;
 		spi2 = &spi_gpio;
 	};
 
@@ -96,6 +97,17 @@
 			reg = <0x0 0x8000000>;
 			label = "flash1";
 		};
+	};
+};
+
+&spi1 {
+	status = "okay";
+	compatible = "aspeed,ast2500-spi-master";
+
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <24750000>;
+		reg = <0>;
 	};
 };
 
