@@ -129,6 +129,7 @@
 	status = "okay";
 	multi-master;
 	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
 };
 
 &i2c1 {
