@@ -18,6 +18,14 @@
 #define XDPE122_AMD_625MV		0x10 /* AMD mode 6.25mV */
 #define XDPE122_PAGE_NUM		2
 
+#define XDPE132_PAGE_NUM		2
+
+enum {
+	xdpe12254,
+	xdpe12284,
+	xdpe132g5c,
+};
+
 static int xdpe122_read_word_data(struct i2c_client *client, int page, int reg)
 {
 	const struct pmbus_driver_info *info = pmbus_get_driver_info(client);
@@ -126,30 +134,56 @@ static struct pmbus_driver_info xdpe122_info = {
 	.read_word_data = xdpe122_read_word_data,
 };
 
+static struct pmbus_driver_info xdpe132_info = {
+	.pages = XDPE132_PAGE_NUM,
+	.format[PSC_VOLTAGE_IN] = linear,
+	.format[PSC_VOLTAGE_OUT] = linear,
+	.format[PSC_TEMPERATURE] = linear,
+	.format[PSC_CURRENT_IN] = linear,
+	.format[PSC_CURRENT_OUT] = linear,
+	.format[PSC_POWER] = linear,
+	.func[0] = PMBUS_HAVE_VIN | PMBUS_HAVE_VOUT | PMBUS_HAVE_STATUS_VOUT |
+		PMBUS_HAVE_IIN | PMBUS_HAVE_IOUT | PMBUS_HAVE_STATUS_IOUT |
+		PMBUS_HAVE_TEMP | PMBUS_HAVE_STATUS_TEMP |
+		PMBUS_HAVE_POUT | PMBUS_HAVE_PIN | PMBUS_HAVE_STATUS_INPUT,
+	.func[1] = PMBUS_HAVE_VIN | PMBUS_HAVE_VOUT | PMBUS_HAVE_STATUS_VOUT |
+		PMBUS_HAVE_IIN | PMBUS_HAVE_IOUT | PMBUS_HAVE_STATUS_IOUT |
+		PMBUS_HAVE_TEMP | PMBUS_HAVE_STATUS_TEMP |
+		PMBUS_HAVE_POUT | PMBUS_HAVE_PIN | PMBUS_HAVE_STATUS_INPUT,
+};
+
 static int xdpe122_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
 	struct pmbus_driver_info *info;
 
-	info = devm_kmemdup(&client->dev, &xdpe122_info, sizeof(*info),
-			    GFP_KERNEL);
+	if (id->driver_data == xdpe12254 || id->driver_data == xdpe12284) {
+		info = devm_kmemdup(&client->dev, &xdpe122_info, sizeof(*info),
+				    GFP_KERNEL);
+	} else if (id->driver_data == xdpe132g5c) {
+		info = devm_kmemdup(&client->dev, &xdpe132_info, sizeof(*info),
+				    GFP_KERNEL);
+	}
+
 	if (!info)
 		return -ENOMEM;
 
 	return pmbus_do_probe(client, id, info);
 }
 
-static const struct i2c_device_id xdpe122_id[] = {
-	{"xdpe12254", 0},
-	{"xdpe12284", 0},
+static const struct i2c_device_id xdpe1xx_id[] = {
+	{"xdpe12254", xdpe12254},
+	{"xdpe12284", xdpe12284},
+	{"xdpe132g5c", xdpe132g5c},
 	{}
 };
 
-MODULE_DEVICE_TABLE(i2c, xdpe122_id);
+MODULE_DEVICE_TABLE(i2c, xdpe1xx_id);
 
 static const struct of_device_id __maybe_unused xdpe122_of_match[] = {
 	{.compatible = "infineon,xdpe12254"},
 	{.compatible = "infineon,xdpe12284"},
+	{.compatible = "infineon,xdpe132g5c"},
 	{}
 };
 MODULE_DEVICE_TABLE(of, xdpe122_of_match);
@@ -161,7 +195,7 @@ static struct i2c_driver xdpe122_driver = {
 	},
 	.probe = xdpe122_probe,
 	.remove = pmbus_do_remove,
-	.id_table = xdpe122_id,
+	.id_table = xdpe1xx_id,
 };
 
 module_i2c_driver(xdpe122_driver);
