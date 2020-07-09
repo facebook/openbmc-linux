@@ -26,6 +26,7 @@
 #include <linux/spi/spi.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
+#include <linux/of.h>
 
 #define ASPEED_SPI_DRIVER		"aspeed-spi"
 #define ASPEED_SPI_CS_NUM		2
@@ -68,6 +69,7 @@
 #define ASPEED_CTRL_CLK_DIV(d)		(((d) & 0xF) << 8)
 
 /*
+ * AST2520/AST2500
  * The Segment Register uses a 8MB unit to encode the start address
  * and the end address of the mapping window of a flash SPI slave :
  *
@@ -75,8 +77,22 @@
  *        +--------+--------+--------+--------+
  *        |  end   |  start |   0    |   0    |
  */
-#define SEGMENT_ADDR_START(_v)		((((_v) >> 16) & 0xFF) << 23)
-#define SEGMENT_ADDR_END(_v)		((((_v) >> 24) & 0xFF) << 23)
+#define ASPEED_2500_SEGMENT_ADDR_START(_v)		((((_v) >> 16) & 0xFF) << 23)
+#define ASPEED_2500_SEGMENT_ADDR_END(_v)		((((_v) >> 24) & 0xFF) << 23)
+
+/*
+ * AST2620/AST2600
+ * The Segment Register uses a 1MB unit to encode the start address
+ * and the end address of the mapping window of a flash SPI slave :
+ *
+ *   bit: |  31-24  |  23-16  |  15-8     |  7-0      |
+ *        | byte 1  | byte 2  |  byte 3   |  byte 4   |
+ *        +---------+---------+-----------+-----------+
+ *        | end msb | end lsb | start msb | start lsb |
+ */
+#define ASPEED_2600_SEGMENT_ADDR_START(_v)		((_v & 0xFFFF) << 16)
+#define ASPEED_2600_SEGMENT_ADDR_END(_v)		((((_v) >> 16) & 0xFFFF) << 16)
+
 
 struct aspeed_spi_priv {
 	void __iomem *reg_base;
@@ -287,12 +303,22 @@ static int aspeed_spi_init_slave_buf(struct aspeed_spi_priv *priv,
 {
 	u16 cs;
 
+	u8 is_ast_g6 = 0;
+	if (of_device_is_compatible(priv->dev->of_node, "aspeed,ast2600-spi-master")) {
+		is_ast_g6 = 1;
+	}
+
 	for (cs = 0; cs < num_cs; cs++) {
 		u32 val, start, end, size, offset;
 
 		val = aspeed_reg_read(priv, cs_reg_map[cs].addr_range_reg);
-		start = SEGMENT_ADDR_START(val);
-		end = SEGMENT_ADDR_END(val);
+		if (is_ast_g6) {
+			start = res->start + ASPEED_2600_SEGMENT_ADDR_START(val);
+			end = res->start + ASPEED_2600_SEGMENT_ADDR_END(val);
+		} else {
+			start = ASPEED_2500_SEGMENT_ADDR_START(val);
+			end = ASPEED_2500_SEGMENT_ADDR_START(val);
+		}
 		size = end - start;
 
 		if (start < res->start) {
@@ -404,6 +430,7 @@ aspeed_spi_remove(struct platform_device *pdev)
 
 static const struct of_device_id aspeed_spi_of_match[] = {
 	{ .compatible = "aspeed,ast2500-spi-master", },
+	{ .compatible = "aspeed,ast2600-spi-master", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, aspeed_spi_of_match);
