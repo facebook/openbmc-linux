@@ -258,14 +258,14 @@ static int aspeed_lpc_ctrl_probe(struct platform_device *pdev)
 		lpc_ctrl->mem_base = resm.start;
 
 		if (!is_power_of_2(lpc_ctrl->mem_size)) {
-			dev_err(dev, "Reserved memory size must be a power of 2, got %zu\n",
-			       lpc_ctrl->mem_size);
+			dev_err(dev, "Reserved memory size must be a power of 2, got %u\n",
+			       (unsigned int)lpc_ctrl->mem_size);
 			return -EINVAL;
 		}
 
 		if (!IS_ALIGNED(lpc_ctrl->mem_base, lpc_ctrl->mem_size)) {
-			dev_err(dev, "Reserved memory must be naturally aligned for size %zu\n",
-			       lpc_ctrl->mem_size);
+			dev_err(dev, "Reserved memory must be naturally aligned for size %u\n",
+			       (unsigned int)lpc_ctrl->mem_size);
 			return -EINVAL;
 		}
 	}
