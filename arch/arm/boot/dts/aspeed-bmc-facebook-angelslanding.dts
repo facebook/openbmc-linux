@@ -79,7 +79,7 @@
 	compatible = "aspeed,ast2500-spi-master";
 
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi1_default &pinctrl_spi1cs1_default>;
+	pinctrl-0 = <&pinctrl_spi1_default>;
 
 	flash@0 {
 		status = "okay";
@@ -186,8 +186,10 @@
 	status = "okay";
 };
 
-&ehci1 {
+&uhci {
 	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usb2bh_default>;
 };
 
 &adc {
@@ -337,6 +339,7 @@
 	bus-width = <8>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd1_default>;
+	sdhci-caps-mask = <0x0 0x580000>;
 	broken-cd;
 };
 
