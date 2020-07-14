@@ -1114,8 +1114,12 @@ static const struct aspeed_gpio_config ast2500_config =
 
 static const struct aspeed_bank_props ast2600_bank_props[] = {
 	/*     input	  output   */
-	{5, 0xffffffff,  0x0000ffff}, /* U/V/W/X */
-	{6, 0xffff0000,  0x0fff0000}, /* Y/Z */
+	/* bit [31:24]    GPIOX    */
+	/* bit [23:16]    GPIOW    */
+	/* bit [15:8]     GPIOV    */
+	/* bit [7:0]      GPIOU    */
+	{ 5, 0xffffffff, 0xffffff00 }, /* U/V/W/X */
+	{ 6, 0x0000ffff, 0x0000ffff }, /* Y/Z */
 	{ },
 };
 
