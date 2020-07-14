@@ -533,21 +533,23 @@ static struct spi_board_info ast_spi1_devices[] = {
 
 static int __init dual_flash_enabled_handler(char *str)
 {
+#if defined(CONFIG_FBTP) || defined(CONFIG_FBY2) || defined(CONFIG_FBTTN) || defined(CONFIG_FBY3_POC)
+	/* HACK: Considering u-boot stores the boot-parameters in the
+	* environment, there is a possibility that u-boot might
+	* incorrectly store the flag as 1. This will happen if we upgrade
+	* from an image before this commit to an image built with this
+	* commit and just before rebooting, the env is modified. This causes
+	* the fw_setenv tool to rebuild the env to the default (old boot
+	* parameters before this commit). This is a workaround which avoids
+	* that by assuming that for these platforms u-boot means 2 when it
+	* says 1.
+	* It is safe to assume that these platforms have verified boot enabled
+	* and hence follow ROM based FIT layout */
+	dual_flash_enabled = 2;
+#else
 	if (kstrtol(str, 10, &dual_flash_enabled)) {
 		dual_flash_enabled = 0;
 	}
-#if defined(CONFIG_FBTP) || defined(CONFIG_FBY2) || defined(CONFIG_FBTTN) || defined(CONFIG_FBY3_POC)
-  /* HACK: Considering u-boot stores the boot-parameters in the
-   * environment, there is a possibility that u-boot might
-   * incorrectly store the flag as 1. This will happen if we upgrade
-   * from an image before this commit to an image built with this
-   * commit and just before rebooting, the env is modified. This causes
-   * the fw_setenv tool to rebuild the env to the default (old boot
-   * parameters before this commit). This is a workaround which avoids
-   * that by assuming that for these platforms u-boot means 2 when it
-   * says 1. */
-	if (dual_flash_enabled == 1)
-		dual_flash_enabled = 2;
 #endif
   return 0;
 }
