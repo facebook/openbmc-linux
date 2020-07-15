@@ -942,9 +942,147 @@ static int aspeed_jtag_init(struct platform_device *pdev,
 	return 0;
 }
 
+#ifdef CONFIG_JTAG_ASPEED_LEGACY_UIO
+static u32 g_sw_tdi;
+static u32 g_sw_tck;
+static u32 g_sw_tms;
+
+#define JTAG_SW_MODE_VAL_MASK	(ASPEED_JTAG_SW_MODE_TDIO | \
+			ASPEED_JTAG_SW_MODE_TCK | ASPEED_JTAG_SW_MODE_TMS)
+
+static ssize_t show_tdo(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct jtag *jtag = dev_get_drvdata(dev);
+	struct aspeed_jtag *ast_jtag = jtag_priv(jtag);
+	u32 val = aspeed_jtag_read(ast_jtag, ASPEED_JTAG_SW);
+
+	return sprintf(buf, "%s\n", (val & ASPEED_JTAG_SW_MODE_TDIO) ?
+		       "1" : "0");
+}
+
+static DEVICE_ATTR(tdo, S_IRUGO, show_tdo, NULL);
+
+static void aspeed_jtag_write_sw_reg(struct device *dev)
+{
+	struct jtag *jtag = dev_get_drvdata(dev);
+	struct aspeed_jtag *ast_jtag = jtag_priv(jtag);
+	u32 old_val = aspeed_jtag_read(ast_jtag, ASPEED_JTAG_SW);
+	u32 new_val = (old_val & ~JTAG_SW_MODE_VAL_MASK) |
+		      (g_sw_tdi | g_sw_tck | g_sw_tms);
+
+	aspeed_jtag_write(ast_jtag, new_val, ASPEED_JTAG_SW);
+}
+
+#define STORE_COMMON(dev, buf, count, tdx, true_value) do {	\
+	unsigned long val;					\
+	int err;						\
+	err = kstrtoul(buf, 0, &val);				\
+	if (err)						\
+		return err;					\
+	tdx = val ? true_value : 0;				\
+	aspeed_jtag_write_sw_reg(dev);				\
+	return count;						\
+} while (0);
+
+static ssize_t store_tdi(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	STORE_COMMON(dev, buf, count, g_sw_tdi, ASPEED_JTAG_SW_MODE_TDIO);
+}
+
+static DEVICE_ATTR(tdi, S_IWUSR, NULL, store_tdi);
+
+static ssize_t store_tms(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	STORE_COMMON(dev, buf, count, g_sw_tms, ASPEED_JTAG_SW_MODE_TMS);
+}
+
+static DEVICE_ATTR(tms, S_IWUSR, NULL, store_tms);
+
+static ssize_t store_tck(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	STORE_COMMON(dev, buf, count, g_sw_tck, ASPEED_JTAG_SW_MODE_TCK);
+}
+
+static DEVICE_ATTR(tck, S_IWUSR, NULL, store_tck);
+
+static ssize_t show_sts(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct jtag *jtag = dev_get_drvdata(dev);
+	struct aspeed_jtag *ast_jtag = jtag_priv(jtag);
+
+	/*
+	 * NOTE: not all the defined states are supported, and this is
+	 * to make sure kernel ABI is consistent with old kernel.
+	 */
+	switch (ast_jtag->status) {
+	case JTAG_STATE_IDLE:
+	case JTAG_STATE_PAUSEIR:
+	case JTAG_STATE_PAUSEDR:
+		return sprintf(buf, "%s\n", end_status_str[ast_jtag->status]);
+
+	default:
+		break;
+	}
+
+	return sprintf(buf, "ERROR\n");
+}
+
+static DEVICE_ATTR(sts, S_IRUGO, show_sts, NULL);
+
+static ssize_t show_frequency(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	u32 frq;
+	struct jtag *jtag = dev_get_drvdata(dev);
+
+	aspeed_jtag_freq_get(jtag, &frq);
+
+	return sprintf(buf, "Frequency : %d\n", frq);
+}
+
+static ssize_t store_frequency(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long val;
+	struct jtag *jtag = dev_get_drvdata(dev);
+	int err;
+	err = kstrtoul(buf, 0, &val);
+	if (err)
+		return err;
+	aspeed_jtag_freq_set(jtag, val);
+
+	return count;
+}
+
+static DEVICE_ATTR(freq, S_IRUGO | S_IWUSR, show_frequency, store_frequency);
+
+static struct attribute *ast_jtag_sysfs_entries[] = {
+	&dev_attr_freq.attr,
+	&dev_attr_sts.attr,
+	&dev_attr_tck.attr,
+	&dev_attr_tms.attr,
+	&dev_attr_tdi.attr,
+	&dev_attr_tdo.attr,
+	NULL
+};
+
+static struct attribute_group ast_jtag_attr_group = {
+	.attrs = ast_jtag_sysfs_entries,
+};
+
+#endif /* CONFIG_JTAG_ASPEED_LEGACY_UIO */
+
 static int aspeed_jtag_deinit(struct platform_device *pdev,
 			      struct aspeed_jtag *aspeed_jtag)
 {
+#ifdef CONFIG_JTAG_ASPEED_LEGACY_UIO
+	sysfs_remove_group(&pdev->dev.kobj, &ast_jtag_attr_group);
+#endif
 	aspeed_jtag_write(aspeed_jtag, 0, ASPEED_JTAG_ISR);
 	/* Disable clock */
 	aspeed_jtag_write(aspeed_jtag, 0, ASPEED_JTAG_CTRL);
@@ -988,6 +1126,12 @@ static int aspeed_jtag_probe(struct platform_device *pdev)
 	err = devm_jtag_register(aspeed_jtag->dev, jtag);
 	if (err)
 		goto err_jtag_register;
+
+#ifdef CONFIG_JTAG_ASPEED_LEGACY_UIO
+	err = sysfs_create_group(&pdev->dev.kobj, &ast_jtag_attr_group);
+	if (err)
+		goto err_jtag_register;
+#endif /* CONFIG_JTAG_ASPEED_LEGACY_UIO */
 
 	return 0;
 
