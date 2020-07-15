@@ -16,6 +16,8 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/delay.h>
+#include <linux/uaccess.h>
+#include <uapi/linux/ioctl.h>
 #include <uapi/linux/jtag.h>
 
 #define ASPEED_SCU_RESET_JTAG		BIT(22)
@@ -1075,6 +1077,64 @@ static struct attribute_group ast_jtag_attr_group = {
 	.attrs = ast_jtag_sysfs_entries,
 };
 
+struct run_cycle_param {
+	unsigned char tdi;
+	unsigned char tms;
+	unsigned char tck;
+	unsigned char tdo;
+};
+#define JTAG_RUN_CYCLE _IOR(__JTAG_IOCTL_MAGIC, 11, struct run_cycle_param)
+
+static void aspeed_jtag_run_cycle(struct jtag *jtag,
+				  struct run_cycle_param *run_cycle)
+{
+	u32 new_val;
+	struct aspeed_jtag *ast_jtag = jtag_priv(jtag);
+	u32 old_val = aspeed_jtag_read(ast_jtag, ASPEED_JTAG_SW);
+
+	g_sw_tdi = run_cycle->tdi ? ASPEED_JTAG_SW_MODE_TDIO : 0;
+	g_sw_tms = run_cycle->tms ? ASPEED_JTAG_SW_MODE_TMS : 0;
+	g_sw_tck = run_cycle->tck ? ASPEED_JTAG_SW_MODE_TCK : 0;
+	new_val = (old_val & ~JTAG_SW_MODE_VAL_MASK) |
+		  (g_sw_tdi | g_sw_tck | g_sw_tms);
+	aspeed_jtag_write(ast_jtag, new_val, ASPEED_JTAG_SW);
+
+	new_val = aspeed_jtag_read(ast_jtag, ASPEED_JTAG_SW);
+	run_cycle->tdo = (new_val & ASPEED_JTAG_SW_MODE_TDIO) ? 1 : 0;
+}
+
+static int aspeed_jtag_ioctl(struct jtag *jtag, unsigned int cmd,
+			     unsigned long arg)
+{
+	int err = 0;
+	struct run_cycle_param jtag_run_cycle;
+
+	if (!arg)
+		return -EINVAL;
+
+	switch (cmd) {
+	case JTAG_RUN_CYCLE:
+		if (copy_from_user(&jtag_run_cycle, (void __user*)arg,
+				   sizeof(struct run_cycle_param))) {
+			err = -EFAULT;
+			break;
+		}
+
+		aspeed_jtag_run_cycle(jtag, &jtag_run_cycle);
+
+		if (copy_to_user((void __user*)(arg), &jtag_run_cycle,
+				 sizeof(struct run_cycle_param)))
+			err = -EFAULT;
+
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return err;
+}
+
 #endif /* CONFIG_JTAG_ASPEED_LEGACY_UIO */
 
 static int aspeed_jtag_deinit(struct platform_device *pdev,
@@ -1100,7 +1160,10 @@ static const struct jtag_ops aspeed_jtag_ops = {
 	.mode_set = aspeed_jtag_mode_set,
 	.bitbang = aspeed_jtag_bitbang,
 	.enable = aspeed_jtag_enable,
-	.disable = aspeed_jtag_disable
+	.disable = aspeed_jtag_disable,
+#ifdef CONFIG_JTAG_ASPEED_LEGACY_UIO
+	.ioctl = aspeed_jtag_ioctl,
+#endif
 };
 
 static int aspeed_jtag_probe(struct platform_device *pdev)
