@@ -29,3 +29,10 @@ menuconfig JTAG_ASPEED
 
 	  To compile this driver as a module, choose M here: the module will
 	  be called jtag-aspeed.
+
+config JTAG_ASPEED_LEGACY_UIO
+	bool "ASPEED JTAG Legacy User Space I/O Support"
+	depends on JTAG_ASPEED
+	help
+	  If you say yes here, you get a set of sysfs interfaces and ioctl
+	  commands for supporting legacy user space applications.
