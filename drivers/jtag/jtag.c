@@ -155,6 +155,8 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
+		if (jtag->ops->ioctl)
+			return jtag->ops->ioctl(jtag, cmd, arg);
 		return -EINVAL;
 	}
 	return err;
