@@ -11,29 +11,29 @@ partitions {
 		label = "romx";
 	};
 	/* Don't expose recovery u-boot, as it is not used
-	recovery-uboot@40000 {
-		reg = <0x40000 0x90000>;
-		label = "recovery-uboot"
+	recovery@40000 {
+		reg = <0x40000 0xA0000>;
+		label = "recovery";
 	};
 	*/
-	env@D0000 {
-		reg = <0xD0000 0x20000>;
+	env@E0000 {
+		reg = <0xE0000 0x10000>;
 		label = "env";
 	};
 	meta@F0000 {
 		reg = <0xF0000 0x10000>;
 		label = "meta";
 	};
-	u-boot-fit@100000 {
+	u-boot@100000 {
 		reg = <0x100000 0xA0000>;
-		label = "u-boot-fit";
+		label = "u-boot";
 	};
 	fit@1A0000 {
-		reg = <0x1A0000 0x1A60000>;
+		reg = <0x1A0000 0x1E60000>;
 		label = "fit";
 	};
-	data0@1C00000 {
-		reg = <0x1C00000 0x400000>;
+	data0@2000000 {
+		reg = <0x2000000 0x400000>;
 		label = "data0";
 	};
 	/*
@@ -42,11 +42,11 @@ partitions {
 	 * explicitly created to avoid breaking legacy applications.
 	 */
 	flash1@0 {
-		reg = <0x0 0x2000000>;
+		reg = <0x0 0x8000000>;
 		label = "flash1";
 	};
 	flash1rw@10000 {
-		reg = <0x10000 0x1ff0000>;
+		reg = <0x10000 0x7ff0000>;
 		label = "flash1rw";
 	};
 };

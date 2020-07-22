@@ -32,6 +32,17 @@
 	};
 };
 
+&wdt1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_wdtrst1_default>;
+	aspeed,reset-type = "soc";
+	aspeed,external-signal;
+	aspeed,ext-push-pull;
+	aspeed,ext-active-high;
+	aspeed,ext-pulse-duration = <256>;
+};
+
 &fmc {
 	status = "okay";
 	flash@0 {
@@ -50,6 +61,12 @@
 	};
 };
 
+&uhci {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usb2ah_default>;
+};
+
 &spi2 {
         status = "okay";
         compatible = "aspeed,ast2500-spi-master";
@@ -64,19 +81,6 @@
                 spi-max-frequency = <12000000>;
                 status = "okay";
         };
-};
-
-&uhci {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_usb2ah_default>;
-};
-
-&wdt1 {
-	status = "okay";
-	aspeed,reset-type = "soc";
-	aspeed,ext-active-high;
-	aspeed,ext-pulse-duration = <256>;
 };
 
 &ibt {
