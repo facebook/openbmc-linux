@@ -385,3 +385,7 @@
 	 */
 	sdhci-caps-mask = <0x0 0x580000>;
 };
+
+&jtag {
+    status = "okay";
+};
