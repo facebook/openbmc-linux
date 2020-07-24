@@ -39,18 +39,6 @@
 		i2c30 = &imux30;
 		i2c31 = &imux31;
 
-		/*
-		 * I2C switch 11-0076, pca9548, total 8 child channels
-		 * assigned bus number 30-37.
-		 */
-		i2c32 = &imux32;
-		i2c33 = &imux33;
-		i2c34 = &imux34;
-		i2c35 = &imux35;
-		i2c36 = &imux36;
-		i2c37 = &imux37;
-		i2c38 = &imux38;
-		i2c39 = &imux39;
 
 		i2c40 = &imux40;
 		i2c41 = &imux41;
@@ -316,10 +304,10 @@
 	status = "okay";
 
 	tpm_i2c_ptp@2e {
-		compatible = "tcg,tpm_i2c_ptp";
+		compatible = "tcg,tpm-tis-i2c";
 		reg = <0x2e>;
-		tpm-pirq = <&gpio0 ASPEED_GPIO(Z, 2) GPIO_ACTIVE_HIGH>;
 	};
+
 };
 
 &i2c8 {
@@ -606,65 +594,6 @@
 	};
 };
 
-&i2c9 {
-	status = "okay";
-
-	i2c-switch@70 {
-		compatible = "nxp,pca9548";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0x76>;
-
-		imux32: i2c@0 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0>;
-		};
-
-		imux33: i2c@1 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <1>;
-		};
-
-		imux34: i2c@2 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <2>;
-		};
-
-		imux35: i2c@3 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <3>;
-		};
-
-		imux36: i2c@4 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <4>;
-		};
-
-		imux37: i2c@5 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <5>;
-		};
-
-		imux38: i2c@6 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <6>;
-		};
-
-		imux39: i2c@7 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <7>;
-		};
-
-	};
-};
 
 &i2c10 {
 	status = "okay";
