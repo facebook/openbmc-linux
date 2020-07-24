@@ -1218,6 +1218,36 @@
 				label = "data0";
 			};
 
+			pfm@2000000 {
+				reg = <0x2000000 0x200000>; // 2MB
+				label = "pfm";
+			};
+
+			rc@2200000 {
+				reg = <0x2200000 0x2000000>; // 32MB
+				label = "rc";
+			};
+
+			stg-bmc@4200000 {
+				reg = <0x4200000 0x2000000>; // 32MB
+				label = "stg-bmc";
+			};
+
+			stg-pch@6a00000 {
+				reg = <0x6a00000 0x1000000>; // 16MB
+				label = "stg-pch";
+			};
+
+			stg-cpld@7a00000 {
+				reg = <0x7a00000 0x100000>; // 1MB
+				label = "stg-cpld";
+			};
+
+			stg-cpldrc@7f00000 {
+				reg = <0x7f00000 0x100000>; // 1MB
+				label = "stg-cpldrc";
+			};
+
 			flash0@0 {
 				reg = <0x0 0x2000000>;
 				label = "flash0";
