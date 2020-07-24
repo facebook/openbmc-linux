@@ -214,6 +214,14 @@
 	status = "okay";
 };
 
+&uart2 {
+	status = "okay";
+};
+
+&uart5 {
+	status = "okay";
+};
+
 &wdt1 {
 	status = "okay";
 };
