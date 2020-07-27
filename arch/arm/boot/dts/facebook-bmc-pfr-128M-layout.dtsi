@@ -6,7 +6,7 @@ partitions {
 	#address-cells = <1>;
 	#size-cells = <1>;
 	u-boot@0 {
-		reg = <0x0 0x60000>;
+		reg = <0x10000 0x50000>;
 		label = "u-boot";
 	};
 	/*
