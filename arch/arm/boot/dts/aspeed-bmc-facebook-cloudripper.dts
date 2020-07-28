@@ -14,6 +14,8 @@
 		serial0 = &uart1;
 
 		mmc0 = &emmc;
+		spi1 = &spi1;
+		spi2 = &spi_gpio;
 	};
 
 	chosen {
@@ -23,6 +25,36 @@
 	memory@80000000 {
 		device_type = "memory";
 		reg = <0x80000000 0x80000000>;
+	};
+
+	spi_gpio: spi-gpio {
+		status = "okay";
+		compatible = "spi-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gpio-sck = <&gpio0 ASPEED_GPIO(X, 3) GPIO_ACTIVE_HIGH>;
+		gpio-mosi = <&gpio0 ASPEED_GPIO(X, 4) GPIO_ACTIVE_HIGH>;
+		gpio-miso = <&gpio0 ASPEED_GPIO(X, 5) GPIO_ACTIVE_HIGH>;
+
+		num-chipselects = <3>;
+		cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>,<0>,<&gpio0 ASPEED_GPIO(X, 2) GPIO_ACTIVE_HIGH>;
+
+		tpmdev@0 {
+			compatible = "tcg,tpm_tis-spi";
+			spi-max-frequency = <33000000>;
+			reg = <0>;
+		};
+	};
+};
+
+&spi1 {
+	status = "okay";
+	compatible = "aspeed,ast2600-spi-master";
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <8250000>;
+		reg = <0>;
 	};
 };
 
