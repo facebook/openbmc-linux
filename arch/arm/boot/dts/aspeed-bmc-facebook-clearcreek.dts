@@ -1,0 +1,126 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2018 Facebook Inc.
+/dts-v1/;
+
+#include "aspeed-g5.dtsi"
+
+/ {
+	model = "Facebook Clear Creek BMC";
+	compatible = "facebook,clearcreek-bmc", "aspeed,ast2500";
+
+	aliases {
+		/*
+		 * Override the default serial aliases to avoid breaking
+		 * the legacy applications.
+		 */
+		serial0 = &uart5;
+		serial1 = &uart1;
+	};
+
+	chosen {
+		stdout-path = &uart5;
+		bootargs = "debug console=ttyS4,57600n8 root=/dev/ram rw";
+	};
+
+	memory@80000000 {
+		reg = <0x80000000 0x20000000>;
+	};
+
+	iio-hwmon {
+		compatible = "iio-hwmon";
+		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
+					<&adc 4>, <&adc 7>, <&adc 8>;
+	};
+};
+
+&wdt1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_wdtrst1_default>;
+	aspeed,reset-type = "soc";
+	aspeed,external-signal;
+	aspeed,ext-push-pull;
+	aspeed,ext-active-high;
+	aspeed,ext-pulse-duration = <256>;
+};
+
+&fmc {
+	status = "okay";
+	flash@0 {
+		reg = < 0 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.0";
+		spi-max-frequency = <40000000>;
+#include "facebook-bmc-pfr-128M-layout.dtsi"
+	};
+	flash@1 {
+		reg = < 1 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
+		spi-max-frequency = <40000000>;
+	};
+};
+
+&spi1 {
+	status = "okay";
+	compatible = "aspeed,ast2500-spi-master";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi1_default>;
+
+	tpmdev@0 {
+		reg = <0>;
+		compatible = "tcg,tpm_tis-spi";
+		spi-max-frequency = <12000000>;
+		status = "okay";
+	};
+};
+
+&uart5 {
+	// BMC Console
+	status = "okay";
+};
+
+&adc {
+	status = "okay";
+};
+
+&i2c0 {
+	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
+	status = "okay";
+};
+
+&pwm_tacho {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default &pinctrl_pwm2_default &pinctrl_pwm3_default>;
+	fan@0 {
+		reg = <0x00>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x00 0x01>;
+	};
+
+	fan@1 {
+		reg = <0x01>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x02 0x03>;
+	};
+	fan@2 {
+		reg = <0x02>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x04 0x05>;
+	};
+
+	fan@3 {
+		reg = <0x03>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x06 0x07>;
+	};
+};
+
+&vhub {
+	status = "okay";
+};
+
+&ehci1 {
+	status = "okay";
+};
