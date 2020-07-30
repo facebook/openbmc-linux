@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2018 Facebook Inc.
+
+partitions {
+	compatible = "fixed-partitions";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	u-boot@0 {
+		reg = <0x10000 0xD0000>;
+		label = "u-boot";
+	};
+	/*
+	 * To keep backward compatible keep env
+	 * as second partition. exposed as mtd1
+	 */
+	env@60000 {
+		reg = <0xE0000 0x10000>;
+		label = "env";
+	};
+	fit@80000 {
+		reg = <0x100000 0x1f00000>;
+		label = "fit";
+	};
+	data0@1c00000 {
+		reg = <0x2000000 0x9e0000>;
+		label = "data0";
+	};
+	pfm@29e0000 {
+		reg = <0x29e0000 0x20000>;
+		label = "pfm";
+	};
+	rc@2a00000 {
+		reg = <0x2a00000 0x2000000>;
+		label = "rc";
+	};
+	stg-bmc@4a00000 {
+		reg = <0x4a00000 0x2000000>;
+		label = "stg-bmc";
+	};
+	stg-pch@6a00000 {
+		reg = <0x6a00000 0x1000000>;
+		label = "stg-pch";
+	};
+	stg-cpld@7a00000 {
+		reg = <0x7a00000 0x100000>;
+		label = "stg-cpld";
+	};
+	stg-cpldrc@7f00000 {
+		reg = <0x7f00000 0x100000>;
+		label = "stg-cpldrc";
+	};
+	flash0@0 {
+		reg = <0x0 0x8000000>;
+		label = "flash0";
+	};
+	/* define at last this is a new added partition
+	 * to avoid cause compatible issue to tools which
+	 * hardcode partion number in code
+	 */
+	meta@F0000 {
+		reg = <0xF0000 0x10000>;
+		lable = "meta";
+	};
+};
