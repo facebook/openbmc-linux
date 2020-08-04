@@ -179,13 +179,21 @@
 		gpio-sck = <&gpio0 ASPEED_GPIO(X, 3) GPIO_ACTIVE_HIGH>;
 		gpio-mosi = <&gpio0 ASPEED_GPIO(X, 4) GPIO_ACTIVE_HIGH>;
 		gpio-miso = <&gpio0 ASPEED_GPIO(X, 5) GPIO_ACTIVE_HIGH>;
-		num-chipselects = <1>;
-		cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>;
+		num-chipselects = <3>;
+		cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>,<0>,<&gpio0 ASPEED_GPIO(X, 2) GPIO_ACTIVE_HIGH>;
 
 		tpmdev@0 {
 			compatible = "tcg,tpm_tis-spi";
 			spi-max-frequency = <33000000>;
 			reg = <0>;
+		};
+
+		eeprom@2 {
+			compatible = "atmel,at93c46d";
+			data-size = <16>;
+			spi-cs-high;
+			spi-max-frequency = <33000000>;
+			reg = <2>;
 		};
 	};
 
@@ -195,6 +203,17 @@
 				<&adc0 4>, <&adc0 5>, <&adc0 6>, <&adc0 7>,
 				<&adc1 0>, <&adc1 1>, <&adc1 2>, <&adc1 3>,
 				<&adc1 4>, <&adc1 5>, <&adc1 6>, <&adc1 7>;
+	};
+};
+
+&spi1 {
+	status = "okay";
+	compatible = "aspeed,ast2600-spi-master";
+
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <8250000>;
+		reg = <0>;
 	};
 };
 
