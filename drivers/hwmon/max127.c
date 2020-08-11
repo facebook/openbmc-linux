@@ -31,6 +31,7 @@
 #define MAX127_DATA1_SHIFT	4
 
 struct max127_data {
+	struct mutex lock;
 	struct i2c_client *client;
 	u8 ctrl_mask;
 };
@@ -84,15 +85,21 @@ static ssize_t max127_voltage_show(struct device *dev,
 	struct max127_data *data = dev_get_drvdata(dev);
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(dev_attr);
 
+	mutex_lock(&data->lock);
+
 	status = max127_select_channel(data, attr->index);
-	if (status < 0)
-		return status;
+	if (status)
+		goto exit;
 
 	status = max127_read_channel(data, attr->index, &vin);
-	if (status < 0)
-		return status;
+	if (status)
+		goto exit;
 
-	return sprintf(buf, "%u", vin);
+	status = sprintf(buf, "%u", vin);
+
+exit:
+	mutex_unlock(&data->lock);
+	return status;
 }
 
 static SENSOR_DEVICE_ATTR_RO(in0_input, max127_voltage, 0);
@@ -134,6 +141,7 @@ static int max127_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	data->client = client;
+	mutex_init(&data->lock);
 	data->ctrl_mask = MAX127_CTRL_START | MAX127_CTRL_RNG;
 
 	hwmon_dev = devm_hwmon_device_register_with_groups(dev,
