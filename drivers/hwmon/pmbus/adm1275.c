@@ -81,6 +81,11 @@ enum chips { adm1075, adm1272, adm1275, adm1276, adm1278, adm1293, adm1294 };
 #define ADM1075_VAUX_OV_WARN		BIT(7)
 #define ADM1075_VAUX_UV_WARN		BIT(6)
 
+#define ADM1075_AVG_MASK		(BIT(0) | BIT(1) | BIT(2))
+#define ADM1272_VI_AVG_MASK		(BIT(8) | BIT(9) | BIT(10))
+#define ADM1272_PWR_AVG_MASK		(BIT(11) | BIT(12) | BIT(13))
+#define ADM1275_MAX_DATA_RATE		128
+
 struct adm1275_data {
 	int id;
 	bool have_oc_fault;
@@ -401,7 +406,7 @@ static int adm1275_probe(struct i2c_client *client,
 	const struct coefficients *coefficients;
 	int vindex = -1, voindex = -1, cindex = -1, pindex = -1;
 	int tindex = -1;
-	u32 shunt;
+	u32 shunt, samples;
 
 	if (!i2c_check_functionality(client->adapter,
 				     I2C_FUNC_SMBUS_READ_BYTE_DATA
@@ -448,6 +453,14 @@ static int adm1275_probe(struct i2c_client *client,
 
 	if (shunt == 0)
 		return -EINVAL;
+
+	if (of_property_read_u32(client->dev.of_node, "data-rate", &samples)) {
+		samples = 0xFFFF;
+	} else {
+		if (samples > ADM1275_MAX_DATA_RATE)
+			return -EINVAL;
+		samples = __ilog2_u32(samples);
+	}
 
 	data->id = mid->driver_data;
 
@@ -519,6 +532,15 @@ static int adm1275_probe(struct i2c_client *client,
 		if (config & ADM1275_VIN_VOUT_SELECT)
 			info->func[0] |=
 			  PMBUS_HAVE_VOUT | PMBUS_HAVE_STATUS_VOUT;
+
+		if (samples != 0xFFFF) {
+			config &= ~(ADM1075_AVG_MASK);
+			config |= samples;
+			ret = i2c_smbus_write_byte_data(client, ADM1275_PMON_CONFIG, config);
+			if (ret < 0)
+				dev_err(&client->dev, "Failed to set data rate\n");
+		}
+
 		break;
 	case adm1272:
 		data->have_vout = true;
@@ -579,6 +601,15 @@ static int adm1275_probe(struct i2c_client *client,
 				return -ENODEV;
 			}
 		}
+
+		if (samples != 0xFFFF) {
+			config &= ~(ADM1272_VI_AVG_MASK | ADM1272_PWR_AVG_MASK);
+			config |= (samples << 8 | samples << 11);
+			ret = i2c_smbus_write_word_data(client, ADM1275_PMON_CONFIG, config);
+			if (ret < 0)
+				dev_err(&client->dev, "Failed to set data rate\n");
+		}
+
 		break;
 	case adm1275:
 		if (device_config & ADM1275_IOUT_WARN2_SELECT)
@@ -597,6 +628,15 @@ static int adm1275_probe(struct i2c_client *client,
 		else
 			info->func[0] |=
 			  PMBUS_HAVE_VIN | PMBUS_HAVE_STATUS_INPUT;
+
+		if (samples != 0xFFFF) {
+			config &= ~(ADM1075_AVG_MASK);
+			config |= samples;
+			ret = i2c_smbus_write_byte_data(client, ADM1275_PMON_CONFIG, config);
+			if (ret < 0)
+				dev_err(&client->dev, "Failed to set data rate\n");
+		}
+
 		break;
 	case adm1276:
 		if (device_config & ADM1275_IOUT_WARN2_SELECT)
@@ -616,6 +656,15 @@ static int adm1275_probe(struct i2c_client *client,
 		if (config & ADM1275_VIN_VOUT_SELECT)
 			info->func[0] |=
 			  PMBUS_HAVE_VOUT | PMBUS_HAVE_STATUS_VOUT;
+
+		if (samples != 0xFFFF) {
+			config &= ~(ADM1075_AVG_MASK);
+			config |= samples;
+			ret = i2c_smbus_write_byte_data(client, ADM1275_PMON_CONFIG, config);
+			if (ret < 0)
+				dev_err(&client->dev, "Failed to set data rate\n");
+		}
+
 		break;
 	case adm1278:
 		data->have_vout = true;
@@ -649,6 +698,15 @@ static int adm1275_probe(struct i2c_client *client,
 				PMBUS_HAVE_TEMP | PMBUS_HAVE_STATUS_TEMP;
 		if (config & ADM1278_VIN_EN)
 			info->func[0] |= PMBUS_HAVE_VIN;
+
+		if (samples != 0xFFFF) {
+			config &= ~(ADM1272_VI_AVG_MASK | ADM1272_PWR_AVG_MASK);
+			config |= (samples << 8 | samples << 11);
+			ret = i2c_smbus_write_word_data(client, ADM1275_PMON_CONFIG, config);
+			if (ret < 0)
+				dev_err(&client->dev, "Failed to set data rate\n");
+		}
+
 		break;
 	case adm1293:
 	case adm1294:
@@ -698,6 +756,14 @@ static int adm1275_probe(struct i2c_client *client,
 
 		info->func[0] |= PMBUS_HAVE_PIN |
 			PMBUS_HAVE_VIN | PMBUS_HAVE_STATUS_INPUT;
+
+		if (samples != 0xFFFF) {
+			config &= ~(ADM1272_VI_AVG_MASK | ADM1272_PWR_AVG_MASK);
+			config |= (samples << 8 | samples << 11);
+			ret = i2c_smbus_write_word_data(client, ADM1275_PMON_CONFIG, config);
+			if (ret < 0)
+				dev_err(&client->dev, "Failed to set data rate\n");
+		}
 
 		break;
 	default:
