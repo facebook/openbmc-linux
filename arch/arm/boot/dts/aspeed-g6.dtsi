@@ -343,6 +343,24 @@
 				quality = <100>;
 			};
 
+			jtag0: jtag@1e6e4000 {
+				compatible = "aspeed,ast2600-jtag";
+				reg = <0x1e6e4000 0x40 0x1e6e2040 0x8 0x1e6e2418 0x4>;
+				clocks = <&syscon ASPEED_CLK_APB1>;
+				resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
+				interrupts = <27>;
+				status = "disabled";
+			};
+
+			jtag1: jtag@1e6e4100 {
+				compatible = "aspeed,ast2600-jtag";
+				reg = <0x1e6e4100 0x40 0x1e6e2050 0x8 0x1e6e2418 0x4>;
+				clocks = <&syscon ASPEED_CLK_APB2>;
+				resets = <&syscon ASPEED_RESET_JTAG_MASTER2>;
+				interrupts = <53>;
+				status = "disabled";
+			};
+
 			adc0: adc@1e6e9000 {
 				compatible = "aspeed,ast2600-adc";
 				reg = <0x1e6e9000 0x100>;
