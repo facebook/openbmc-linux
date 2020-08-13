@@ -203,6 +203,7 @@
 			adm1272@13 {
 				compatible = "adi,adm1272";
 				reg = <0x13>;
+				data-rate = <128>;
 				fast-gate-disable;
 			};
 			// ADC for monitoring vicor temperature
@@ -259,6 +260,7 @@
 			adm1272@10 {
 				compatible = "adi,adm1272";
 				reg = <0x10>;
+				data-rate = <128>;
 				fast-gate-disable;
 			};
 			// PDB Outlet temperature
@@ -276,6 +278,7 @@
 			adm1278@42 {
 				compatible = "adi,adm1278";
 				reg = <0x42>;
+				data-rate = <128>;
 			};
 			ltc4282@43 {
 				compatible = "lltc,ltc4282";
