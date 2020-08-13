@@ -21,6 +21,14 @@
 #include <uapi/linux/jtag.h>
 
 #define ASPEED_SCU_RESET_JTAG		BIT(22)
+#define ASPEED_2600_SCU_CLEAR_REGISTER 0x04
+
+/* AST2600 JTAG master pins */
+#define ASPEED_2600_SCU_ENABLE_PIN_TDI      BIT(4)
+#define ASPEED_2600_SCU_ENABLE_PIN_TMS      BIT(3)
+#define ASPEED_2600_SCU_ENABLE_PIN_TCK      BIT(2)
+#define ASPEED_2600_SCU_ENABLE_PIN_TDO      BIT(1)
+#define ASPEED_2600_SCU_ENABLE_PIN_TRSTN    BIT(0)
 
 #define ASPEED_JTAG_DATA		0x00
 #define ASPEED_JTAG_INST		0x04
@@ -107,6 +115,7 @@ static const char * const regnames[] = {
 struct aspeed_jtag {
 	void __iomem			*reg_base;
 	void __iomem			*scu_base;
+	void __iomem			*scupin_ctrl;
 	struct device			*dev;
 	struct clk			*pclk;
 	enum jtag_endstate		status;
@@ -115,6 +124,7 @@ struct aspeed_jtag {
 	u32				flag;
 	wait_queue_head_t		jtag_wq;
 	u32				mode;
+	int				scu_clear_reg;
 };
 
 /*
@@ -300,16 +310,37 @@ static int aspeed_jtag_freq_get(struct jtag *jtag, u32 *frq)
 
 static inline void aspeed_jtag_slave(struct aspeed_jtag *aspeed_jtag)
 {
-	u32 scu_reg = readl(aspeed_jtag->scu_base);
-
-	writel(scu_reg | ASPEED_SCU_RESET_JTAG, aspeed_jtag->scu_base);
+	u32 scu_reg;
+	if (aspeed_jtag->scu_clear_reg) {
+		writel(ASPEED_SCU_RESET_JTAG, aspeed_jtag->scu_base);
+	} else {
+		scu_reg = readl(aspeed_jtag->scu_base);
+		writel(scu_reg | ASPEED_SCU_RESET_JTAG, aspeed_jtag->scu_base);
+	}
 }
 
 static inline void aspeed_jtag_master(struct aspeed_jtag *aspeed_jtag)
 {
-	u32 scu_reg = readl(aspeed_jtag->scu_base);
+	u32 scu_reg;
+	u32 val;
+	if (aspeed_jtag->scu_clear_reg) {
+		writel(ASPEED_SCU_RESET_JTAG,
+				aspeed_jtag->scu_base + ASPEED_2600_SCU_CLEAR_REGISTER);
+	} else {
+		scu_reg = readl(aspeed_jtag->scu_base);
+		writel(scu_reg & ~ASPEED_SCU_RESET_JTAG, aspeed_jtag->scu_base);
+	}
 
-	writel(scu_reg & ~ASPEED_SCU_RESET_JTAG, aspeed_jtag->scu_base);
+	if (aspeed_jtag->scupin_ctrl) {
+		val = readl(aspeed_jtag->scupin_ctrl);
+		writel((val |
+					ASPEED_2600_SCU_ENABLE_PIN_TDI |
+					ASPEED_2600_SCU_ENABLE_PIN_TMS |
+					ASPEED_2600_SCU_ENABLE_PIN_TCK |
+					ASPEED_2600_SCU_ENABLE_PIN_TDO) &
+					~ASPEED_2600_SCU_ENABLE_PIN_TRSTN,
+				aspeed_jtag->scupin_ctrl);
+	}
 
 	aspeed_jtag_write(aspeed_jtag, (ASPEED_JTAG_CTL_ENG_EN |
 					ASPEED_JTAG_CTL_ENG_OUT_EN),
@@ -883,6 +914,7 @@ static int aspeed_jtag_init(struct platform_device *pdev,
 {
 	struct resource *res;
 	struct resource *scu_res;
+	struct resource *scupin_res;
 #ifdef USE_INTERRUPTS
 	int err;
 #endif
@@ -897,6 +929,19 @@ static int aspeed_jtag_init(struct platform_device *pdev,
 						      scu_res);
 	if (IS_ERR(aspeed_jtag->scu_base))
 		return -ENOMEM;
+
+	if (of_device_is_compatible(pdev->dev.of_node, "aspeed,ast2600-jtag")) {
+		scupin_res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+		aspeed_jtag->scupin_ctrl = devm_ioremap_resource(aspeed_jtag->dev,
+							      scupin_res);
+		if (IS_ERR(aspeed_jtag->scupin_ctrl))
+			return -ENOMEM;
+
+		aspeed_jtag->scu_clear_reg = 1;
+	} else {
+		aspeed_jtag->scupin_ctrl = NULL;
+		aspeed_jtag->scu_clear_reg = 0;
+	}
 
 	aspeed_jtag->pclk = devm_clk_get(aspeed_jtag->dev, NULL);
 	if (IS_ERR(aspeed_jtag->pclk)) {
@@ -1216,6 +1261,7 @@ static int aspeed_jtag_remove(struct platform_device *pdev)
 static const struct of_device_id aspeed_jtag_of_match[] = {
 	{ .compatible = "aspeed,ast2400-jtag", },
 	{ .compatible = "aspeed,ast2500-jtag", },
+	{ .compatible = "aspeed,ast2600-jtag", },
 	{}
 };
 
