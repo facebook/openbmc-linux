@@ -235,7 +235,7 @@
 
 			jtag: jtag@1e6e4000 {
 				compatible = "aspeed,ast2500-jtag";
-				reg = <0x1e6e4000 0x1c>;
+				reg = <0x1e6e4000 0x1c 0x1e6e2004 0x04>;
 				clocks = <&syscon ASPEED_CLK_APB>;
 				resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
 				interrupts = <43>;

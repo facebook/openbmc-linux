@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 // drivers/jtag/jtag.c
 //
-// Copyright (c) 2017 Mellanox Technologies. All rights reserved.
-// Copyright (c) 2017 Oleksandr Shamray <oleksandrs@mellanox.com>
+// Copyright (c) 2018 Mellanox Technologies. All rights reserved.
+// Copyright (c) 2018 Oleksandr Shamray <oleksandrs@mellanox.com>
 
 #include <linux/cdev.h>
 #include <linux/device.h>
@@ -16,265 +16,284 @@
 #include <linux/types.h>
 #include <uapi/linux/jtag.h>
 
-#define JTAG_NAME   "jtag0"
-#define MAX_JTAG_NAME_LEN (sizeof("jtag") + 5)
-
 struct jtag {
-    struct miscdevice miscdev;
-    struct device *dev;
-    const struct jtag_ops *ops;
-    int id;
-    bool opened;
-    struct mutex open_lock;
-    unsigned long priv[0];
+	struct miscdevice miscdev;
+	const struct jtag_ops *ops;
+	int id;
+	unsigned long priv[0];
 };
 
 static DEFINE_IDA(jtag_ida);
 
 void *jtag_priv(struct jtag *jtag)
 {
-    return jtag->priv;
+	return jtag->priv;
 }
 EXPORT_SYMBOL_GPL(jtag_priv);
 
 static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-    struct jtag *jtag = file->private_data;
-    struct jtag_run_test_idle idle;
-    struct jtag_xfer xfer;
-    u8 *xfer_data;
-    u32 data_size;
-    u32 value;
-    int err;
+	struct jtag *jtag = file->private_data;
+	struct jtag_end_tap_state endstate;
+	struct jtag_xfer xfer;
+	struct tck_bitbang bitbang;
+	struct jtag_mode mode;
+	u8 *xfer_data;
+	u32 data_size;
+	u32 value;
+	int err;
 
-    if (!arg)
-        return -EINVAL;
+	if (!arg)
+		return -EINVAL;
 
-    switch (cmd) {
-    case JTAG_GIOCFREQ:
-        if (!jtag->ops->freq_get)
-            err = -EOPNOTSUPP;
+	switch (cmd) {
+	case JTAG_GIOCFREQ:
+		if (!jtag->ops->freq_get)
+			return -EOPNOTSUPP;
 
-        err = jtag->ops->freq_get(jtag, &value);
-        if (err)
-            break;
+		err = jtag->ops->freq_get(jtag, &value);
+		if (err)
+			break;
 
-        if (put_user(value, (__u32 *)arg))
-            err = -EFAULT;
-        break;
+		if (put_user(value, (__u32 __user *)arg))
+			err = -EFAULT;
+		break;
 
-    case JTAG_SIOCFREQ:
-        if (!jtag->ops->freq_set)
-            return -EOPNOTSUPP;
+	case JTAG_SIOCFREQ:
+		if (!jtag->ops->freq_set)
+			return -EOPNOTSUPP;
 
-        if (get_user(value, (__u32 *)arg))
-            return -EFAULT;
-        if (value == 0)
-            return -EINVAL;
+		if (get_user(value, (__u32 __user *)arg))
+			return -EFAULT;
+		if (value == 0)
+			return -EINVAL;
 
-        err = jtag->ops->freq_set(jtag, value);
-        break;
+		err = jtag->ops->freq_set(jtag, value);
+		break;
 
-    case JTAG_IOCRUNTEST:
-        if (!jtag->ops->idle)
-            return -EOPNOTSUPP;
+	case JTAG_SIOCSTATE:
+		if (copy_from_user(&endstate, (const void __user *)arg,
+				   sizeof(struct jtag_end_tap_state)))
+			return -EFAULT;
 
-        if (copy_from_user(&idle, (void *)arg,
-                   sizeof(struct jtag_run_test_idle)))
-            return -EFAULT;
+		if (endstate.endstate > JTAG_STATE_UPDATEIR)
+			return -EINVAL;
 
-        if (idle.endstate > JTAG_STATE_PAUSEDR)
-            return -EINVAL;
+		if (endstate.reset > JTAG_FORCE_RESET)
+			return -EINVAL;
 
-        err = jtag->ops->idle(jtag, &idle);
-        break;
+		err = jtag->ops->status_set(jtag, &endstate);
+		break;
 
-    case JTAG_IOCXFER:
-        if (!jtag->ops->xfer)
-            return -EOPNOTSUPP;
+	case JTAG_IOCXFER:
+		if (copy_from_user(&xfer, (const void __user *)arg,
+				   sizeof(struct jtag_xfer)))
+			return -EFAULT;
 
-        if (copy_from_user(&xfer, (void *)arg,
-                   sizeof(struct jtag_xfer)))
-            return -EFAULT;
+		if (xfer.length >= JTAG_MAX_XFER_DATA_LEN)
+			return -EINVAL;
 
-        if (xfer.length >= JTAG_MAX_XFER_DATA_LEN)
-            return -EINVAL;
+		if (xfer.type > JTAG_SDR_XFER)
+			return -EINVAL;
 
-        if (xfer.type > JTAG_SDR_XFER)
-            return -EINVAL;
+		if (xfer.direction > JTAG_READ_WRITE_XFER)
+			return -EINVAL;
 
-        if (xfer.direction > JTAG_WRITE_XFER)
-            return -EINVAL;
+		if (xfer.endstate > JTAG_STATE_UPDATEIR)
+			return -EINVAL;
 
-        if (xfer.endstate > JTAG_STATE_PAUSEDR)
-            return -EINVAL;
+		data_size = DIV_ROUND_UP(xfer.length, BITS_PER_BYTE);
+		xfer_data = memdup_user(u64_to_user_ptr(xfer.tdio), data_size);
+		if (IS_ERR(xfer_data))
+			return -EFAULT;
 
-        data_size = DIV_ROUND_UP(xfer.length, BITS_PER_BYTE);
-        xfer_data = memdup_user((void __user *)(xfer.tdio), data_size);
+		err = jtag->ops->xfer(jtag, &xfer, xfer_data);
+		if (err) {
+			kfree(xfer_data);
+			return err;
+		}
 
-        if (!xfer_data)
-            return -EFAULT;
+		err = copy_to_user(u64_to_user_ptr(xfer.tdio),
+				   (void *)xfer_data, data_size);
+		kfree(xfer_data);
+		if (err)
+			return -EFAULT;
 
-        err = jtag->ops->xfer(jtag, &xfer, xfer_data);
-        if (err) {
-            kfree(xfer_data);
-            return -EFAULT;
-        }
+		if (copy_to_user((void __user *)arg, (void *)&xfer,
+				 sizeof(struct jtag_xfer)))
+			return -EFAULT;
+		break;
 
-        err = copy_to_user((void __user *)(xfer.tdio),
-                   (void *)(xfer_data), data_size);
+	case JTAG_GIOCSTATUS:
+		err = jtag->ops->status_get(jtag, &value);
+		if (err)
+			break;
 
-        if (err) {
-            kfree(xfer_data);
-            return -EFAULT;
-        }
+		err = put_user(value, (__u32 __user *)arg);
+		break;
+	case JTAG_IOCBITBANG:
+		if (copy_from_user(&bitbang, (const void __user *)arg,
+				   sizeof(struct tck_bitbang)))
+			return -EFAULT;
+		err = jtag->ops->bitbang(jtag, &bitbang);
+		if (err)
+			break;
 
-        kfree(xfer_data);
-        if (copy_to_user((void *)arg, &xfer, sizeof(struct jtag_xfer)))
-            return -EFAULT;
-        break;
+		if (copy_to_user((void __user *)arg, (void *)&bitbang,
+				 sizeof(struct tck_bitbang)))
+			return -EFAULT;
+		break;
+	case JTAG_SIOCMODE:
+		if (!jtag->ops->mode_set)
+			return -EOPNOTSUPP;
 
-    case JTAG_GIOCSTATUS:
-        if (!jtag->ops->status_get)
-            return -EOPNOTSUPP;
+		if (copy_from_user(&mode, (const void __user *)arg,
+				   sizeof(struct jtag_mode)))
+			return -EFAULT;
 
-        err = jtag->ops->status_get(jtag, &value);
-        if (err)
-            break;
+		err = jtag->ops->mode_set(jtag, &mode);
+		break;
 
-        err = put_user(value, (__u32 *)arg);
-        if (err)
-            err = -EFAULT;
-        break;
-    case JTAG_SIOCMODE:
-        if (!jtag->ops->mode_set)
-            return  -EOPNOTSUPP;
-
-        if (get_user(value, (__u32 *)arg))
-            return -EFAULT;
-        if (value == 0)
-            return -EINVAL;
-
-        err = jtag->ops->mode_set(jtag, value);
-        break;
-
-    default:
-        return -EINVAL;
-    }
-    return err;
+	default:
+		if (jtag->ops->ioctl)
+			return jtag->ops->ioctl(jtag, cmd, arg);
+		return -EINVAL;
+	}
+	return err;
 }
 
 static int jtag_open(struct inode *inode, struct file *file)
 {
-    struct jtag *jtag = container_of(file->private_data, struct jtag,
-                     miscdev);
+	struct jtag *jtag = container_of(file->private_data,
+					 struct jtag,
+					 miscdev);
 
-    if (mutex_lock_interruptible(&jtag->open_lock))
-        return -ERESTARTSYS;
-
-    if (jtag->opened) {
-        mutex_unlock(&jtag->open_lock);
-        return -EBUSY;
-    }
-    jtag->opened = true;
-    mutex_unlock(&jtag->open_lock);
-
-    nonseekable_open(inode, file);
-    file->private_data = jtag;
-    return 0;
+	file->private_data = jtag;
+	if (jtag->ops->enable(jtag))
+		return -EBUSY;
+	return nonseekable_open(inode, file);
 }
 
 static int jtag_release(struct inode *inode, struct file *file)
 {
-    struct jtag *jtag = file->private_data;
+	struct jtag *jtag = file->private_data;
 
-    mutex_lock(&jtag->open_lock);
-    jtag->opened = false;
-    mutex_unlock(&jtag->open_lock);
-    return 0;
+	if (jtag->ops->disable(jtag))
+		return -EBUSY;
+	return 0;
 }
 
 static const struct file_operations jtag_fops = {
-    .owner      = THIS_MODULE,
-    .open       = jtag_open,
-    .release    = jtag_release,
-    .llseek     = noop_llseek,
-    .unlocked_ioctl = jtag_ioctl,
+	.owner		= THIS_MODULE,
+	.open		= jtag_open,
+	.llseek		= noop_llseek,
+	.unlocked_ioctl = jtag_ioctl,
+	.release	= jtag_release,
 };
 
-struct jtag *jtag_alloc(size_t priv_size, const struct jtag_ops *ops)
+struct jtag *jtag_alloc(struct device *host, size_t priv_size,
+			const struct jtag_ops *ops)
 {
-    struct jtag *jtag;
+	struct jtag *jtag;
 
-    jtag = kzalloc(sizeof(*jtag) + priv_size, GFP_KERNEL);
-    if (!jtag)
-        return NULL;
+	if (!host)
+		return NULL;
 
-    jtag->ops = ops;
-    return jtag;
+	if (!ops)
+		return NULL;
+
+	if (!ops->status_set || !ops->status_get || !ops->xfer)
+		return NULL;
+
+	jtag = kzalloc(sizeof(*jtag) + priv_size, GFP_KERNEL);
+	if (!jtag)
+		return NULL;
+
+	jtag->ops = ops;
+	jtag->miscdev.parent = host;
+
+	return jtag;
 }
 EXPORT_SYMBOL_GPL(jtag_alloc);
 
 void jtag_free(struct jtag *jtag)
 {
-    kfree(jtag);
+	kfree(jtag);
 }
 EXPORT_SYMBOL_GPL(jtag_free);
 
-int jtag_register(struct jtag *jtag)
+static int jtag_register(struct jtag *jtag)
 {
-    char *name;
-    int err;
-    int id;
+	struct device *dev = jtag->miscdev.parent;
+	int err;
+	int id;
 
-    id = ida_simple_get(&jtag_ida, 0, 0, GFP_KERNEL);
-    if (id < 0)
-        return id;
+	if (!dev)
+		return -ENODEV;
 
-    jtag->id = id;
-    jtag->opened = false;
+	id = ida_simple_get(&jtag_ida, 0, 0, GFP_KERNEL);
+	if (id < 0)
+		return id;
 
-    name = kzalloc(MAX_JTAG_NAME_LEN, GFP_KERNEL);
-    if (!name) {
-        err = -ENOMEM;
-        goto err_jtag_alloc;
-    }
+	jtag->id = id;
 
-    err = snprintf(name, MAX_JTAG_NAME_LEN, "jtag%d", id);
-    if (err < 0)
-        goto err_jtag_name;
+	jtag->miscdev.fops =  &jtag_fops;
+	jtag->miscdev.minor = MISC_DYNAMIC_MINOR;
+	jtag->miscdev.name = kasprintf(GFP_KERNEL, "jtag%d", id);
+	if (!jtag->miscdev.name) {
+		err = -ENOMEM;
+		goto err_jtag_alloc;
+	}
 
-    mutex_init(&jtag->open_lock);
-    jtag->miscdev.fops =  &jtag_fops;
-    jtag->miscdev.minor = MISC_DYNAMIC_MINOR;
-    jtag->miscdev.name = name;
-
-    err = misc_register(&jtag->miscdev);
-    if (err) {
-        dev_err(jtag->dev, "Unable to register device\n");
-        goto err_jtag_name;
-    }
-    return 0;
+	err = misc_register(&jtag->miscdev);
+	if (err) {
+		dev_err(jtag->miscdev.parent, "Unable to register device\n");
+		goto err_jtag_name;
+	}
+	return 0;
 
 err_jtag_name:
-    kfree(name);
+	kfree(jtag->miscdev.name);
 err_jtag_alloc:
-    ida_simple_remove(&jtag_ida, id);
-    return err;
+	ida_simple_remove(&jtag_ida, id);
+	return err;
 }
-EXPORT_SYMBOL_GPL(jtag_register);
 
-void jtag_unregister(struct jtag *jtag)
+static void jtag_unregister(struct jtag *jtag)
 {
-    misc_deregister(&jtag->miscdev);
-    kfree(jtag->miscdev.name);
-    ida_simple_remove(&jtag_ida, jtag->id);
+	misc_deregister(&jtag->miscdev);
+	kfree(jtag->miscdev.name);
+	ida_simple_remove(&jtag_ida, jtag->id);
 }
-EXPORT_SYMBOL_GPL(jtag_unregister);
+
+static void devm_jtag_unregister(struct device *dev, void *res)
+{
+	jtag_unregister(*(struct jtag **)res);
+}
+
+int devm_jtag_register(struct device *dev, struct jtag *jtag)
+{
+	struct jtag **ptr;
+	int ret;
+
+	ptr = devres_alloc(devm_jtag_unregister, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return -ENOMEM;
+
+	ret = jtag_register(jtag);
+	if (!ret) {
+		*ptr = jtag;
+		devres_add(dev, ptr);
+	} else {
+		devres_free(ptr);
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(devm_jtag_register);
 
 static void __exit jtag_exit(void)
 {
-    ida_destroy(&jtag_ida);
+	ida_destroy(&jtag_ida);
 }
 
 module_exit(jtag_exit);
