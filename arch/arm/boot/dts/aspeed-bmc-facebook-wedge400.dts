@@ -14,40 +14,40 @@
 		 * PCA9548 (2-0070) provides 8 channels connecting to
 		 * SCM (System Controller Module).
 		 */
-		i2c14 = &imux14;
-		i2c15 = &imux15;
 		i2c16 = &imux16;
 		i2c17 = &imux17;
 		i2c18 = &imux18;
 		i2c19 = &imux19;
 		i2c20 = &imux20;
 		i2c21 = &imux21;
+		i2c22 = &imux22;
+		i2c23 = &imux23;
 
 		/*
 		 * PCA9548 (8-0070) provides 8 channels connecting to
 		 * SMB (Switch Main Board).
 		 */
-		i2c22 = &imux22;
-		i2c23 = &imux23;
 		i2c24 = &imux24;
 		i2c25 = &imux25;
 		i2c26 = &imux26;
 		i2c27 = &imux27;
 		i2c28 = &imux28;
 		i2c29 = &imux29;
+		i2c30 = &imux30;
+		i2c31 = &imux31;
 
 		/*
 		 * PCA9548 (11-0076) provides 8 channels connecting to
 		 * FCM (Fan Controller Module).
 		 */
-		i2c30 = &imux30;
-		i2c31 = &imux31;
 		i2c32 = &imux32;
 		i2c33 = &imux33;
 		i2c34 = &imux34;
 		i2c35 = &imux35;
 		i2c36 = &imux36;
 		i2c37 = &imux37;
+		i2c38 = &imux38;
+		i2c39 = &imux39;
 
 		spi1 = &spi1;
 		spi2 = &spi_gpio;
@@ -150,49 +150,49 @@
 		reg = <0x70>;
 		i2c-mux-idle-disconnect;
 
-		imux14: i2c@0 {
+		imux16: i2c@0 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0>;
 		};
 
-		imux15: i2c@1 {
+		imux17: i2c@1 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <1>;
 		};
 
-		imux16: i2c@2 {
+		imux18: i2c@2 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
 		};
 
-		imux17: i2c@3 {
+		imux19: i2c@3 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <3>;
 		};
 
-		imux18: i2c@4 {
+		imux20: i2c@4 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <4>;
 		};
 
-		imux19: i2c@5 {
+		imux21: i2c@5 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <5>;
 		};
 
-		imux20: i2c@6 {
+		imux22: i2c@6 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <6>;
 		};
 
-		imux21: i2c@7 {
+		imux23: i2c@7 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <7>;
@@ -230,49 +230,49 @@
 		reg = <0x70>;
 		i2c-mux-idle-disconnect;
 
-		imux22: i2c@0 {
+		imux24: i2c@0 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0>;
 		};
 
-		imux23: i2c@1 {
+		imux25: i2c@1 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <1>;
 		};
 
-		imux24: i2c@2 {
+		imux26: i2c@2 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
 		};
 
-		imux25: i2c@3 {
+		imux27: i2c@3 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <3>;
 		};
 
-		imux26: i2c@4 {
+		imux28: i2c@4 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <4>;
 		};
 
-		imux27: i2c@5 {
+		imux29: i2c@5 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <5>;
 		};
 
-		imux28: i2c@6 {
+		imux30: i2c@6 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <6>;
 		};
 
-		imux29: i2c@7 {
+		imux31: i2c@7 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <7>;
@@ -299,49 +299,49 @@
 		reg = <0x76>;
 		i2c-mux-idle-disconnect;
 
-		imux30: i2c@0 {
+		imux32: i2c@0 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0>;
 		};
 
-		imux31: i2c@1 {
+		imux33: i2c@1 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <1>;
 		};
 
-		imux32: i2c@2 {
+		imux34: i2c@2 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
 		};
 
-		imux33: i2c@3 {
+		imux35: i2c@3 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <3>;
 		};
 
-		imux34: i2c@4 {
+		imux36: i2c@4 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <4>;
 		};
 
-		imux35: i2c@5 {
+		imux37: i2c@5 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <5>;
 		};
 
-		imux36: i2c@6 {
+		imux38: i2c@6 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <6>;
 		};
 
-		imux37: i2c@7 {
+		imux39: i2c@7 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <7>;
