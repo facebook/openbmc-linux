@@ -11,8 +11,8 @@
 
 	aliases {
 		/*
-		 * I2C switch 2-0070, pca9548, total 8 child channels
-		 * assigned bus number 14-21.
+		 * PCA9548 (2-0070) provides 8 channels connecting to
+		 * SCM (System Controller Module).
 		 */
 		i2c14 = &imux14;
 		i2c15 = &imux15;
@@ -24,8 +24,8 @@
 		i2c21 = &imux21;
 
 		/*
-		 * I2C switch 8-0070, pca9548, total 8 child channels
-		 * assigned bus number 22-29.
+		 * PCA9548 (8-0070) provides 8 channels connecting to
+		 * SMB (Switch Main Board).
 		 */
 		i2c22 = &imux22;
 		i2c23 = &imux23;
@@ -37,8 +37,8 @@
 		i2c29 = &imux29;
 
 		/*
-		 * I2C switch 11-0076, pca9548, total 8 child channels
-		 * assigned bus number 30-37.
+		 * PCA9548 (11-0076) provides 8 channels connecting to
+		 * FCM (Fan Controller Module).
 		 */
 		i2c30 = &imux30;
 		i2c31 = &imux31;
@@ -69,11 +69,11 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
+		cs-gpios = <&gpio ASPEED_GPIO(R, 2) GPIO_ACTIVE_LOW>;
 		gpio-sck = <&gpio ASPEED_GPIO(R, 3) GPIO_ACTIVE_HIGH>;
 		gpio-mosi = <&gpio ASPEED_GPIO(R, 4) GPIO_ACTIVE_HIGH>;
 		gpio-miso = <&gpio ASPEED_GPIO(R, 5) GPIO_ACTIVE_HIGH>;
 		num-chipselects = <1>;
-		cs-gpios = <&gpio ASPEED_GPIO(R, 2) GPIO_ACTIVE_LOW>;
 
 		tpmdev@0 {
 			compatible = "tcg,tpm_tis-spi";
@@ -125,6 +125,10 @@
 		     &pinctrl_rxd4_default>;
 };
 
+/*
+ * I2C bus #0 is multi-master environment dedicated for BMC and Bridge IC
+ * communication.
+ */
 &i2c0 {
 	status = "okay";
 	multi-master;
@@ -144,6 +148,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
+		i2c-mux-idle-disconnect;
 
 		imux14: i2c@0 {
 			#address-cells = <1>;
@@ -223,6 +228,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
+		i2c-mux-idle-disconnect;
 
 		imux22: i2c@0 {
 			#address-cells = <1>;
@@ -291,6 +297,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x76>;
+		i2c-mux-idle-disconnect;
 
 		imux30: i2c@0 {
 			#address-cells = <1>;
@@ -374,4 +381,3 @@
 &jtag {
     status = "okay";
 };
-
