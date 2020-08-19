@@ -116,6 +116,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
+		i2c-mux-idle-disconnect;
 	};
 };
 
@@ -127,19 +128,11 @@
 	status = "okay";
 };
 
-&i2c10 {
-	status = "okay";
-};
-
 &i2c11 {
 	status = "okay";
 };
 
 &i2c12 {
-	status = "okay";
-};
-
-&i2c13 {
 	status = "okay";
 };
 
