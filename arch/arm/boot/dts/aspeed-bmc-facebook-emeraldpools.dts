@@ -147,6 +147,16 @@
 
 &i2c4 {
 	status = "okay";
+	// BSM FRUID after DVT-2
+	eeprom@56 {
+		compatible = "atmel,24c64";
+		reg = <0x56>;
+	};
+	// Server presence after DVT-2
+	pca9555@20 {
+		compatible = "nxp,pca9555";
+		reg = <0x20>;
+	};
 };
 
 &i2c5 {
@@ -457,11 +467,12 @@
 	multi-master;
 	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
-	// BSM FRUID
+	// BSM FRUID before DVT-2
 	eeprom@56 {
 		compatible = "atmel,24c64";
 		reg = <0x56>;
 	};
+	// Server presence before DVT-2
 	pca9555@20 {
 		compatible = "nxp,pca9555";
 		reg = <0x20>;
