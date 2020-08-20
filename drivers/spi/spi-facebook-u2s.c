@@ -126,16 +126,6 @@ struct fbu2s_spi_bus {
 	struct spi_device *spi;
 };
 
-/* endpoint type define for USB transfer according to diffreent spi operation,
- * TODO: add 8 bulk-in endpoints
- */
-enum EPTYPE {
-	BULK_IN,
-	BULK_OUT,
-	CTRL_IN,
-	CTRL_OUT
-};
-
 /*
  * Structure for the TLV
  */
@@ -153,52 +143,31 @@ static struct fbu2s_tlv tlv_pkg = {0};
  */
 #define SPI_FREQ_25MHZ	1
 #define DELAY_10NS		0x10
-unsigned char spi_ctr_data[FBU2S_SPI_CTR_DATA_LEN] = {
+static unsigned char spi_ctr_data[FBU2S_SPI_CTR_DATA_LEN] = {
 	SPI_FREQ_25MHZ, DELAY_10NS, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+/* endpoint type define for USB transfer according to diffreent spi operation,
+ * TODO: add 8 bulk-in endpoints
+ */
+enum {
+	USPI_BULK_IN = 0,
+	USPI_BULK_OUT,
+	USPI_EP_MAX,
 };
 
 /*
  * Structure for the entire FPGA device (usb-spi bridge).
  */
 static struct fbu2s_usb {
-	struct usb_device				*usb_dev;
-	struct usb_interface			*usb_intf;
-	/* limiting the number of writes in progress */
-	struct semaphore				limit_sem;
-	/* in case we need to retract our submissions */
-	struct usb_anchor				submitted;
-	/* the urb to read data with */
-	struct urb						*bulk_in_urb;
-	/* the buffer to receive data */
-	unsigned char					*bulk_in_buffer;
-	// struct usb_endpoint_descriptor	*bulk_in;
-	// struct usb_endpoint_descriptor	*bulk_out;
-	/* the size of the receive buffer */
-	size_t							bulk_in_size;
-	/* number of bytes in the buffer */
-	size_t							bulk_in_filled;
-	/* already copied to user space */
-	size_t							bulk_in_copied;
-	/* the address of the ctrl in endpoint */
-	__u8							ctrl_in_endpointAddr;
-	/* the address of the ctrl out endpoint */
-	__u8							ctrl_out_endpointAddr;
-	/* the address of the bulk in endpoint */
-	__u8							bulk_in_endpointAddr;
-	/* the address of the bulk out endpoint */
-	__u8							bulk_out_endpointAddr;
-	/* the last request tanked */
-	int								errors;
-	/* a read is going on */
-	bool							ongoing_read;
-	/* lock for errors */
-	spinlock_t						err_lock;
-	struct kref						kref;
-	/* synchronize I/O with disconnect */
-	struct mutex					io_mutex;
-	unsigned long					disconnected:1;
-	/* to wait for an ongoing read */
-	wait_queue_head_t				bulk_in_wait;
+	struct usb_device *usb_dev;
+	struct usb_interface *usb_intf;
+
+	u8 ep_list[USPI_EP_MAX];
+#define BULK_IN_PIPE	usb_sndbulkpipe(fbu2s_bridge.usb_dev, \
+					fbu2s_bridge.ep_list[USPI_BULK_IN])
+#define BULK_OUT_PIPE	usb_sndbulkpipe(fbu2s_bridge.usb_dev, \
+					fbu2s_bridge.ep_list[USPI_BULK_IN])
 
 	struct fbu2s_spi_bus *spi_buses[FBUS_NUM_SPI_BUSES];
 } fbu2s_bridge;
@@ -220,7 +189,7 @@ static void fbu2s_spi_set_cs(struct spi_device *slave, bool level)
 }
 
 static int fbu2s_tlv_parse(u16 tlv_type, unsigned long address,
-						   void *data_buf, u16 data_len)
+			   const void *data_buf, u16 data_len)
 {
 	struct device *parent = &(fbu2s_bridge.usb_intf->dev);
 	int read_len = FBU2S_SPI_READ_REQUEST_LEN;
@@ -271,57 +240,34 @@ static int fbu2s_tlv_parse(u16 tlv_type, unsigned long address,
 	return 0;
 }
 
-int fbu2s_usb_transfer(void *transfer_buff, int transfer_len,
-					   enum EPTYPE transfer_bulk, void **receive_buff)
+int fbu2s_usb_transfer(int endp, void *buf, int req_len, int *actual_len)
 {
 	int ret = 0;
-	unsigned int count = 0;
-	__u8 pipe;
-	void *transfer_buff_temp = NULL;
 
-	switch (transfer_bulk) {
-	case BULK_IN:
-		pipe = fbu2s_bridge.bulk_in_endpointAddr;
-		transfer_buff_temp = kmalloc(USB_BULK_MAX_SIZE, GFP_KERNEL);
-		memset(transfer_buff_temp, 0, USB_BULK_MAX_SIZE);
-		ret = usb_bulk_msg(fbu2s_bridge.usb_dev,
-						   usb_sndbulkpipe(fbu2s_bridge.usb_dev, pipe),
-						   transfer_buff_temp,
-						   transfer_len,
-						   &count, DATA_TIMEOUT);
-		memcpy(*receive_buff, transfer_buff_temp, transfer_len);
-		kfree(transfer_buff_temp);
-		transfer_buff_temp = NULL;
+	switch (endp) {
+	case USPI_BULK_IN:
+		ret = usb_bulk_msg(fbu2s_bridge.usb_dev, BULK_IN_PIPE,
+				   buf, req_len, actual_len, DATA_TIMEOUT);
 		break;
-	case BULK_OUT:
-		pipe = fbu2s_bridge.bulk_out_endpointAddr;
-		ret = usb_bulk_msg(fbu2s_bridge.usb_dev,
-						   usb_sndbulkpipe(fbu2s_bridge.usb_dev, pipe),
-						   transfer_buff,
-						   transfer_len,
-						   &count, DATA_TIMEOUT);
+
+	case USPI_BULK_OUT:
+		ret = usb_bulk_msg(fbu2s_bridge.usb_dev, BULK_OUT_PIPE,
+				   buf, req_len, actual_len, DATA_TIMEOUT);
 		break;
-	case CTRL_IN:
-		pipe = fbu2s_bridge.ctrl_in_endpointAddr;
-		break;
-	case CTRL_OUT:
-		pipe = fbu2s_bridge.ctrl_out_endpointAddr;
-		break;
+
 	default:
-		return -1;
+		return -EINVAL;
 	}
-
-	if (ret)
-		return -1;
 
 	return ret;
 }
 
-static int fbu2s_spi_get_ctr_buff(int cmd_type, void *spi_ctr_buff,
-								  int spi_ctr_buff_len,
-								  unsigned long ctr_addr,
-								  unsigned char spi_data_continue_cs,
-								  int first_read_transfer_flag)
+static int fbu2s_spi_get_ctr_buff(int cmd_type,
+				  void *spi_ctr_buff,
+				  int spi_ctr_buff_len,
+				  unsigned long ctr_addr,
+				  unsigned char spi_data_continue_cs,
+				  int first_read_transfer_flag)
 {
 	int ret;
 	unsigned int spi_data_access_len = 0;
@@ -345,7 +291,7 @@ static int fbu2s_spi_get_ctr_buff(int cmd_type, void *spi_ctr_buff,
 	spi_ctr_data[FBU2S_SPI_CTR_DATA_CS_FIELD_OFFSET] = spi_data_continue_cs;
 
 	ret = fbu2s_tlv_parse(TLV_TYPE_WRITE, ctr_addr,
-						  (void *)spi_ctr_data, FBU2S_SPI_CTR_DATA_LEN);
+				(void *)spi_ctr_data, FBU2S_SPI_CTR_DATA_LEN);
 	if (ret)
 		return -1;
 
@@ -356,7 +302,7 @@ static int fbu2s_spi_get_ctr_buff(int cmd_type, void *spi_ctr_buff,
 
 static int fbu2s_spi_xfer_tx(struct spi_transfer *xfer, unsigned int id)
 {
-	int ret;
+	int ret = 0;
 	int temp = 0;
 	int mosi_buff_len;
 	int spi_ctr_buff_len;
@@ -381,51 +327,57 @@ static int fbu2s_spi_xfer_tx(struct spi_transfer *xfer, unsigned int id)
 	mosi_buff_len = tlv_pkg.length + OFFSET_SPI_HEAD;
 
 	mosi_buff = kmalloc(mosi_buff_len, GFP_KERNEL);
+	if (mosi_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(mosi_buff, 0, mosi_buff_len);
 	memcpy(mosi_buff, &tlv_pkg, mosi_buff_len);
 
-	ret = fbu2s_usb_transfer(mosi_buff, mosi_buff_len, BULK_OUT, NULL);
+	ret = fbu2s_usb_transfer(USPI_BULK_OUT, mosi_buff, mosi_buff_len, NULL);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
-		goto error;
+		goto exit;
 	}
 
 	//write spi controller:(hard code rigth now)
 	spi_ctr_buff_len = FBU2S_SPI_CTR_BUFF_LEN;
 	spi_ctr_buff = kmalloc(spi_ctr_buff_len, GFP_KERNEL);
+	if (spi_ctr_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(spi_ctr_buff, 0, spi_ctr_buff_len);
 	ret = fbu2s_spi_get_ctr_buff(temp, spi_ctr_buff, spi_ctr_buff_len,
 			ctr_addr, FBU2S_SPI_CTR_CONTINUE_CS_OFF, 0);
 	if (ret) {
 		dev_info(parent, "Send spi ctr register fail!\n");
-		goto error;
+		goto exit;
 	}
 
-	ret = fbu2s_usb_transfer(spi_ctr_buff, spi_ctr_buff_len,
-			BULK_OUT, NULL);
+	ret = fbu2s_usb_transfer(USPI_BULK_OUT, spi_ctr_buff,
+				 spi_ctr_buff_len, NULL);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
-		goto error;
+		goto exit;
 	}
 
 	/* add 40us delay for spi write*/
 	udelay(4 * SPI_TRANSFER_DELAY);
-	return 0;
-error:
+
+exit:
 	if (mosi_buff != NULL) {
 		kfree(mosi_buff);
-		mosi_buff = NULL;
 	}
 	if (spi_ctr_buff != NULL) {
 		kfree(spi_ctr_buff);
-		spi_ctr_buff = NULL;
 	}
 	return ret;
 }
 
 static int fbu2s_spi_xfer_rx_read(struct spi_transfer *xfer, unsigned int id)
 {
-	int ret;
+	int ret = 0;
 	int temp = 0;
 	int mosi_buff_len;
 	int spi_ctr_buff_len;
@@ -441,53 +393,57 @@ static int fbu2s_spi_xfer_rx_read(struct spi_transfer *xfer, unsigned int id)
 
 	mosi_buff_len = tlv_pkg.length + OFFSET_SPI_HEAD;
 	mosi_buff = kmalloc(mosi_buff_len, GFP_KERNEL);
+	if (mosi_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(mosi_buff, 0, mosi_buff_len);
 	memcpy(mosi_buff, &tlv_pkg, mosi_buff_len);
 
-	ret = fbu2s_usb_transfer(mosi_buff, mosi_buff_len,
-			BULK_OUT, NULL);
+	ret = fbu2s_usb_transfer(USPI_BULK_OUT, mosi_buff,
+				mosi_buff_len, NULL);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
-		goto error;
+		goto exit;
 	}
 
 	//write spi controller:(hard code rigth now)
 	spi_ctr_buff_len = FBU2S_SPI_CTR_BUFF_LEN;
 	spi_ctr_buff = kmalloc(spi_ctr_buff_len, GFP_KERNEL);
+	if (spi_ctr_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(spi_ctr_buff, 0, spi_ctr_buff_len);
 	ret = fbu2s_spi_get_ctr_buff(temp, spi_ctr_buff,
-								 spi_ctr_buff_len, ctr_addr,
-								 FBU2S_SPI_CTR_CONTINUE_CS_OFF, 0);
+				spi_ctr_buff_len, ctr_addr,
+				FBU2S_SPI_CTR_CONTINUE_CS_OFF, 0);
 	if (ret) {
 		dev_info(parent, "Send spi ctr register fail!\n");
-		goto error;
+		goto exit;
 	}
 
-	ret = fbu2s_usb_transfer(spi_ctr_buff, spi_ctr_buff_len,
-							 BULK_OUT, NULL);
+	ret = fbu2s_usb_transfer(USPI_BULK_OUT, spi_ctr_buff,
+				spi_ctr_buff_len, NULL);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
-		goto error;
 	}
 
-error:
+exit:
 	if (mosi_buff != NULL) {
 		kfree(mosi_buff);
-		mosi_buff = NULL;
 	}
 	if (spi_ctr_buff != NULL) {
 		kfree(spi_ctr_buff);
-		spi_ctr_buff = NULL;
 	}
 	return ret;
 }
 
 static int fbu2s_spi_xfer_rx_status_check(struct spi_transfer *xfer,
-										  unsigned int id)
+					  unsigned int id)
 {
-	int ret;
+	int ret = 0;
 	int j = 0;
-	int temp = 0;
 	int read_len;
 	unsigned long ctr_addr;
 	unsigned int count;
@@ -499,32 +455,38 @@ static int fbu2s_spi_xfer_rx_status_check(struct spi_transfer *xfer,
 			   (OFFSET_SPI_CONTROLLER_DATA_SIZE * id);
 
 	ret = fbu2s_tlv_parse(TLV_TYPE_READ_REQ, ctr_addr,
-						  NULL, FBU2S_SPI_CTR_BUFF_LEN);
+				NULL, FBU2S_SPI_CTR_BUFF_LEN);
 	read_len = tlv_pkg.length + OFFSET_SPI_HEAD;
 	ctr_buff = kmalloc(USB_BULK_MAX_SIZE, GFP_KERNEL);
+	if (ctr_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(ctr_buff, 0, USB_BULK_MAX_SIZE);
 	read_buf = kmalloc(read_len, GFP_KERNEL);
+	if (read_buf == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(read_buf, 0, read_len);
 	memcpy(read_buf, &tlv_pkg, read_len);
+
 	//check the spi controller status to make sure the read is done.
 	for (j = 0; j < SPI_TRANSFER_DELAY_COUNT; j++) {
-		ret = fbu2s_usb_transfer(read_buf, read_len, BULK_OUT, NULL);
+		ret = fbu2s_usb_transfer(USPI_BULK_OUT, read_buf,
+					read_len, NULL);
 		if (ret) {
 			dev_info(parent, "USB transfer fail!\n");
-			goto error;
+			break;
 		}
 
 		memset(ctr_buff, 0, USB_BULK_MAX_SIZE);
-		ret = usb_bulk_msg(fbu2s_bridge.usb_dev,
-						   usb_rcvbulkpipe(fbu2s_bridge.usb_dev,
-						   fbu2s_bridge.bulk_in_endpointAddr),
-						   ctr_buff,
-						   FBU2S_SPI_CTR_BUFF_LEN,
-						   &count, DATA_TIMEOUT);
-
+		ret = usb_bulk_msg(fbu2s_bridge.usb_dev, BULK_IN_PIPE,
+				   ctr_buff, FBU2S_SPI_CTR_BUFF_LEN,
+				   &count, DATA_TIMEOUT);
 		if (ret) {
 			dev_info(parent, "USB transfer fail!\n");
-			goto error;
+			break;
 		}
 
 		//SPI controller done when 1
@@ -534,21 +496,19 @@ static int fbu2s_spi_xfer_rx_status_check(struct spi_transfer *xfer,
 			break;
 	}
 
-error:
+exit:
 	if (ctr_buff != NULL) {
 		kfree(ctr_buff);
-		ctr_buff = NULL;
 	}
 	if (read_buf != NULL) {
 		kfree(read_buf);
-		read_buf = NULL;
 	}
 	return ret;
 }
 
 static int fbu2s_spi_xfer_rx_get_buf(struct spi_transfer *xfer, unsigned int id)
 {
-	int ret;
+	int ret = 0;
 	int read_len;
 	unsigned int count;
 	unsigned long read_addr;
@@ -558,33 +518,38 @@ static int fbu2s_spi_xfer_rx_get_buf(struct spi_transfer *xfer, unsigned int id)
 
 	read_addr = OFFSET_SPI_BASE_MISO + (OFFSET_SPI_MASTER_DATA_SIZE * id);
 	read_buf = kmalloc(USB_BULK_MAX_SIZE, GFP_KERNEL);
+	if (read_buf == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(read_buf, 0, USB_BULK_MAX_SIZE);
 	recv_data_buff = kmalloc(USB_BULK_MAX_SIZE, GFP_KERNEL);
+	if (recv_data_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(recv_data_buff, 0, USB_BULK_MAX_SIZE);
 
 	//write read buffer request
 	ret = fbu2s_tlv_parse(TLV_TYPE_READ_REQ, read_addr,
-						  NULL, FBU2S_SPI_DATA_READ_REQUEST_LEN);
+				NULL, FBU2S_SPI_DATA_READ_REQUEST_LEN);
 	read_len = tlv_pkg.length + OFFSET_SPI_HEAD;
 	memset(read_buf, 0, read_len);
 	memcpy(read_buf, &tlv_pkg, read_len);
-	ret = fbu2s_usb_transfer(read_buf, read_len, BULK_OUT, NULL);
+	ret = fbu2s_usb_transfer(USPI_BULK_OUT, read_buf, read_len, NULL);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
-		goto error;
+		goto exit;
 	}
 
 	//read
 	memset(recv_data_buff, 0, USB_BULK_MAX_SIZE);
-	ret = usb_bulk_msg(fbu2s_bridge.usb_dev,
-					   usb_rcvbulkpipe(fbu2s_bridge.usb_dev,
-					   fbu2s_bridge.bulk_in_endpointAddr),
-					   recv_data_buff,
-					   FBU2S_SPI_DATA_NORMAL_READ_LEN,
-					   &count, DATA_TIMEOUT);
+	ret = usb_bulk_msg(fbu2s_bridge.usb_dev, BULK_IN_PIPE,
+			   recv_data_buff, FBU2S_SPI_DATA_NORMAL_READ_LEN,
+			   &count, DATA_TIMEOUT);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
-		goto error;
+		goto exit;
 	}
 
 	/* if the read was successful, copy the data to user space */
@@ -595,21 +560,20 @@ static int fbu2s_spi_xfer_rx_get_buf(struct spi_transfer *xfer, unsigned int id)
 			   xfer->len);
 	}
 	ret = 0;
-error:
+
+exit:
 	if (recv_data_buff != NULL) {
 		kfree(recv_data_buff);
-		recv_data_buff = NULL;
 	}
 	if (read_buf != NULL) {
 		kfree(read_buf);
-		read_buf = NULL;
 	}
 	return ret;
 }
 
 static int fbu2s_spi_xfer_rx_read_1st_256B(uint8_t *mosi_buff,
-										   struct fbu2s_tlv tlv_pkg_temp,
-										   int mosi_buff_len)
+					struct fbu2s_tlv tlv_pkg_temp,
+					int mosi_buff_len)
 {
 	int ret;
 	struct device *parent = &fbu2s_bridge.usb_intf->dev;
@@ -618,8 +582,8 @@ static int fbu2s_spi_xfer_rx_read_1st_256B(uint8_t *mosi_buff,
 	 */
 	memcpy(&tlv_pkg, &tlv_pkg_temp, sizeof(tlv_pkg));
 	memcpy(mosi_buff, &tlv_pkg, mosi_buff_len);
-	ret = fbu2s_usb_transfer(mosi_buff, mosi_buff_len,
-							 BULK_OUT, NULL);
+	ret = fbu2s_usb_transfer(USPI_BULK_OUT, mosi_buff,
+				mosi_buff_len, NULL);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
 		return -1;
@@ -627,9 +591,10 @@ static int fbu2s_spi_xfer_rx_read_1st_256B(uint8_t *mosi_buff,
 	return 0;
 }
 
-static int fbu2s_spi_xfer_rx_read_ctrl(unsigned int id, unsigned int i,
-									   unsigned int read_count,
-									   uint8_t *spi_ctr_buff)
+static int fbu2s_spi_xfer_rx_read_ctrl(unsigned int id,
+					unsigned int i,
+					unsigned int read_count,
+					uint8_t *spi_ctr_buff)
 {
 	int ret;
 	int first_read_transfer_flag = 0;
@@ -670,7 +635,8 @@ static int fbu2s_spi_xfer_rx_read_ctrl(unsigned int id, unsigned int i,
 		return -1;
 	}
 
-	ret = fbu2s_usb_transfer(spi_ctr_buff, spi_ctr_buff_len, BULK_OUT, NULL);
+	ret = fbu2s_usb_transfer(USPI_BULK_OUT, spi_ctr_buff,
+				spi_ctr_buff_len, NULL);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
 		return -1;
@@ -679,10 +645,11 @@ static int fbu2s_spi_xfer_rx_read_ctrl(unsigned int id, unsigned int i,
 	return 0;
 }
 
-static int fbu2s_spi_xfer_rx_4k_get_buff(unsigned int id, unsigned int i,
-										 uint8_t *read_buf,
-										 uint8_t *recv_data_buff,
-										 uint8_t **recv_full_data_buff)
+static int fbu2s_spi_xfer_rx_4k_get_buff(unsigned int id,
+					unsigned int i,
+					uint8_t *read_buf,
+					uint8_t *recv_data_buff,
+					uint8_t **recv_full_data_buff)
 {
 	int ret;
 	int read_len;
@@ -695,23 +662,20 @@ static int fbu2s_spi_xfer_rx_4k_get_buff(unsigned int id, unsigned int i,
 	//read begin
 	//write read buffer request
 	ret = fbu2s_tlv_parse(TLV_TYPE_READ_REQ, read_addr, NULL,
-						  FBU2S_SPI_DATA_READ_REQUEST_LEN);
+				FBU2S_SPI_DATA_READ_REQUEST_LEN);
 	read_len = tlv_pkg.length + OFFSET_SPI_HEAD;
 	memset(read_buf, 0, read_len);
 	memcpy(read_buf, &tlv_pkg, read_len);
-	ret = fbu2s_usb_transfer(read_buf, read_len, BULK_OUT, NULL);
+	ret = fbu2s_usb_transfer(USPI_BULK_OUT, read_buf, read_len, NULL);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
 		return -1;
 	}
 
 	//read
-	ret = usb_bulk_msg(fbu2s_bridge.usb_dev,
-					   usb_rcvbulkpipe(fbu2s_bridge.usb_dev,
-					   fbu2s_bridge.bulk_in_endpointAddr),
-					   recv_data_buff,
-					   FBU2S_SPI_DATA_NORMAL_READ_LEN,
-					   &count, DATA_TIMEOUT);
+	ret = usb_bulk_msg(fbu2s_bridge.usb_dev, BULK_IN_PIPE,
+			   recv_data_buff, FBU2S_SPI_DATA_NORMAL_READ_LEN,
+			   &count, DATA_TIMEOUT);
 	if (ret) {
 		dev_info(parent, "USB transfer fail!\n");
 		return -1;
@@ -739,7 +703,7 @@ static int fbu2s_spi_xfer_rx_4k_get_buff(unsigned int id, unsigned int i,
 
 static int fbu2s_spi_xfer_rx_4k_read(struct spi_transfer *xfer, unsigned int id)
 {
-	int ret;
+	int ret = 0;
 	uint8_t *spi_ctr_buff        = NULL;
 	uint8_t *read_buf            = NULL;
 	uint8_t *mosi_buff           = NULL;
@@ -754,6 +718,10 @@ static int fbu2s_spi_xfer_rx_4k_read(struct spi_transfer *xfer, unsigned int id)
 	struct device *parent = &fbu2s_bridge.usb_intf->dev;
 
 	recv_full_data_buff = kmalloc(xfer->len, GFP_KERNEL);
+	if (recv_full_data_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(recv_full_data_buff, 0, xfer->len);
 
 	if ((xfer->len) % READ_MAX_LEN == 0)
@@ -770,42 +738,61 @@ static int fbu2s_spi_xfer_rx_4k_read(struct spi_transfer *xfer, unsigned int id)
 
 	mosi_buff_len = tlv_pkg.length + OFFSET_SPI_HEAD;
 	mosi_buff = kmalloc(mosi_buff_len, GFP_KERNEL);
+	if (mosi_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(mosi_buff, 0, mosi_buff_len);
+
 	spi_ctr_buff_len = FBU2S_SPI_CTR_BUFF_LEN;
 	spi_ctr_buff = kmalloc(spi_ctr_buff_len, GFP_KERNEL);
+	if (spi_ctr_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(spi_ctr_buff, 0, spi_ctr_buff_len);
+
 	read_buf = kmalloc(USB_BULK_MAX_SIZE, GFP_KERNEL);
+	if (read_buf == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(read_buf, 0, USB_BULK_MAX_SIZE);
 	recv_data_buff = kmalloc(USB_BULK_MAX_SIZE, GFP_KERNEL);
+	if (recv_data_buff == NULL) {
+		ret = -ENOMEM;
+		goto exit;
+	}
 	memset(recv_data_buff, 0, USB_BULK_MAX_SIZE);
 
 	for (i = 0; i < read_count; i++) {
 		if (i == 0) {
 			ret = fbu2s_spi_xfer_rx_read_1st_256B(mosi_buff,
-												  tlv_pkg_temp, mosi_buff_len);
+						tlv_pkg_temp, mosi_buff_len);
 			if (ret) {
-				dev_info(parent, "spi transfer read 1st 256bytes fail!\n");
-				goto error;
+				dev_info(parent,
+					"spi transfer read 1st 256bytes fail!\n");
+				goto exit;
 			}
 		}
 
 		ret = fbu2s_spi_xfer_rx_read_ctrl(id, i, read_count, spi_ctr_buff);
 		if (ret) {
 			dev_info(parent, "SPI Rx transfer set read ctrl fail!\n");
-			goto error;
+			goto exit;
 		}
 
-	ret = fbu2s_spi_xfer_rx_status_check(xfer, id);
-	if (ret) {
-		dev_info(parent, "SPI Rx transfer status check fail!\n");
-		goto error;
-	}
+		ret = fbu2s_spi_xfer_rx_status_check(xfer, id);
+		if (ret) {
+			dev_info(parent, "SPI Rx transfer status check fail!\n");
+			goto exit;
+		}
 
 		ret = fbu2s_spi_xfer_rx_4k_get_buff(id, i,
 				read_buf, recv_data_buff, &recv_full_data_buff);
 		if (ret) {
 			dev_info(parent, "SPI Rx transfer4k buffer get fail!\n");
-			goto error;
+			goto exit;
 		}
 
 	}
@@ -815,22 +802,18 @@ static int fbu2s_spi_xfer_rx_4k_read(struct spi_transfer *xfer, unsigned int id)
 	memcpy(xfer->rx_buf, recv_full_data_buff, xfer->len);
 	ret = 0;
 
-error:
+exit:
 	if (mosi_buff != NULL) {
 		kfree(mosi_buff);
-		mosi_buff = NULL;
 	}
 	if (spi_ctr_buff != NULL) {
 		kfree(spi_ctr_buff);
-		spi_ctr_buff = NULL;
 	}
 	if (read_buf != NULL) {
 		kfree(read_buf);
-		read_buf = NULL;
 	}
 	if (recv_data_buff != NULL) {
 		kfree(recv_data_buff);
-		recv_data_buff = NULL;
 	}
 
 	return ret;
@@ -839,8 +822,6 @@ static int fbu2s_spi_xfer_rx(struct spi_transfer *xfer, unsigned int id)
 {
 	int ret;
 	int temp = 0;
-	int mosi_buff_len;
-	int spi_ctr_buff_len;
 	unsigned long addr, read_addr, ctr_addr;
 	struct device *parent = &fbu2s_bridge.usb_intf->dev;
 
@@ -883,8 +864,8 @@ static int fbu2s_spi_xfer_rx(struct spi_transfer *xfer, unsigned int id)
  * spi_xfer_one
  */
 static int fbu2s_spi_xfer_one(struct spi_master *master,
-							  struct spi_device *slave,
-							  struct spi_transfer *xfer)
+				struct spi_device *slave,
+				struct spi_transfer *xfer)
 {
 	int ret;
 	unsigned int id;
@@ -928,8 +909,13 @@ static int fbu2s_spi_bus_init(u32 id)
 	struct spi_master *master;
 	struct fbu2s_spi_bus *spi_bus;
 	struct device *parent = &fbu2s_bridge.usb_intf->dev;
-	unsigned long minor;
 	int	status = 0;
+	struct spi_board_info spi_dev = {
+		.modalias = "spidev",
+		.max_speed_hz = 25000000,
+		.bus_num = master->bus_num,
+		.chip_select = 0,
+	};
 
 	master = spi_alloc_master(parent, sizeof(struct fbu2s_spi_bus));
 	if (master == NULL) {
@@ -959,12 +945,6 @@ static int fbu2s_spi_bus_init(u32 id)
 	spi_bus->spi_id = id;
 	fbu2s_bridge.spi_buses[id] = spi_bus;
 
-	struct spi_board_info spi_dev = {
-		.modalias = "spidev",
-		.max_speed_hz = 25000000,
-		.bus_num = master->bus_num,
-		.chip_select = 0,
-	};
 	spi_new_device(master, &spi_dev);
 
 	return status;
@@ -993,17 +973,9 @@ static int fbu2s_usb_probe(struct usb_interface *usb_intf,
 	int ret;
 	struct usb_endpoint_descriptor *bulk_in, *bulk_out;
 
-	kref_init(&fbu2s_bridge.kref);
-	sema_init(&fbu2s_bridge.limit_sem, WRITES_IN_FLIGHT);
-	mutex_init(&fbu2s_bridge.io_mutex);
-	spin_lock_init(&fbu2s_bridge.err_lock);
-	init_usb_anchor(&fbu2s_bridge.submitted);
-	init_waitqueue_head(&fbu2s_bridge.bulk_in_wait);
-
 	fbu2s_bridge.usb_intf = usb_intf;
 	fbu2s_bridge.usb_dev = usb_get_dev(interface_to_usbdev(usb_intf));
 	usb_set_intfdata(usb_intf, &fbu2s_bridge);
-	fbu2s_bridge.disconnected = 0;
 
 	/* set up the endpoint information */
 	/* use only the first bulk-in and bulk-out endpoints */
@@ -1015,21 +987,8 @@ static int fbu2s_usb_probe(struct usb_interface *usb_intf,
 		goto error;
 	}
 
-	fbu2s_bridge.bulk_in_size = usb_endpoint_maxp(bulk_in);
-	fbu2s_bridge.bulk_in_endpointAddr = bulk_in->bEndpointAddress;
-	fbu2s_bridge.bulk_in_buffer = kmalloc(fbu2s_bridge.bulk_in_size,
-										  GFP_KERNEL);
-	if (!fbu2s_bridge.bulk_in_buffer) {
-		ret = -ENOMEM;
-		goto error;
-	}
-	fbu2s_bridge.bulk_in_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!fbu2s_bridge.bulk_in_urb) {
-		ret = -ENOMEM;
-		goto error;
-	}
-
-	fbu2s_bridge.bulk_out_endpointAddr = bulk_out->bEndpointAddress;
+	fbu2s_bridge.ep_list[USPI_BULK_IN] = bulk_in->bEndpointAddress;
+	fbu2s_bridge.ep_list[USPI_BULK_OUT] = bulk_out->bEndpointAddress;
 
 	for (i = 0; i < ARRAY_SIZE(fbu2s_bridge.spi_buses); i++) {
 		ret = fbu2s_spi_bus_init(i);
@@ -1040,9 +999,9 @@ static int fbu2s_usb_probe(struct usb_interface *usb_intf,
 	/* save our data pointer in this interface device */
 	usb_set_intfdata(usb_intf, &fbu2s_bridge);
 
-	dev_info(&usb_intf->dev, "[debug] bulk in: %x, bulk out: %x\n",
-			 fbu2s_bridge.bulk_in_endpointAddr,
-			 fbu2s_bridge.bulk_out_endpointAddr);
+	dev_info(&usb_intf->dev, "ep_bulk_in: 0x%x, ep_bulk_out: 0x%x\n",
+		 fbu2s_bridge.ep_list[USPI_BULK_IN],
+		 fbu2s_bridge.ep_list[USPI_BULK_OUT]);
 
 	return 0;
 
@@ -1056,7 +1015,6 @@ static void fbu2s_usb_disconnect(struct usb_interface *usb_intf)
 	fbu2s_spi_remove_all();
 	usb_set_intfdata(usb_intf, NULL);
 	usb_put_dev(fbu2s_bridge.usb_dev);
-	fbu2s_bridge.disconnected = 1;
 }
 
 static const struct usb_device_id fbu2s_usb_table[] = {
