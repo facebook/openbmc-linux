@@ -13,8 +13,6 @@
 
 #include <linux/debugfs.h>
 
-#define FACEBOOK_USB2SPI_DRIVER "facebook-usb2spi"
-
 #define FBUS_NUM_SPI_BUSES	8
 
 #define USB_BULK_MAX_SIZE	512
@@ -41,25 +39,10 @@
 /* USB_BULK_MAX_SIZE - type - length - address */
 #define TLV_DATA_MAX_SIZE	(USB_BULK_MAX_SIZE - 8)
 
-/* our private defines. if this grows any larger, use your own header file */
-#define MAX_TRANSFER		(PAGE_SIZE - 512)
-/*
- * MAX_TRANSFER is chosen so that the VM is not stressed by
- * allocations > PAGE_SIZE and the number of packets in a page
- * is an integer 512 is the largest possible packet on EHCI
- */
-#define WRITES_IN_FLIGHT	8
-/* arbitrarily chosen */
-
 /* milliseconds , USB data transfer time out */
 #define DATA_TIMEOUT				2000
 #define SPI_TRANSFER_DELAY			10	/* ? unit of time */
 #define SPI_TRANSFER_DELAY_COUNT	10
-
-#define U8_TO_U32(x) (((x[0]) << 24) |\
-					  ((x[1]) << 16) |\
-					  ((x[2]) << 8) |\
-					  ((x[3]) + 0))
 
 /* FLASH command*/
 #define FLASH_COMMAND_READ  0x3  /* read flash */
