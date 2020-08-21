@@ -10,8 +10,7 @@
 #include <linux/usb.h>
 #include <linux/mutex.h>
 #include <linux/spi/spi.h>
-
-#include <linux/debugfs.h>
+#include <linux/mtd/spi-nor.h>
 
 #define FBUS_NUM_SPI_BUSES	8
 
@@ -43,15 +42,6 @@
 #define DATA_TIMEOUT				2000
 #define SPI_TRANSFER_DELAY			10	/* ? unit of time */
 #define SPI_TRANSFER_DELAY_COUNT	10
-
-/* FLASH command*/
-#define FLASH_COMMAND_READ  0x3  /* read flash */
-#define FLASH_COMMAND_PP	0x2  /* page program flash */
-#define FLASH_COMMAND_SE	0x20 /* sector erase flash */
-#define FLASH_COMMAND_BE	0x52 /* block erase flash */
-#define FLASH_COMMAND_WREN  0x6  /* write enable flash */
-#define FLASH_COMMAND_RDSR  0x5  /* read status register flash */
-#define FLASH_COMMAND_RDID  0x9f /* read identification */
 
 /* FPGA specific treatment start*/
 /* fpga spi controller register force CS on */
@@ -204,7 +194,7 @@ static int fbu2s_tlv_parse(u16 tlv_type, unsigned long address,
 		if (tlv_type == TLV_TYPE_WRITE) {
 			memcpy(tlv_pkg.data_buff, data_buf, data_len);
 			temp = tlv_pkg.data_buff[0];
-			if (temp == FLASH_COMMAND_WREN) {
+			if (temp == SPINOR_OP_WREN) {
 				/* For spi write enable command,
 				 * the length is awalys 0x1+ address length
 				 */
@@ -255,13 +245,13 @@ static int fbu2s_spi_get_ctr_buff(int cmd_type,
 	int ret;
 	unsigned int spi_data_access_len = 0;
 
-	if ((cmd_type == FLASH_COMMAND_SE) ||
-	   (cmd_type == FLASH_COMMAND_BE) ||
-	   (cmd_type == FLASH_COMMAND_RDSR))
+	if ((cmd_type == SPINOR_OP_BE_4K) ||
+	   (cmd_type == SPINOR_OP_BE_32K) ||
+	   (cmd_type == SPINOR_OP_RDSR))
 		spi_data_access_len = FBU2S_SPI_DATA_ERASE_ACCESS_LEN;
-	else if (cmd_type == FLASH_COMMAND_WREN)
+	else if (cmd_type == SPINOR_OP_WREN)
 		spi_data_access_len = FBU2S_SPI_DATA_WREN_ACCESS_LEN;
-	else if (cmd_type == FLASH_COMMAND_READ)
+	else if (cmd_type == SPINOR_OP_READ)
 		spi_data_access_len = FBU2S_SPI_DATA_READ_ACCESS_LEN;
 	else
 		spi_data_access_len = FBU2S_SPI_DATA_NORMAL_ACCESS_LEN;
@@ -304,7 +294,7 @@ static int fbu2s_spi_xfer_tx(struct spi_transfer *xfer, unsigned int id)
 	/* 4K read for continue CS. read command is sent when rx_buff is
 	 * received, otherwise sent when tx_buff received.
 	 */
-	if (temp == FLASH_COMMAND_READ)
+	if (temp == SPINOR_OP_READ)
 		return 0;
 
 	mosi_buff_len = tlv_pkg.length + OFFSET_SPI_HEAD;
@@ -609,7 +599,7 @@ static int fbu2s_spi_xfer_rx_read_ctrl(unsigned int id,
 	else
 		first_read_transfer_flag = 0;
 
-	ret = fbu2s_spi_get_ctr_buff(FLASH_COMMAND_READ, spi_ctr_buff,
+	ret = fbu2s_spi_get_ctr_buff(SPINOR_OP_READ, spi_ctr_buff,
 			spi_ctr_buff_len, ctr_addr,
 			spi_ctr_data[FBU2S_SPI_CTR_DATA_CS_FIELD_OFFSET],
 			first_read_transfer_flag);
@@ -713,7 +703,7 @@ static int fbu2s_spi_xfer_rx_4k_read(struct spi_transfer *xfer, unsigned int id)
 		read_count = (xfer->len / READ_MAX_LEN) + 1;
 
 	temp = tlv_pkg.data_buff[0];
-	if (temp == FLASH_COMMAND_READ)
+	if (temp == SPINOR_OP_READ)
 		/* used to store send mosi buffer,
 		 * because tlv_pkg will change to miso request buffer
 		 */
@@ -815,7 +805,7 @@ static int fbu2s_spi_xfer_rx(struct spi_transfer *xfer, unsigned int id)
 
 	if (xfer->len <= READ_MAX_LEN) {
 		temp = tlv_pkg.data_buff[0];
-		if (temp == FLASH_COMMAND_READ) {
+		if (temp == SPINOR_OP_READ) {
 			ret = fbu2s_spi_xfer_rx_read(xfer, id);
 			if (ret) {
 				dev_info(parent, "SPI Rx transfer read fail!\n");
