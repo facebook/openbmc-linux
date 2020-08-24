@@ -14,8 +14,8 @@
 		serial0 = &uart1;
 
 		/*
-		 * I2C switch 2-0070, pca9548, total 8 child channels
-		 * assigned bus number 14-21.
+		 * PCA9548 (2-0070) provides 8 channels connecting to
+		 * SCM (System Controller Module).
 		 */
 		i2c16 = &imux16;
 		i2c17 = &imux17;
@@ -27,8 +27,8 @@
 		i2c23 = &imux23;
 
 		/*
-		 * I2C switch 8-0070, pca9548, total 8 child channels
-		 * assigned bus number 22-29.
+		 * PCA9548 (8-0070) provides 8 channels connecting to
+		 * SMB (Switch Main Board).
 		 */
 		i2c24 = &imux24;
 		i2c25 = &imux25;
@@ -39,7 +39,10 @@
 		i2c30 = &imux30;
 		i2c31 = &imux31;
 
-
+		/*
+		 * PCA9548 (11-0077) provides 8 channels connecting to
+		 * SMB (Switch Main Board).
+		 */
 		i2c40 = &imux40;
 		i2c41 = &imux41;
 		i2c42 = &imux42;
@@ -49,6 +52,10 @@
 		i2c46 = &imux46;
 		i2c47 = &imux47;
 
+		/*
+		 * PCA9548 (24-0071) provides 8 channels connecting to
+		 * PDB-L.
+		 */
 		i2c48 = &imux48;
 		i2c49 = &imux49;
 		i2c50 = &imux50;
@@ -58,6 +65,10 @@
 		i2c54 = &imux54;
 		i2c55 = &imux55;
 
+		/*
+		 * PCA9548 (25-0072) provides 8 channels connecting to
+		 * PDB-R.
+		 */
 		i2c56 = &imux56;
 		i2c57 = &imux57;
 		i2c58 = &imux58;
@@ -67,6 +78,10 @@
 		i2c62 = &imux62;
 		i2c63 = &imux63;
 
+		/*
+		 * PCA9548 (26-0076) provides 8 channels connecting to
+		 * FCM1.
+		 */
 		i2c64 = &imux64;
 		i2c65 = &imux65;
 		i2c66 = &imux66;
@@ -76,6 +91,10 @@
 		i2c70 = &imux70;
 		i2c71 = &imux71;
 
+		/*
+		 * PCA9548 (27-0076) provides 8 channels connecting to
+		 * FCM2.
+		 */
 		i2c72 = &imux72;
 		i2c73 = &imux73;
 		i2c74 = &imux74;
@@ -85,6 +104,10 @@
 		i2c78 = &imux78;
 		i2c79 = &imux79;
 
+		/*
+		 * PCA9548 (40-0076) provides 8 channels connecting to
+		 * PIM1.
+		 */
 		i2c80 = &imux80;
 		i2c81 = &imux81;
 		i2c82 = &imux82;
@@ -94,6 +117,10 @@
 		i2c86 = &imux86;
 		i2c87 = &imux87;
 
+		/*
+		 * PCA9548 (41-0076) provides 8 channels connecting to
+		 * PIM2.
+		 */
 		i2c88 = &imux88;
 		i2c89 = &imux89;
 		i2c90 = &imux90;
@@ -103,6 +130,10 @@
 		i2c94 = &imux94;
 		i2c95 = &imux95;
 
+		/*
+		 * PCA9548 (42-0076) provides 8 channels connecting to
+		 * PIM3.
+		 */
 		i2c96 = &imux96;
 		i2c97 = &imux97;
 		i2c98 = &imux98;
@@ -112,6 +143,10 @@
 		i2c102 = &imux102;
 		i2c103 = &imux103;
 
+		/*
+		 * PCA9548 (43-0076) provides 8 channels connecting to
+		 * PIM4.
+		 */
 		i2c104 = &imux104;
 		i2c105 = &imux105;
 		i2c106 = &imux106;
@@ -121,6 +156,10 @@
 		i2c110 = &imux110;
 		i2c111 = &imux111;
 
+		/*
+		 * PCA9548 (44-0076) provides 8 channels connecting to
+		 * PIM5.
+		 */
 		i2c112 = &imux112;
 		i2c113 = &imux113;
 		i2c114 = &imux114;
@@ -130,6 +169,10 @@
 		i2c118 = &imux118;
 		i2c119 = &imux119;
 
+		/*
+		 * PCA9548 (45-0076) provides 8 channels connecting to
+		 * PIM6.
+		 */
 		i2c120 = &imux120;
 		i2c121 = &imux121;
 		i2c122 = &imux122;
@@ -139,6 +182,10 @@
 		i2c126 = &imux126;
 		i2c127 = &imux127;
 
+		/*
+		 * PCA9548 (46-0076) provides 8 channels connecting to
+		 * PIM7.
+		 */
 		i2c128 = &imux128;
 		i2c129 = &imux129;
 		i2c130 = &imux130;
@@ -148,6 +195,10 @@
 		i2c134 = &imux134;
 		i2c135 = &imux135;
 
+		/*
+		 * PCA9548 (47-0076) provides 8 channels connecting to
+		 * PIM8.
+		 */
 		i2c136 = &imux136;
 		i2c137 = &imux137;
 		i2c138 = &imux138;
@@ -252,6 +303,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
+		i2c-mux-idle-disconnect;
 
 		imux16: i2c@0 {
 			#address-cells = <1>;
@@ -337,6 +389,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
+		i2c-mux-idle-disconnect;
 
 		imux24: i2c@0 {
 			#address-cells = <1>;
@@ -348,6 +401,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x71>;
+				i2c-mux-idle-disconnect;
 
 				imux48: i2c@0 {
 					#address-cells = <1>;
@@ -410,6 +464,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x72>;
+				i2c-mux-idle-disconnect;
 
 				imux56: i2c@0 {
 					#address-cells = <1>;
@@ -472,6 +527,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux64: i2c@0 {
 					#address-cells = <1>;
@@ -534,6 +590,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux72: i2c@0 {
 					#address-cells = <1>;
@@ -626,6 +683,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x77>;
+		i2c-mux-idle-disconnect;
 
 		imux40: i2c@0 {
 			#address-cells = <1>;
@@ -637,6 +695,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux80: i2c@0 {
 					#address-cells = <1>;
@@ -699,6 +758,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux88: i2c@0 {
 					#address-cells = <1>;
@@ -761,6 +821,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux96: i2c@0 {
 					#address-cells = <1>;
@@ -823,6 +884,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux104: i2c@0 {
 					#address-cells = <1>;
@@ -885,6 +947,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux112: i2c@0 {
 					#address-cells = <1>;
@@ -947,6 +1010,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux120: i2c@0 {
 					#address-cells = <1>;
@@ -1009,6 +1073,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux128: i2c@0 {
 					#address-cells = <1>;
@@ -1071,6 +1136,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0x76>;
+				i2c-mux-idle-disconnect;
 
 				imux136: i2c@0 {
 					#address-cells = <1>;
