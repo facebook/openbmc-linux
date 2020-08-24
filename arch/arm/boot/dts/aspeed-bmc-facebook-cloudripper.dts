@@ -18,8 +18,8 @@
 		spi2 = &spi_gpio;
 
 		/*
-		 * I2C switch 1-0070, pca9548, total 8 child channels
-		 * assigned bus number 16-23.
+		 * PCA9548 (1-0070) provides 8 channels connecting to
+		 * SMB (Switch Main Board).
 		 */
 		i2c16 = &imux16;
 		i2c17 = &imux17;
@@ -31,8 +31,8 @@
 		i2c23 = &imux23;
 
 		/*
-		 * I2C switch 2-0070, pca9548, total 8 child channels
-		 * assigned bus number 24-31.
+		 * PCA9548 (2-0070) provides 8 channels connecting to
+		 * SCM (System Controller Module).
 		 */
 		i2c24 = &imux24;
 		i2c25 = &imux25;
@@ -44,8 +44,8 @@
 		i2c31 = &imux31;
 
 		/*
-		 * I2C switch 3-0070, pca9548, total 8 child channels
-		 * assigned bus number 32-39.
+		 * PCA9548 (3-0070) provides 8 channels connecting to
+		 * SMB (Switch Main Board).
 		 */
 		i2c32 = &imux32;
 		i2c33 = &imux33;
@@ -57,8 +57,8 @@
 		i2c39 = &imux39;
 
 		/*
-		 * I2C switch 8-0070, pca9548, total 8 child channels
-		 * assigned bus number 40-47.
+		 * PCA9548 (8-0070) provides 8 channels connecting to
+		 * PDB (Power Delivery Board).
 		 */
 		i2c40 = &imux40;
 		i2c41 = &imux41;
@@ -70,8 +70,8 @@
 		i2c47 = &imux47;
 
 		/*
-		 * I2C switch 15-0076, pca9548, total 8 child channels
-		 * assigned bus number 48-55.
+		 * PCA9548 (15-0076) provides 8 channels connecting to
+		 * FCM (Fan Controller Module).
 		 */
 		i2c48 = &imux48;
 		i2c49 = &imux49;
@@ -245,6 +245,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
+		i2c-mux-idle-disconnect;
 
 		imux16: i2c@0 {
 			#address-cells = <1>;
@@ -304,6 +305,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
+		i2c-mux-idle-disconnect;
 
 		imux24: i2c@0 {
 			#address-cells = <1>;
@@ -363,6 +365,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
+		i2c-mux-idle-disconnect;
 
 		imux32: i2c@0 {
 			#address-cells = <1>;
@@ -443,6 +446,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
+		i2c-mux-idle-disconnect;
 
 		imux40: i2c@0 {
 			#address-cells = <1>;
@@ -519,6 +523,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x76>;
+		i2c-mux-idle-disconnect;
 
 		imux48: i2c@0 {
 			#address-cells = <1>;
