@@ -437,11 +437,9 @@ static ssize_t ltc4282_show_value(struct device *dev,
 		value = ltc4282_reg_to_value(data, ltc4282_reg_power);
 		break;
 	case ltc4282_power_min:
-		data = ltc4282_update_adc(dev, ltc4282_reg_power_min);
 		value = ltc4282_reg_to_value(data, ltc4282_reg_power_min);
 		break;
 	case ltc4282_power_max:
-		data = ltc4282_update_adc(dev, ltc4282_reg_power_max);
 		value = ltc4282_reg_to_value(data, ltc4282_reg_power_max);
 		break;
 	case ltc4282_temp:
@@ -637,9 +635,9 @@ static SENSOR_DEVICE_ATTR(curr1_max, 0644, ltc4282_show_value,
 
 static SENSOR_DEVICE_ATTR(power1_input, 0444, ltc4282_show_value, NULL,
 	      ltc4282_power);
-static SENSOR_DEVICE_ATTR(power1_min, 0444, ltc4282_show_value, NULL,
+static SENSOR_DEVICE_ATTR(power1_input_lowest, 0444, ltc4282_show_value, NULL,
 	      ltc4282_power_min);
-static SENSOR_DEVICE_ATTR(power1_max, 0444, ltc4282_show_value, NULL,
+static SENSOR_DEVICE_ATTR(power1_input_highest, 0444, ltc4282_show_value, NULL,
 	      ltc4282_power_max);
 
 static SENSOR_DEVICE_ATTR(temp1_input, 0444, ltc4282_show_value, NULL,
@@ -738,8 +736,8 @@ static struct attribute *ltc4282_attrs[] =  {
 	&sensor_dev_attr_curr1_min.dev_attr.attr,
 	&sensor_dev_attr_curr1_max.dev_attr.attr,
 	&sensor_dev_attr_power1_input.dev_attr.attr,
-	&sensor_dev_attr_power1_min.dev_attr.attr,
-	&sensor_dev_attr_power1_max.dev_attr.attr,
+	&sensor_dev_attr_power1_input_lowest.dev_attr.attr,
+	&sensor_dev_attr_power1_input_highest.dev_attr.attr,
 	&sensor_dev_attr_temp1_input.dev_attr.attr,
 	&sensor_dev_attr_temp1_min.dev_attr.attr,
 	&sensor_dev_attr_temp1_max.dev_attr.attr,
