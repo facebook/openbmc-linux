@@ -256,6 +256,14 @@ static int tpm_tis_i2c_probe(struct i2c_client *dev,
 					NULL);
 }
 
+static int tpm_tis_i2c_remove(struct i2c_client *dev)
+{
+	struct tpm_chip *chip = dev_get_drvdata(&dev->dev);
+
+	tpm_chip_unregister(chip);
+	return 0;
+}
+
 static const struct i2c_device_id tpm_tis_i2c_id[] = {
 	{"tpm_tis_i2c", 0},
 	{}
@@ -283,6 +291,7 @@ static struct i2c_driver tpm_tis_i2c_driver = {
 		.acpi_match_table = ACPI_PTR(acpi_tis_i2c_match),
 	},
 	.probe = tpm_tis_i2c_probe,
+	.remove = tpm_tis_i2c_remove,
 	.id_table = tpm_tis_i2c_id,
 };
 
