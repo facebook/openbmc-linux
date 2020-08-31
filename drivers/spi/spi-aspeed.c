@@ -67,6 +67,8 @@
 #define ASPEED_CTRL_CLK_DIV_MAX		16
 #define ASPEED_CTRL_CLK_DIV_MASK	(0xF << 8)
 #define ASPEED_CTRL_CLK_DIV(d)		(((d) & 0xF) << 8)
+#define ASPEED2600_CTRL_CLK_DIV_MASK    ((0xF << 24) | (0xF << 8))
+#define ASPEED2600_CTRL_CLK_DIV(d)      (((d) & 0xF) << 8) | (((d) & 0xF0) << 20)
 
 /*
  * AST2520/AST2500
@@ -90,14 +92,22 @@
  *        +---------+---------+-----------+-----------+
  *        | end msb | end lsb | start msb | start lsb |
  */
-#define ASPEED_2600_SEGMENT_ADDR_START(_v)		((_v & 0xFFFF) << 16)
-#define ASPEED_2600_SEGMENT_ADDR_END(_v)		((((_v) >> 16) & 0xFFFF) << 16)
+#define ASPEED_2600_SEGMENT_ADDR_START(_v)		((_v) & 0x0FF00000)
+#define ASPEED_2600_SEGMENT_ADDR_END(_v)		(((_v) << 16) & 0x0FF00000)
 
+// CE0 gets 128MB CE0/CE1 get 64MB each by default
+#define AST2600_START_OFFSET(cs)       (cs == 0 ? 0x0000000 : \
+                                                  (0x8000000 + (cs - 1)*0x4000000))
+#define AST2600_END_OFFSET(cs)         (cs == 0 ? 0x8000000 : \
+                                                  (0x8000000 + (cs)*0x4000000))
+#define AST2600_SEGMENT_ADDR_VALUE(start, end) \
+	(((start & 0x0FF00000) >> 16) | (((end) - 1) & 0x0FF00000))
 
 struct aspeed_spi_priv {
 	void __iomem *reg_base;
 	struct spi_master *master;
 	struct device *dev;
+	bool aspeed_g6;
 	unsigned long ahb_clk_freq;
 
 	/*
@@ -159,6 +169,22 @@ static void aspeed_deactivate_cs(struct aspeed_spi_priv *priv, u8 cs)
 	aspeed_reg_write(priv, val, ctrl_reg);
 }
 
+static void aspeed2600_set_default_range(struct aspeed_spi_priv *priv,
+				        struct resource *res, u16 num_cs)
+{
+	u16 cs;
+	u32 start_offset;
+
+	for (cs = 0; cs < num_cs; cs++) {
+              u32 addr_range_reg = cs_reg_map[cs].addr_range_reg;
+              u32 val = aspeed_reg_read(priv, addr_range_reg);
+
+              val = AST2600_SEGMENT_ADDR_VALUE(res->start + AST2600_START_OFFSET(cs),
+                    res->start + AST2600_END_OFFSET(cs));
+              aspeed_reg_write(priv, val, addr_range_reg);
+	}
+}
+
 static bool aspeed_check_set_div2(struct aspeed_spi_priv *priv,
 				  u8 cs, u32 spi_max_freq)
 {
@@ -198,6 +224,39 @@ static u32 aspeed_spi_clk_div(unsigned long ahb_clk_freq,
 	return div_val;
 }
 
+/*
+ * Calculate spi clock frequency divisor. Refer to AST2600 datasheet,
+ * Chapter 15, CE# control registers SPIR10/14/18, bit 27:24, 11:8.
+ */
+static u32 aspeed2600_spi_clk_div(unsigned long ahb_clk_freq,
+			      u32 spi_max_freq)
+{
+	unsigned long i, j;
+	u32 div_val = 0;
+	u8 base_div = 0;
+	bool done = 0;
+
+	static const u32 div_map[ASPEED_CTRL_CLK_DIV_MAX] = {
+		15, 7, 14, 6, 13, 5, 12, 4,
+		11, 3, 10, 2, 9, 1, 8, 0,
+	};
+
+	for (j = 0; j < 0xF; j++) {
+		for (i = 1; i <= ASPEED_CTRL_CLK_DIV_MAX; i++) {
+			base_div = j*16;
+			if ((spi_max_freq * (i+base_div)) >= ahb_clk_freq) {
+				div_val = (j << 4) | div_map[i - 1];
+				done = 1;
+				break;
+			}
+		}
+		if (done)
+			break;
+	}
+
+	return div_val;
+}
+
 static int
 aspeed_spi_setup(struct spi_device *slave)
 {
@@ -226,17 +285,21 @@ aspeed_spi_setup(struct spi_device *slave)
 	val &= ~ASPEED_CTRL_CLK_MODE_3; /* clock mode 3 is not supported */
 	if (slave->max_speed_hz != 0) {
 		freq = slave->max_speed_hz;
-		val &= ~ASPEED_CTRL_CLK_DIV_MASK;
+                if (priv->aspeed_g6) {
+			val &= ~ASPEED2600_CTRL_CLK_DIV_MASK;
+			div = aspeed2600_spi_clk_div(priv->ahb_clk_freq, freq);
+			val |= ASPEED2600_CTRL_CLK_DIV(div);
+                } else {
+			val &= ~ASPEED_CTRL_CLK_DIV_MASK;
 
-		if (aspeed_check_set_div2(priv, cs, freq)) {
-			/*
-			 * SPI clock divided by 4.
-			 */
-			val |= ASPEED_CTRL_CLK_DIV4_MODE;
-			freq = freq >> 2;
-		}
-		div = aspeed_spi_clk_div(priv->ahb_clk_freq, freq);
-		val |= ASPEED_CTRL_CLK_DIV(div);
+			if (aspeed_check_set_div2(priv, cs, freq)) {
+				// SPI clock divided by 4
+				val |= ASPEED_CTRL_CLK_DIV4_MODE;
+				freq = freq >> 2;
+			}
+			val |= ASPEED_CTRL_CLK_DIV(div);
+			div = aspeed_spi_clk_div(priv->ahb_clk_freq, freq);
+                }
 	}
 	aspeed_reg_write(priv, val, ctrl_reg);
 
@@ -303,16 +366,11 @@ static int aspeed_spi_init_slave_buf(struct aspeed_spi_priv *priv,
 {
 	u16 cs;
 
-	u8 is_ast_g6 = 0;
-	if (of_device_is_compatible(priv->dev->of_node, "aspeed,ast2600-spi-master")) {
-		is_ast_g6 = 1;
-	}
-
 	for (cs = 0; cs < num_cs; cs++) {
 		u32 val, start, end, size, offset;
 
 		val = aspeed_reg_read(priv, cs_reg_map[cs].addr_range_reg);
-		if (is_ast_g6) {
+		if (priv->aspeed_g6) {
 			start = res->start + ASPEED_2600_SEGMENT_ADDR_START(val);
 			end = res->start + ASPEED_2600_SEGMENT_ADDR_END(val);
 		} else {
@@ -394,6 +452,12 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 	priv->slave_mem_size = slave_mem_size;
 	priv->ahb_clk_freq = ahb_clk_freq;
 	platform_set_drvdata(pdev, priv);
+	if (of_device_is_compatible(master->dev.of_node, "aspeed,ast2600-spi-master")) {
+		priv->aspeed_g6 = true;
+		// AST2600: CE0 gets 128MB CE0/CE1 get 64MB each by default
+		aspeed2600_set_default_range(priv, res, master->num_chipselect);
+	}
+
 	error = aspeed_spi_init_slave_buf(priv, res, master->num_chipselect);
 	if (error != 0)
 		goto err_exit;
