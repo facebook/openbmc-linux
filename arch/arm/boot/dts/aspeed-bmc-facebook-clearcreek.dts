@@ -15,6 +15,15 @@
 		 */
 		serial0 = &uart5;
 		serial1 = &uart1;
+
+		i2c16 = &imux16;
+		i2c17 = &imux17;
+		i2c18 = &imux18;
+		i2c19 = &imux19;
+		i2c20 = &imux20;
+		i2c21 = &imux21;
+		i2c22 = &imux22;
+		i2c23 = &imux23;
 	};
 
 	chosen {
@@ -47,19 +56,20 @@
 &fmc {
 	status = "okay";
 	flash@0 {
-		reg = < 0 >;
-		status = "okay";
-		m25p,fast-read;
-		label = "spi0.0";
-		spi-max-frequency = <40000000>;
-#include "facebook-bmc-pfr-128M-layout.dtsi"
-	};
-	flash@1 {
 		reg = < 1 >;
 		status = "okay";
 		m25p,fast-read;
 		label = "spi0.1";
 		spi-max-frequency = <40000000>;
+#include "facebook-bmc-vboot2-flash1-layout.dtsi"
+	};
+	flash@1 {
+		reg = < 0 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.0";
+		spi-max-frequency = <40000000>;
+#include "facebook-bmc-vboot2-flash0-layout.dtsi"
 	};
 };
 
@@ -78,6 +88,21 @@
 	};
 };
 
+&spi2 {
+	status = "okay";
+	compatible = "aspeed,ast2500-spi-master";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi2ck_default &pinctrl_spi2cs0_default &pinctrl_spi2miso_default &pinctrl_spi2mosi_default>;
+
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		spi-max-frequency = <12000000>;
+		label = "switch0";
+	};
+};
+
 &uart5 {
 	// BMC Console
 	status = "okay";
@@ -88,9 +113,174 @@
 };
 
 &i2c0 {
-	multi-master;
-	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+&i2c3 {
+	status = "okay";
+	i2c-switch@70 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x70>;
+		imux16: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+		imux17: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+		imux18: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+		imux19: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+		imux20: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+		};
+		imux21: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+			eeprom@50 {
+			compatible = "atmel,24c64";
+			reg = <0x50>;
+			};
+		};
+		imux22: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+			eeprom@50 {
+			compatible = "atmel,24c64";
+			reg = <0x50>;
+			};
+		};
+		imux23: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+			// BSM FRUID
+			eeprom@56 {
+			compatible = "atmel,24c64";
+			reg = <0x56>;
+	};
+		};
+	};
+};
+
+&i2c4 {
+	status = "okay";
+};
+
+&i2c7 {
+	status = "okay";
+};
+
+&i2c9 {
+	status = "okay";
+};
+
+&i2c10 {
+	status = "okay";
+};
+
+&i2c11 {
+	status = "okay";
+};
+
+&i2c13 {
+	status = "okay";
+};
+
+&i2c3 {
+	status = "okay";
+};
+
+&i2c8 {
+	status = "okay";
+};
+
+&i2c12 {
+	status = "okay";
+};
+
+&i2c6 {
+	status = "okay";
+	// Baseboard FRUID
+	eeprom@54 {
+		compatible = "atmel,24c64";
+		reg = <0x54>;
+	};
+};
+
+&i2c5 {
+	status = "okay";
+	// PDB FRUID
+	eeprom@54 {
+		compatible = "atmel,24c64";
+		reg = <0x54>;
+	};
+
+	// Voltage regulators
+	VDD@0x31 {
+		compatible = "mps,mpq8645p";
+		reg = <0x31>;
+	};
+	VDD@0x30 {
+		compatible = "mps,mpq8645p";
+		reg = <0x30>;
+	};
+	VDD@0x32 {
+		compatible = "mps,mpq8645p";
+		reg = <0x32>;
+	};
+	VDD@0x38 {
+		compatible = "mps,mpq8645p";
+		reg = <0x38>;
+	};
+	VDD@0x33 {
+		compatible = "mps,mpq8645p";
+		reg = <0x33>;
+	};
+	AVD@0x34 {
+		compatible = "mps,mpq8645p";
+		reg = <0x34>;
+	};
+	AVD@0x35 {
+		compatible = "mps,mpq8645p";
+		reg = <0x35>;
+	};
+	AVD@0x36 {
+		compatible = "mps,mpq8645p";
+		reg = <0x36>;
+	};
+	mp5920@0x44 {
+		compatible = "mps,mp5920";
+		reg = <0x44>;
+	};
+	mp5920@0x43 {
+		compatible = "mps,mp5920";
+		reg = <0x43>;
+	};
 };
 
 &pwm_tacho {
@@ -117,10 +307,26 @@
 	};
 };
 
+&uhci {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usb2bh_default>;
+};
+
 &vhub {
 	status = "okay";
 };
 
-&ehci1 {
+&sdhci0 {
+	// eMMC
 	status = "okay";
+	bus-width = <8>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sd1_default>;
+	sdhci-caps-mask = <0x0 0x580000>;
+	broken-cd;
+};
+
+&gpio {
+	aspeed,skip-init-cmdsrc;
 };
