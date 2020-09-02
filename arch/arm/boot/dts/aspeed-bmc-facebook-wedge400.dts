@@ -378,6 +378,7 @@
 };
 
 &sdhci1 {
+	max-frequency = <25000000>;
 	aspeed,sdhci-disable-dma;
 };
 
