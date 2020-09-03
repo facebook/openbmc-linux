@@ -138,6 +138,7 @@ Hardware Monitoring Kernel Drivers
    peci-cputemp
    peci-dimmtemp
    peci-cpupower
+   peci-dimmpower
    pmbus
    powr1220
    pxe1610
