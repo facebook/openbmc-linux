@@ -30,24 +30,6 @@
 			      <&adc 4>, <&adc 5>, <&adc 6>, <&adc 7>,
                               <&adc 8>, <&adc 9>, <&adc 10>;
 	};
-	spi_gpio: spi-gpio {
-		status = "okay";
-		compatible = "spi-gpio";
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		gpio-sck = <&gpio ASPEED_GPIO(R, 3) GPIO_ACTIVE_HIGH>;
-		gpio-mosi = <&gpio ASPEED_GPIO(R, 4) GPIO_ACTIVE_HIGH>;
-		gpio-miso = <&gpio ASPEED_GPIO(R, 5) GPIO_ACTIVE_HIGH>;
-		num-chipselects = <1>;
-		cs-gpios = <&gpio ASPEED_GPIO(R, 2) GPIO_ACTIVE_LOW>;
-
-		tpmdev@0 {
-			compatible = "tcg,tpm_tis-spi";
-			spi-max-frequency = <33000000>;
-			reg = <0>;
-		};
-	};
 };
 
 &wdt1 {
@@ -64,18 +46,19 @@
 &fmc {
 	status = "okay";
 	flash@0 {
-		reg = < 1 >;
-		status = "okay";
-		m25p,fast-read;
-		label = "spi0.1";
-#include "facebook-bmc-vboot2-flash1-layout.dtsi"
-	};
-	flash@1 {
 		reg = < 0 >;
 		status = "okay";
 		m25p,fast-read;
 		label = "spi0.0";
-#include "facebook-bmc-vboot2-flash0-layout.dtsi"
+		spi-max-frequency = <40000000>;
+#include "facebook-bmc-pfr-128M-layout.dtsi"
+	};
+	flash@1 {
+		reg = < 1 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
+		spi-max-frequency = <40000000>;
 	};
 };
 
@@ -83,6 +66,22 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_usb2ah_default>;
+};
+
+&spi2 {
+        status = "okay";
+        compatible = "aspeed,ast2500-spi-master";
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_spi2ck_default
+                     &pinctrl_spi2cs0_default
+                     &pinctrl_spi2miso_default
+                     &pinctrl_spi2mosi_default>;
+        tpm@0 {
+                reg = < 0 >;
+                compatible = "tcg,tpm_tis-spi";
+                spi-max-frequency = <12000000>;
+                status = "okay";
+        };
 };
 
 &ibt {
@@ -132,6 +131,7 @@
 	no-hw-checksum;
 	use-ncsi;
 	mlx,multi-host;
+	ncsi-ctrl,start-redo-probe;
 	ncsi-package = <1>;
 	ncsi-channel = <1>;
 	ncsi-rexmit = <1>;
