@@ -90,8 +90,6 @@
 #define ASPEED_JTAG_RESET_CNTR		10
 #define WAIT_ITERATIONS		75
 
-/*#define USE_INTERRUPTS*/
-
 static const char * const regnames[] = {
 	[ASPEED_JTAG_DATA] = "ASPEED_JTAG_DATA",
 	[ASPEED_JTAG_INST] = "ASPEED_JTAG_INST",
@@ -388,7 +386,7 @@ static int aspeed_jtag_bitbang(struct jtag *jtag,
 static int aspeed_jtag_wait_instruction_pause(struct aspeed_jtag *aspeed_jtag)
 {
 	int res = 0;
-#ifdef USE_INTERRUPTS
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
 	res = wait_event_interruptible(aspeed_jtag->jtag_wq,
 				       aspeed_jtag->flag &
 				       ASPEED_JTAG_ISR_INST_PAUSE);
@@ -425,7 +423,7 @@ static int
 aspeed_jtag_wait_instruction_complete(struct aspeed_jtag *aspeed_jtag)
 {
 	int res = 0;
-#ifdef USE_INTERRUPTS
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
 	res = wait_event_interruptible(aspeed_jtag->jtag_wq,
 				       aspeed_jtag->flag &
 				       ASPEED_JTAG_ISR_INST_COMPLETE);
@@ -462,7 +460,7 @@ static int
 aspeed_jtag_wait_data_pause_complete(struct aspeed_jtag *aspeed_jtag)
 {
 	int res = 0;
-#ifdef USE_INTERRUPTS
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
 	res = wait_event_interruptible(aspeed_jtag->jtag_wq,
 				       aspeed_jtag->flag &
 				       ASPEED_JTAG_ISR_DATA_PAUSE);
@@ -497,7 +495,7 @@ aspeed_jtag_wait_data_pause_complete(struct aspeed_jtag *aspeed_jtag)
 static int aspeed_jtag_wait_data_complete(struct aspeed_jtag *aspeed_jtag)
 {
 	int res = 0;
-#ifdef USE_INTERRUPTS
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
 	res = wait_event_interruptible(aspeed_jtag->jtag_wq,
 				       aspeed_jtag->flag &
 				       ASPEED_JTAG_ISR_DATA_COMPLETE);
@@ -576,11 +574,9 @@ static int aspeed_jtag_status_set(struct jtag *jtag,
 	if (endstate->reset) {
 		/* Disable sw mode */
 		aspeed_jtag_write(aspeed_jtag, 0, ASPEED_JTAG_SW);
-		mdelay(1);
 		aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_CTL_ENG_EN |
 				  ASPEED_JTAG_CTL_ENG_OUT_EN |
 				  ASPEED_JTAG_CTL_FORCE_TMS, ASPEED_JTAG_CTRL);
-		mdelay(1);
 		aspeed_jtag_write(aspeed_jtag,
 				  ASPEED_JTAG_SW_TDIO, ASPEED_JTAG_SW);
 		aspeed_jtag->status = JTAG_STATE_TLRESET;
@@ -650,12 +646,14 @@ static int aspeed_jtag_xfer_push_data(struct aspeed_jtag *aspeed_jtag,
 	int res = 0;
 
 	if (type == JTAG_SIR_XFER) {
+		aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_INST_PAUSE;
 		aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_IOUT_LEN(bits_len),
 				  ASPEED_JTAG_CTRL);
 		aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_IOUT_LEN(bits_len) |
 				  ASPEED_JTAG_CTL_INST_EN, ASPEED_JTAG_CTRL);
 		res = aspeed_jtag_wait_instruction_pause(aspeed_jtag);
 	} else {
+		aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_DATA_PAUSE;
 		aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_DOUT_LEN(bits_len),
 				  ASPEED_JTAG_CTRL);
 		aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_DOUT_LEN(bits_len) |
@@ -671,8 +669,8 @@ static int aspeed_jtag_xfer_push_data_last(struct aspeed_jtag *aspeed_jtag,
 					   enum jtag_endstate endstate)
 {
 	int res = 0;
-
 	if (type == JTAG_SIR_XFER) {
+		aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_INST_COMPLETE;
 		aspeed_jtag_write(aspeed_jtag,
 				  ASPEED_JTAG_IOUT_LEN(shift_bits) |
 				  ASPEED_JTAG_CTL_LASPEED_INST,
@@ -684,6 +682,7 @@ static int aspeed_jtag_xfer_push_data_last(struct aspeed_jtag *aspeed_jtag,
 				  ASPEED_JTAG_CTRL);
 		res = aspeed_jtag_wait_instruction_complete(aspeed_jtag);
 	} else {
+		aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_DATA_COMPLETE;
 		aspeed_jtag_write(aspeed_jtag,
 				  ASPEED_JTAG_DOUT_LEN(shift_bits) |
 				  ASPEED_JTAG_CTL_LASPEED_DATA,
@@ -833,7 +832,7 @@ static int aspeed_jtag_status_get(struct jtag *jtag, u32 *status)
 	return 0;
 }
 
-#ifdef USE_INTERRUPTS
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
 static irqreturn_t aspeed_jtag_interrupt(s32 this_irq, void *dev_id)
 {
 	struct aspeed_jtag *aspeed_jtag = dev_id;
@@ -883,7 +882,7 @@ static int aspeed_jtag_init(struct platform_device *pdev,
 {
 	struct resource *res;
 	struct resource *scu_res;
-#ifdef USE_INTERRUPTS
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
 	int err;
 #endif
 
@@ -904,7 +903,7 @@ static int aspeed_jtag_init(struct platform_device *pdev,
 		return PTR_ERR(aspeed_jtag->pclk);
 	}
 
-#ifdef USE_INTERRUPTS
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
 	aspeed_jtag->irq = platform_get_irq(pdev, 0);
 	if (aspeed_jtag->irq < 0) {
 		dev_err(aspeed_jtag->dev, "no irq specified\n");
@@ -925,7 +924,7 @@ static int aspeed_jtag_init(struct platform_device *pdev,
 	}
 	reset_control_deassert(aspeed_jtag->rst);
 
-#ifdef USE_INTERRUPTS
+#if IS_ENABLED(CONFIG_JTAG_ASPEED_USE_INTERRUPTS)
 	err = devm_request_irq(aspeed_jtag->dev, aspeed_jtag->irq,
 			       aspeed_jtag_interrupt, 0,
 			       "aspeed-jtag", aspeed_jtag);
