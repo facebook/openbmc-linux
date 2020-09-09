@@ -5,6 +5,11 @@ partitions {
 	compatible = "fixed-partitions";
 	#address-cells = <1>;
 	#size-cells = <1>;
+	/*
+	 * To avoid accessing to first 64K(IBB)
+	 * which will trigger PFR reset the bmc
+	 * define the start address of u-boot as 0x10000
+	 */
 	u-boot@0 {
 		reg = <0x10000 0xD0000>;
 		label = "u-boot";
@@ -13,15 +18,15 @@ partitions {
 	 * To keep backward compatible keep env
 	 * as second partition. exposed as mtd1
 	 */
-	env@60000 {
+	env@e0000 {
 		reg = <0xE0000 0x10000>;
 		label = "env";
 	};
-	fit@80000 {
+	fit@100000 {
 		reg = <0x100000 0x1f00000>;
 		label = "fit";
 	};
-	data0@1c00000 {
+	data0@2000000 {
 		reg = <0x2000000 0x9e0000>;
 		label = "data0";
 	};
