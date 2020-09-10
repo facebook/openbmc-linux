@@ -1,38 +1,30 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2018 Intel Corporation
+// Copyright (c) 2018-2019 Intel Corporation
 
 #include <linux/bitfield.h>
 #include <linux/crc8.h>
-#include <linux/delay.h>
-#include <linux/fs.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/peci.h>
 #include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
+#include <linux/sched/task_stack.h>
 #include <linux/slab.h>
-#include <linux/uaccess.h>
 
 /* Mask for getting minor revision number from DIB */
-#define REVISION_NUM_MASK  GENMASK(15, 8)
+#define REVISION_NUM_MASK	GENMASK(15, 8)
 
-/* CRC8 table for Assure Write Frame Check */
-#define PECI_CRC8_POLYNOMIAL  0x07
+/* CRC8 table for Assured Write Frame Check */
+#define PECI_CRC8_POLYNOMIAL	0x07
 DECLARE_CRC8_TABLE(peci_crc8_table);
 
-static struct device_type peci_adapter_type;
-static struct device_type peci_client_type;
-
-/* Max number of peci cdev */
-#define PECI_CDEV_MAX  16
-
-static dev_t peci_devt;
 static bool is_registered;
 
 static DEFINE_MUTEX(core_lock);
 static DEFINE_IDR(peci_adapter_idr);
 
-static struct peci_adapter *peci_get_adapter(int nr)
+struct peci_adapter *peci_get_adapter(int nr)
 {
 	struct peci_adapter *adapter;
 
@@ -48,10 +40,12 @@ static struct peci_adapter *peci_get_adapter(int nr)
 
 out_unlock:
 	mutex_unlock(&core_lock);
+
 	return adapter;
 }
+EXPORT_SYMBOL_GPL(peci_get_adapter);
 
-static void peci_put_adapter(struct peci_adapter *adapter)
+void peci_put_adapter(struct peci_adapter *adapter)
 {
 	if (!adapter)
 		return;
@@ -59,6 +53,7 @@ static void peci_put_adapter(struct peci_adapter *adapter)
 	put_device(&adapter->dev);
 	module_put(adapter->owner);
 }
+EXPORT_SYMBOL_GPL(peci_put_adapter);
 
 static ssize_t name_show(struct device *dev,
 			 struct device_attribute *attr,
@@ -84,10 +79,11 @@ static struct attribute *peci_device_attrs[] = {
 };
 ATTRIBUTE_GROUPS(peci_device);
 
-static struct device_type peci_client_type = {
+struct device_type peci_client_type = {
 	.groups		= peci_device_groups,
 	.release	= peci_client_dev_release,
 };
+EXPORT_SYMBOL_GPL(peci_client_type);
 
 /**
  * peci_verify_client - return parameter as peci_client, or NULL
@@ -103,77 +99,178 @@ struct peci_client *peci_verify_client(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(peci_verify_client);
 
-static u8 peci_aw_fcs(u8 *data, int len)
+/**
+ * peci_get_xfer_msg() - get a DMA safe peci_xfer_msg for the given tx and rx
+ *			 length
+ * @tx_len: the length of tx_buf. May be 0 if tx_buf isn't needed.
+ * @rx_len: the length of rx_buf. May be 0 if rx_buf isn't needed.
+ *
+ * Return: NULL if a DMA safe buffer was not obtained.
+ *	   Or a valid pointer to be used with DMA. After use, release it by
+ *	   calling peci_put_xfer_msg().
+ *
+ * This function must only be called from process context!
+ */
+struct peci_xfer_msg *peci_get_xfer_msg(u8 tx_len, u8 rx_len)
 {
-	return crc8(peci_crc8_table, data, (size_t)len, 0);
+	struct peci_xfer_msg *msg;
+	u8 *tx_buf, *rx_buf;
+
+	if (tx_len) {
+		tx_buf = kzalloc(tx_len, GFP_KERNEL);
+		if (!tx_buf)
+			return NULL;
+	} else {
+		tx_buf = NULL;
+	}
+
+	if (rx_len) {
+		rx_buf = kzalloc(rx_len, GFP_KERNEL);
+		if (!rx_buf)
+			goto err_free_tx_buf;
+	} else {
+		rx_buf = NULL;
+	}
+
+	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+	if (!msg)
+		goto err_free_tx_rx_buf;
+
+	msg->tx_len = tx_len;
+	msg->tx_buf = tx_buf;
+	msg->rx_len = rx_len;
+	msg->rx_buf = rx_buf;
+
+	return msg;
+
+err_free_tx_rx_buf:
+	kfree(rx_buf);
+err_free_tx_buf:
+	kfree(tx_buf);
+
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(peci_get_xfer_msg);
+
+/**
+ * peci_put_xfer_msg - release a DMA safe peci_xfer_msg
+ * @msg: the message obtained from peci_get_xfer_msg(). May be NULL.
+ */
+void peci_put_xfer_msg(struct peci_xfer_msg *msg)
+{
+	if (!msg)
+		return;
+
+	kfree(msg->rx_buf);
+	kfree(msg->tx_buf);
+	kfree(msg);
+}
+EXPORT_SYMBOL_GPL(peci_put_xfer_msg);
+
+/* Calculate an Assured Write Frame Check Sequence byte */
+static int peci_aw_fcs(struct peci_xfer_msg *msg, int len, u8 *aw_fcs)
+{
+	u8 *tmp_buf;
+
+	/* Allocate a temporary buffer to use a contiguous byte array */
+	tmp_buf = kmalloc(len, GFP_KERNEL);
+	if (!tmp_buf)
+		return -ENOMEM;
+
+	tmp_buf[0] = msg->addr;
+	tmp_buf[1] = msg->tx_len;
+	tmp_buf[2] = msg->rx_len;
+	memcpy(&tmp_buf[3], msg->tx_buf, len - 3);
+
+	*aw_fcs = crc8(peci_crc8_table, tmp_buf, (size_t)len, 0);
+
+	kfree(tmp_buf);
+
+	return 0;
 }
 
 static int __peci_xfer(struct peci_adapter *adapter, struct peci_xfer_msg *msg,
 		       bool do_retry, bool has_aw_fcs)
 {
-	ktime_t start, end;
-	s64 elapsed_ms;
-	int rc = 0;
+	uint interval_ms = PECI_DEV_RETRY_INTERVAL_MIN_MSEC;
+	ulong timeout = jiffies;
+	u8 aw_fcs;
+	int ret;
 
-	/**
+	/*
+	 * In case if adapter uses DMA, check at here whether tx and rx buffers
+	 * are DMA capable or not.
+	 */
+	if (IS_ENABLED(CONFIG_HAS_DMA) && adapter->use_dma) {
+		if (is_vmalloc_addr(msg->tx_buf) ||
+		    is_vmalloc_addr(msg->rx_buf)) {
+			WARN_ONCE(1, "xfer msg is not dma capable\n");
+			return -EAGAIN;
+		} else if (object_is_on_stack(msg->tx_buf) ||
+			   object_is_on_stack(msg->rx_buf)) {
+			WARN_ONCE(1, "xfer msg is on stack\n");
+			return -EAGAIN;
+		}
+	}
+
+	/*
 	 * For some commands, the PECI originator may need to retry a command if
 	 * the processor PECI client responds with a 0x8x completion code. In
 	 * each instance, the processor PECI client may have started the
 	 * operation but not completed it yet. When the 'retry' bit is set, the
 	 * PECI client will ignore a new request if it exactly matches a
-	 * previous valid request.
+	 * previous valid request. For better performance and for reducing
+	 * retry traffic, the interval time will be increased exponentially.
 	 */
 
 	if (do_retry)
-		start = ktime_get();
+		timeout += PECI_DEV_RETRY_TIMEOUT;
 
-	do {
-		rc = adapter->xfer(adapter, msg);
+	for (;;) {
+		ret = adapter->xfer(adapter, msg);
 
-		if (!do_retry || rc)
-			break;
-
-		if (msg->rx_buf[0] == DEV_PECI_CC_SUCCESS)
+		if (!do_retry || ret || !msg->rx_buf)
 			break;
 
 		/* Retry is needed when completion code is 0x8x */
-		if ((msg->rx_buf[0] & DEV_PECI_CC_RETRY_CHECK_MASK) !=
-		    DEV_PECI_CC_NEED_RETRY) {
-			rc = -EIO;
+		if ((msg->rx_buf[0] & PECI_DEV_CC_RETRY_CHECK_MASK) !=
+		    PECI_DEV_CC_NEED_RETRY)
 			break;
-		}
 
 		/* Set the retry bit to indicate a retry attempt */
-		msg->tx_buf[1] |= DEV_PECI_RETRY_BIT;
+		msg->tx_buf[1] |= PECI_DEV_RETRY_BIT;
 
 		/* Recalculate the AW FCS if it has one */
-		if (has_aw_fcs)
-			msg->tx_buf[msg->tx_len - 1] = 0x80 ^
-						peci_aw_fcs((u8 *)msg,
-							    2 + msg->tx_len);
+		if (has_aw_fcs) {
+			ret = peci_aw_fcs(msg, 2 + msg->tx_len, &aw_fcs);
+			if (ret)
+				break;
 
-		/**
-		 * Retry for at least 250ms before returning an error.
-		 * Retry interval guideline:
-		 *   No minimum < Retry Interval < No maximum
-		 *                (recommend 10ms)
-		 */
-		end = ktime_get();
-		elapsed_ms = ktime_to_ms(ktime_sub(end, start));
-		if (elapsed_ms >= DEV_PECI_RETRY_TIME_MS) {
+			msg->tx_buf[msg->tx_len - 1] = 0x80 ^ aw_fcs;
+		}
+
+		/* Retry it for 'timeout' before returning an error. */
+		if (time_after(jiffies, timeout)) {
 			dev_dbg(&adapter->dev, "Timeout retrying xfer!\n");
-			rc = -ETIMEDOUT;
+			ret = -ETIMEDOUT;
 			break;
 		}
 
-		usleep_range((DEV_PECI_RETRY_INTERVAL_USEC >> 2) + 1,
-			     DEV_PECI_RETRY_INTERVAL_USEC);
-	} while (true);
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (schedule_timeout(msecs_to_jiffies(interval_ms))) {
+			ret = -EINTR;
+			break;
+		}
 
-	if (rc)
-		dev_dbg(&adapter->dev, "xfer error, rc: %d\n", rc);
+		interval_ms *= 2;
+		if (interval_ms > PECI_DEV_RETRY_INTERVAL_MAX_MSEC)
+			interval_ms = PECI_DEV_RETRY_INTERVAL_MAX_MSEC;
+	}
 
-	return rc;
+	if (ret)
+		dev_dbg(&adapter->dev, "xfer error: %d\n", ret);
+
+	return ret;
 }
 
 static int peci_xfer(struct peci_adapter *adapter, struct peci_xfer_msg *msg)
@@ -190,37 +287,47 @@ static int peci_xfer_with_retries(struct peci_adapter *adapter,
 
 static int peci_scan_cmd_mask(struct peci_adapter *adapter)
 {
-	struct peci_xfer_msg msg;
+	struct peci_xfer_msg *msg;
 	u8 revision;
-	int rc = 0;
+	int ret;
 	u64 dib;
 
 	/* Update command mask just once */
 	if (adapter->cmd_mask & BIT(PECI_CMD_XFER))
 		return 0;
 
-	msg.addr      = PECI_BASE_ADDR;
-	msg.tx_len    = GET_DIB_WR_LEN;
-	msg.rx_len    = GET_DIB_RD_LEN;
-	msg.tx_buf[0] = GET_DIB_PECI_CMD;
+	msg = peci_get_xfer_msg(PECI_GET_DIB_WR_LEN, PECI_GET_DIB_RD_LEN);
+	if (!msg)
+		return -ENOMEM;
 
-	rc = peci_xfer(adapter, &msg);
-	if (rc)
-		return rc;
+	msg->addr      = PECI_BASE_ADDR;
+	msg->tx_buf[0] = PECI_GET_DIB_CMD;
 
-	dib = le64_to_cpup((__le64 *)msg.rx_buf);
+	ret = peci_xfer(adapter, msg);
+	if (ret)
+		return ret;
+
+	dib = le64_to_cpup((__le64 *)msg->rx_buf);
 
 	/* Check special case for Get DIB command */
 	if (dib == 0) {
 		dev_dbg(&adapter->dev, "DIB read as 0\n");
-		return -EIO;
+		ret = -EIO;
+		goto out;
 	}
 
-	/**
-	 * Setting up the supporting commands based on minor revision number.
+	/*
+	 * Setting up the supporting commands based on revision number.
 	 * See PECI Spec Table 3-1.
 	 */
 	revision = FIELD_GET(REVISION_NUM_MASK, dib);
+	if (revision >= 0x40) { /* Rev. 4.0 */
+		adapter->cmd_mask |= BIT(PECI_CMD_RD_IA_MSREX);
+		adapter->cmd_mask |= BIT(PECI_CMD_RD_END_PT_CFG);
+		adapter->cmd_mask |= BIT(PECI_CMD_WR_END_PT_CFG);
+		adapter->cmd_mask |= BIT(PECI_CMD_CRASHDUMP_DISC);
+		adapter->cmd_mask |= BIT(PECI_CMD_CRASHDUMP_GET_FRAME);
+	}
 	if (revision >= 0x36) /* Rev. 3.6 */
 		adapter->cmd_mask |= BIT(PECI_CMD_WR_IA_MSR);
 	if (revision >= 0x35) /* Rev. 3.5 */
@@ -243,10 +350,14 @@ static int peci_scan_cmd_mask(struct peci_adapter *adapter)
 	adapter->cmd_mask |= BIT(PECI_CMD_GET_DIB);
 	adapter->cmd_mask |= BIT(PECI_CMD_PING);
 
-	return rc;
+out:
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-static int peci_cmd_support(struct peci_adapter *adapter, enum peci_cmd cmd)
+static int peci_check_cmd_support(struct peci_adapter *adapter,
+				  enum peci_cmd cmd)
 {
 	if (!(adapter->cmd_mask & BIT(PECI_CMD_PING)) &&
 	    peci_scan_cmd_mask(adapter) < 0) {
@@ -262,70 +373,137 @@ static int peci_cmd_support(struct peci_adapter *adapter, enum peci_cmd cmd)
 	return 0;
 }
 
-static int peci_ioctl_xfer(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_xfer(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_xfer_msg *msg = vmsg;
+	u8 aw_fcs;
+	int ret;
 
-	return peci_xfer(adapter, msg);
+	if (!msg->tx_len) {
+		ret = peci_xfer(adapter, msg);
+	} else {
+		switch (msg->tx_buf[0]) {
+		case PECI_RDPKGCFG_CMD:
+		case PECI_RDIAMSR_CMD:
+		case PECI_RDIAMSREX_CMD:
+		case PECI_RDPCICFG_CMD:
+		case PECI_RDPCICFGLOCAL_CMD:
+		case PECI_RDENDPTCFG_CMD:
+		case PECI_CRASHDUMP_CMD:
+			ret = peci_xfer_with_retries(adapter, msg, false);
+			break;
+		case PECI_WRPKGCFG_CMD:
+		case PECI_WRIAMSR_CMD:
+		case PECI_WRPCICFG_CMD:
+		case PECI_WRPCICFGLOCAL_CMD:
+		case PECI_WRENDPTCFG_CMD:
+			/* Check if the AW FCS byte is already provided */
+			ret = peci_aw_fcs(msg, 2 + msg->tx_len, &aw_fcs);
+			if (ret)
+				break;
+
+			if (msg->tx_buf[msg->tx_len - 1] != (0x80 ^ aw_fcs)) {
+				/*
+				 * Add an Assured Write Frame Check Sequence
+				 * byte and increment the tx_len to include
+				 * the new byte.
+				 */
+				msg->tx_len++;
+				ret = peci_aw_fcs(msg, 2 + msg->tx_len,
+						  &aw_fcs);
+				if (ret)
+					break;
+
+				msg->tx_buf[msg->tx_len - 1] = 0x80 ^ aw_fcs;
+			}
+
+			ret = peci_xfer_with_retries(adapter, msg, true);
+			break;
+		case PECI_GET_DIB_CMD:
+		case PECI_GET_TEMP_CMD:
+		default:
+			ret = peci_xfer(adapter, msg);
+			break;
+		}
+	}
+
+	return ret;
 }
 
-static int peci_ioctl_ping(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_ping(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_ping_msg *umsg = vmsg;
-	struct peci_xfer_msg msg;
+	struct peci_xfer_msg *msg;
+	int ret;
 
-	msg.addr   = umsg->addr;
-	msg.tx_len = 0;
-	msg.rx_len = 0;
+	msg = peci_get_xfer_msg(0, 0);
+	if (!msg)
+		return -ENOMEM;
 
-	return peci_xfer(adapter, &msg);
+	msg->addr   = umsg->addr;
+
+	ret = peci_xfer(adapter, msg);
+
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-static int peci_ioctl_get_dib(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_get_dib(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_get_dib_msg *umsg = vmsg;
-	struct peci_xfer_msg msg;
-	int rc;
+	struct peci_xfer_msg *msg;
+	int ret;
 
-	msg.addr      = umsg->addr;
-	msg.tx_len    = GET_DIB_WR_LEN;
-	msg.rx_len    = GET_DIB_RD_LEN;
-	msg.tx_buf[0] = GET_DIB_PECI_CMD;
+	msg = peci_get_xfer_msg(PECI_GET_DIB_WR_LEN, PECI_GET_DIB_RD_LEN);
+	if (!msg)
+		return -ENOMEM;
 
-	rc = peci_xfer(adapter, &msg);
-	if (rc)
-		return rc;
+	msg->addr      = umsg->addr;
+	msg->tx_buf[0] = PECI_GET_DIB_CMD;
 
-	umsg->dib = le64_to_cpup((__le64 *)msg.rx_buf);
+	ret = peci_xfer(adapter, msg);
+	if (ret)
+		goto out;
 
-	return 0;
+	umsg->dib = le64_to_cpup((__le64 *)msg->rx_buf);
+
+out:
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-static int peci_ioctl_get_temp(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_get_temp(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_get_temp_msg *umsg = vmsg;
-	struct peci_xfer_msg msg;
-	int rc;
+	struct peci_xfer_msg *msg;
+	int ret;
 
-	msg.addr      = umsg->addr;
-	msg.tx_len    = GET_TEMP_WR_LEN;
-	msg.rx_len    = GET_TEMP_RD_LEN;
-	msg.tx_buf[0] = GET_TEMP_PECI_CMD;
+	msg = peci_get_xfer_msg(PECI_GET_TEMP_WR_LEN, PECI_GET_TEMP_RD_LEN);
+	if (!msg)
+		return -ENOMEM;
 
-	rc = peci_xfer(adapter, &msg);
-	if (rc)
-		return rc;
+	msg->addr      = umsg->addr;
+	msg->tx_buf[0] = PECI_GET_TEMP_CMD;
 
-	umsg->temp_raw = le16_to_cpup((__le16 *)msg.rx_buf);
+	ret = peci_xfer(adapter, msg);
+	if (ret)
+		goto out;
 
-	return 0;
+	umsg->temp_raw = le16_to_cpup((__le16 *)msg->rx_buf);
+
+out:
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-static int peci_ioctl_rd_pkg_cfg(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_rd_pkg_cfg(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_rd_pkg_cfg_msg *umsg = vmsg;
-	struct peci_xfer_msg msg;
-	int rc = 0;
+	struct peci_xfer_msg *msg;
+	int ret;
 
 	/* Per the PECI spec, the read length must be a byte, word, or dword */
 	if (umsg->rx_len != 1 && umsg->rx_len != 2 && umsg->rx_len != 4) {
@@ -334,29 +512,35 @@ static int peci_ioctl_rd_pkg_cfg(struct peci_adapter *adapter, void *vmsg)
 		return -EINVAL;
 	}
 
-	msg.addr = umsg->addr;
-	msg.tx_len = RDPKGCFG_WRITE_LEN;
-	/* read lengths of 1 and 2 result in an error, so only use 4 for now */
-	msg.rx_len = RDPKGCFG_READ_LEN_BASE + umsg->rx_len;
-	msg.tx_buf[0] = RDPKGCFG_PECI_CMD;
-	msg.tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
-				   /* Host ID is 0 for PECI 3.0 */
-	msg.tx_buf[2] = umsg->index;            /* RdPkgConfig index */
-	msg.tx_buf[3] = (u8)umsg->param;        /* LSB - Config parameter */
-	msg.tx_buf[4] = (u8)(umsg->param >> 8); /* MSB - Config parameter */
+	msg = peci_get_xfer_msg(PECI_RDPKGCFG_WRITE_LEN,
+				PECI_RDPKGCFG_READ_LEN_BASE + umsg->rx_len);
+	if (!msg)
+		return -ENOMEM;
 
-	rc = peci_xfer_with_retries(adapter, &msg, false);
-	if (!rc)
-		memcpy(umsg->pkg_config, &msg.rx_buf[1], umsg->rx_len);
+	msg->addr = umsg->addr;
+	msg->tx_buf[0] = PECI_RDPKGCFG_CMD;
+	msg->tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
+				    /* Host ID is 0 for PECI 3.0 */
+	msg->tx_buf[2] = umsg->index;            /* RdPkgConfig index */
+	msg->tx_buf[3] = (u8)umsg->param;        /* LSB - Config parameter */
+	msg->tx_buf[4] = (u8)(umsg->param >> 8); /* MSB - Config parameter */
 
-	return rc;
+	ret = peci_xfer_with_retries(adapter, msg, false);
+	if (!ret)
+		memcpy(umsg->pkg_config, &msg->rx_buf[1], umsg->rx_len);
+
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-static int peci_ioctl_wr_pkg_cfg(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_wr_pkg_cfg(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_wr_pkg_cfg_msg *umsg = vmsg;
-	struct peci_xfer_msg msg;
-	int rc = 0, i;
+	struct peci_xfer_msg *msg;
+	int ret, i;
+	u8 aw_fcs;
 
 	/* Per the PECI spec, the write length must be a dword */
 	if (umsg->tx_len != 4) {
@@ -365,86 +549,145 @@ static int peci_ioctl_wr_pkg_cfg(struct peci_adapter *adapter, void *vmsg)
 		return -EINVAL;
 	}
 
-	msg.addr = umsg->addr;
-	msg.tx_len = WRPKGCFG_WRITE_LEN_BASE + umsg->tx_len;
-	/* read lengths of 1 and 2 result in an error, so only use 4 for now */
-	msg.rx_len = WRPKGCFG_READ_LEN;
-	msg.tx_buf[0] = WRPKGCFG_PECI_CMD;
-	msg.tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
+	msg = peci_get_xfer_msg(PECI_WRPKGCFG_WRITE_LEN_BASE + umsg->tx_len,
+				PECI_WRPKGCFG_READ_LEN);
+	if (!msg)
+		return -ENOMEM;
+
+	msg->addr = umsg->addr;
+	msg->tx_buf[0] = PECI_WRPKGCFG_CMD;
+	msg->tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
 				   /* Host ID is 0 for PECI 3.0 */
-	msg.tx_buf[2] = umsg->index;            /* RdPkgConfig index */
-	msg.tx_buf[3] = (u8)umsg->param;        /* LSB - Config parameter */
-	msg.tx_buf[4] = (u8)(umsg->param >> 8); /* MSB - Config parameter */
+	msg->tx_buf[2] = umsg->index;            /* RdPkgConfig index */
+	msg->tx_buf[3] = (u8)umsg->param;        /* LSB - Config parameter */
+	msg->tx_buf[4] = (u8)(umsg->param >> 8); /* MSB - Config parameter */
 	for (i = 0; i < umsg->tx_len; i++)
-		msg.tx_buf[5 + i] = (u8)(umsg->value >> (i << 3));
+		msg->tx_buf[5 + i] = (u8)(umsg->value >> (i << 3));
 
-	/* Add an Assure Write Frame Check Sequence byte */
-	msg.tx_buf[5 + i] = 0x80 ^
-			    peci_aw_fcs((u8 *)&msg, 8 + umsg->tx_len);
+	/* Add an Assured Write Frame Check Sequence byte */
+	ret = peci_aw_fcs(msg, 8 + umsg->tx_len, &aw_fcs);
+	if (ret)
+		goto out;
 
-	rc = peci_xfer_with_retries(adapter, &msg, true);
+	msg->tx_buf[5 + i] = 0x80 ^ aw_fcs;
 
-	return rc;
+	ret = peci_xfer_with_retries(adapter, msg, true);
+
+out:
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-static int peci_ioctl_rd_ia_msr(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_rd_ia_msr(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_rd_ia_msr_msg *umsg = vmsg;
-	struct peci_xfer_msg msg;
-	int rc = 0;
+	struct peci_xfer_msg *msg;
+	int ret;
 
-	msg.addr = umsg->addr;
-	msg.tx_len = RDIAMSR_WRITE_LEN;
-	msg.rx_len = RDIAMSR_READ_LEN;
-	msg.tx_buf[0] = RDIAMSR_PECI_CMD;
-	msg.tx_buf[1] = 0;
-	msg.tx_buf[2] = umsg->thread_id;
-	msg.tx_buf[3] = (u8)umsg->address;
-	msg.tx_buf[4] = (u8)(umsg->address >> 8);
+	msg = peci_get_xfer_msg(PECI_RDIAMSR_WRITE_LEN, PECI_RDIAMSR_READ_LEN);
+	if (!msg)
+		return -ENOMEM;
 
-	rc = peci_xfer_with_retries(adapter, &msg, false);
-	if (!rc)
-		memcpy(&umsg->value, &msg.rx_buf[1], sizeof(uint64_t));
+	msg->addr = umsg->addr;
+	msg->tx_buf[0] = PECI_RDIAMSR_CMD;
+	msg->tx_buf[1] = 0;
+	msg->tx_buf[2] = umsg->thread_id;
+	msg->tx_buf[3] = (u8)umsg->address;
+	msg->tx_buf[4] = (u8)(umsg->address >> 8);
 
-	return rc;
+	ret = peci_xfer_with_retries(adapter, msg, false);
+	if (!ret)
+		memcpy(&umsg->value, &msg->rx_buf[1], sizeof(uint64_t));
+
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-static int peci_ioctl_rd_pci_cfg(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_rd_ia_msrex(struct peci_adapter *adapter, void *vmsg)
+{
+	struct peci_rd_ia_msrex_msg *umsg = vmsg;
+	struct peci_xfer_msg *msg;
+	int ret;
+
+	msg = peci_get_xfer_msg(PECI_RDIAMSREX_WRITE_LEN,
+				PECI_RDIAMSREX_READ_LEN);
+	if (!msg)
+		return -ENOMEM;
+
+	msg->addr = umsg->addr;
+	msg->tx_buf[0] = PECI_RDIAMSREX_CMD;
+	msg->tx_buf[1] = 0;
+	msg->tx_buf[2] = (u8)umsg->thread_id;
+	msg->tx_buf[3] = (u8)(umsg->thread_id >> 8);
+	msg->tx_buf[4] = (u8)umsg->address;
+	msg->tx_buf[5] = (u8)(umsg->address >> 8);
+
+	ret = peci_xfer_with_retries(adapter, msg, false);
+	if (!ret)
+		memcpy(&umsg->value, &msg->rx_buf[1], sizeof(uint64_t));
+
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
+}
+
+static int peci_cmd_wr_ia_msr(struct peci_adapter *adapter, void *vmsg)
+{
+	return -ENOSYS; /* Not implemented yet */
+}
+
+static int peci_cmd_rd_pci_cfg(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_rd_pci_cfg_msg *umsg = vmsg;
-	struct peci_xfer_msg msg;
+	struct peci_xfer_msg *msg;
 	u32 address;
-	int rc = 0;
+	int ret;
+
+	msg = peci_get_xfer_msg(PECI_RDPCICFG_WRITE_LEN,
+				PECI_RDPCICFG_READ_LEN);
+	if (!msg)
+		return -ENOMEM;
 
 	address = umsg->reg;                  /* [11:0]  - Register */
 	address |= (u32)umsg->function << 12; /* [14:12] - Function */
 	address |= (u32)umsg->device << 15;   /* [19:15] - Device   */
 	address |= (u32)umsg->bus << 20;      /* [27:20] - Bus      */
 					      /* [31:28] - Reserved */
-	msg.addr = umsg->addr;
-	msg.tx_len = RDPCICFG_WRITE_LEN;
-	msg.rx_len = RDPCICFG_READ_LEN;
-	msg.tx_buf[0] = RDPCICFG_PECI_CMD;
-	msg.tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
+	msg->addr = umsg->addr;
+	msg->tx_buf[0] = PECI_RDPCICFG_CMD;
+	msg->tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
 				   /* Host ID is 0 for PECI 3.0 */
-	msg.tx_buf[2] = (u8)address;         /* LSB - PCI Config Address */
-	msg.tx_buf[3] = (u8)(address >> 8);  /* PCI Config Address */
-	msg.tx_buf[4] = (u8)(address >> 16); /* PCI Config Address */
-	msg.tx_buf[5] = (u8)(address >> 24); /* MSB - PCI Config Address */
+	msg->tx_buf[2] = (u8)address;         /* LSB - PCI Config Address */
+	msg->tx_buf[3] = (u8)(address >> 8);  /* PCI Config Address */
+	msg->tx_buf[4] = (u8)(address >> 16); /* PCI Config Address */
+	msg->tx_buf[5] = (u8)(address >> 24); /* MSB - PCI Config Address */
 
-	rc = peci_xfer_with_retries(adapter, &msg, false);
-	if (!rc)
-		memcpy(umsg->pci_config, &msg.rx_buf[1], 4);
+	ret = peci_xfer_with_retries(adapter, msg, false);
+	if (!ret)
+		memcpy(umsg->pci_config, &msg->rx_buf[1], 4);
 
-	return rc;
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-static int peci_ioctl_rd_pci_cfg_local(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_wr_pci_cfg(struct peci_adapter *adapter, void *vmsg)
+{
+	return -ENOSYS; /* Not implemented yet */
+}
+
+static int peci_cmd_rd_pci_cfg_local(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_rd_pci_cfg_local_msg *umsg = vmsg;
-	struct peci_xfer_msg msg;
+	struct peci_xfer_msg *msg;
 	u32 address;
-	int rc = 0;
+	int ret;
 
 	/* Per the PECI spec, the read length must be a byte, word, or dword */
 	if (umsg->rx_len != 1 && umsg->rx_len != 2 && umsg->rx_len != 4) {
@@ -453,34 +696,42 @@ static int peci_ioctl_rd_pci_cfg_local(struct peci_adapter *adapter, void *vmsg)
 		return -EINVAL;
 	}
 
+	msg = peci_get_xfer_msg(PECI_RDPCICFGLOCAL_WRITE_LEN,
+				PECI_RDPCICFGLOCAL_READ_LEN_BASE +
+				umsg->rx_len);
+	if (!msg)
+		return -ENOMEM;
+
 	address = umsg->reg;                  /* [11:0]  - Register */
 	address |= (u32)umsg->function << 12; /* [14:12] - Function */
 	address |= (u32)umsg->device << 15;   /* [19:15] - Device   */
 	address |= (u32)umsg->bus << 20;      /* [23:20] - Bus      */
 
-	msg.addr = umsg->addr;
-	msg.tx_len = RDPCICFGLOCAL_WRITE_LEN;
-	msg.rx_len = RDPCICFGLOCAL_READ_LEN_BASE + umsg->rx_len;
-	msg.tx_buf[0] = RDPCICFGLOCAL_PECI_CMD;
-	msg.tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
-				   /* Host ID is 0 for PECI 3.0 */
-	msg.tx_buf[2] = (u8)address;       /* LSB - PCI Configuration Address */
-	msg.tx_buf[3] = (u8)(address >> 8);  /* PCI Configuration Address */
-	msg.tx_buf[4] = (u8)(address >> 16); /* PCI Configuration Address */
+	msg->addr = umsg->addr;
+	msg->tx_buf[0] = PECI_RDPCICFGLOCAL_CMD;
+	msg->tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
+				    /* Host ID is 0 for PECI 3.0 */
+	msg->tx_buf[2] = (u8)address;      /* LSB - PCI Configuration Address */
+	msg->tx_buf[3] = (u8)(address >> 8);  /* PCI Configuration Address */
+	msg->tx_buf[4] = (u8)(address >> 16); /* PCI Configuration Address */
 
-	rc = peci_xfer_with_retries(adapter, &msg, false);
-	if (!rc)
-		memcpy(umsg->pci_config, &msg.rx_buf[1], umsg->rx_len);
+	ret = peci_xfer_with_retries(adapter, msg, false);
+	if (!ret)
+		memcpy(umsg->pci_config, &msg->rx_buf[1], umsg->rx_len);
 
-	return rc;
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-static int peci_ioctl_wr_pci_cfg_local(struct peci_adapter *adapter, void *vmsg)
+static int peci_cmd_wr_pci_cfg_local(struct peci_adapter *adapter, void *vmsg)
 {
 	struct peci_wr_pci_cfg_local_msg *umsg = vmsg;
-	struct peci_xfer_msg msg;
-	int rc = 0, i;
+	struct peci_xfer_msg *msg;
 	u32 address;
+	int ret, i;
+	u8 aw_fcs;
 
 	/* Per the PECI spec, the write length must be a byte, word, or dword */
 	if (umsg->tx_len != 1 && umsg->tx_len != 2 && umsg->tx_len != 4) {
@@ -489,47 +740,448 @@ static int peci_ioctl_wr_pci_cfg_local(struct peci_adapter *adapter, void *vmsg)
 		return -EINVAL;
 	}
 
+	msg = peci_get_xfer_msg(PECI_WRPCICFGLOCAL_WRITE_LEN_BASE +
+				umsg->tx_len, PECI_WRPCICFGLOCAL_READ_LEN);
+	if (!msg)
+		return -ENOMEM;
+
 	address = umsg->reg;                  /* [11:0]  - Register */
 	address |= (u32)umsg->function << 12; /* [14:12] - Function */
 	address |= (u32)umsg->device << 15;   /* [19:15] - Device   */
 	address |= (u32)umsg->bus << 20;      /* [23:20] - Bus      */
 
-	msg.addr = umsg->addr;
-	msg.tx_len = WRPCICFGLOCAL_WRITE_LEN_BASE + umsg->tx_len;
-	msg.rx_len = WRPCICFGLOCAL_READ_LEN;
-	msg.tx_buf[0] = WRPCICFGLOCAL_PECI_CMD;
-	msg.tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
-				   /* Host ID is 0 for PECI 3.0 */
-	msg.tx_buf[2] = (u8)address;       /* LSB - PCI Configuration Address */
-	msg.tx_buf[3] = (u8)(address >> 8);  /* PCI Configuration Address */
-	msg.tx_buf[4] = (u8)(address >> 16); /* PCI Configuration Address */
+	msg->addr = umsg->addr;
+	msg->tx_buf[0] = PECI_WRPCICFGLOCAL_CMD;
+	msg->tx_buf[1] = 0;         /* request byte for Host ID | Retry bit */
+				    /* Host ID is 0 for PECI 3.0 */
+	msg->tx_buf[2] = (u8)address;      /* LSB - PCI Configuration Address */
+	msg->tx_buf[3] = (u8)(address >> 8);  /* PCI Configuration Address */
+	msg->tx_buf[4] = (u8)(address >> 16); /* PCI Configuration Address */
 	for (i = 0; i < umsg->tx_len; i++)
-		msg.tx_buf[5 + i] = (u8)(umsg->value >> (i << 3));
+		msg->tx_buf[5 + i] = (u8)(umsg->value >> (i << 3));
 
-	/* Add an Assure Write Frame Check Sequence byte */
-	msg.tx_buf[5 + i] = 0x80 ^
-			    peci_aw_fcs((u8 *)&msg, 8 + umsg->tx_len);
+	/* Add an Assured Write Frame Check Sequence byte */
+	ret = peci_aw_fcs(msg, 8 + umsg->tx_len, &aw_fcs);
+	if (ret)
+		goto out;
 
-	rc = peci_xfer_with_retries(adapter, &msg, true);
+	msg->tx_buf[5 + i] = 0x80 ^ aw_fcs;
 
-	return rc;
+	ret = peci_xfer_with_retries(adapter, msg, true);
+
+out:
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
 }
 
-typedef int (*peci_ioctl_fn_type)(struct peci_adapter *, void *);
+static int peci_cmd_rd_end_pt_cfg(struct peci_adapter *adapter, void *vmsg)
+{
+	struct peci_rd_end_pt_cfg_msg *umsg = vmsg;
+	struct peci_xfer_msg *msg = NULL;
+	u32 address;
+	u8 tx_size;
+	int ret;
 
-static const peci_ioctl_fn_type peci_ioctl_fn[PECI_CMD_MAX] = {
-	peci_ioctl_xfer,
-	peci_ioctl_ping,
-	peci_ioctl_get_dib,
-	peci_ioctl_get_temp,
-	peci_ioctl_rd_pkg_cfg,
-	peci_ioctl_wr_pkg_cfg,
-	peci_ioctl_rd_ia_msr,
-	NULL, /* Reserved */
-	peci_ioctl_rd_pci_cfg,
-	NULL, /* Reserved */
-	peci_ioctl_rd_pci_cfg_local,
-	peci_ioctl_wr_pci_cfg_local,
+	switch (umsg->msg_type) {
+	case PECI_ENDPTCFG_TYPE_LOCAL_PCI:
+	case PECI_ENDPTCFG_TYPE_PCI:
+		/*
+		 * Per the PECI spec, the read length must be a byte, word,
+		 * or dword
+		 */
+		if (umsg->rx_len != 1 && umsg->rx_len != 2 &&
+		    umsg->rx_len != 4) {
+			dev_dbg(&adapter->dev,
+				"Invalid read length, rx_len: %d\n",
+				umsg->rx_len);
+			return -EINVAL;
+		}
+
+		msg = peci_get_xfer_msg(PECI_RDENDPTCFG_PCI_WRITE_LEN,
+					PECI_RDENDPTCFG_READ_LEN_BASE +
+					umsg->rx_len);
+		if (!msg)
+			return -ENOMEM;
+
+		address = umsg->params.pci_cfg.reg; /* [11:0] - Register */
+		address |= (u32)umsg->params.pci_cfg.function
+			   << 12; /* [14:12] - Function */
+		address |= (u32)umsg->params.pci_cfg.device
+			   << 15; /* [19:15] - Device   */
+		address |= (u32)umsg->params.pci_cfg.bus
+			   << 20; /* [27:20] - Bus      */
+				  /* [31:28] - Reserved */
+		msg->addr = umsg->addr;
+		msg->tx_buf[0] = PECI_RDENDPTCFG_CMD;
+		msg->tx_buf[1] = 0x00; /* request byte for Host ID|Retry bit */
+		msg->tx_buf[2] = umsg->msg_type;	   /* Message Type */
+		msg->tx_buf[3] = 0x00;			   /* Endpoint ID */
+		msg->tx_buf[4] = 0x00;			   /* Reserved */
+		msg->tx_buf[5] = 0x00;			   /* Reserved */
+		msg->tx_buf[6] = PECI_ENDPTCFG_ADDR_TYPE_PCI; /* Addr Type */
+		msg->tx_buf[7] = umsg->params.pci_cfg.seg; /* PCI Segment */
+		msg->tx_buf[8] = (u8)address; /* LSB - PCI Config Address */
+		msg->tx_buf[9] = (u8)(address >> 8);   /* PCI Config Address */
+		msg->tx_buf[10] = (u8)(address >> 16); /* PCI Config Address */
+		msg->tx_buf[11] =
+			(u8)(address >> 24); /* MSB - PCI Config Address */
+		break;
+
+	case PECI_ENDPTCFG_TYPE_MMIO:
+		/*
+		 * Per the PECI spec, the read length must be a byte, word,
+		 * dword, or qword
+		 */
+		if (umsg->rx_len != 1 && umsg->rx_len != 2 &&
+		    umsg->rx_len != 4 && umsg->rx_len != 8) {
+			dev_dbg(&adapter->dev,
+				"Invalid read length, rx_len: %d\n",
+				umsg->rx_len);
+			return -EINVAL;
+		}
+		/*
+		 * Per the PECI spec, the address type must specify either DWORD
+		 * or QWORD
+		 */
+		if (umsg->params.mmio.addr_type !=
+		    PECI_ENDPTCFG_ADDR_TYPE_MMIO_D &&
+		    umsg->params.mmio.addr_type !=
+		    PECI_ENDPTCFG_ADDR_TYPE_MMIO_Q) {
+			dev_dbg(&adapter->dev,
+				"Invalid address type, addr_type: %d\n",
+				umsg->params.mmio.addr_type);
+			return -EINVAL;
+		}
+
+		if (umsg->params.mmio.addr_type ==
+			PECI_ENDPTCFG_ADDR_TYPE_MMIO_D)
+			tx_size = PECI_RDENDPTCFG_MMIO_D_WRITE_LEN;
+		else
+			tx_size = PECI_RDENDPTCFG_MMIO_Q_WRITE_LEN;
+		msg = peci_get_xfer_msg(tx_size,
+					PECI_RDENDPTCFG_READ_LEN_BASE +
+					umsg->rx_len);
+		if (!msg)
+			return -ENOMEM;
+
+		address = umsg->params.mmio.function; /* [2:0] - Function */
+		address |= (u32)umsg->params.mmio.device
+			   << 3; /* [7:3] - Device */
+
+		msg->addr = umsg->addr;
+		msg->tx_buf[0] = PECI_RDENDPTCFG_CMD;
+		msg->tx_buf[1] = 0x00; /* request byte for Host ID|Retry bit */
+		msg->tx_buf[2] = umsg->msg_type;	      /* Message Type */
+		msg->tx_buf[3] = 0x00;			      /* Endpoint ID */
+		msg->tx_buf[4] = 0x00;			      /* Reserved */
+		msg->tx_buf[5] = umsg->params.mmio.bar;       /* BAR # */
+		msg->tx_buf[6] = umsg->params.mmio.addr_type; /* Address Type */
+		msg->tx_buf[7] = umsg->params.mmio.seg;       /* PCI Segment */
+		msg->tx_buf[8] = (u8)address;	   /* Function/Device */
+		msg->tx_buf[9] = umsg->params.mmio.bus; /* PCI Bus */
+		msg->tx_buf[10] = (u8)umsg->params.mmio
+					 .offset; /* LSB - Register Offset */
+		msg->tx_buf[11] = (u8)(umsg->params.mmio.offset
+				       >> 8); /* Register Offset */
+		msg->tx_buf[12] = (u8)(umsg->params.mmio.offset
+				       >> 16); /* Register Offset */
+		msg->tx_buf[13] = (u8)(umsg->params.mmio.offset
+				       >> 24); /* MSB - DWORD Register Offset */
+		if (umsg->params.mmio.addr_type ==
+		    PECI_ENDPTCFG_ADDR_TYPE_MMIO_Q) {
+			msg->tx_buf[14] = (u8)(umsg->params.mmio.offset
+					       >> 32); /* Register Offset */
+			msg->tx_buf[15] = (u8)(umsg->params.mmio.offset
+					       >> 40); /* Register Offset */
+			msg->tx_buf[16] = (u8)(umsg->params.mmio.offset
+					       >> 48); /* Register Offset */
+			msg->tx_buf[17] =
+				(u8)(umsg->params.mmio.offset
+				     >> 56); /* MSB - QWORD Register Offset */
+		}
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	ret = peci_xfer_with_retries(adapter, msg, false);
+	if (!ret)
+		memcpy(umsg->data, &msg->rx_buf[1], umsg->rx_len);
+
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
+}
+
+static int peci_cmd_wr_end_pt_cfg(struct peci_adapter *adapter, void *vmsg)
+{
+	struct peci_wr_end_pt_cfg_msg *umsg = vmsg;
+	struct peci_xfer_msg *msg = NULL;
+	u8 tx_size, aw_fcs;
+	int ret, i, idx;
+	u32 address;
+
+	switch (umsg->msg_type) {
+	case PECI_ENDPTCFG_TYPE_LOCAL_PCI:
+	case PECI_ENDPTCFG_TYPE_PCI:
+		/*
+		 * Per the PECI spec, the write length must be a byte, word,
+		 * or dword
+		 */
+		if (umsg->tx_len != 1 && umsg->tx_len != 2 &&
+		    umsg->tx_len != 4) {
+			dev_dbg(&adapter->dev,
+				"Invalid write length, tx_len: %d\n",
+				umsg->tx_len);
+			return -EINVAL;
+		}
+
+		msg = peci_get_xfer_msg(PECI_WRENDPTCFG_PCI_WRITE_LEN_BASE +
+					umsg->tx_len, PECI_WRENDPTCFG_READ_LEN);
+		if (!msg)
+			return -ENOMEM;
+
+		address = umsg->params.pci_cfg.reg; /* [11:0] - Register */
+		address |= (u32)umsg->params.pci_cfg.function
+			   << 12; /* [14:12] - Function */
+		address |= (u32)umsg->params.pci_cfg.device
+			   << 15; /* [19:15] - Device   */
+		address |= (u32)umsg->params.pci_cfg.bus
+			   << 20; /* [27:20] - Bus      */
+				  /* [31:28] - Reserved */
+		msg->addr = umsg->addr;
+		msg->tx_buf[0] = PECI_WRENDPTCFG_CMD;
+		msg->tx_buf[1] = 0x00; /* request byte for Host ID|Retry bit */
+		msg->tx_buf[2] = umsg->msg_type;	   /* Message Type */
+		msg->tx_buf[3] = 0x00;			   /* Endpoint ID */
+		msg->tx_buf[4] = 0x00;			   /* Reserved */
+		msg->tx_buf[5] = 0x00;			   /* Reserved */
+		msg->tx_buf[6] = PECI_ENDPTCFG_ADDR_TYPE_PCI; /* Addr Type */
+		msg->tx_buf[7] = umsg->params.pci_cfg.seg; /* PCI Segment */
+		msg->tx_buf[8] = (u8)address; /* LSB - PCI Config Address */
+		msg->tx_buf[9] = (u8)(address >> 8);   /* PCI Config Address */
+		msg->tx_buf[10] = (u8)(address >> 16); /* PCI Config Address */
+		msg->tx_buf[11] =
+			(u8)(address >> 24); /* MSB - PCI Config Address */
+		for (i = 0; i < umsg->tx_len; i++)
+			msg->tx_buf[12 + i] = (u8)(umsg->value >> (i << 3));
+
+		/* Add an Assured Write Frame Check Sequence byte */
+		ret = peci_aw_fcs(msg, 15 + umsg->tx_len, &aw_fcs);
+		if (ret)
+			goto out;
+
+		msg->tx_buf[12 + i] = 0x80 ^ aw_fcs;
+		break;
+
+	case PECI_ENDPTCFG_TYPE_MMIO:
+		/*
+		 * Per the PECI spec, the write length must be a byte, word,
+		 * dword, or qword
+		 */
+		if (umsg->tx_len != 1 && umsg->tx_len != 2 &&
+		    umsg->tx_len != 4 && umsg->tx_len != 8) {
+			dev_dbg(&adapter->dev,
+				"Invalid write length, tx_len: %d\n",
+				umsg->tx_len);
+			return -EINVAL;
+		}
+		/*
+		 * Per the PECI spec, the address type must specify either DWORD
+		 * or QWORD
+		 */
+		if (umsg->params.mmio.addr_type !=
+		    PECI_ENDPTCFG_ADDR_TYPE_MMIO_D &&
+		    umsg->params.mmio.addr_type !=
+		    PECI_ENDPTCFG_ADDR_TYPE_MMIO_Q) {
+			dev_dbg(&adapter->dev,
+				"Invalid address type, addr_type: %d\n",
+				umsg->params.mmio.addr_type);
+			return -EINVAL;
+		}
+
+		if (umsg->params.mmio.addr_type ==
+			PECI_ENDPTCFG_ADDR_TYPE_MMIO_D)
+			tx_size = PECI_WRENDPTCFG_MMIO_D_WRITE_LEN_BASE +
+				  umsg->tx_len;
+		else
+			tx_size = PECI_WRENDPTCFG_MMIO_Q_WRITE_LEN_BASE +
+				  umsg->tx_len;
+		msg = peci_get_xfer_msg(tx_size, PECI_WRENDPTCFG_READ_LEN);
+		if (!msg)
+			return -ENOMEM;
+
+		address = umsg->params.mmio.function; /* [2:0] - Function */
+		address |= (u32)umsg->params.mmio.device
+			   << 3; /* [7:3] - Device */
+
+		msg->addr = umsg->addr;
+		msg->tx_buf[0] = PECI_WRENDPTCFG_CMD;
+		msg->tx_buf[1] = 0x00; /* request byte for Host ID|Retry bit */
+		msg->tx_buf[2] = umsg->msg_type;	      /* Message Type */
+		msg->tx_buf[3] = 0x00;			      /* Endpoint ID */
+		msg->tx_buf[4] = 0x00;			      /* Reserved */
+		msg->tx_buf[5] = umsg->params.mmio.bar;       /* BAR # */
+		msg->tx_buf[6] = umsg->params.mmio.addr_type; /* Address Type */
+		msg->tx_buf[7] = umsg->params.mmio.seg;       /* PCI Segment */
+		msg->tx_buf[8] = (u8)address;	   /* Function/Device */
+		msg->tx_buf[9] = umsg->params.mmio.bus; /* PCI Bus */
+		msg->tx_buf[10] = (u8)umsg->params.mmio
+					 .offset; /* LSB - Register Offset */
+		msg->tx_buf[11] = (u8)(umsg->params.mmio.offset
+				       >> 8); /* Register Offset */
+		msg->tx_buf[12] = (u8)(umsg->params.mmio.offset
+				       >> 16); /* Register Offset */
+		msg->tx_buf[13] = (u8)(umsg->params.mmio.offset
+				       >> 24); /* MSB - DWORD Register Offset */
+		if (umsg->params.mmio.addr_type ==
+		    PECI_ENDPTCFG_ADDR_TYPE_MMIO_Q) {
+			msg->tx_len = PECI_WRENDPTCFG_MMIO_Q_WRITE_LEN_BASE;
+			msg->tx_buf[14] = (u8)(umsg->params.mmio.offset
+					       >> 32); /* Register Offset */
+			msg->tx_buf[15] = (u8)(umsg->params.mmio.offset
+					       >> 40); /* Register Offset */
+			msg->tx_buf[16] = (u8)(umsg->params.mmio.offset
+					       >> 48); /* Register Offset */
+			msg->tx_buf[17] =
+				(u8)(umsg->params.mmio.offset
+				     >> 56); /* MSB - QWORD Register Offset */
+			idx = 18;
+		} else {
+			idx = 14;
+		}
+		for (i = 0; i < umsg->tx_len; i++)
+			msg->tx_buf[idx + i] = (u8)(umsg->value >> (i << 3));
+
+		/* Add an Assured Write Frame Check Sequence byte */
+		ret = peci_aw_fcs(msg, idx + 3 + umsg->tx_len, &aw_fcs);
+		if (ret)
+			goto out;
+
+		msg->tx_buf[idx + i] = 0x80 ^ aw_fcs;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	ret = peci_xfer_with_retries(adapter, msg, false);
+
+out:
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
+}
+
+static int peci_cmd_crashdump_disc(struct peci_adapter *adapter, void *vmsg)
+{
+	struct peci_crashdump_disc_msg *umsg = vmsg;
+	struct peci_xfer_msg *msg;
+	int ret;
+
+	/* Per the EDS, the read length must be a byte, word, or qword */
+	if (umsg->rx_len != 1 && umsg->rx_len != 2 && umsg->rx_len != 8) {
+		dev_dbg(&adapter->dev, "Invalid read length, rx_len: %d\n",
+			umsg->rx_len);
+		return -EINVAL;
+	}
+
+	msg = peci_get_xfer_msg(PECI_CRASHDUMP_DISC_WRITE_LEN,
+				PECI_CRASHDUMP_DISC_READ_LEN_BASE +
+				umsg->rx_len);
+	if (!msg)
+		return -ENOMEM;
+
+	msg->addr = umsg->addr;
+	msg->tx_buf[0] = PECI_CRASHDUMP_CMD;
+	msg->tx_buf[1] = 0x00;        /* request byte for Host ID | Retry bit */
+				      /* Host ID is 0 for PECI 3.0 */
+	msg->tx_buf[2] = PECI_CRASHDUMP_DISC_VERSION;
+	msg->tx_buf[3] = PECI_CRASHDUMP_DISC_OPCODE;
+	msg->tx_buf[4] = umsg->subopcode;
+	msg->tx_buf[5] = umsg->param0;
+	msg->tx_buf[6] = (u8)umsg->param1;
+	msg->tx_buf[7] = (u8)(umsg->param1 >> 8);
+	msg->tx_buf[8] = umsg->param2;
+
+	ret = peci_xfer_with_retries(adapter, msg, false);
+	if (!ret)
+		memcpy(umsg->data, &msg->rx_buf[1], umsg->rx_len);
+
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
+}
+
+static int peci_cmd_crashdump_get_frame(struct peci_adapter *adapter,
+					void *vmsg)
+{
+	struct peci_crashdump_get_frame_msg *umsg = vmsg;
+	struct peci_xfer_msg *msg;
+	int ret;
+
+	/* Per the EDS, the read length must be a qword or dqword */
+	if (umsg->rx_len != 8 && umsg->rx_len != 16) {
+		dev_dbg(&adapter->dev, "Invalid read length, rx_len: %d\n",
+			umsg->rx_len);
+		return -EINVAL;
+	}
+
+	msg = peci_get_xfer_msg(PECI_CRASHDUMP_GET_FRAME_WRITE_LEN,
+				PECI_CRASHDUMP_GET_FRAME_READ_LEN_BASE +
+				umsg->rx_len);
+	if (!msg)
+		return -ENOMEM;
+
+	msg->addr = umsg->addr;
+	msg->tx_buf[0] = PECI_CRASHDUMP_CMD;
+	msg->tx_buf[1] = 0x00;        /* request byte for Host ID | Retry bit */
+				      /* Host ID is 0 for PECI 3.0 */
+	msg->tx_buf[2] = PECI_CRASHDUMP_GET_FRAME_VERSION;
+	msg->tx_buf[3] = PECI_CRASHDUMP_GET_FRAME_OPCODE;
+	msg->tx_buf[4] = (u8)umsg->param0;
+	msg->tx_buf[5] = (u8)(umsg->param0 >> 8);
+	msg->tx_buf[6] = (u8)umsg->param1;
+	msg->tx_buf[7] = (u8)(umsg->param1 >> 8);
+	msg->tx_buf[8] = (u8)umsg->param2;
+	msg->tx_buf[9] = (u8)(umsg->param2 >> 8);
+
+	ret = peci_xfer_with_retries(adapter, msg, false);
+	if (!ret)
+		memcpy(umsg->data, &msg->rx_buf[1], umsg->rx_len);
+
+	umsg->cc = msg->rx_buf[0];
+	peci_put_xfer_msg(msg);
+
+	return ret;
+}
+
+typedef int (*peci_cmd_fn_type)(struct peci_adapter *, void *);
+
+static const peci_cmd_fn_type peci_cmd_fn[PECI_CMD_MAX] = {
+	peci_cmd_xfer,
+	peci_cmd_ping,
+	peci_cmd_get_dib,
+	peci_cmd_get_temp,
+	peci_cmd_rd_pkg_cfg,
+	peci_cmd_wr_pkg_cfg,
+	peci_cmd_rd_ia_msr,
+	peci_cmd_wr_ia_msr,
+	peci_cmd_rd_ia_msrex,
+	peci_cmd_rd_pci_cfg,
+	peci_cmd_wr_pci_cfg,
+	peci_cmd_rd_pci_cfg_local,
+	peci_cmd_wr_pci_cfg_local,
+	peci_cmd_rd_end_pt_cfg,
+	peci_cmd_wr_end_pt_cfg,
+	peci_cmd_crashdump_disc,
+	peci_cmd_crashdump_get_frame,
 };
 
 /**
@@ -545,108 +1197,27 @@ static const peci_ioctl_fn_type peci_ioctl_fn[PECI_CMD_MAX] = {
  */
 int peci_command(struct peci_adapter *adapter, enum peci_cmd cmd, void *vmsg)
 {
-	int rc = 0;
+	int ret;
 
 	if (cmd >= PECI_CMD_MAX || cmd < PECI_CMD_XFER)
-		return -EINVAL;
+		return -ENOTTY;
 
 	dev_dbg(&adapter->dev, "%s, cmd=0x%02x\n", __func__, cmd);
 
-	if (!peci_ioctl_fn[cmd])
+	if (!peci_cmd_fn[cmd])
 		return -EINVAL;
 
-	rt_mutex_lock(&adapter->bus_lock);
+	mutex_lock(&adapter->bus_lock);
 
-	rc = peci_cmd_support(adapter, cmd);
-	if (!rc)
-		rc = peci_ioctl_fn[cmd](adapter, vmsg);
+	ret = peci_check_cmd_support(adapter, cmd);
+	if (!ret)
+		ret = peci_cmd_fn[cmd](adapter, vmsg);
 
-	rt_mutex_unlock(&adapter->bus_lock);
+	mutex_unlock(&adapter->bus_lock);
 
-	return rc;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(peci_command);
-
-static long peci_ioctl(struct file *file, unsigned int iocmd, unsigned long arg)
-{
-	struct peci_adapter *adapter = file->private_data;
-	void __user *argp = (void __user *)arg;
-	unsigned int msg_len;
-	enum peci_cmd cmd;
-	int rc = 0;
-	u8 *msg;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-
-	dev_dbg(&adapter->dev, "ioctl, cmd=0x%x, arg=0x%lx\n", iocmd, arg);
-
-	switch (iocmd) {
-	case PECI_IOC_XFER:
-	case PECI_IOC_PING:
-	case PECI_IOC_GET_DIB:
-	case PECI_IOC_GET_TEMP:
-	case PECI_IOC_RD_PKG_CFG:
-	case PECI_IOC_WR_PKG_CFG:
-	case PECI_IOC_RD_IA_MSR:
-	case PECI_IOC_RD_PCI_CFG:
-	case PECI_IOC_RD_PCI_CFG_LOCAL:
-	case PECI_IOC_WR_PCI_CFG_LOCAL:
-		cmd = _IOC_NR(iocmd);
-		msg_len = _IOC_SIZE(iocmd);
-		break;
-
-	default:
-		dev_dbg(&adapter->dev, "Invalid ioctl cmd : 0x%x\n", iocmd);
-		return -ENOTTY;
-	}
-
-	if (!access_ok(argp, msg_len))
-		return -EFAULT;
-
-	msg = memdup_user(argp, msg_len);
-	if (IS_ERR(msg))
-		return PTR_ERR(msg);
-
-	rc = peci_command(adapter, cmd, msg);
-
-	if (!rc && copy_to_user(argp, msg, msg_len))
-		rc = -EFAULT;
-
-	kfree(msg);
-	return (long)rc;
-}
-
-static int peci_open(struct inode *inode, struct file *file)
-{
-	unsigned int minor = iminor(inode);
-	struct peci_adapter *adapter;
-
-	adapter = peci_get_adapter(minor);
-	if (!adapter)
-		return -ENODEV;
-
-	file->private_data = adapter;
-
-	return 0;
-}
-
-static int peci_release(struct inode *inode, struct file *file)
-{
-	struct peci_adapter *adapter = file->private_data;
-
-	peci_put_adapter(adapter);
-	file->private_data = NULL;
-
-	return 0;
-}
-
-static const struct file_operations peci_fops = {
-	.owner          = THIS_MODULE,
-	.unlocked_ioctl = peci_ioctl,
-	.open           = peci_open,
-	.release        = peci_release,
-};
 
 static int peci_detect(struct peci_adapter *adapter, u8 addr)
 {
@@ -666,9 +1237,9 @@ peci_of_match_device(const struct of_device_id *matches,
 		return NULL;
 
 	return of_match_device(matches, &client->dev);
-#else
+#else /* CONFIG_OF */
 	return NULL;
-#endif
+#endif /* CONFIG_OF */
 }
 
 static const struct peci_device_id *
@@ -737,6 +1308,7 @@ static int peci_device_probe(struct device *dev)
 
 err_detach_pm_domain:
 	dev_pm_domain_detach(&client->dev, true);
+
 	return status;
 }
 
@@ -775,13 +1347,14 @@ static void peci_device_shutdown(struct device *dev)
 		driver->shutdown(client);
 }
 
-static struct bus_type peci_bus_type = {
+struct bus_type peci_bus_type = {
 	.name		= "peci",
 	.match		= peci_device_match,
 	.probe		= peci_device_probe,
 	.remove		= peci_device_remove,
 	.shutdown	= peci_device_shutdown,
 };
+EXPORT_SYMBOL_GPL(peci_bus_type);
 
 static int peci_check_addr_validity(u8 addr)
 {
@@ -814,18 +1387,22 @@ static int peci_check_client_busy(struct device *dev, void *client_new_p)
 int peci_get_cpu_id(struct peci_adapter *adapter, u8 addr, u32 *cpu_id)
 {
 	struct peci_rd_pkg_cfg_msg msg;
-	int rc;
+	int ret;
 
 	msg.addr = addr;
-	msg.index = MBX_INDEX_CPU_ID;
-	msg.param = PKG_ID_CPU_ID;
+	msg.index = PECI_MBX_INDEX_CPU_ID;
+	msg.param = PECI_PKG_ID_CPU_ID;
 	msg.rx_len = 4;
 
-	rc = peci_command(adapter, PECI_CMD_RD_PKG_CFG, &msg);
-	if (!rc)
-		*cpu_id = le32_to_cpup((__le32 *)msg.pkg_config);
+	ret = peci_command(adapter, PECI_CMD_RD_PKG_CFG, &msg);
+	if (msg.cc != PECI_DEV_CC_SUCCESS)
+		ret = -EAGAIN;
+	if (ret)
+		return ret;
 
-	return rc;
+	*cpu_id = le32_to_cpup((__le32 *)msg.pkg_config);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(peci_get_cpu_id);
 
@@ -833,7 +1410,7 @@ static struct peci_client *peci_new_device(struct peci_adapter *adapter,
 					   struct peci_board_info const *info)
 {
 	struct peci_client *client;
-	int rc;
+	int ret;
 
 	/* Increase reference count for the adapter assigned */
 	if (!peci_get_adapter(adapter->nr))
@@ -847,46 +1424,49 @@ static struct peci_client *peci_new_device(struct peci_adapter *adapter,
 	client->addr = info->addr;
 	strlcpy(client->name, info->type, sizeof(client->name));
 
-	rc = peci_check_addr_validity(client->addr);
-	if (rc) {
+	ret = peci_check_addr_validity(client->addr);
+	if (ret) {
 		dev_err(&adapter->dev, "Invalid PECI CPU address 0x%02hx\n",
 			client->addr);
 		goto err_free_client_silent;
 	}
 
 	/* Check online status of client */
-	rc = peci_detect(adapter, client->addr);
-	if (rc)
+	ret = peci_detect(adapter, client->addr);
+	if (ret)
 		goto err_free_client;
 
-	rc = device_for_each_child(&adapter->dev, client,
-				   peci_check_client_busy);
-	if (rc)
+	ret = device_for_each_child(&adapter->dev, client,
+				    peci_check_client_busy);
+	if (ret)
 		goto err_free_client;
 
 	client->dev.parent = &client->adapter->dev;
 	client->dev.bus = &peci_bus_type;
 	client->dev.type = &peci_client_type;
-	client->dev.of_node = info->of_node;
+	client->dev.of_node = of_node_get(info->of_node);
 	dev_set_name(&client->dev, "%d-%02x", adapter->nr, client->addr);
 
-	rc = device_register(&client->dev);
-	if (rc)
-		goto err_free_client;
+	ret = device_register(&client->dev);
+	if (ret)
+		goto err_put_of_node;
 
 	dev_dbg(&adapter->dev, "client [%s] registered with bus id %s\n",
 		client->name, dev_name(&client->dev));
 
 	return client;
 
+err_put_of_node:
+	of_node_put(info->of_node);
 err_free_client:
 	dev_err(&adapter->dev,
 		"Failed to register peci client %s at 0x%02x (%d)\n",
-		client->name, client->addr, rc);
+		client->name, client->addr, ret);
 err_free_client_silent:
 	kfree(client);
 err_put_adapter:
 	peci_put_adapter(adapter);
+
 	return NULL;
 }
 
@@ -895,8 +1475,10 @@ static void peci_unregister_device(struct peci_client *client)
 	if (!client)
 		return;
 
-	if (client->dev.of_node)
+	if (client->dev.of_node) {
 		of_node_clear_flag(client->dev.of_node, OF_POPULATED);
+		of_node_put(client->dev.of_node);
+	}
 
 	device_unregister(&client->dev);
 }
@@ -916,7 +1498,7 @@ static void peci_adapter_dev_release(struct device *dev)
 
 	dev_dbg(dev, "%s: %s\n", __func__, adapter->name);
 	mutex_destroy(&adapter->userspace_clients_lock);
-	rt_mutex_destroy(&adapter->bus_lock);
+	mutex_destroy(&adapter->bus_lock);
 	kfree(adapter);
 }
 
@@ -928,7 +1510,8 @@ static ssize_t peci_sysfs_new_device(struct device *dev,
 	struct peci_board_info info = {};
 	struct peci_client *client;
 	char *blank, end;
-	int rc;
+	short addr;
+	int ret;
 
 	/* Parse device type */
 	blank = strchr(buf, ' ');
@@ -943,16 +1526,17 @@ static ssize_t peci_sysfs_new_device(struct device *dev,
 	memcpy(info.type, buf, blank - buf);
 
 	/* Parse remaining parameters, reject extra parameters */
-	rc = sscanf(++blank, "%hi%c", &info.addr, &end);
-	if (rc < 1) {
+	ret = sscanf(++blank, "%hi%c", &addr, &end);
+	if (ret < 1) {
 		dev_err(dev, "%s: Can't parse client address\n", "new_device");
 		return -EINVAL;
 	}
-	if (rc > 1  && end != '\n') {
+	if (ret > 1 && end != '\n') {
 		dev_err(dev, "%s: Extra parameters\n", "new_device");
 		return -EINVAL;
 	}
 
+	info.addr = (u8)addr;
 	client = peci_new_device(adapter, &info);
 	if (!client)
 		return -EINVAL;
@@ -961,8 +1545,8 @@ static ssize_t peci_sysfs_new_device(struct device *dev,
 	mutex_lock(&adapter->userspace_clients_lock);
 	list_add_tail(&client->detected, &adapter->userspace_clients);
 	mutex_unlock(&adapter->userspace_clients_lock);
-	dev_info(dev, "%s: Instantiated device %s at 0x%02hx\n", "new_device",
-		 info.type, info.addr);
+	dev_dbg(dev, "%s: Instantiated device %s at 0x%02hx\n", "new_device",
+		info.type, info.addr);
 
 	return count;
 }
@@ -975,9 +1559,9 @@ static ssize_t peci_sysfs_delete_device(struct device *dev,
 	struct peci_adapter *adapter = to_peci_adapter(dev);
 	struct peci_client *client, *next;
 	struct peci_board_info info = {};
-	struct peci_driver *driver;
 	char *blank, end;
-	int rc;
+	short addr;
+	int ret;
 
 	/* Parse device type */
 	blank = strchr(buf, ' ');
@@ -992,41 +1576,41 @@ static ssize_t peci_sysfs_delete_device(struct device *dev,
 	memcpy(info.type, buf, blank - buf);
 
 	/* Parse remaining parameters, reject extra parameters */
-	rc = sscanf(++blank, "%hi%c", &info.addr, &end);
-	if (rc < 1) {
+	ret = sscanf(++blank, "%hi%c", &addr, &end);
+	if (ret < 1) {
 		dev_err(dev, "%s: Can't parse client address\n",
 			"delete_device");
 		return -EINVAL;
 	}
-	if (rc > 1  && end != '\n') {
+	if (ret > 1 && end != '\n') {
 		dev_err(dev, "%s: Extra parameters\n", "delete_device");
 		return -EINVAL;
 	}
 
+	info.addr = (u8)addr;
+
 	/* Make sure the device was added through sysfs */
-	rc = -ENOENT;
+	ret = -ENOENT;
 	mutex_lock(&adapter->userspace_clients_lock);
 	list_for_each_entry_safe(client, next, &adapter->userspace_clients,
 				 detected) {
-		driver = to_peci_driver(client->dev.driver);
-
 		if (client->addr == info.addr &&
 		    !strncmp(client->name, info.type, PECI_NAME_SIZE)) {
-			dev_info(dev, "%s: Deleting device %s at 0x%02hx\n",
-				 "delete_device", client->name, client->addr);
+			dev_dbg(dev, "%s: Deleting device %s at 0x%02hx\n",
+				"delete_device", client->name, client->addr);
 			list_del(&client->detected);
 			peci_unregister_device(client);
-			rc = count;
+			ret = count;
 			break;
 		}
 	}
 	mutex_unlock(&adapter->userspace_clients_lock);
 
-	if (rc < 0)
-		dev_err(dev, "%s: Can't find device in list\n",
+	if (ret < 0)
+		dev_dbg(dev, "%s: Can't find device in list\n",
 			"delete_device");
 
-	return rc;
+	return ret;
 }
 static DEVICE_ATTR_IGNORE_LOCKDEP(delete_device, 0200, NULL,
 				  peci_sysfs_delete_device);
@@ -1039,10 +1623,11 @@ static struct attribute *peci_adapter_attrs[] = {
 };
 ATTRIBUTE_GROUPS(peci_adapter);
 
-static struct device_type peci_adapter_type = {
+struct device_type peci_adapter_type = {
 	.groups		= peci_adapter_groups,
 	.release	= peci_adapter_dev_release,
 };
+EXPORT_SYMBOL_GPL(peci_adapter_type);
 
 /**
  * peci_verify_adapter - return parameter as peci_adapter, or NULL
@@ -1063,32 +1648,26 @@ static struct peci_client *peci_of_register_device(struct peci_adapter *adapter,
 						   struct device_node *node)
 {
 	struct peci_board_info info = {};
-	struct peci_client *result;
-	const __be32 *addr_be;
-	int len;
+	struct peci_client *client;
+	u32 addr;
+	int ret;
 
 	dev_dbg(&adapter->dev, "register %pOF\n", node);
 
-	if (of_modalias_node(node, info.type, sizeof(info.type)) < 0) {
-		dev_err(&adapter->dev, "modalias failure on %pOF\n", node);
-		return ERR_PTR(-EINVAL);
-	}
-
-	addr_be = of_get_property(node, "reg", &len);
-	if (!addr_be || len < sizeof(*addr_be)) {
+	ret = of_property_read_u32(node, "reg", &addr);
+	if (ret) {
 		dev_err(&adapter->dev, "invalid reg on %pOF\n", node);
-		return ERR_PTR(-EINVAL);
+		return ERR_PTR(ret);
 	}
 
-	info.addr = be32_to_cpup(addr_be);
-	info.of_node = of_node_get(node);
+	info.addr = addr;
+	info.of_node = node;
 
-	result = peci_new_device(adapter, &info);
-	if (!result)
-		result = ERR_PTR(-EINVAL);
+	client = peci_new_device(adapter, &info);
+	if (!client)
+		client = ERR_PTR(-EINVAL);
 
-	of_node_put(node);
-	return result;
+	return client;
 }
 
 static void peci_of_register_devices(struct peci_adapter *adapter)
@@ -1119,12 +1698,12 @@ static void peci_of_register_devices(struct peci_adapter *adapter)
 
 	of_node_put(bus);
 }
-#else
+#else /* CONFIG_OF */
 static void peci_of_register_devices(struct peci_adapter *adapter) { }
 #endif /* CONFIG_OF */
 
 #if IS_ENABLED(CONFIG_OF_DYNAMIC)
-static int peci_of_match_node(struct device *dev, void *data)
+static int peci_of_match_node(struct device *dev, const void *data)
 {
 	return dev->of_node == data;
 }
@@ -1163,9 +1742,7 @@ static struct peci_adapter *peci_of_find_adapter(struct device_node *node)
 	return adapter;
 }
 
-static int peci_of_notify(struct notifier_block *nb,
-			  unsigned long action,
-			  void *arg)
+static int peci_of_notify(struct notifier_block *nb, ulong action, void *arg)
 {
 	struct of_reconfig_data *rd = arg;
 	struct peci_adapter *adapter;
@@ -1216,7 +1793,7 @@ static int peci_of_notify(struct notifier_block *nb,
 static struct notifier_block peci_of_notifier = {
 	.notifier_call = peci_of_notify,
 };
-#else
+#else /* CONFIG_OF_DYNAMIC */
 extern struct notifier_block peci_of_notifier;
 #endif /* CONFIG_OF_DYNAMIC */
 
@@ -1240,7 +1817,7 @@ extern struct notifier_block peci_of_notifier;
  *
  * Return: the peci_adapter structure on success, else NULL.
  */
-struct peci_adapter *peci_alloc_adapter(struct device *dev, unsigned int size)
+struct peci_adapter *peci_alloc_adapter(struct device *dev, uint size)
 {
 	struct peci_adapter *adapter;
 
@@ -1263,7 +1840,7 @@ EXPORT_SYMBOL_GPL(peci_alloc_adapter);
 
 static int peci_register_adapter(struct peci_adapter *adapter)
 {
-	int rc = -EINVAL;
+	int ret = -EINVAL;
 
 	/* Can't register until after driver model init */
 	if (WARN_ON(!is_registered))
@@ -1275,27 +1852,17 @@ static int peci_register_adapter(struct peci_adapter *adapter)
 	if (WARN(!adapter->xfer, "peci adapter has no xfer function\n"))
 		goto err_free_idr;
 
-	rt_mutex_init(&adapter->bus_lock);
+	mutex_init(&adapter->bus_lock);
 	mutex_init(&adapter->userspace_clients_lock);
 	INIT_LIST_HEAD(&adapter->userspace_clients);
 
 	dev_set_name(&adapter->dev, "peci-%d", adapter->nr);
 
-	/* cdev */
-	cdev_init(&adapter->cdev, &peci_fops);
-	adapter->cdev.owner = THIS_MODULE;
-	adapter->dev.devt = MKDEV(MAJOR(peci_devt), adapter->nr);
-	rc = cdev_add(&adapter->cdev, adapter->dev.devt, 1);
-	if (rc) {
-		pr_err("adapter '%s': can't add cdev (%d)\n",
-		       adapter->name, rc);
-		goto err_free_idr;
-	}
-	rc = device_add(&adapter->dev);
-	if (rc) {
+	ret = device_add(&adapter->dev);
+	if (ret) {
 		pr_err("adapter '%s': can't add device (%d)\n",
-		       adapter->name, rc);
-		goto err_del_cdev;
+		       adapter->name, ret);
+		goto err_free_idr;
 	}
 
 	dev_dbg(&adapter->dev, "adapter [%s] registered\n", adapter->name);
@@ -1309,13 +1876,11 @@ static int peci_register_adapter(struct peci_adapter *adapter)
 
 	return 0;
 
-err_del_cdev:
-	cdev_del(&adapter->cdev);
 err_free_idr:
 	mutex_lock(&core_lock);
 	idr_remove(&peci_adapter_idr, adapter->nr);
 	mutex_unlock(&core_lock);
-	return rc;
+	return ret;
 }
 
 static int peci_add_numbered_adapter(struct peci_adapter *adapter)
@@ -1354,12 +1919,10 @@ int peci_add_adapter(struct peci_adapter *adapter)
 	struct device *dev = &adapter->dev;
 	int id;
 
-	if (dev->of_node) {
-		id = of_alias_get_id(dev->of_node, "peci");
-		if (id >= 0) {
-			adapter->nr = id;
-			return peci_add_numbered_adapter(adapter);
-		}
+	id = of_alias_get_id(dev->of_node, "peci");
+	if (id >= 0) {
+		adapter->nr = id;
+		return peci_add_numbered_adapter(adapter);
 	}
 
 	mutex_lock(&core_lock);
@@ -1411,7 +1974,7 @@ void peci_del_adapter(struct peci_adapter *adapter)
 	}
 	mutex_unlock(&adapter->userspace_clients_lock);
 
-	/**
+	/*
 	 * Detach any active clients. This can't fail, thus we do not
 	 * check the returned value.
 	 */
@@ -1420,13 +1983,8 @@ void peci_del_adapter(struct peci_adapter *adapter)
 	/* device name is gone after device_unregister */
 	dev_dbg(&adapter->dev, "adapter [%s] unregistered\n", adapter->name);
 
-	/* free cdev */
-	cdev_del(&adapter->cdev);
-
 	pm_runtime_disable(&adapter->dev);
-
 	nr = adapter->nr;
-
 	device_unregister(&adapter->dev);
 
 	/* free bus id */
@@ -1435,6 +1993,18 @@ void peci_del_adapter(struct peci_adapter *adapter)
 	mutex_unlock(&core_lock);
 }
 EXPORT_SYMBOL_GPL(peci_del_adapter);
+
+int peci_for_each_dev(void *data, int (*fn)(struct device *, void *))
+{
+	int ret;
+
+	mutex_lock(&core_lock);
+	ret = bus_for_each_dev(&peci_bus_type, NULL, data, fn);
+	mutex_unlock(&core_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(peci_for_each_dev);
 
 /**
  * peci_register_driver - register a PECI driver
@@ -1446,7 +2016,7 @@ EXPORT_SYMBOL_GPL(peci_del_adapter);
  */
 int peci_register_driver(struct module *owner, struct peci_driver *driver)
 {
-	int rc;
+	int ret;
 
 	/* Can't register until after driver model init */
 	if (WARN_ON(!is_registered))
@@ -1456,13 +2026,13 @@ int peci_register_driver(struct module *owner, struct peci_driver *driver)
 	driver->driver.owner = owner;
 	driver->driver.bus = &peci_bus_type;
 
-	/**
+	/*
 	 * When registration returns, the driver core
 	 * will have called probe() for all matching-but-unbound devices.
 	 */
-	rc = driver_register(&driver->driver);
-	if (rc)
-		return rc;
+	ret = driver_register(&driver->driver);
+	if (ret)
+		return ret;
 
 	pr_debug("driver [%s] registered\n", driver->driver.name);
 
@@ -1492,13 +2062,6 @@ static int __init peci_init(void)
 		return ret;
 	}
 
-	ret = alloc_chrdev_region(&peci_devt, 0, PECI_CDEV_MAX, "peci");
-	if (ret < 0) {
-		pr_err("peci: Failed to allocate chr dev region!\n");
-		bus_unregister(&peci_bus_type);
-		return ret;
-	}
-
 	crc8_populate_msb(peci_crc8_table, PECI_CRC8_POLYNOMIAL);
 
 	if (IS_ENABLED(CONFIG_OF_DYNAMIC))
@@ -1514,11 +2077,10 @@ static void __exit peci_exit(void)
 	if (IS_ENABLED(CONFIG_OF_DYNAMIC))
 		WARN_ON(of_reconfig_notifier_unregister(&peci_of_notifier));
 
-	unregister_chrdev_region(peci_devt, PECI_CDEV_MAX);
 	bus_unregister(&peci_bus_type);
 }
 
-postcore_initcall(peci_init);
+subsys_initcall(peci_init);
 module_exit(peci_exit);
 
 MODULE_AUTHOR("Jason M Biils <jason.m.bills@linux.intel.com>");

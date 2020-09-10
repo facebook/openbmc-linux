@@ -4,7 +4,6 @@
 
 config PECI
 	bool "PECI support"
-	select RT_MUTEXES
 	select CRC8
 	help
 	  The Platform Environment Control Interface (PECI) is a one-wire bus
@@ -15,6 +14,14 @@ config PECI
 	  specific driver for your bus adapter(s) below.
 
 if PECI
+
+config PECI_CHARDEV
+	bool "PECI device interface"
+	default y
+	help
+	  Say Y here to use peci-* device files, usually found in the /dev
+	  directory on your system. They make it possible to have user-space
+	  programs use the PECI bus.
 
 #
 # PECI hardware bus configuration

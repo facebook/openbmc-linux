@@ -1,19 +1,18 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright (c) 2018 Intel Corporation */
+/* Copyright (c) 2018-2019 Intel Corporation */
 
 #ifndef __LINUX_PECI_H
 #define __LINUX_PECI_H
 
-#include <linux/cdev.h>
 #include <linux/device.h>
+#include <linux/mutex.h>
 #include <linux/peci-ioctl.h>
-#include <linux/rtmutex.h>
 
 #define PECI_NAME_SIZE   32
 
 struct peci_board_info {
 	char			type[PECI_NAME_SIZE];
-	unsigned short		addr;	/* CPU client address */
+	u8			addr;	/* CPU client address */
 	struct device_node	*of_node;
 };
 
@@ -22,29 +21,29 @@ struct peci_board_info {
  * @owner: owner module of the PECI adpater
  * @bus_lock: mutex for exclusion of multiple callers
  * @dev: device interface to this driver
- * @cdev: character device object to create character device
  * @nr: the bus number to map
  * @name: name of the adapter
  * @userspace_clients_lock: mutex for exclusion of clients handling
  * @userspace_clients: list of registered clients
  * @xfer: low-level transfer function pointer of the adapter
  * @cmd_mask: mask for supportable PECI commands
+ * @use_dma: flag for indicating that adapter uses DMA
  *
  * Each PECI adapter can communicate with one or more PECI client children.
  * These make a small bus, sharing a single wired PECI connection.
  */
 struct peci_adapter {
 	struct module		*owner;
-	struct rt_mutex		bus_lock;
+	struct mutex		bus_lock; /* mutex for bus locking */
 	struct device		dev;
-	struct cdev		cdev;
 	int			nr;
 	char			name[PECI_NAME_SIZE];
 	struct mutex		userspace_clients_lock; /* clients list mutex */
 	struct list_head	userspace_clients;
 	int			(*xfer)(struct peci_adapter *adapter,
 					struct peci_xfer_msg *msg);
-	uint			cmd_mask;
+	u32			cmd_mask;
+	bool			use_dma;
 };
 
 static inline struct peci_adapter *to_peci_adapter(void *d)
@@ -87,8 +86,8 @@ static inline struct peci_client *to_peci_client(void *d)
 }
 
 struct peci_device_id {
-	char		name[PECI_NAME_SIZE];
-	unsigned long	driver_data;	/* Data private to the driver */
+	char	name[PECI_NAME_SIZE];
+	ulong	driver_data;	/* Data private to the driver */
 };
 
 /**
@@ -129,13 +128,22 @@ static inline struct peci_driver *to_peci_driver(void *d)
 /* use a define to avoid include chaining to get THIS_MODULE */
 #define peci_add_driver(driver) peci_register_driver(THIS_MODULE, driver)
 
+extern struct bus_type peci_bus_type;
+extern struct device_type peci_adapter_type;
+extern struct device_type peci_client_type;
+
 int  peci_register_driver(struct module *owner, struct peci_driver *drv);
 void peci_del_driver(struct peci_driver *driver);
 struct peci_client *peci_verify_client(struct device *dev);
-struct peci_adapter *peci_alloc_adapter(struct device *dev, unsigned int size);
+struct peci_adapter *peci_alloc_adapter(struct device *dev, uint size);
+struct peci_adapter *peci_get_adapter(int nr);
+void peci_put_adapter(struct peci_adapter *adapter);
 int  peci_add_adapter(struct peci_adapter *adapter);
 void peci_del_adapter(struct peci_adapter *adapter);
 struct peci_adapter *peci_verify_adapter(struct device *dev);
+int  peci_for_each_dev(void *data, int (*fn)(struct device *, void *));
+struct peci_xfer_msg *peci_get_xfer_msg(u8 tx_len, u8 rx_len);
+void peci_put_xfer_msg(struct peci_xfer_msg *msg);
 int  peci_command(struct peci_adapter *adpater, enum peci_cmd cmd, void *vmsg);
 int  peci_get_cpu_id(struct peci_adapter *adapter, u8 addr, u32 *cpu_id);
 
