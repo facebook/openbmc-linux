@@ -1407,7 +1407,7 @@
 			};
 
 			data0@1c00000 {
-				reg = <0x1c00000 0x400000>;
+				reg = <0x1c00000 0x400000>; // 4MB
 				label = "data0";
 			};
 
@@ -1427,12 +1427,12 @@
 			};
 
 			stg-pch@6a00000 {
-				reg = <0x6a00000 0x1000000>; // 16MB
+				reg = <0x6200000 0x1000000>; // 16MB
 				label = "stg-pch";
 			};
 
 			stg-cpld@7a00000 {
-				reg = <0x7a00000 0x100000>; // 1MB
+				reg = <0x7200000 0xd00000>; // 13MB
 				label = "stg-cpld";
 			};
 
