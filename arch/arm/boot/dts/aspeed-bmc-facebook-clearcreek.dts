@@ -75,7 +75,6 @@
 
 &spi1 {
 	status = "okay";
-	compatible = "aspeed,ast2500-spi-master";
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_spi1_default>;
@@ -90,7 +89,6 @@
 
 &spi2 {
 	status = "okay";
-	compatible = "aspeed,ast2500-spi-master";
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_spi2ck_default &pinctrl_spi2cs0_default &pinctrl_spi2miso_default &pinctrl_spi2mosi_default>;
@@ -320,10 +318,8 @@
 &sdhci0 {
 	// eMMC
 	status = "okay";
-	bus-width = <8>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sd1_default>;
-	sdhci-caps-mask = <0x0 0x580000>;
+	pinctrl-0 = <&pinctrl_sd2_default>;
 	broken-cd;
 };
 
