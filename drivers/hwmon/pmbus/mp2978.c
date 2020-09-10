@@ -97,6 +97,17 @@ static struct pmbus_driver_info mp2978_info = {
 static int mp2978_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
+	int rv = 0;
+	const u8 databuf[2] = {0x0, 0x0};
+	/*
+	 * fix sometime after MCU warm reboot mp2978/2975 will failed to identify chip
+	 * capabilities.
+	 * root cause: after MCU reboot, the MP2978/2975 may still stag in page1
+	 */
+	rv = i2c_master_send(client, databuf, sizeof(databuf));
+	if (rv < 0)
+		return rv;
+
 	return pmbus_do_probe(client, id, &mp2978_info);
 }
 
