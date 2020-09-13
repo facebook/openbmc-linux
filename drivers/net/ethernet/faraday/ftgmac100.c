@@ -59,10 +59,6 @@
 #define MAX_PKT_SIZE		1518
 #define RX_BUF_SIZE		PAGE_SIZE	/* must be smaller than 0x3fff */
 
-#define MAX_NCSI_DATA_PAYLOAD 1480  /* for getting the size of the nc-si control data packet */
- /* max ethernet frame size = 1518 */
- /* ethernet headr (14) + nc-si header (16) + nc-si payload (1480) + nc-si checksum (4) + 4 (FCS) = 1518*/
-
 #define noNCSI_DEBUG   /* for debug printf messages */
 
 /*
@@ -166,7 +162,7 @@ typedef struct ncsi_nl_msg_t {
 } NCSI_NL_MSG_T;
 
 
-#define MAX_RESPONSE_PAYLOAD 1024 /* maximum payload size*/
+#define MAX_RESPONSE_PAYLOAD MAX_NCSI_DATA_PAYLOAD /* maximum payload size*/
 typedef struct ncsi_nl_response {
   uint8_t cmd;
   uint16_t payload_length;

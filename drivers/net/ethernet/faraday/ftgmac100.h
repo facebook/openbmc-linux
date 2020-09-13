@@ -294,6 +294,10 @@ typedef struct {
 #define GET_NCSI_STATISTICS     0x19
 #define GET_NCSI_PASS_THROUGH_STATISTICS  0x1A
 
+#define MAX_NCSI_DATA_PAYLOAD 1480  /* for getting the size of the nc-si control data packet */
+ /* max ethernet frame size = 1518 */
+ /* ethernet headr (14) + nc-si header (16) + nc-si payload (1480) + nc-si checksum (4) + 4 (FCS) = 1518*/
+
 /* NC-SI Response Packet */
 typedef struct {
 	unsigned char  DA[6];
@@ -319,7 +323,7 @@ typedef struct {
 /* end of NC-SI header */
 	unsigned short  Response_Code;
 	unsigned short  Reason_Code;
-	unsigned char   Payload_Data[256];
+	unsigned char   Payload_Data[MAX_NCSI_DATA_PAYLOAD-4]; /* Exclude resp/reason code */
 } __attribute__((packed)) NCSI_Response_Packet;
 
 
