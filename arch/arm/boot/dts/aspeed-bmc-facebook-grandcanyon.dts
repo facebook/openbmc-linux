@@ -41,14 +41,13 @@
 	};
 };
 
-&mac1 {
+&mac3 {
 	status = "okay";
 
-	phy-mode = "rgmii";
-	phy-handle = <&ethphy1>;
-
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rgmii2_default>;
+	pinctrl-0 = <&pinctrl_rmii4_default>;
+	no-hw-checksum;
+	use-ncsi;
 };
 
 &rtc {
