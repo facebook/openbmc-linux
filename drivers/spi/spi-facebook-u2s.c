@@ -689,6 +689,7 @@ static int fbus_spi_xfer_is_ready(struct fbus_spi_master *uspi)
 	int ret;
 	int retry = 3;
 	u16 data_len;
+	u32 status;
 	struct fbus_tlv *tlv;
 	struct fbus_spi_csr *csr;
 
@@ -702,11 +703,15 @@ static int fbus_spi_xfer_is_ready(struct fbus_spi_master *uspi)
 			dev_err(&uspi->master->dev,
 				"reg_csr short read: expect %d, actual %d\n",
 				sizeof(*csr), data_len);
+			kfree(tlv);
 			return -EBADMSG;
 		}
 
 		csr = (struct fbus_spi_csr *)tlv->data_buf;
-		if (csr->status & USPI_STAT_XFER_DONE)
+		status = csr->status;
+		kfree(tlv);
+
+		if (status & USPI_STAT_XFER_DONE)
 			return 0;  /* transfer completed. */
 
 		retry--;
@@ -758,10 +763,12 @@ static int fbus_spi_xfer_single_rx(struct fbus_spi_master *uspi,
 		dev_err(&uspi->master->dev,
 			"miso buffer short read, expect %d, actual %d\n",
 			op_offset + nrequest, TLV_PAYLOAD_SIZE(tlv));
+		kfree(tlv);
 		return -EBADMSG;
 	}
 
 	memcpy(&rx_buf[rx_offset], &tlv->data_buf[op_offset], nrequest);
+	kfree(tlv);
 	return nrequest;
 }
 
