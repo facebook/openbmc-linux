@@ -328,11 +328,11 @@ static int fbus_bulk_in_tlv_dispatch(struct fbus_tlv *tlv)
 	u32 data_buf_end = (FBUS_NUM_SPI_BUSES * USPI_DATA_BUF_SIZE) +
 			USPI_DATA_BUF_BASE;
 
-	if (addr < csr_end) {
+	if ((addr >= USPI_CSR_REG_BASE) && (addr < csr_end)) {
 		/*
 		 * SPI CSR register space.
 		 */
-		id = addr / USPI_CSR_REG_SIZE;
+		id = (addr - USPI_CSR_REG_BASE) / USPI_CSR_REG_SIZE;
 		uspi = fbus_bridge.spi_buses[id];
 
 		USPI_CSR_CACHE_SET(uspi, tlv);
@@ -341,7 +341,7 @@ static int fbus_bulk_in_tlv_dispatch(struct fbus_tlv *tlv)
 		 * SPI Data buffer space. We never read MOSI buffer thus
 		 * we assume it's always MISO buffer.
 		 */
-		id = addr / USPI_DATA_BUF_SIZE;
+		id = (addr - USPI_DATA_BUF_BASE) / USPI_DATA_BUF_SIZE;
 		uspi = fbus_bridge.spi_buses[id];
 		USPI_MISO_CACHE_SET(uspi, tlv);
 	} else {
