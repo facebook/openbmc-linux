@@ -612,20 +612,26 @@ static bool fbus_spi_is_read_op(u8 flash_op)
 	return ret;
 }
 
-static int fbus_spi_read_op_cache(struct fbus_spi_master *uspi,
-				  struct spi_transfer *xfer)
+static int fbus_spi_cache_flash_op(struct fbus_spi_master *uspi,
+				   struct spi_transfer *xfer)
 {
+	u16 len;
+	u8 flash_op = ((u8*)xfer->tx_buf)[0];
+
 	if (xfer->len <= sizeof(uspi->read_op_cache)) {
-		uspi->read_op_size = xfer->len;
+		len = xfer->len;
 	} else {
-		uspi->read_op_size = sizeof(uspi->read_op_cache);
+		len = sizeof(uspi->read_op_cache);
 		dev_warn(&uspi->master->dev,
 			"flash op (0x%x) truncated in cache: %u -> %u\n",
-			((u8*)xfer->tx_buf)[0], xfer->len,
-			sizeof(uspi->read_op_cache));
+			flash_op, xfer->len, sizeof(uspi->read_op_cache));
+		/* fall through */
 	}
 
-	memcpy(&uspi->read_op_cache, xfer->tx_buf, uspi->read_op_size);
+	memcpy(&uspi->read_op_cache, xfer->tx_buf, len);
+	if (fbus_spi_is_read_op(flash_op))
+		uspi->read_op_size = len;
+
 	return 0;
 }
 
@@ -671,8 +677,8 @@ static int fbus_spi_xfer_rx_prepare_op(struct fbus_spi_master *uspi,
 	 */
 	if (uspi->read_op_size == 0) {
 		dev_err(&uspi->master->dev,
-			"no read_op command cached (len=%d). exiting\n",
-			xfer->len);
+			"no read_op command cached (len=%d): last op 0x%02x\n",
+			xfer->len, uspi->read_op_cache.op);
 		return -EINVAL;
 	}
 
@@ -782,13 +788,14 @@ static int fbus_spi_xfer_rx(struct fbus_spi_master *uspi,
 			    struct spi_transfer *xfer)
 {
 	int ret;
+	u16 op_offset;
 	unsigned int ndata = 0;
-	u16 op_offset = uspi->read_op_size;
 
 	ret = fbus_spi_xfer_rx_prepare_op(uspi, xfer);
 	if (ret < 0)
 		return ret;
 
+	op_offset = uspi->read_op_size;
 	uspi->read_op_size = 0;
 
 	while (ndata < xfer->len) {
@@ -822,13 +829,12 @@ static int fbus_spi_xfer_one(struct spi_master *master,
 		 * We cache the read command and combine it with following "rx"
 		 * request.
 		 */
-		if (fbus_spi_is_read_op(flash_op))
-			ret = fbus_spi_read_op_cache(uspi, xfer);
-		else
+		fbus_spi_cache_flash_op(uspi, xfer);
+		if (!fbus_spi_is_read_op(flash_op)) {
 			ret = fbus_spi_xfer_tx(uspi, xfer);
-
-		if (ret < 0)
-			return ret;
+			if (ret < 0)
+				return ret;
+		}
 	}
 
 	if (xfer->rx_buf != NULL)
