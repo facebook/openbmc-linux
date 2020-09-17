@@ -375,7 +375,8 @@ static struct fbus_tlv* fbus_usb_bulk_in_drain(unsigned long addr)
 				"failed to read bulk-in pipe, error=%d\n",
 				ret);
 			kfree(tlv);
-			return NULL;
+			tlv = NULL;
+			break;
 		}
 
 		if (tlv->address == addr)
@@ -492,6 +493,7 @@ static int fbus_spi_csr_read(struct fbus_spi_master *uspi,
 			     struct fbus_tlv **out_tlv)
 {
 	int ret;
+	int retry = 3;
 	struct fbus_tlv *tlv = NULL;
 
 	ret = fbus_spi_issue_read_request(uspi, uspi->reg_csr_base, req_size);
@@ -516,12 +518,13 @@ static int fbus_spi_csr_read(struct fbus_spi_master *uspi,
 	 * It's possible the bulk-in packet was fetched by another thread:
 	 * let's release CPU and try to read from cache again.
 	 */
-	if (tlv == NULL) {
+	while ((tlv == NULL) && (retry-- > 0)) {
 		yield();
+
 		USPI_CSR_CACHE_GET(uspi, tlv);
-		if (tlv == NULL)
-			return -ENODATA;
 	}
+	if (tlv == NULL)
+		return -ENODATA;
 
 	*out_tlv = tlv;
 	return 0;
@@ -751,7 +754,7 @@ static int fbus_spi_xfer_single_rx(struct fbus_spi_master *uspi,
 	ret = fbus_spi_xfer_is_ready(uspi);
 	if (ret < 0) {
 		dev_err(&uspi->master->dev,
-			"failed to check hardware state, error=%d\n", ret);
+			"failed to check transfer status, error=%d\n", ret);
 		return ret;
 	}
 
