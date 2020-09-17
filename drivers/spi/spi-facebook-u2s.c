@@ -576,7 +576,10 @@ static int fbus_spi_miso_read(struct fbus_spi_master *uspi,
 #define JEDEC_REMS		0x90
 
 /* Read Electronic Signature */
-#define JEDEC_RES               0xab
+#define JEDEC_RES		0xab
+
+/* Some ST M95X model */
+#define ST_M95_RDID		0x83
 
 static bool fbus_spi_is_read_op(u8 flash_op)
 {
@@ -595,8 +598,8 @@ static bool fbus_spi_is_read_op(u8 flash_op)
 		ret = true;
 		break;
 
-	/* Read ID command for some AT24 chips. */
 	case AT25F_RDID:
+	case ST_M95_RDID:
 	case JEDEC_REMS:
 	case JEDEC_RES:
 		ret = true;
