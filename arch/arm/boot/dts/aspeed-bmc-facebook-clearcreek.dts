@@ -329,6 +329,10 @@
 	status = "okay";
 };
 
+&sdmmc {
+	status = "okay";
+}; 
+
 &sdhci0 {
 	// eMMC
 	status = "okay";
