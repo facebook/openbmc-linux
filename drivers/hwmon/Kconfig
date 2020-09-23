@@ -381,6 +381,10 @@ config SENSORS_ASPEED
 	  This driver can also be built as a module. If so, the module
 	  will be called aspeed_pwm_tacho.
 
+config SENSORS_ASPEED_PWM_TECHOMETER 
+	tristate "ASPEED AST2600 PWM and Fan Tachometer"
+	depends on THERMAL || THERMAL=n
+
 config SENSORS_ATXP1
 	tristate "Attansic ATXP1 VID controller"
 	depends on I2C
