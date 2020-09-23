@@ -228,10 +228,24 @@
 		compatible = "atmel,24c64";
 		reg = <0x54>;
 	};
+	tmp421@4c {
+		compatible = "ti,tmp421";
+		reg = <0x4c>;
+	};
+	tmp421@4f {
+		compatible = "ti,tmp421";
+		reg = <0x4f>;
+	};
 };
 
 &i2c5 {
 	status = "okay";
+	//ADC128 for monitoring fan voltage/current
+	adc128d818@1d {
+		compatible = "ti,adc128d818";
+		reg = <0x1d>;
+		ti,mode = /bits/ 8 <1>;
+	};
 	// PDB FRUID
 	eeprom@54 {
 		compatible = "atmel,24c64";
