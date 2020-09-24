@@ -333,7 +333,7 @@
 	status = "okay";
 }; 
 
-&sdhci0 {
+&sdhci1 {
 	// eMMC
 	status = "okay";
 	pinctrl-names = "default";
