@@ -13,12 +13,17 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 
 #include "sdhci-pltfm.h"
 
 #define ASPEED_SDC_INFO		0x00
 #define   ASPEED_SDC_S1MMC8	BIT(25)
 #define   ASPEED_SDC_S0MMC8	BIT(24)
+
+#define AST2500_SCU_PIN_CTRL5	0x90
+#define ASPEED_SCU_SD1_8BIT	BIT(3)
 
 struct aspeed_sdc {
 	struct clk *clk;
@@ -161,6 +166,7 @@ static int aspeed_sdhci_probe(struct platform_device *pdev)
 	struct aspeed_sdhci *dev;
 	struct sdhci_host *host;
 	struct resource *res;
+	struct regmap *scu;
 	int slot;
 	int ret;
 
@@ -202,6 +208,15 @@ static int aspeed_sdhci_probe(struct platform_device *pdev)
 	ret = sdhci_add_host(host);
 	if (ret)
 		goto err_sdhci_add;
+
+	/* Enable SD1 8-bit mode */
+	if (!slot && host->mmc->caps & MMC_CAP_8_BIT_DATA) {
+		scu = syscon_regmap_lookup_by_compatible("aspeed,ast2500-scu");
+		if (!IS_ERR(scu)) {
+			regmap_update_bits(scu, AST2500_SCU_PIN_CTRL5, ASPEED_SCU_SD1_8BIT,
+					   ASPEED_SCU_SD1_8BIT);
+		}
+	}
 
 	return 0;
 
