@@ -493,7 +493,6 @@ static int fbus_spi_csr_read(struct fbus_spi_master *uspi,
 			     struct fbus_tlv **out_tlv)
 {
 	int ret;
-	int retry = 3;
 	struct fbus_tlv *tlv = NULL;
 
 	ret = fbus_spi_issue_read_request(uspi, uspi->reg_csr_base, req_size);
@@ -518,13 +517,12 @@ static int fbus_spi_csr_read(struct fbus_spi_master *uspi,
 	 * It's possible the bulk-in packet was fetched by another thread:
 	 * let's release CPU and try to read from cache again.
 	 */
-	while ((tlv == NULL) && (retry-- > 0)) {
+	if (tlv == NULL) {
 		yield();
-
 		USPI_CSR_CACHE_GET(uspi, tlv);
+		if (tlv == NULL)
+			return -ENODATA;
 	}
-	if (tlv == NULL)
-		return -ENODATA;
 
 	*out_tlv = tlv;
 	return 0;
