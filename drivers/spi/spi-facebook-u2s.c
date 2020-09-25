@@ -622,10 +622,6 @@ static int fbus_spi_cache_flash_op(struct fbus_spi_master *uspi,
 		len = xfer->len;
 	} else {
 		len = sizeof(uspi->read_op_cache);
-		dev_warn(&uspi->master->dev,
-			"flash op (0x%x) truncated in cache: %u -> %u\n",
-			flash_op, xfer->len, sizeof(uspi->read_op_cache));
-		/* fall through */
 	}
 
 	memcpy(&uspi->read_op_cache, xfer->tx_buf, len);
