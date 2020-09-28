@@ -113,3 +113,122 @@
                 aspeed,min_rpm = <0>;
         };
 };
+
+&i2c0 {
+	status = "okay";
+	bus-frequency = <400000>;
+};
+
+&i2c1 {	
+	status = "okay";
+	bus-frequency = <400000>;
+};
+
+// To BIC
+&i2c2 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// To FPGA of Barton Springs
+&i2c3 {
+	status = "okay";
+	bus-frequency = <400000>;
+};
+
+&i2c4 {
+	status = "okay";
+	bus-frequency = <400000>;
+	// UIC FRU
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+	};
+};
+
+// To FPGA of UIC (PFR)
+&i2c5 {
+	bus-frequency = <400000>;
+	status = "okay";
+};
+
+&i2c6 {
+	status = "okay";
+	bus-frequency = <400000>;
+
+	// BSM FRU
+	eeprom@54 {
+		compatible = "atmel,24c64";
+		reg = <0x54>;
+	};
+
+	// UIC temperature
+	tmp75@4A {
+		compatible = "ti,tmp75";
+		reg = <0x4A>;
+	};
+};
+
+// To debug card
+&i2c7 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <400000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// To NIC
+&i2c8 {
+	status = "okay";
+	bus-frequency = <400000>;
+};
+
+&i2c9 {
+	status = "okay";
+	bus-frequency = <400000>;
+
+	// Voltage sensor for E1.S
+	adc128@1d {
+		compatible = "ti,adc128d818";
+		reg = <0x1d>;
+		ti,mode = /bits/ 8 <1>;
+	};
+};
+
+// To expander
+&i2c10 {
+	multi-master;
+	bus-frequency = <400000>;
+	aspeed,hw-timeout-ms = <1000>;
+	status = "okay";
+};
+
+// To IOC
+&i2c11 {
+	status = "okay";
+	bus-frequency = <400000>;
+};
+
+// To E1.S SSD_1
+&i2c12 {
+	status = "okay";
+	bus-frequency = <400000>;
+};
+
+// To E1.S SSD_2
+&i2c13 {
+	status = "okay";
+	bus-frequency = <400000>;
+};
+
+&i2c14 {
+	status = "okay";
+	bus-frequency = <400000>;
+};
+
+&i2c15 {
+	status = "okay";
+	bus-frequency = <400000>;
+};
