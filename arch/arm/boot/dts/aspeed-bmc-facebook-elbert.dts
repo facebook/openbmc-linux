@@ -246,30 +246,33 @@
 			#size-cells = <1>;
 
 			u-boot@0 {
-				reg = <0x0 0xe0000>; // 896KB
+				reg = <0x0 0xE0000>; // 896KB
 				label = "u-boot";
 			};
-
-			u-boot-env@e0000 {
-				reg = <0xe0000 0x20000>; // 128KB
+			/*
+			* To keep backward compatible keep env
+			* as second partition. exposed as mtd1
+			*/
+			env@E0000 {
+				reg = <0xE0000 0x10000>; // 64K
 				label = "env";
 			};
-
+			meta@F0000 {
+				reg = <0xF0000 0x10000>; // 64K
+				lable = "meta";
+			};
 			fit@100000 {
 				reg = <0x100000 0x1B00000>; // 27MB
 				label = "fit";
 			};
-
 			data0@1c00000 {
-				reg = <0x1c00000 0x400000>;
+				reg = <0x1c00000 0x400000>; // 4MB
 				label = "data0";
 			};
-
 			flash0@0 {
-				reg = <0x0 0x2000000>;
+				reg = <0x0 0x2000000>; // 32MB
 				label = "flash0";
 			};
-
 		};
 	};
 	flash@1 {
@@ -284,7 +287,7 @@
 			#size-cells = <1>;
 
 			flash0@0 {
-				reg = <0x0 0x2000000>;
+				reg = <0x0 0x2000000>; // 32MB
 				label = "flash1";
 			};
 
