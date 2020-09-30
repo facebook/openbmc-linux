@@ -569,9 +569,8 @@ static ssize_t aspeed_xdma_write(struct file *file, const char __user *buf,
 	if (len != sizeof(op))
 		return -EINVAL;
 
-	rc = copy_from_user(&op, buf, len);
-	if (rc)
-		return rc;
+	if (copy_from_user(&op, buf, len))
+		return -EFAULT;
 
 	if (!op.len || op.len > client->size ||
 	    op.direction > ASPEED_XDMA_DIRECTION_UPSTREAM)
