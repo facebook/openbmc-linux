@@ -898,6 +898,7 @@ static int fbus_spi_master_init(u32 id)
 static void fbus_spi_remove_all(void)
 {
 	u32 i;
+	struct fbus_tlv *tlv;
 	struct fbus_spi_master *uspi;
 
 	for (i = 0; i < ARRAY_SIZE(fbus_bridge.spi_buses); i++) {
@@ -906,6 +907,13 @@ static void fbus_spi_remove_all(void)
 		if (uspi != NULL) {
 			spi_unregister_device(uspi->slave);
 			spi_unregister_master(uspi->master);
+
+			USPI_CSR_CACHE_GET(uspi, tlv);
+			if (tlv != NULL)
+				kfree(tlv);
+			USPI_MISO_CACHE_GET(uspi, tlv);
+			if (tlv != NULL)
+				kfree(tlv);
 		}
 	}
 }
