@@ -45,6 +45,7 @@
  */
 #define USPI_SAMPLE_DELAY_OFFSET	12
 #define USPI_CLK_25MHZ			1
+#define USPI_CLK_50MHZ			0
 
 /*
  * Bit fields in SPI Descriptor Register.
@@ -873,8 +874,8 @@ static int fbus_spi_master_init(u32 id)
 	/*
 	 * Initialize Control/Status registers.
 	 */
-	uspi->reg_csr.timing = (USPI_CLK_25MHZ |
-				(1 << USPI_SAMPLE_DELAY_OFFSET));
+	uspi->reg_csr.timing = (USPI_CLK_50MHZ |
+				(2 << USPI_SAMPLE_DELAY_OFFSET));
 
 	ret = spi_register_master(master);
 	if (ret) {
