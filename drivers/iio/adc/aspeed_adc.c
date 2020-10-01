@@ -17,6 +17,8 @@
 #include <linux/reset.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 
 #include <linux/iio/iio.h>
 #include <linux/iio/driver.h>
@@ -29,6 +31,7 @@
 #define ASPEED_REG_INTERRUPT_CONTROL	0x04
 #define ASPEED_REG_VGA_DETECT_CONTROL	0x08
 #define ASPEED_REG_CLOCK_CONTROL	0x0C
+#define ASPEED_REG_COMPENSATION_TRIM	0xC4
 #define ASPEED_REG_MAX			0xC0
 
 //ast2600
@@ -47,8 +50,18 @@
 
 #define ASPEED_ADC_CTRL_INIT_RDY	BIT(8)
 
+#define ASPEED_CTRL_COMPENSATION	BIT(4)
+#define ASPEED_ADC_CTRL_CH_EN(n)	(1 << (16 + n))
+#define ASPEED_ADC_CTRL_CH_EN_ALL	GENMASK(31, 16)
+
 #define ASPEED_ADC_INIT_POLLING_TIME	500
 #define ASPEED_ADC_INIT_TIMEOUT		500000
+
+struct aspeed_adc_trim_locate {
+	unsigned int scu_offset;
+	unsigned int bit_offset;
+	unsigned int bit_mask;
+};
 
 struct aspeed_adc_model_data {
 	const char *model_name;
@@ -64,6 +77,7 @@ struct aspeed_adc_data {
 	struct device		*dev;
 	void __iomem		*base;
 	spinlock_t		clk_lock;
+	struct regmap		*scu;
 	struct clk_hw		*clk_prescaler;
 	struct clk_hw		*clk_scaler;
 	struct reset_control	*rst;
@@ -120,7 +134,7 @@ static int aspeed_adc_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
-		*val = readw(data->base + chan->address);
+		*val = readw(data->base + chan->address) + data->cv;
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_SCALE:
@@ -195,6 +209,7 @@ static int aspeed_adc_probe(struct platform_device *pdev)
 {
 	struct iio_dev *indio_dev;
 	struct aspeed_adc_data *data;
+	struct aspeed_adc_trim_locate trim_locate;
 	const struct aspeed_adc_model_data *model_data;
 	const char *clk_parent_name;
 	char prescaler_clk_name[32];
@@ -202,6 +217,9 @@ static int aspeed_adc_probe(struct platform_device *pdev)
 	int ret;
 	u32 eng_ctrl = 0;
 	u32 adc_engine_control_reg_val;
+	u32 scu_otp;
+	u32 trim;
+	u32 compensating_trim;
 
 	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*data));
 	if (!indio_dev)
@@ -259,10 +277,10 @@ static int aspeed_adc_probe(struct platform_device *pdev)
 		else if (model_data->vref_voltage == 1200)
 			eng_ctrl = REF_VLOTAGE_1200mV;
 		else if ((model_data->vref_voltage >= 1550) &&
-		(model_data->vref_voltage <= 2700))
+			(model_data->vref_voltage <= 2700))
 			eng_ctrl = REF_VLOTAGE_1550mV;
 		else if ((model_data->vref_voltage >= 900) &&
-		(model_data->vref_voltage <= 1650))
+			(model_data->vref_voltage <= 1650))
 			eng_ctrl = REF_VLOTAGE_900mV;
 		else {
 			printk("error ref voltage %d \n", model_data->vref_voltage);
@@ -287,29 +305,81 @@ static int aspeed_adc_probe(struct platform_device *pdev)
 			goto poll_timeout_error;
 	}
 
-	// do compensating calculation use ch 0
-	writel(eng_ctrl | ASPEED_OPERATION_MODE_NORMAL |
-			ASPEED_ENGINE_ENABLE | ASPEED_AUTOPENSATING,
-			data->base + ASPEED_REG_ENGINE_CONTROL);
+	/*
+	 * The auto compensating sensing mode is not ready for AST2600.
+	 * Need to set the trimming data for Compensating sensing mode.
+	 */
+	if (!strcmp(model_data->model_name, "ast2600-adc")) {
+		data->scu = syscon_regmap_lookup_by_compatible("aspeed,ast2600-scu");
+		if (IS_ERR(data->scu)) {
+			dev_err(&pdev->dev, "failed to find SCU regmap\n");
+			ret = PTR_ERR(data->scu);
+			goto syscon_regmap_error;
+		}
 
-	writel(eng_ctrl | ASPEED_OPERATION_MODE_NORMAL | BIT(16) |
-			ASPEED_ENGINE_ENABLE | ASPEED_AUTOPENSATING,
-			data->base + ASPEED_REG_ENGINE_CONTROL);
-	mdelay(1);
+		eng_ctrl = readl(data->base + ASPEED_REG_ENGINE_CONTROL);
+		eng_ctrl |= (ASPEED_OPERATION_MODE_NORMAL | ASPEED_ENGINE_ENABLE);
+		/* Trimming data setting */
+		ret = of_property_read_u32_array(data->dev->of_node, "trim_locate",
+						(u32 *)&trim_locate,
+						sizeof(trim_locate) / 4);
+		if (ret < 0) {
+			printk(KERN_WARNING "Get trim_locate fail, ret %d\n", ret);
+			trim = 0x0;
+		} else {
+			if (regmap_read(data->scu, trim_locate.scu_offset, &scu_otp)) {
+				printk(KERN_WARNING "read scu trim value fail \n");
+				trim = 0x0;
+			} else {
+				trim = (scu_otp >> trim_locate.bit_offset) &
+					trim_locate.bit_mask;
+			}
+		}
+		if (trim == 0x0) {
+			trim = 0x8;
+		}
+		dev_info(data->dev, "trim %d \n", trim);
+		compensating_trim = readl(data->base + ASPEED_REG_COMPENSATION_TRIM);
+		compensating_trim = (compensating_trim & (~(GENMASK(3, 0)))) | trim;
+		writel(compensating_trim, data->base + ASPEED_REG_COMPENSATION_TRIM);
 
-	data->cv = 0x200 - (readl(data->base + 0x10) & GENMASK(9, 0));
+		/* Compensating Sensing Mode */
+		writel(eng_ctrl | ASPEED_CTRL_COMPENSATION,
+				data->base + ASPEED_REG_ENGINE_CONTROL);
+		writel(eng_ctrl | ASPEED_CTRL_COMPENSATION | ASPEED_ADC_CTRL_CH_EN(0),
+				data->base + ASPEED_REG_ENGINE_CONTROL);
+		mdelay(1);
 
-	writel(eng_ctrl | ASPEED_OPERATION_MODE_NORMAL |
-			ASPEED_ENGINE_ENABLE | ASPEED_AUTOPENSATING,
+		data->cv = 0x200 - (readl(data->base + 0x10) & GENMASK(9, 0));
+
+		/* Disable Compensating Sensing mode */
+		writel(eng_ctrl & (~ASPEED_CTRL_COMPENSATION),
 			data->base + ASPEED_REG_ENGINE_CONTROL);
-	printk(KERN_INFO "aspeed_adc: cv %d \n", data->cv);
+	} else {
+		// do compensating calculation use ch 0
+		writel(eng_ctrl | ASPEED_OPERATION_MODE_NORMAL |
+				ASPEED_ENGINE_ENABLE | ASPEED_AUTOPENSATING,
+				data->base + ASPEED_REG_ENGINE_CONTROL);
+
+		writel(eng_ctrl | ASPEED_OPERATION_MODE_NORMAL | BIT(16) |
+				ASPEED_ENGINE_ENABLE | ASPEED_AUTOPENSATING,
+				data->base + ASPEED_REG_ENGINE_CONTROL);
+		mdelay(1);
+
+		data->cv = 0x200 - (readl(data->base + 0x10) & GENMASK(9, 0));
+
+		writel(eng_ctrl | ASPEED_OPERATION_MODE_NORMAL |
+				ASPEED_ENGINE_ENABLE | ASPEED_AUTOPENSATING,
+				data->base + ASPEED_REG_ENGINE_CONTROL);
+	}
+	dev_info(data->dev, "cv %d \n", data->cv);
 
 	/* Start all channels in normal mode. */
 	ret = clk_prepare_enable(data->clk_scaler->clk);
 	if (ret)
 		goto clk_enable_error;
 
-	adc_engine_control_reg_val = eng_ctrl | GENMASK(31, 16) |
+	adc_engine_control_reg_val = eng_ctrl | ASPEED_ADC_CTRL_CH_EN_ALL |
 		ASPEED_OPERATION_MODE_NORMAL | ASPEED_ENGINE_ENABLE;
 	writel(adc_engine_control_reg_val,
 		data->base + ASPEED_REG_ENGINE_CONTROL);
@@ -333,6 +403,7 @@ iio_register_error:
 		data->base + ASPEED_REG_ENGINE_CONTROL);
 	clk_disable_unprepare(data->clk_scaler->clk);
 clk_enable_error:
+syscon_regmap_error:
 poll_timeout_error:
 	reset_control_assert(data->rst);
 reset_error:
