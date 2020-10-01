@@ -381,6 +381,7 @@
 				resets = <&syscon ASPEED_RESET_ADC>;
 				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
 				#io-channel-cells = <1>;
+				trim_locate = <0x5D0 0 0xf>;
 				status = "disabled";
 			};
 
@@ -391,6 +392,7 @@
 				resets = <&syscon ASPEED_RESET_ADC>;
 				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
 				#io-channel-cells = <1>;
+				trim_locate = <0x5D0 4 0xf>;
 				status = "disabled";
 			};
 
