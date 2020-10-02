@@ -156,3 +156,13 @@
 &vhub {
 	status = "okay";
 };
+
+&kcs2 {
+	status = "okay";
+	kcs_addr = <0xca8>;
+};
+
+&kcs3 {
+	status = "okay";
+	kcs_addr = <0xca2>;
+};
