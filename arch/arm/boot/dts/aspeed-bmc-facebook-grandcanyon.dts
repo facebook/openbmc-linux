@@ -148,19 +148,6 @@
 	};
 };
 
-&sdc {
-	status = "okay";
-};
-
-&sdhci0 {
-	// eMMC
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sd1_default>;
-	sdhci-caps-mask = <0x0 0x580000>;
-	broken-cd;
-};
-
 &pwm_tacho {
         status = "okay";
         pinctrl-names = "default";
