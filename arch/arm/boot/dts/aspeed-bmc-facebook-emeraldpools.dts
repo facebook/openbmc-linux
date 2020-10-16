@@ -503,14 +503,6 @@
 	};
 };
 
-&sdhci_slot1 {
-	// eMMC
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sd2_default>;
-	broken-cd;
-};
-
 &vhub {
 	status = "okay";
 };
