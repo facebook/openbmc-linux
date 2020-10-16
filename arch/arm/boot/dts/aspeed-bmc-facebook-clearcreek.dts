@@ -330,18 +330,6 @@
 	status = "okay";
 };
 
-&sdmmc {
-	status = "okay";
-}; 
-
-&sdhci1 {
-	// eMMC
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sd2_default>;
-	broken-cd;
-};
-
 &gpio {
 	aspeed,skip-init-cmdsrc;
 };
