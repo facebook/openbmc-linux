@@ -335,16 +335,6 @@
 	};
 };
 
-&sdhci_slot0 {
-	// eMMC
-	status = "okay";
-	bus-width = <8>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sd1_default>;
-	sdhci-caps-mask = <0x0 0x580000>;
-	broken-cd;
-};
-
 &sram {
   compatible = "mmio-sram", "syscon";
 };
