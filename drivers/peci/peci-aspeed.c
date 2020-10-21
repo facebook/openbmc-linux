@@ -114,7 +114,38 @@ struct aspeed_peci {
 	struct completion	xfer_complete;
 	u32			status;
 	u32			cmd_timeout_ms;
+	u32			msg_timing;
+	u32			addr_timing;
+	u32			rd_sampling_point;
+	u32			clk_div;
 };
+
+static void aspeed_peci_enable(struct aspeed_peci *priv)
+{
+	regmap_write(priv->regmap, ASPEED_PECI_CTRL,
+		     FIELD_PREP(PECI_CTRL_CLK_DIV_MASK, PECI_CLK_DIV_DEFAULT) |
+		     PECI_CTRL_PECI_CLK_EN);
+
+	/**
+	 * Timing negotiation period setting.
+	 * The unit of the programmed value is 4 times of PECI clock period.
+	 */
+	regmap_write(priv->regmap, ASPEED_PECI_TIMING,
+		     FIELD_PREP(PECI_TIMING_MESSAGE_MASK, priv->msg_timing) |
+		     FIELD_PREP(PECI_TIMING_ADDRESS_MASK, priv->addr_timing));
+
+	/* Clear interrupts */
+	regmap_write(priv->regmap, ASPEED_PECI_INT_STS, PECI_INT_MASK);
+
+	/* Enable interrupts */
+	regmap_write(priv->regmap, ASPEED_PECI_INT_CTRL, PECI_INT_MASK);
+
+	/* Read sampling point and clock speed setting */
+	regmap_write(priv->regmap, ASPEED_PECI_CTRL,
+		     FIELD_PREP(PECI_CTRL_SAMPLING_MASK, priv->rd_sampling_point) |
+		     FIELD_PREP(PECI_CTRL_CLK_DIV_MASK, priv->clk_div) |
+		     PECI_CTRL_PECI_EN | PECI_CTRL_PECI_CLK_EN);
+}
 
 static int aspeed_peci_xfer_native(struct aspeed_peci *priv,
 				   struct peci_xfer_msg *msg)
@@ -175,7 +206,12 @@ static int aspeed_peci_xfer_native(struct aspeed_peci *priv,
 		} else if (err == 0) {
 			dev_dbg(priv->dev, "Timeout waiting for a response!\n");
 			rc = -ETIMEDOUT;
-			goto err_irqrestore;
+			spin_unlock_irqrestore(&priv->lock, flags);
+			reset_control_assert(priv->rst);
+			msleep(10);
+			reset_control_deassert(priv->rst);
+			aspeed_peci_enable(priv);
+			return rc;
 		}
 
 		dev_dbg(priv->dev, "No valid response!\n");
@@ -336,29 +372,11 @@ static int aspeed_peci_init_ctrl(struct aspeed_peci *priv)
 		priv->cmd_timeout_ms = PECI_CMD_TIMEOUT_MS_DEFAULT;
 	}
 
-	regmap_write(priv->regmap, ASPEED_PECI_CTRL,
-		     FIELD_PREP(PECI_CTRL_CLK_DIV_MASK, PECI_CLK_DIV_DEFAULT) |
-		     PECI_CTRL_PECI_CLK_EN);
-
-	/**
-	 * Timing negotiation period setting.
-	 * The unit of the programmed value is 4 times of PECI clock period.
-	 */
-	regmap_write(priv->regmap, ASPEED_PECI_TIMING,
-		     FIELD_PREP(PECI_TIMING_MESSAGE_MASK, msg_timing) |
-		     FIELD_PREP(PECI_TIMING_ADDRESS_MASK, addr_timing));
-
-	/* Clear interrupts */
-	regmap_write(priv->regmap, ASPEED_PECI_INT_STS, PECI_INT_MASK);
-
-	/* Enable interrupts */
-	regmap_write(priv->regmap, ASPEED_PECI_INT_CTRL, PECI_INT_MASK);
-
-	/* Read sampling point and clock speed setting */
-	regmap_write(priv->regmap, ASPEED_PECI_CTRL,
-		     FIELD_PREP(PECI_CTRL_SAMPLING_MASK, rd_sampling_point) |
-		     FIELD_PREP(PECI_CTRL_CLK_DIV_MASK, clk_div_val) |
-		     PECI_CTRL_PECI_EN | PECI_CTRL_PECI_CLK_EN);
+	priv->msg_timing = msg_timing;
+	priv->addr_timing = addr_timing;
+	priv->rd_sampling_point = rd_sampling_point;
+	priv->clk_div = clk_div_val;
+	aspeed_peci_enable(priv);
 
 	return 0;
 }
