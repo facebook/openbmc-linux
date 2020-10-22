@@ -1383,7 +1383,16 @@
 	flash@0 {
 		status = "okay";
 		m25p,fast-read;
-		label = "bmc";
+		label = "spi0.0";
+		spi-max-frequency = <50000000>;
+
+#include "facebook-bmc-flash-layout-128.dtsi"
+	};
+
+	flash@1 {
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
 		spi-max-frequency = <50000000>;
 
 		partitions {
@@ -1391,61 +1400,10 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			u-boot@0 {
-				reg = <0x0 0xe0000>; // 896KB
-				label = "u-boot";
-			};
-
-			u-boot-env@e0000 {
-				reg = <0xe0000 0x20000>; // 128KB
-				label = "env";
-			};
-
-			fit@100000 {
-				reg = <0x100000 0x1B00000>; // 27MB
-				label = "fit";
-			};
-
-			data0@1c00000 {
-				reg = <0x1c00000 0x400000>; // 4MB
-				label = "data0";
-			};
-
-			pfm@2000000 {
-				reg = <0x2000000 0x200000>; // 2MB
-				label = "pfm";
-			};
-
-			rc@2200000 {
-				reg = <0x2200000 0x2000000>; // 32MB
-				label = "rc";
-			};
-
-			stg-bmc@4200000 {
-				reg = <0x4200000 0x2000000>; // 32MB
-				label = "stg-bmc";
-			};
-
-			stg-pch@6a00000 {
-				reg = <0x6200000 0x1000000>; // 16MB
-				label = "stg-pch";
-			};
-
-			stg-cpld@7a00000 {
-				reg = <0x7200000 0xd00000>; // 13MB
-				label = "stg-cpld";
-			};
-
-			stg-cpldrc@7f00000 {
-				reg = <0x7f00000 0x100000>; // 1MB
-				label = "stg-cpldrc";
-			};
-
-			flash0@0 {
+			flash1@0 {
 				reg = <0x0 0x8000000>;
-				label = "flash0";
+				label = "flash1";
 			};
-
 		};
 	};
 };
