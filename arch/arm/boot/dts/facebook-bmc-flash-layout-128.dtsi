@@ -7,26 +7,34 @@ partitions {
 	#size-cells = <1>;
 
 	/*
-	 * u-boot partition: 384KB.
+	 * u-boot partition: 892KB.
 	 */
 	u-boot@0 {
-		reg = <0x0 0x60000>;
+		reg = <0x0 0xdf000>;
 		label = "u-boot";
 	};
 
 	/*
-	 * u-boot environment variables: 128KB.
+	 * u-boot environment variables: 64KB.
 	 */
-	u-boot-env@60000 {
-		reg = <0x60000 0x20000>;
+	u-boot-env@e0000 {
+		reg = <0xe0000 0x10000>;
 		label = "env";
 	};
 
 	/*
-	 * FIT image: 123.5 MB.
+	 * u-boot environment variables: 64KB.
 	 */
-	fit@80000 {
-		reg = <0x80000 0x7b80000>;
+	image-meta@f0000 {
+		reg = <0xf0000 0x10000>;
+		label = "meta";
+	};
+
+	/*
+	 * FIT image: 123 MB.
+	 */
+	fit@100000 {
+		reg = <0x100000 0x7b00000>;
 		label = "fit";
 	};
 
@@ -34,7 +42,7 @@ partitions {
 	 * "data0" partition (4MB) is used by Facebook BMC platforms as
 	 * persistent data store.
 	 */
-	data0@3800000 {
+	data0@7c00000 {
 		reg = <0x7c00000 0x800000>;
 		label = "data0";
 	};
