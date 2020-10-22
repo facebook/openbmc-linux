@@ -222,7 +222,16 @@
 	flash@0 {
 		status = "okay";
 		m25p,fast-read;
-		label = "bmc";
+		label = "spi0.0";
+		spi-max-frequency = <50000000>;
+
+#include "facebook-bmc-flash-layout-128.dtsi"
+	};
+
+	flash@1 {
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
 		spi-max-frequency = <50000000>;
 
 		partitions {
@@ -230,31 +239,10 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			u-boot@0 {
-				reg = <0x0 0xe0000>; // 896KB
-				label = "u-boot";
+			flash1@0 {
+				reg = <0x0 0x8000000>;
+				label = "flash1";
 			};
-
-			u-boot-env@e0000 {
-				reg = <0xe0000 0x20000>; // 128KB
-				label = "env";
-			};
-
-			fit@100000 {
-				reg = <0x100000 0x1B00000>; // 27MB
-				label = "fit";
-			};
-
-			data0@1c00000 {
-				reg = <0x1c00000 0x400000>;
-				label = "data0";
-			};
-
-			flash0@0 {
-				reg = <0x0 0x2000000>;
-				label = "flash0";
-			};
-
 		};
 	};
 };
