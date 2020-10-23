@@ -551,11 +551,6 @@
 
 &i2c7 {
 	status = "okay";
-
-	tpm_i2c_ptp@2e {
-		compatible = "tcg,tpm-tis-i2c";
-		reg = <0x2e>;
-	};
 };
 
 &i2c8 {
