@@ -194,6 +194,11 @@
 		compatible = "atmel,24c64";
 		reg = <0x50>;
 	};
+	// UIC temperature
+	tmp75@4A {
+		compatible = "ti,tmp75";
+		reg = <0x4A>;
+	};
 };
 
 // To FPGA of UIC (PFR)
@@ -210,12 +215,6 @@
 	eeprom@54 {
 		compatible = "atmel,24c64";
 		reg = <0x54>;
-	};
-
-	// UIC temperature
-	tmp75@4A {
-		compatible = "ti,tmp75";
-		reg = <0x4A>;
 	};
 };
 
