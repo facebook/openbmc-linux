@@ -134,66 +134,8 @@ struct fbus_spi_master {
 		u8 op;
 		u8 addr[3];
 	} read_op_cache;
-	u16 read_op_size;
-
-	/*
-	 * All the 8 SPI masters share the same bulk-in pipe, and it is
-	 * possible that the current thread may receive a packet which
-	 * was requested by a different thread. For example:
-	 *    1) spi1-thread issues READ_REQUEST for MISO buffer
-	 *    2) spi5-thread issues READ_REQUEST for CSR registers
-	 *    3) spi1-thread reads from bulk-in pipe
-	 *    4) spi5-thread reads from bulk-in pipe
-	 * In above example, spi1-thread may receive the packet requested
-	 * by spi5-thread. If it happens, we just "send" the packet to
-	 * spi5.
-	 * "lock" is required to prevent race when bulk-in packets are
-	 * cached/fetched.
-	 */
-	spinlock_t lock;
-	struct fbus_tlv *csr_read_cache;
-	struct fbus_tlv *miso_read_cache;
+	unsigned int read_op_size;
 };
-
-/*
- * Helper macros to set/get CSR read cached.
- */
-#define USPI_CSR_CACHE_SET(_uspi, _tlv) do {				    \
-	spin_lock(&(_uspi)->lock);					    \
-	if ((_uspi)->csr_read_cache != NULL) {				    \
-		dev_warn(&(_uspi)->master->dev, "overriding csr cache\n");  \
-		kfree((_uspi)->csr_read_cache);				    \
-	}								    \
-	(_uspi)->csr_read_cache = (_tlv);				    \
-	spin_unlock(&(_uspi)->lock);					    \
-} while (0)
-
-#define USPI_CSR_CACHE_GET(_uspi, _tlv) do {				    \
-	spin_lock(&(_uspi)->lock);					    \
-	(_tlv) = (_uspi)->csr_read_cache;				    \
-	(_uspi)->csr_read_cache = NULL;					    \
-	spin_unlock(&(_uspi)->lock);					    \
-} while (0)
-
-/*
- * Helper macros to set/get MISO read cached.
- */
-#define USPI_MISO_CACHE_SET(_uspi, _tlv) do {				    \
-	spin_lock(&(_uspi)->lock);					    \
-	if ((_uspi)->miso_read_cache != NULL) {				    \
-		dev_warn(&(_uspi)->master->dev, "overriding miso cache\n"); \
-		kfree((_uspi)->miso_read_cache);			    \
-	}								    \
-	(_uspi)->miso_read_cache = (_tlv);				    \
-	spin_unlock(&(_uspi)->lock);					    \
-} while (0)
-
-#define USPI_MISO_CACHE_GET(_uspi, _tlv) do {				    \
-	spin_lock(&(_uspi)->lock);					    \
-	(_tlv) = (_uspi)->miso_read_cache;				    \
-	(_uspi)->miso_read_cache = NULL;				    \
-	spin_unlock(&(_uspi)->lock);					    \
-} while (0)
 
 /*
  * List of endpoints (besides Control Endpoint #0) supported by the
@@ -211,6 +153,12 @@ enum {
 static struct {
 	struct usb_device *usb_dev;
 	struct usb_interface *usb_intf;
+
+	/*
+	 * "xfer_lock" is required to serilize usb device memory read and
+	 * write requests.
+	 */
+	struct mutex xfer_lock;
 
 	u8 ep_list[USPI_EP_MAX];
 #define BULK_IN_PIPE	usb_rcvbulkpipe(fbus_bridge.usb_dev, \
@@ -239,7 +187,7 @@ static int fbus_tlv_init(struct fbus_tlv *tlv,
 		         u16 type,
 			 u32 address,
 			 const void *data_buf,
-			 u16 data_len)
+			 unsigned int data_len)
 {
 	if (data_len > sizeof(tlv->data_buf))
 		return -E2BIG;
@@ -267,136 +215,99 @@ static int fbus_tlv_init(struct fbus_tlv *tlv,
 	return 0;
 }
 
-/*
- * Send a TLV-format packet to USB bulk-out pipe.
- * Return value:
- *   - 0 for success, or negative error code on failures.
- *     Actual transaction length is returned in <actual_len> argument.
- */
-static int fbus_usb_bulk_out_tlv(struct fbus_tlv *tlv)
+static int udev_mem_write(u32 addr, const void *buf, unsigned int size)
 {
-	int ret;
-	int actual_len;
+	struct fbus_tlv *tlv;
+	int ret, req_len, actual_len;
 
-	ret = usb_bulk_msg(fbus_bridge.usb_dev, BULK_OUT_PIPE,
-			   tlv, TLV_PKT_SIZE(tlv), &actual_len,
-			   USB_BULK_TIMEOUT_MS);
+	tlv = kmalloc(sizeof(*tlv), GFP_KERNEL);
+	if (tlv == NULL)
+		return -ENOMEM;
+
+	ret = fbus_tlv_init(tlv, TLV_TYPE_WRITE, addr, buf, size);
 	if (ret < 0)
-		return ret;
+		goto exit;
 
-	if (actual_len < TLV_PKT_SIZE(tlv))
-		return -EBADMSG;
+	mutex_lock(&fbus_bridge.xfer_lock);
 
-	return 0;
-}
-
-/*
- * Read a TLV-format packet from USB bulk-in pipe.
- * Return value:
- *   - 0 for success, or negative error code on failures.
- *     Actual transaction length is returned in <actual_len> argument.
- */
-static int fbus_usb_bulk_in_tlv(struct fbus_tlv *tlv)
-{
-	int ret = 0;
-	int actual_len;
-
-	/*
-	 * Read TLV packet header.
-	 */
-	ret = usb_bulk_msg(fbus_bridge.usb_dev, BULK_IN_PIPE,
-			   tlv, sizeof(*tlv), &actual_len,
-			   USB_BULK_TIMEOUT_MS);
-	if ((ret == 0) && (actual_len < TLV_PKT_MIN_SIZE))
+	req_len = TLV_PKT_SIZE(tlv);
+	ret = usb_bulk_msg(fbus_bridge.usb_dev, BULK_OUT_PIPE,
+			   tlv, req_len, &actual_len, USB_BULK_TIMEOUT_MS);
+	if ((ret == 0) && (actual_len < req_len)) {
+		dev_err(&fbus_bridge.usb_intf->dev,
+			"udevmem short write (type=0x%x, addr=0x%x): "
+			"expect %u, actual %d\n",
+			TLV_TYPE_WRITE, addr, req_len, actual_len);
 		ret = -EBADMSG;
+	}
 
+	mutex_unlock(&fbus_bridge.xfer_lock);
+
+exit:
+	kfree(tlv);
 	return ret;
 }
 
-/*
- * Store the bulk-in packet in spi master's read_cache depending on
- * "tlv->address".
- * Return:
- *   - 0 (zero) if the packet is cached; otherwise -EINVAL.
- */
-static int fbus_bulk_in_tlv_dispatch(struct fbus_tlv *tlv)
+static int udev_mem_read(u32 addr, void *buf, unsigned int size)
 {
-	u8 id;
-	u32 addr = tlv->address;
-	struct fbus_spi_master *uspi;
-	u32 csr_end = (FBUS_NUM_SPI_BUSES * USPI_CSR_REG_SIZE) +
-			USPI_CSR_REG_BASE;
-	u32 data_buf_end = (FBUS_NUM_SPI_BUSES * USPI_DATA_BUF_SIZE) +
-			USPI_DATA_BUF_BASE;
+	struct fbus_tlv *tlv;
+	int ret, req_len, actual_len;
 
-	if ((addr >= USPI_CSR_REG_BASE) && (addr < csr_end)) {
-		/*
-		 * SPI CSR register space.
-		 */
-		id = (addr - USPI_CSR_REG_BASE) / USPI_CSR_REG_SIZE;
-		uspi = fbus_bridge.spi_buses[id];
+	tlv = kmalloc(sizeof(*tlv), GFP_KERNEL);
+	if (tlv == NULL)
+		return -ENOMEM;
 
-		USPI_CSR_CACHE_SET(uspi, tlv);
-	} else if ((addr >= USPI_DATA_BUF_BASE) && (addr < data_buf_end)) {
-		/*
-		 * SPI Data buffer space. We never read MOSI buffer thus
-		 * we assume it's always MISO buffer.
-		 */
-		id = (addr - USPI_DATA_BUF_BASE) / USPI_DATA_BUF_SIZE;
-		uspi = fbus_bridge.spi_buses[id];
-		USPI_MISO_CACHE_SET(uspi, tlv);
-	} else {
-		return -EINVAL; /* Invalid address */
+	/*
+	 * Send read request to the FPGA.
+	 */
+	ret = fbus_tlv_init(tlv, TLV_TYPE_READ_REQ, addr, NULL, size);
+	if (ret < 0)
+		goto exit_mem;
+
+	mutex_lock(&fbus_bridge.xfer_lock);
+
+	req_len = TLV_PKT_SIZE(tlv);
+	ret = usb_bulk_msg(fbus_bridge.usb_dev, BULK_OUT_PIPE,
+			   tlv, req_len, &actual_len, USB_BULK_TIMEOUT_MS);
+	if (ret < 0) {
+		goto exit_lock;
+	} else if (actual_len < req_len) {
+		dev_err(&fbus_bridge.usb_intf->dev,
+			"udevmem short write (type=0x%x, addr=0x%x): "
+			"expect %u, actual %d\n",
+			TLV_TYPE_READ_REQ, addr, req_len, actual_len);
+		ret = -EBADMSG;
+		goto exit_lock;
 	}
 
-	return 0;
-}
-
-/*
- * Read TLV-format packets from bulk-in pipe until either of the following
- * condition is met:
- *   - received a TLV whose tlv->address is equal to supplied <addr>
- *   - error happens.
- */
-static struct fbus_tlv* fbus_usb_bulk_in_drain(unsigned long addr)
-{
-	int ret = 0;
-	struct fbus_tlv *tlv = NULL;
-
-	while (1) {
-		if (tlv == NULL) {
-			tlv = kmalloc(sizeof(*tlv), GFP_KERNEL);
-			if (tlv == NULL)
-				break;
-		}
-
-		ret = fbus_usb_bulk_in_tlv(tlv);
-		if (ret < 0) {
-			dev_err(&fbus_bridge.usb_intf->dev,
-				"failed to read bulk-in pipe, error=%d\n",
-				ret);
-			kfree(tlv);
-			tlv = NULL;
-			break;
-		}
-
-		if (tlv->address == addr)
-			break;  /* found matched tlv packet */
-
-		ret = fbus_bulk_in_tlv_dispatch(tlv);
-		if (ret == 0)
-			tlv = NULL;	/* tlv being cached */
-		else
-			dev_warn(&fbus_bridge.usb_intf->dev,
-				"drop bulk-in packet: unknown address 0x%x)\n",
-				tlv->address);
+	/*
+	 * Then read from bulk-in pipe.
+	 */
+	memset(tlv, 0, TLV_PKT_MIN_SIZE); /* reset tlv head only. */
+	req_len = TLV_PKT_MIN_SIZE + size;
+	ret = usb_bulk_msg(fbus_bridge.usb_dev, BULK_IN_PIPE,
+			   tlv, req_len, &actual_len, USB_BULK_TIMEOUT_MS);
+	if (ret < 0) {
+		goto exit_lock;
+	} else if (actual_len < req_len) {
+		dev_err(&fbus_bridge.usb_intf->dev,
+			"udevmem short read (addr=0x%x): "
+			"expect %u, actual %d\n", addr, req_len, actual_len);
+		ret = -EBADMSG;
+		goto exit_lock;
 	}
 
-	return tlv;
+	memcpy(buf, tlv->data_buf, size);
+
+exit_lock:
+	mutex_unlock(&fbus_bridge.xfer_lock);
+exit_mem:
+	kfree(tlv);
+	return ret;
 }
 
 static void fbus_spicsr_set_xfer_len(struct fbus_spi_master *uspi,
-				     u16 xfer_len)
+				     unsigned int xfer_len)
 {
 	u32 mask = (USPI_XFER_LEN_MASK << USPI_XFER_LEN_OFFSET);
 
@@ -406,12 +317,9 @@ static void fbus_spicsr_set_xfer_len(struct fbus_spi_master *uspi,
 }
 
 static int fbus_spi_xfer_start_hw(struct fbus_spi_master *uspi,
-				  u16 xfer_len,
+				  unsigned int xfer_len,
 				  int continue_cs)
 {
-	int ret = 0;
-	struct fbus_tlv *tlv;
-
 	/*
 	 * Update Control/Status registers.
 	 */
@@ -422,149 +330,32 @@ static int fbus_spi_xfer_start_hw(struct fbus_spi_master *uspi,
 	else
 		uspi->reg_csr.desc &= ~USPI_CONTINUOUS_CS;
 
-	tlv = kmalloc(sizeof(*tlv), GFP_KERNEL);
-	if (tlv == NULL)
-		return -ENOMEM;
-
-	ret = fbus_tlv_init(tlv, TLV_TYPE_WRITE, uspi->reg_csr_base,
-			    &uspi->reg_csr, sizeof(uspi->reg_csr));
-	if (ret < 0)
-		goto exit;
-
-	ret = fbus_usb_bulk_out_tlv(tlv);
-
-exit:
-	kfree(tlv);
-	return ret;
+	/*
+	 * Send the updated CSR register values to the device.
+	 */
+	return udev_mem_write(uspi->reg_csr_base, &uspi->reg_csr,
+			      sizeof(uspi->reg_csr));
 }
 
 static int fbus_spi_mosi_write(struct fbus_spi_master *uspi,
 			       const void *buf,
-			       unsigned len)
+			       unsigned int len)
 {
-	int ret = 0;
-	struct fbus_tlv *tlv;
-
-	tlv = kmalloc(sizeof(*tlv), GFP_KERNEL);
-	if (tlv == NULL)
-		return -ENOMEM;
-
-	ret = fbus_tlv_init(tlv, TLV_TYPE_WRITE, uspi->reg_mosi_base,
-			    buf, len);
-	if (ret < 0)
-		goto exit;
-
-	ret = fbus_usb_bulk_out_tlv(tlv);
-
-exit:
-	kfree(tlv);
-	return ret;
-}
-
-static int fbus_spi_issue_read_request(struct fbus_spi_master *uspi,
-				       u16 address,
-				       u16 size)
-{
-	int ret = 0;
-	struct fbus_tlv *tlv = NULL;
-
-	/*
-	 * First, we need to send request to the USB-SPI adapter.
-	 */
-	tlv = kmalloc(sizeof(*tlv), GFP_KERNEL);
-	if (tlv == NULL)
-		return -ENOMEM;
-
-	ret = fbus_tlv_init(tlv, TLV_TYPE_READ_REQ, address, NULL, size);
-	if (ret < 0)
-		goto exit;
-
-	ret = fbus_usb_bulk_out_tlv(tlv);
-	if (ret < 0)
-		dev_err(&uspi->master->dev,
-			"failed to send read request, error=%d\n", ret);
-
-exit:
-	kfree(tlv);
-	return ret;
+	return udev_mem_write(uspi->reg_mosi_base, buf, len);
 }
 
 static int fbus_spi_csr_read(struct fbus_spi_master *uspi,
-			     u16 req_size,
-			     struct fbus_tlv **out_tlv)
+			     void *buf,
+			     unsigned int len)
 {
-	int ret;
-	struct fbus_tlv *tlv = NULL;
-
-	ret = fbus_spi_issue_read_request(uspi, uspi->reg_csr_base, req_size);
-	if (ret < 0) {
-		dev_err(&uspi->master->dev,
-			"failed to send read_csr request: error=%d\n", ret);
-		return ret;
-	}
-
-	/*
-	 * First, let's check if CSR register is already cached.
-	 */
-	USPI_CSR_CACHE_GET(uspi, tlv);
-
-	/*
-	 * Read from bulk-in pipe if the TLV is not cached.
-	 */
-	if (tlv == NULL)
-		tlv = fbus_usb_bulk_in_drain(uspi->reg_csr_base);
-
-	/*
-	 * It's possible the bulk-in packet was fetched by another thread:
-	 * let's release CPU and try to read from cache again.
-	 */
-	if (tlv == NULL) {
-		yield();
-		USPI_CSR_CACHE_GET(uspi, tlv);
-		if (tlv == NULL)
-			return -ENODATA;
-	}
-
-	*out_tlv = tlv;
-	return 0;
+	return udev_mem_read(uspi->reg_csr_base, buf, len);
 }
 
 static int fbus_spi_miso_read(struct fbus_spi_master *uspi,
-			      u16 req_size,
-			      struct fbus_tlv **out_tlv)
+			      void *buf,
+			      unsigned int len)
 {
-	int ret;
-	struct fbus_tlv *tlv = NULL;
-
-	ret = fbus_spi_issue_read_request(uspi, uspi->reg_miso_base,
-					  req_size);
-	if (ret < 0)
-		return ret;
-
-	/*
-	 * First, let's check if MISO buffer is cached.
-	 */
-	USPI_MISO_CACHE_GET(uspi, tlv);
-
-	/*
-	 * Read from bulk-in pipe if the TLV is not cached.
-	 */
-	if (tlv == NULL)
-		tlv = fbus_usb_bulk_in_drain(uspi->reg_miso_base);
-
-	/*
-	 * It's possible the bulk-in packet was fetched by another thread:
-	 * let's release CPU and try to read from cache again.
-	 */
-	if (tlv == NULL) {
-		yield();
-		USPI_MISO_CACHE_GET(uspi, tlv);
-		if (tlv == NULL)
-			return -ENODATA;
-	}
-
-	*out_tlv = tlv;
-	return 0;
+	return udev_mem_read(uspi->reg_miso_base, buf, len);
 }
 
 /*
@@ -614,7 +405,7 @@ static bool fbus_spi_is_read_op(u8 flash_op)
 static int fbus_spi_cache_flash_op(struct fbus_spi_master *uspi,
 				   struct spi_transfer *xfer)
 {
-	u16 len;
+	unsigned int len;
 	u8 flash_op = ((u8*)xfer->tx_buf)[0];
 
 	if (xfer->len <= sizeof(uspi->read_op_cache)) {
@@ -694,31 +485,15 @@ static int fbus_spi_xfer_rx_prepare_op(struct fbus_spi_master *uspi,
 static int fbus_spi_xfer_is_ready(struct fbus_spi_master *uspi)
 {
 	int ret;
-	int retry = 3;
-	u16 data_len;
-	u32 status;
-	struct fbus_tlv *tlv;
-	struct fbus_spi_csr *csr;
+	int retry = 2;
+	struct fbus_spi_csr csr;
 
 	while (retry >= 0) {
-		ret = fbus_spi_csr_read(uspi, sizeof(*csr), &tlv);
+		ret = fbus_spi_csr_read(uspi, &csr, sizeof(csr));
 		if (ret < 0)
 			return ret;
 
-		data_len = TLV_PAYLOAD_SIZE(tlv);
-		if (data_len < sizeof(*csr)) {
-			dev_err(&uspi->master->dev,
-				"reg_csr short read: expect %d, actual %d\n",
-				sizeof(*csr), data_len);
-			kfree(tlv);
-			return -EBADMSG;
-		}
-
-		csr = (struct fbus_spi_csr *)tlv->data_buf;
-		status = csr->status;
-		kfree(tlv);
-
-		if (status & USPI_STAT_XFER_DONE)
+		if (csr.status & USPI_STAT_XFER_DONE)
 			return 0;  /* transfer completed. */
 
 		retry--;
@@ -730,21 +505,19 @@ static int fbus_spi_xfer_is_ready(struct fbus_spi_master *uspi)
 
 static int fbus_spi_xfer_single_rx(struct fbus_spi_master *uspi,
 				   struct spi_transfer *xfer,
-				   u16 op_offset,
+				   unsigned int op_size,
 				   unsigned int rx_offset)
 {
-	u16 payload_max;
 	int ret, continue_cs;
-	struct fbus_tlv *tlv;
-	unsigned int nleft, nrequest;
-	u8 *rx_buf = xfer->rx_buf;
+	u8 *rx_buf, *recv_buf;
+	unsigned int nleft, nrequest, payload_max;
 
 	nleft = xfer->len - rx_offset;
-	payload_max = TLV_PAYLOAD_MAX_SIZE - op_offset;
+	payload_max = TLV_PAYLOAD_MAX_SIZE - op_size;
 	nrequest = MIN(nleft, payload_max);
 	continue_cs = ((nrequest == nleft) ? 0 : 1);
 
-	ret = fbus_spi_xfer_start_hw(uspi, op_offset + nrequest,
+	ret = fbus_spi_xfer_start_hw(uspi, op_size + nrequest,
 				     continue_cs);
 	if (ret < 0) {
 		dev_err(&uspi->master->dev,
@@ -759,42 +532,39 @@ static int fbus_spi_xfer_single_rx(struct fbus_spi_master *uspi,
 		return ret;
 	}
 
-	ret = fbus_spi_miso_read(uspi, nrequest + op_offset, &tlv);
+	recv_buf = kmalloc(nrequest + op_size, GFP_KERNEL);
+	if (recv_buf == NULL)
+		return -ENOMEM;
+
+	ret = fbus_spi_miso_read(uspi, recv_buf, nrequest + op_size);
 	if (ret < 0) {
 		dev_err(&uspi->master->dev,
 			"failed to read data from MISO, error=%d\n", ret);
-		return ret;
+	} else {
+		rx_buf = xfer->rx_buf;
+		memcpy(&rx_buf[rx_offset], &recv_buf[op_size], nrequest);
 	}
 
-	if (TLV_PAYLOAD_SIZE(tlv) < (op_offset + nrequest)) {
-		dev_err(&uspi->master->dev,
-			"miso buffer short read, expect %d, actual %d\n",
-			op_offset + nrequest, TLV_PAYLOAD_SIZE(tlv));
-		kfree(tlv);
-		return -EBADMSG;
-	}
-
-	memcpy(&rx_buf[rx_offset], &tlv->data_buf[op_offset], nrequest);
-	kfree(tlv);
-	return nrequest;
+	kfree(recv_buf);
+	return (ret < 0 ? ret : nrequest);
 }
 
 static int fbus_spi_xfer_rx(struct fbus_spi_master *uspi,
 			    struct spi_transfer *xfer)
 {
 	int ret;
-	u16 op_offset;
+	unsigned int op_size;
 	unsigned int ndata = 0;
 
 	ret = fbus_spi_xfer_rx_prepare_op(uspi, xfer);
 	if (ret < 0)
 		return ret;
 
-	op_offset = uspi->read_op_size;
+	op_size = uspi->read_op_size;
 	uspi->read_op_size = 0;
 
 	while (ndata < xfer->len) {
-		ret = fbus_spi_xfer_single_rx(uspi, xfer, op_offset, ndata);
+		ret = fbus_spi_xfer_single_rx(uspi, xfer, op_size, ndata);
 		if (ret < 0)
 			return ret;
 
@@ -802,7 +572,7 @@ static int fbus_spi_xfer_rx(struct fbus_spi_master *uspi,
 		 * flash op is only needed for the first spi transaction,
 		 * so let's set it to 0.
 		 */
-		op_offset = 0;
+		op_size = 0;
 
 		ndata += ret;
 	}
@@ -864,7 +634,6 @@ static int fbus_spi_master_init(u32 id)
 
 	uspi->spi_id = id;
 	uspi->master = master;
-	spin_lock_init(&uspi->lock);
 	uspi->reg_csr_base = USPI_CSR_REG_BASE +
 			     (USPI_CSR_REG_SIZE * id);
 	uspi->reg_mosi_base = USPI_DATA_BUF_BASE +
@@ -908,13 +677,6 @@ static void fbus_spi_remove_all(void)
 		if (uspi != NULL) {
 			spi_unregister_device(uspi->slave);
 			spi_unregister_master(uspi->master);
-
-			USPI_CSR_CACHE_GET(uspi, tlv);
-			if (tlv != NULL)
-				kfree(tlv);
-			USPI_MISO_CACHE_GET(uspi, tlv);
-			if (tlv != NULL)
-				kfree(tlv);
 		}
 	}
 }
@@ -941,6 +703,8 @@ static int fbus_usb_probe(struct usb_interface *usb_intf,
 	}
 	fbus_bridge.ep_list[USPI_BULK_IN] = bulk_in->bEndpointAddress;
 	fbus_bridge.ep_list[USPI_BULK_OUT] = bulk_out->bEndpointAddress;
+
+	mutex_init(&fbus_bridge.xfer_lock);
 
 	for (i = 0; i < ARRAY_SIZE(fbus_bridge.spi_buses); i++) {
 		ret = fbus_spi_master_init(i);
