@@ -24,29 +24,52 @@
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
 #include <linux/delay.h>
+#include <linux/jiffies.h>
 
 #define NET_ASIC_DELAY     10
 #define NET_NCSI_MSG_LEN   4
 
+#define NET_ASIC_HEARTBEAT_REG  0x108
+
+enum sdk_status {
+  NOT_RUNNING,
+  RUNNING,
+};
+
+struct heart_beat {
+  /*
+   * When SDK is running, the heart beat value should keep increasing
+   * every 100ms, or it should be keep the same.
+   */
+  unsigned int curr;
+  unsigned int last;
+};
+
 struct net_asic_data {
 	struct i2c_client *client;
 	struct mutex update_lock; /* mutex protect updates */
+  unsigned long last_updated;	/* In jiffies */
+  struct heart_beat heartbeat;
+  unsigned int sdk_status;
 };
 
-/* sysfs callback function */
-static ssize_t net_asic_temp_show(struct device *dev, struct device_attribute *dev_attr,
-                                  char *buf)
+/*
+ * Check sdk is running or not
+ * return value: 1-running, 0-not running
+ * When SDK is running, the heart beat value should keep increasing
+ * every 100ms, or it should be keep the same.
+ */
+static inline int sdk_is_running(struct heart_beat heartbeat)
 {
-  struct sensor_device_attribute *attr = to_sensor_dev_attr(dev_attr);
-  struct net_asic_data *data = dev_get_drvdata(dev);
-  struct i2c_client *client = data->client;
-  int value = -1;
-  int index;
+  return heartbeat.curr != heartbeat.last ? RUNNING : NOT_RUNNING;
+}
 
-  int file_index = attr->index;
-  int reg = file_index * NET_NCSI_MSG_LEN;
+static int net_asic_i2c_read(struct net_asic_data *data,
+                             unsigned int reg, unsigned int *value)
+{
+  struct i2c_client *client = data->client;
   char send_buf[NET_NCSI_MSG_LEN], read_buf[NET_NCSI_MSG_LEN];
-  int bit_shift;
+  int index, bit_shift;
 
   for (index = 0; index < NET_NCSI_MSG_LEN; index++) {
     // Convert 32-bits address to buffer
@@ -63,23 +86,58 @@ static ssize_t net_asic_temp_show(struct device *dev, struct device_attribute *d
   }
   mutex_unlock(&data->update_lock);
 
-  if ((read_buf[0] & 0xFF) != 0x00) {
-    /* error case */
-    return -1;
-  }
-
-  value = 0;
+  *value = 0;
   for (index = 0; index < NET_NCSI_MSG_LEN; index++) {
     // Convert read buffer to 32-bits value
     bit_shift = (NET_NCSI_MSG_LEN - 1 - index) * 8;
-    value |= (read_buf[index] << bit_shift);
+    *value |= (read_buf[index] << bit_shift);
   }
 
-  return sprintf(buf, "%d\n", value);
+  return 0;
 
 err_exit:
   mutex_unlock(&data->update_lock);
   return -1;
+}
+
+/* sysfs callback function */
+static ssize_t net_asic_temp_show(struct device *dev, struct device_attribute *dev_attr,
+                                  char *buf)
+{
+  struct sensor_device_attribute *attr = to_sensor_dev_attr(dev_attr);
+  struct net_asic_data *data = dev_get_drvdata(dev);
+  int value = -1;
+
+  int file_index = attr->index;
+  int reg = file_index * NET_NCSI_MSG_LEN;
+  if(net_asic_i2c_read(data, reg, &value))
+    goto err_exit;
+
+  /*
+   * Check sdk is running or not
+   * return value: 1-running, 0-not running
+   * When SDK is running, the heart beat value should keep increasing
+   * every 100ms, or it should be keep the same.
+   * Only when SDK is running, the temperature values are valid.
+   */
+  if(time_after(jiffies, data->last_updated + HZ / 10)) {
+    if(net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_REG, &data->heartbeat.curr))
+      goto err_exit;
+    data->last_updated = jiffies;
+    if(sdk_is_running(data->heartbeat) == RUNNING) {
+      data->heartbeat.last = data->heartbeat.curr;
+      data->sdk_status = RUNNING;
+    } else {
+      data->sdk_status = NOT_RUNNING;
+    }
+  }
+
+  /* if SDK is running in the last 100ms, return the temperature */
+  if(data->sdk_status == RUNNING)
+    return sprintf(buf, "%d\n", value);
+
+err_exit:
+    return -1;
 }
 
 static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, net_asic_temp_show, NULL, 1);
@@ -123,7 +181,11 @@ static int net_asic_probe(struct i2c_client *client,
     return -1;
   }
   data->client = client;
-  mutex_init(&data ->update_lock);
+  mutex_init(&data->update_lock);
+
+  net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_REG, &data->heartbeat.last);
+  data->last_updated = jiffies;
+  data->sdk_status = NOT_RUNNING;
 
   hwmon_dev = devm_hwmon_device_register_with_groups(dev, client->name,
                                                      data, net_asic_groups);
