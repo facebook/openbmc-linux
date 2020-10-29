@@ -351,6 +351,7 @@ static int mpq8645p_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	pdata->client = client;
+	mutex_init(&pdata->lock);
 	for (i = 0; i < MPQ8645P_NUM_ENTRIES; ++i) {
 		pdata->index[i] = i;
 	}
