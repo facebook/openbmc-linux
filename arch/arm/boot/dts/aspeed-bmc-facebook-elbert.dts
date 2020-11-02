@@ -144,6 +144,13 @@
 
 &i2c4 {
 	status = "okay";
+        temp-sensor@4d {
+                compatible = "maxim,max6581";
+                smbus-timeout-disable;
+                reg = <0x4d>;
+                resistance-cancellation = <0x06>;
+                transistor-ideality = <0x06 0x1F>;
+        };
 };
 
 &i2c5 {
