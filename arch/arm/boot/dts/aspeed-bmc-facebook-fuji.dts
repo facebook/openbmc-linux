@@ -503,7 +503,7 @@
 							reg = <3>;
 							color = <LED_COLOR_ID_MULTI>;
 							function = LED_FUNCTION_ACTIVITY;
-							label = "scm";
+							label = "smb";
 
 							led@0 {
 								reg = <0>;
