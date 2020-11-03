@@ -43,7 +43,7 @@ partitions {
 	 * persistent data store.
 	 */
 	data0@7c00000 {
-		reg = <0x7c00000 0x800000>;
+		reg = <0x7c00000 0x400000>;
 		label = "data0";
 	};
 
