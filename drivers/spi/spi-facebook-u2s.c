@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (c) 2020 Facebook Inc.
 
-#include <linux/kernel.h>
 #include <linux/err.h>
 #include <linux/errno.h>
-#include <linux/module.h>
+#include <linux/fs.h>
+#include <linux/kernel.h>
 #include <linux/kref.h>
-#include <linux/uaccess.h>
-#include <linux/usb.h>
+#include <linux/ioctl.h>
+#include <linux/miscdevice.h>
+#include <linux/module.h>
+#include <linux/mtd/spi-nor.h>
 #include <linux/mutex.h>
 #include <linux/spi/spi.h>
-#include <linux/mtd/spi-nor.h>
+#include <linux/uaccess.h>
+#include <linux/usb.h>
 
 #define FBUS_NUM_SPI_BUSES	8
 
@@ -69,6 +72,23 @@
 #ifndef MIN
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #endif
+
+/*
+ * usb-bridge chardev ioctl commands
+ */
+#define UBRG_CMD_MEM_IO	0x101
+
+/*
+ * Structure to pass usb memory read/write command and data between user
+ * and kernel space.
+ */
+struct ubrg_ioc_xfer {
+	u32 addr;
+	void *buf;
+	unsigned int len;
+	unsigned int flags;
+#define UMEM_IOF_WRITE	0x1
+};
 
 /*
  * All the USB Bulk transactions should follow "fbus_tlv" format.
@@ -167,6 +187,8 @@ static struct {
 					fbus_bridge.ep_list[USPI_BULK_OUT])
 
 	struct fbus_spi_master *spi_buses[FBUS_NUM_SPI_BUSES];
+
+	struct miscdevice miscdev;
 } fbus_bridge;
 
 static int fbus_spi_setup(struct spi_device *slave)
@@ -608,6 +630,87 @@ static int fbus_spi_xfer_one(struct spi_master *master,
 	return ret;
 }
 
+static long ubrg_cdev_ioctl(struct file *file,
+			    unsigned int cmd,
+			    unsigned long arg)
+{
+	int ret = 0;
+	u8 *xfer_buf;
+	struct ubrg_ioc_xfer ioc_xfer;
+
+	switch (cmd) {
+	case UBRG_CMD_MEM_IO:
+		if (copy_from_user(&ioc_xfer, (struct ubrg_ioc_xfer*)arg,
+				   sizeof(ioc_xfer)))
+			return -EFAULT;
+
+		if ((ioc_xfer.buf == NULL) ||
+		    (ioc_xfer.len > TLV_PAYLOAD_MAX_SIZE))
+			return -EINVAL;
+
+		xfer_buf = kmalloc(ioc_xfer.len, GFP_KERNEL);
+		if (xfer_buf == NULL)
+			return -ENOMEM;
+
+		if (ioc_xfer.flags & UMEM_IOF_WRITE) {
+			if (copy_from_user(xfer_buf, ioc_xfer.buf,
+			    ioc_xfer.len)) {
+				ret = -EFAULT;
+				goto io_exit;
+			}
+			ret = udev_mem_write(ioc_xfer.addr, xfer_buf,
+					     ioc_xfer.len);
+		} else {
+			ret = udev_mem_read(ioc_xfer.addr, xfer_buf,
+					    ioc_xfer.len);
+			if (ret < 0)
+				goto io_exit;
+
+			if (copy_to_user(ioc_xfer.buf, xfer_buf, ioc_xfer.len))
+				ret = -EFAULT;
+		}
+
+io_exit:
+		kfree(xfer_buf);
+		break;
+
+	default:
+		return -ENOTTY;
+	} /* switch */
+
+	return ret;
+}
+
+static const struct file_operations ubrg_cdev_fops = {
+	.owner = THIS_MODULE,
+	.llseek = no_llseek,
+	.unlocked_ioctl = ubrg_cdev_ioctl,
+};
+
+static void misc_dev_destroy(struct miscdevice *miscdev)
+{
+	misc_deregister(miscdev);
+	kfree(miscdev->name);
+}
+
+static int misc_dev_init(struct device *parent, struct miscdevice *miscdev)
+{
+	int ret;
+
+	miscdev->parent = parent;
+	miscdev->fops =  &ubrg_cdev_fops;
+	miscdev->minor = MISC_DYNAMIC_MINOR;
+	miscdev->name = kasprintf(GFP_KERNEL, "usb-fpga");
+	if (miscdev->name == NULL)
+		return -ENOMEM;
+
+	ret = misc_register(miscdev);
+	if (ret < 0)
+		kfree(miscdev->name);
+
+	return ret;
+}
+
 static int fbus_spi_master_init(u32 id)
 {
 	int ret;
@@ -712,6 +815,13 @@ static int fbus_usb_probe(struct usb_interface *usb_intf,
 			goto error;
 	}
 
+	ret = misc_dev_init(&usb_intf->dev, &fbus_bridge.miscdev);
+	if (ret < 0) {
+		dev_err(&usb_intf->dev,
+			"failed to initialize miscdevice, ret=%d\n", ret);
+		goto error;
+	}
+
 	usb_set_intfdata(usb_intf, &fbus_bridge);
 
 	dev_info(&usb_intf->dev, "ep_bulk_in: 0x%x, ep_bulk_out: 0x%x\n",
@@ -727,6 +837,7 @@ error:
 
 static void fbus_usb_disconnect(struct usb_interface *usb_intf)
 {
+	misc_dev_destroy(&fbus_bridge.miscdev);
 	fbus_spi_remove_all();
 	usb_set_intfdata(usb_intf, NULL);
 	usb_put_dev(fbus_bridge.usb_dev);
