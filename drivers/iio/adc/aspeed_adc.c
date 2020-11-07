@@ -134,7 +134,12 @@ static int aspeed_adc_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
-		*val = readw(data->base + chan->address) + data->cv;
+		if (!strcmp(model_data->model_name, "ast2600-adc")) {
+			*val = readw(data->base + chan->address) + data->cv;
+		}
+		else {
+			*val = readw(data->base + chan->address);
+		}
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_SCALE:
