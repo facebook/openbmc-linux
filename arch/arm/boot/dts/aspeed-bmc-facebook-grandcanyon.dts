@@ -252,6 +252,11 @@
 &i2c8 {
 	status = "okay";
 	bus-frequency = <400000>;
+	// MEZZ EEPROM
+	eeprom@50 {
+		compatible = "st,24c64";
+		reg = <0x50>;
+	};
 };
 
 &i2c9 {
