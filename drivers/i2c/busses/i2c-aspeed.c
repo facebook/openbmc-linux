@@ -127,6 +127,8 @@
 
 /* 0x18 : I2CD Slave Device Address Register   */
 #define ASPEED_I2CD_DEV_ADDR_MASK			GENMASK(6, 0)
+#define ASPEED_I2CD_DEV_ADDR2_MASK			GENMASK(14, 8)
+#define ASPEED_I2CD_DEV_ADDR2_EN			BIT(15)
 
 enum aspeed_i2c_master_state {
 	ASPEED_I2C_MASTER_INACTIVE,
@@ -1016,6 +1018,11 @@ static int aspeed_i2c_init(struct aspeed_i2c_bus *bus,
 	       bus->base + ASPEED_I2C_FUN_CTRL_REG);
 
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
+	/* Disable slave address 2 */
+	writel(readl(bus->base + ASPEED_I2C_DEV_ADDR_REG) &
+	       ~(ASPEED_I2CD_DEV_ADDR2_EN | ASPEED_I2CD_DEV_ADDR2_MASK),
+	       bus->base + ASPEED_I2C_DEV_ADDR_REG);
+
 	/* If slave has already been registered, re-enable it. */
 	if (bus->slave)
 		__aspeed_i2c_reg_slave(bus, bus->slave->addr);
