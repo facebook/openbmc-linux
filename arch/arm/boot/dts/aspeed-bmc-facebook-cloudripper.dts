@@ -104,12 +104,21 @@
 		gpio-miso = <&gpio0 ASPEED_GPIO(X, 5) GPIO_ACTIVE_HIGH>;
 
 		num-chipselects = <3>;
-		cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>,<0>,<&gpio0 ASPEED_GPIO(X, 2) GPIO_ACTIVE_HIGH>;
+		cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>, <&gpio0 ASPEED_GPIO(X, 1) GPIO_ACTIVE_HIGH>, <0>;
 
 		tpmdev@0 {
 			compatible = "tcg,tpm_tis-spi";
 			spi-max-frequency = <33000000>;
 			reg = <0>;
+		};
+
+		eeprom@1 {
+			compatible = "atmel,at93c46d";
+			data-size = <16>;
+			spi-cs-high;
+			/* According HW SI, max freq should be no more than 250khz */
+			spi-max-frequency = <250000>;
+			reg = <1>;
 		};
 	};
 
