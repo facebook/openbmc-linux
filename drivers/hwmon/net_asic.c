@@ -26,10 +26,14 @@
 #include <linux/delay.h>
 #include <linux/jiffies.h>
 
+#define BUILD_U64(_high, _low) (((u_int64_t)(_high) << 32) | (_low))
+
 #define NET_ASIC_DELAY     10
 #define NET_NCSI_MSG_LEN   4
 
-#define NET_ASIC_HEARTBEAT_REG  0x108
+#define HEARTBEAT_REFRESH_INTERVAL (HZ / 10)
+#define NET_ASIC_HEARTBEAT_LSB_REG  0x108
+#define NET_ASIC_HEARTBEAT_MSB_REG  0x10C
 
 enum sdk_status {
   NOT_RUNNING,
@@ -41,8 +45,8 @@ struct heart_beat {
    * When SDK is running, the heart beat value should keep increasing
    * every 100ms, or it should be keep the same.
    */
-  unsigned int curr;
-  unsigned int last;
+  u_int64_t curr;
+  u_int64_t last;
 };
 
 struct net_asic_data {
@@ -61,7 +65,7 @@ struct net_asic_data {
  */
 static inline int sdk_is_running(struct heart_beat heartbeat)
 {
-  return heartbeat.curr != heartbeat.last ? RUNNING : NOT_RUNNING;
+  return heartbeat.curr > heartbeat.last ? RUNNING : NOT_RUNNING;
 }
 
 static int net_asic_i2c_read(struct net_asic_data *data,
@@ -100,6 +104,44 @@ err_exit:
   return -1;
 }
 
+static int net_asic_heartbeat_update(struct net_asic_data *data)
+{
+  u_int32_t lsb, msb;
+
+  if(time_after(jiffies, data->last_updated + HEARTBEAT_REFRESH_INTERVAL)) {
+    if(net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_LSB_REG, &lsb))
+      goto err_exit;
+    if(net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_MSB_REG, &msb))
+      goto err_exit;
+
+    data->last_updated = jiffies;
+    data->heartbeat.curr = msb;
+    data->heartbeat.curr = BUILD_U64(msb, lsb);
+    if(sdk_is_running(data->heartbeat) == RUNNING) {
+      data->sdk_status = RUNNING;
+    } else {
+      data->sdk_status = NOT_RUNNING;
+    }
+    data->heartbeat.last = data->heartbeat.curr;
+  }
+
+  return 0;
+
+err_exit:
+  return -1;
+}
+
+static int net_asic_sdk_status_show(struct device *dev, struct device_attribute *dev_attr,
+                                    char *buf)
+{
+  struct net_asic_data *data = dev_get_drvdata(dev);
+
+  if(net_asic_heartbeat_update(data))
+    return -1;
+
+  return sprintf(buf, "%d\n", data->sdk_status == RUNNING ? 1 : 0);
+}
+
 /* sysfs callback function */
 static ssize_t net_asic_temp_show(struct device *dev, struct device_attribute *dev_attr,
                                   char *buf)
@@ -120,17 +162,8 @@ static ssize_t net_asic_temp_show(struct device *dev, struct device_attribute *d
    * every 100ms, or it should be keep the same.
    * Only when SDK is running, the temperature values are valid.
    */
-  if(time_after(jiffies, data->last_updated + HZ / 10)) {
-    if(net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_REG, &data->heartbeat.curr))
-      goto err_exit;
-    data->last_updated = jiffies;
-    if(sdk_is_running(data->heartbeat) == RUNNING) {
-      data->heartbeat.last = data->heartbeat.curr;
-      data->sdk_status = RUNNING;
-    } else {
-      data->sdk_status = NOT_RUNNING;
-    }
-  }
+  if(net_asic_heartbeat_update(data))
+    return -1;
 
   /* if SDK is running in the last 100ms, return the temperature */
   if(data->sdk_status == RUNNING)
@@ -150,6 +183,7 @@ static SENSOR_DEVICE_ATTR(temp7_input, S_IRUGO, net_asic_temp_show, NULL, 7);
 static SENSOR_DEVICE_ATTR(temp8_input, S_IRUGO, net_asic_temp_show, NULL, 8);
 static SENSOR_DEVICE_ATTR(temp9_input, S_IRUGO, net_asic_temp_show, NULL, 9);
 static SENSOR_DEVICE_ATTR(temp10_input, S_IRUGO, net_asic_temp_show, NULL, 10);
+static SENSOR_DEVICE_ATTR(sdk_status, S_IRUGO, net_asic_sdk_status_show, NULL, 0);
 
 static struct attribute *net_asic_attrs[] = {
   &sensor_dev_attr_temp1_input.dev_attr.attr,
@@ -162,6 +196,7 @@ static struct attribute *net_asic_attrs[] = {
   &sensor_dev_attr_temp8_input.dev_attr.attr,
   &sensor_dev_attr_temp9_input.dev_attr.attr,
   &sensor_dev_attr_temp10_input.dev_attr.attr,
+  &sensor_dev_attr_sdk_status.dev_attr.attr,
   NULL,
 };
 ATTRIBUTE_GROUPS(net_asic);
@@ -172,6 +207,8 @@ static int net_asic_probe(struct i2c_client *client,
   struct net_asic_data *data;
   struct device *dev = &client->dev;
   struct device *hwmon_dev;
+  u_int32_t lsb = 0xffffffff;
+  u_int32_t msb = 0xffffffff;
 
   data = devm_kzalloc(dev, sizeof(struct net_asic_data), GFP_KERNEL);
   if (!data)
@@ -183,7 +220,10 @@ static int net_asic_probe(struct i2c_client *client,
   data->client = client;
   mutex_init(&data->update_lock);
 
-  net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_REG, &data->heartbeat.last);
+  net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_LSB_REG, &lsb);
+  net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_MSB_REG, &msb);
+  data->heartbeat.last = msb;
+  data->heartbeat.last = BUILD_U64(msb, lsb);
   data->last_updated = jiffies;
   data->sdk_status = NOT_RUNNING;
 
