@@ -115,7 +115,6 @@ static int net_asic_heartbeat_update(struct net_asic_data *data)
       goto err_exit;
 
     data->last_updated = jiffies;
-    data->heartbeat.curr = msb;
     data->heartbeat.curr = BUILD_U64(msb, lsb);
     if(sdk_is_running(data->heartbeat) == RUNNING) {
       data->sdk_status = RUNNING;
@@ -222,7 +221,6 @@ static int net_asic_probe(struct i2c_client *client,
 
   net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_LSB_REG, &lsb);
   net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_MSB_REG, &msb);
-  data->heartbeat.last = msb;
   data->heartbeat.last = BUILD_U64(msb, lsb);
   data->last_updated = jiffies;
   data->sdk_status = NOT_RUNNING;
