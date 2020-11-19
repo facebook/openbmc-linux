@@ -330,3 +330,7 @@
        pinctrl-0 = <&pinctrl_jtagm_default>;
 };
 
+// connect to BIC 
+&ehci1 {
+    status = "okay";
+};
