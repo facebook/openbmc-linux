@@ -285,11 +285,11 @@ aspeed_spi_setup(struct spi_device *slave)
 	val &= ~ASPEED_CTRL_CLK_MODE_3; /* clock mode 3 is not supported */
 	if (slave->max_speed_hz != 0) {
 		freq = slave->max_speed_hz;
-                if (priv->aspeed_g6) {
+		if (priv->aspeed_g6) {
 			val &= ~ASPEED2600_CTRL_CLK_DIV_MASK;
 			div = aspeed2600_spi_clk_div(priv->ahb_clk_freq, freq);
 			val |= ASPEED2600_CTRL_CLK_DIV(div);
-                } else {
+		} else {
 			val &= ~ASPEED_CTRL_CLK_DIV_MASK;
 
 			if (aspeed_check_set_div2(priv, cs, freq)) {
@@ -297,9 +297,9 @@ aspeed_spi_setup(struct spi_device *slave)
 				val |= ASPEED_CTRL_CLK_DIV4_MODE;
 				freq = freq >> 2;
 			}
-			val |= ASPEED_CTRL_CLK_DIV(div);
 			div = aspeed_spi_clk_div(priv->ahb_clk_freq, freq);
-                }
+			val |= ASPEED_CTRL_CLK_DIV(div);
+		}
 	}
 	aspeed_reg_write(priv, val, ctrl_reg);
 
