@@ -324,3 +324,9 @@
 	pinctrl-0 = <&pinctrl_adc8_default &pinctrl_adc9_default>;
 };
 
+&jtag1 {
+       status = "okay";
+       pinctrl-names = "default";
+       pinctrl-0 = <&pinctrl_jtagm_default>;
+};
+
