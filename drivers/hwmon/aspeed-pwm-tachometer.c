@@ -501,7 +501,7 @@ static void aspeed_set_fan_tach_ch_enable(struct aspeed_pwm_tachometer_data *pri
 	if(enable) {
 		//4 ^ n
 //		printk("=== %ld \n", (priv->clk_freq * 60 / priv->techo_channel[fan_tach_ch].min_rpm * 2));
-		target_div = (priv->clk_freq * 60 / priv->techo_channel[fan_tach_ch].min_rpm * 2) / (0xfffff + 1);
+		target_div = (priv->clk_freq / priv->techo_channel[fan_tach_ch].min_rpm * 60 * 2) / (0xfffff + 1);
 //		printk("min_rpm %d , target_div %d \n", priv->techo_channel[fan_tach_ch].min_rpm, target_div);
 		if(target_div) {
 			for(i = 0; i < 12; i++) {
@@ -613,7 +613,7 @@ static int aspeed_get_fan_tach_ch_rpm(struct aspeed_pwm_tachometer_data *priv,
 	 * We need the mode to determine if the raw_data is double (from
 	 * counting both edges).
 	 */
-	tach_div = raw_data * (priv->techo_channel[fan_tach_ch].divide) * (two_plus);
+	tach_div = raw_data * (two_plus);
 
 //	printk("clk %ld, raw_data %d , tach_div %d  \n", priv->clk_freq, raw_data, tach_div);
 	
@@ -622,7 +622,7 @@ static int aspeed_get_fan_tach_ch_rpm(struct aspeed_pwm_tachometer_data *priv,
 	if (raw_data == 0)
 		return 0;
 
-	return ((clk_source / tach_div) * 60);
+	return ((clk_source / tach_div) * 60 / (priv->techo_channel[fan_tach_ch].divide));
 
 }
 
@@ -968,7 +968,10 @@ static int aspeed_pwm_create_fan(struct device *dev,
 	ret = of_property_read_u32(child, "aspeed,min_rpm", &fan_min_rpm);
 	if (ret)
 		fan_min_rpm = DEFAULT_MIN_RPM;
-	
+	// Prevent to devided by zero
+	if (fan_min_rpm == 0) {
+		fan_min_rpm = 1;
+	}
 	aspeed_create_fan_tach_channel(priv, fan_tach_ch, count, fan_min_rpm);
 
 	return 0;
