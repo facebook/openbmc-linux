@@ -181,7 +181,7 @@
                 reg = <0x00>;
                 aspeed,target_pwm = <25000>;
                 aspeed,fan-tach-ch = /bits/ 8 <0x00 0x02 0x03 0x04>;
-                aspeed,min_rpm = <0>;
+                aspeed,min_rpm = <30>;
         };
 };
 
