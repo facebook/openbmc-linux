@@ -88,6 +88,23 @@
 	status = "okay";
 };
 
+&lpc_ctrl {
+	// BMC LPC controller
+	status = "okay";
+};
+
+&kcs2 {
+	// BMC KCS channel 2
+	status = "okay";
+	kcs_addr = <0xca8>;
+};
+
+&kcs3 {
+	// BMC KCS channel 3
+	status = "okay";
+	kcs_addr = <0xca2>;
+};
+
 &wdt1 {
 	status = "okay";
 };
