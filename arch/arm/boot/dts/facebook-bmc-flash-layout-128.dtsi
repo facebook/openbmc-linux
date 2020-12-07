@@ -31,19 +31,19 @@ partitions {
 	};
 
 	/*
-	 * FIT image: 123 MB.
+	 * FIT image: 119 MB.
 	 */
 	fit@100000 {
-		reg = <0x100000 0x7b00000>;
+		reg = <0x100000 0x7700000>;
 		label = "fit";
 	};
 
 	/*
-	 * "data0" partition (4MB) is used by Facebook BMC platforms as
+	 * "data0" partition (8MB) is used by Facebook BMC platforms as
 	 * persistent data store.
 	 */
-	data0@7c00000 {
-		reg = <0x7c00000 0x400000>;
+	data0@7800000 {
+		reg = <0x7800000 0x800000>;
 		label = "data0";
 	};
 
