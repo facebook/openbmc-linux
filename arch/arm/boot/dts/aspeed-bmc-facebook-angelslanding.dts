@@ -170,6 +170,8 @@
 	status = "okay";
 	no-hw-checksum;
 	use-ncsi;
+	ncsi-ctrl,start-redo-probe;
+	ncsi-ctrl,no-channel-monitor;
 	ncsi-package = <2>;
 	ncsi-channel = <2>;
 	ncsi-rexmit = <1>;
@@ -179,6 +181,8 @@
 	status = "okay";
 	no-hw-checksum;
 	use-ncsi;
+	ncsi-ctrl,start-redo-probe;
+	ncsi-ctrl,no-channel-monitor;
 	ncsi-package = <2>;
 	ncsi-channel = <2>;
 	ncsi-rexmit = <1>;
