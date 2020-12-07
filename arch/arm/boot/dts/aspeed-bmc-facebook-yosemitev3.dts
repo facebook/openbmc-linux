@@ -194,6 +194,9 @@
 };
 
 &i2c9 {
+	multi-master;
+	bus-frequency = <100000>;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
