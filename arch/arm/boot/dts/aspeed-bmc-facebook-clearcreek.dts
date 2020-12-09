@@ -176,6 +176,16 @@
 				compatible = "atmel,24c64";
 				reg = <0x50>;
 			};
+			adc128d818@1d {
+				compatible = "ti,adc128d818";
+				reg = <0x1d>;
+				ti,mode = /bits/ 8 <1>;
+			};
+			adc128d818@1f {
+				compatible = "ti,adc128d818";
+				reg = <0x1f>;
+				ti,mode = /bits/ 8 <1>;
+			};
 		};
 		imux22: i2c@6 {
 			#address-cells = <1>;
@@ -184,6 +194,16 @@
 			eeprom@50 {
 				compatible = "atmel,24c64";
 				reg = <0x50>;
+			};
+			adc128d818@1d {
+				compatible = "ti,adc128d818";
+				reg = <0x1d>;
+				ti,mode = /bits/ 8 <1>;
+			};
+			adc128d818@1f {
+				compatible = "ti,adc128d818";
+				reg = <0x1f>;
+				ti,mode = /bits/ 8 <1>;
 			};
 		};
 		imux23: i2c@7 {
