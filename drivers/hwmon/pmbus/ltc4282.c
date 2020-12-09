@@ -803,7 +803,6 @@ static int ltc4282_probe(struct i2c_client *client,
 	}
 
 	val = i2c_smbus_read_word_data(client, LTC4282_CONTROL);
-	val |= OC_AUTORETRY;
 	val &= ~ON_FAULT_MASK;
 	i2c_smbus_write_word_data(client, LTC4282_CONTROL, val);
 
