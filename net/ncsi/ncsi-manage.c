@@ -1181,7 +1181,8 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 		ndp->hot_channel = hot_nc;
 		spin_unlock_irqrestore(&ndp->lock, flags);
 
-		ncsi_start_channel_monitor(nc);
+		if (!(ndp->ctrl_flags & NCSI_CTRL_FLAG_NO_CHANNEL_MONITOR))
+			ncsi_start_channel_monitor(nc);
 		ncsi_process_next_channel(ndp);
 		break;
 	default:
@@ -1737,6 +1738,7 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 	INIT_LIST_HEAD(&ndp->vlan_vids);
 	INIT_WORK(&ndp->work, ncsi_dev_work);
 	ndp->package_whitelist = UINT_MAX;
+	ndp->ctrl_flags = 0;
 
 	/* Initialize private NCSI device */
 	spin_lock_init(&ndp->lock);
@@ -1770,6 +1772,12 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 			if (of_get_property(np, "mlx,multi-host", NULL))
 				ndp->mlx_multi_host = true;
 
+			if (of_get_property(np, "ncsi-ctrl,no-channel-monitor", NULL))
+				ndp->ctrl_flags |= NCSI_CTRL_FLAG_NO_CHANNEL_MONITOR;
+
+			if (of_get_property(np, "ncsi-ctrl,start-redo-probe", NULL))
+				ndp->ctrl_flags |= NCSI_CTRL_FLAG_START_REDO_PROBE;
+
 			if (!of_property_read_u32(np, "ncsi-package", &property) &&
 				(property < NCSI_MAX_PACKAGE)) {
 				ndp->max_package = (u8)property;
@@ -1792,10 +1800,24 @@ EXPORT_SYMBOL_GPL(ncsi_register_dev);
 int ncsi_start_dev(struct ncsi_dev *nd)
 {
 	struct ncsi_dev_priv *ndp = TO_NCSI_DEV_PRIV(nd);
+	struct ncsi_package *np, *tmp;
+	unsigned long flags;
 
 	if (nd->state != ncsi_dev_state_registered &&
 	    nd->state != ncsi_dev_state_functional)
 		return -ENOTTY;
+
+	if (ndp->ctrl_flags & NCSI_CTRL_FLAG_START_REDO_PROBE) {
+		nd->state = ncsi_dev_state_probe;
+
+		spin_lock_irqsave(&ndp->lock, flags);
+		ndp->flags &= ~NCSI_DEV_PROBED;
+		ndp->gma_flag = 0;
+		spin_unlock_irqrestore(&ndp->lock, flags);
+
+		list_for_each_entry_safe(np, tmp, &ndp->packages, node)
+			ncsi_remove_package(np);
+	}
 
 	if (!(ndp->flags & NCSI_DEV_PROBED)) {
 		ndp->package_probe_id = 0;
