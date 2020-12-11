@@ -459,16 +459,43 @@
 	bus-frequency = <400000>;
 };
 
-// To E1.S SSD_1
+// [T5]: To E1.S SSD_1 [T7]: To IOCM
 &i2c12 {
 	status = "okay";
 	bus-frequency = <400000>;
 };
 
-// To E1.S SSD_2
+// [T5]: To E1.S SSD_2 [T7]: To IOCM
 &i2c13 {
 	status = "okay";
 	bus-frequency = <400000>;
+	// Voltage sensor for IOCM
+	ads1015@49 {
+		compatible = "ti,ads1015";
+		reg = <0x49>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		// P3V3_STBY_SENSE
+		channel@4 {
+			reg = <4>;
+			ti,gain = <1>; // FSR: 4096 (mV)
+		};
+		// P1V8_SENSE
+		channel@5 {
+			reg = <5>;
+			ti,gain = <2>; // FSR: 2048 (mV)
+		};
+		// P1V5_SENSE
+		channel@6 {
+			reg = <6>;
+			ti,gain = <2>; // FSR: 2048 (mV)
+		};
+		// P0V865_SENSE
+		channel@7 {
+			reg = <7>;
+			ti,gain = <3>; // FSR: 1024 (mV)
+		};
+       };
 };
 
 &i2c14 {
