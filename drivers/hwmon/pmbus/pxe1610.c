@@ -128,10 +128,21 @@ static const struct i2c_device_id pxe1610_id[] = {
 
 MODULE_DEVICE_TABLE(i2c, pxe1610_id);
 
+static const struct of_device_id pxe1610_of_match[] = {
+	{.compatible = "infineon,pxe1610"},
+	{.compatible = "infineon,pxe1110"},
+	{.compatible = "infineon,pxe1310"},
+	{.compatible = "infineon,pxe1211"},
+	{}
+};
+
+MODULE_DEVICE_TABLE(of, pxe1610_of_match);
+
 static struct i2c_driver pxe1610_driver = {
 	.driver = {
-			.name = "pxe1610",
-			},
+		.name = "pxe1610",
+		.of_match_table = of_match_ptr(pxe1610_of_match),
+	},
 	.probe = pxe1610_probe,
 	.remove = pmbus_do_remove,
 	.id_table = pxe1610_id,
