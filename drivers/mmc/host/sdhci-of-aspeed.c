@@ -25,6 +25,16 @@
 #define AST2500_SCU_PIN_CTRL5	0x90
 #define ASPEED_SCU_SD1_8BIT	BIT(3)
 
+
+/*
+ * Slot 0 Clock Delay Selection is in 0x1e7500f4[1:0];
+ * Slot 0 Clock Phase is in 0x1e7500f4[7:3];
+ */
+
+#define ASPEED_SDC_CLOCK_PHASE			0xF4
+#define ASPEED_CLK_PHASE_CTRL_CLK_SEL		0x03
+#define ASPEED_2600_CLOCK_PHASE_EN		0x01
+
 struct aspeed_sdc {
 	struct clk *clk;
 	struct resource *res;
@@ -36,6 +46,8 @@ struct aspeed_sdc {
 struct aspeed_sdhci {
 	struct aspeed_sdc *parent;
 	u32 width_mask;
+	u32 clock_phase;
+	u8 clock_phase_enable;
 };
 
 static void aspeed_sdc_configure_8bit_mode(struct aspeed_sdc *sdc,
@@ -58,13 +70,15 @@ static void aspeed_sdc_configure_8bit_mode(struct aspeed_sdc *sdc,
 static void aspeed_sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 {
 	struct sdhci_pltfm_host *pltfm_host;
+	struct aspeed_sdhci *dev;
 	unsigned long parent;
 	int div;
 	u16 clk;
+	u32 clock_phase;
 
 	pltfm_host = sdhci_priv(host);
 	parent = clk_get_rate(pltfm_host->clk);
-
+	dev = sdhci_pltfm_priv(pltfm_host);
 	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
 
 	if (clock == 0)
@@ -82,6 +96,14 @@ static void aspeed_sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 	clk = div << SDHCI_DIVIDER_SHIFT;
 
 	sdhci_enable_clk(host, clk);
+
+	if (dev->clock_phase_enable == ASPEED_2600_CLOCK_PHASE_EN) {
+		clock_phase = readl(host->ioaddr + ASPEED_SDC_CLOCK_PHASE);
+		clock_phase |= ((dev->clock_phase << 3) |
+					ASPEED_CLK_PHASE_CTRL_CLK_SEL);
+		writel(clock_phase, host->ioaddr + ASPEED_SDC_CLOCK_PHASE);
+	}
+
 }
 
 static unsigned int aspeed_sdhci_get_max_clock(struct sdhci_host *host)
@@ -169,6 +191,7 @@ static int aspeed_sdhci_probe(struct platform_device *pdev)
 	struct regmap *scu;
 	int slot;
 	int ret;
+	u32 clock_phase;
 
 	host = sdhci_pltfm_init(pdev, &aspeed_sdhci_pdata, sizeof(*dev));
 	if (IS_ERR(host))
@@ -215,6 +238,16 @@ static int aspeed_sdhci_probe(struct platform_device *pdev)
 		if (!IS_ERR(scu)) {
 			regmap_update_bits(scu, AST2500_SCU_PIN_CTRL5, ASPEED_SCU_SD1_8BIT,
 					   ASPEED_SCU_SD1_8BIT);
+		}
+	}
+
+	/* Modify ast2600 data hold time to meet the EMMC datasheet */
+	if (of_device_is_compatible(pdev->dev.of_node,
+		 "aspeed,ast2600-sdhci")) {
+		if (of_property_read_u32(pdev->dev.of_node, "clock-phase",
+			 &clock_phase) == 0) {
+			dev->clock_phase = clock_phase;
+			dev->clock_phase_enable = ASPEED_2600_CLOCK_PHASE_EN;
 		}
 	}
 
