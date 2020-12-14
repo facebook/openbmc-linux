@@ -1326,8 +1326,9 @@
 	status = "okay";
 
 	non-removable;
-	max-frequency = <100000000>;
+	max-frequency = <25000000>;
 	bus-width = <4>;
+	clock-phase = <0x10>;
 };
 
 &mdio1 {
