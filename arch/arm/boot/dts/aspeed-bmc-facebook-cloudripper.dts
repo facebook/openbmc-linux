@@ -193,10 +193,11 @@
 	status = "okay";
 
 	non-removable;
-	max-frequency = <100000000>;
+	max-frequency = <25000000>;
 	/* AST2600 A0 only support PIO mode */
 	// sdhci-caps-mask = <0x0 0x580000>;
 	bus-width = <4>;
+	clock-phase = <0x10>;
 };
 
 &mdio1 {
