@@ -35,6 +35,12 @@
 #define NET_ASIC_HEARTBEAT_LSB_REG  0x108
 #define NET_ASIC_HEARTBEAT_MSB_REG  0x10C
 
+/*
+ * This is because net_asic sometimes return random temperatures.
+ * after discussion, let's return -1 if temperature is bigger than 150 digree.
+ */
+#define NET_ASIC_IMPOSSIBLE_TEMP  (150 * 1000)
+
 enum sdk_status {
   NOT_RUNNING,
   RUNNING,
@@ -151,8 +157,6 @@ static ssize_t net_asic_temp_show(struct device *dev, struct device_attribute *d
 
   int file_index = attr->index;
   int reg = file_index * NET_NCSI_MSG_LEN;
-  if(net_asic_i2c_read(data, reg, &value))
-    goto err_exit;
 
   /*
    * Check sdk is running or not
@@ -161,12 +165,20 @@ static ssize_t net_asic_temp_show(struct device *dev, struct device_attribute *d
    * every 100ms, or it should be keep the same.
    * Only when SDK is running, the temperature values are valid.
    */
-  if(net_asic_heartbeat_update(data))
+  if (net_asic_heartbeat_update(data))
     return -1;
 
   /* if SDK is running in the last 100ms, return the temperature */
-  if(data->sdk_status == RUNNING)
+  if (data->sdk_status == RUNNING) {
+    /*
+     * This is because net_asic sometimes return random temperatures.
+     * After discussion, let's return -1 if temperature is bigger than
+     * NET_ASIC_IMPOSSIBLE_TEMP digree.
+     */
+    if (net_asic_i2c_read(data, reg, &value) || value > NET_ASIC_IMPOSSIBLE_TEMP)
+      goto err_exit;
     return sprintf(buf, "%d\n", value);
+  }
 
 err_exit:
     return -1;
