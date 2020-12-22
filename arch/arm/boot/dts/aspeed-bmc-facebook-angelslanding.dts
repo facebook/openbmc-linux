@@ -224,7 +224,6 @@
 
 &i2c3 {
 	multi-master;
-	bus-frequency = <400000>;
 	status = "okay";
 };
 
