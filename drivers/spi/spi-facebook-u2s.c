@@ -121,6 +121,17 @@ struct fbus_spi_csr {
 	u32 status;
 };
 
+
+/*
+ * this spi_flow_ctrl is used to control part of the fpga tlv receiving
+ * process because fpga has not yet separately supported all types of tlv
+ * transmissions, BMC must send specific TLVs to fpga in sequence.
+ * The fpga's multi-threaded is not complete, it just looks similar to
+ * multi-threaded transmission. The lock should be dropped when multi-thread
+ * support is implemented/fixed in fpga side.
+ */
+struct mutex spi_flow_ctrl;
+
 /*
  * Structure for a SPI master.
  */
@@ -586,7 +597,9 @@ static int fbus_spi_xfer_rx(struct fbus_spi_master *uspi,
 	uspi->read_op_size = 0;
 
 	while (ndata < xfer->len) {
+		mutex_lock(&spi_flow_ctrl);
 		ret = fbus_spi_xfer_single_rx(uspi, xfer, op_size, ndata);
+		mutex_unlock(&spi_flow_ctrl);
 		if (ret < 0)
 			return ret;
 
@@ -609,6 +622,7 @@ static int fbus_spi_xfer_one(struct spi_master *master,
 	int ret = 0;
 	struct fbus_spi_master *uspi = spi_master_get_devdata(master);
 
+
 	if (xfer->tx_buf != NULL) {
 		u8 flash_op = ((u8*)(xfer->tx_buf))[0];
 
@@ -618,9 +632,12 @@ static int fbus_spi_xfer_one(struct spi_master *master,
 		 */
 		fbus_spi_cache_flash_op(uspi, xfer);
 		if (!fbus_spi_is_read_op(flash_op)) {
+			mutex_lock(&spi_flow_ctrl);
 			ret = fbus_spi_xfer_tx(uspi, xfer);
-			if (ret < 0)
+			mutex_unlock(&spi_flow_ctrl);
+			if (ret < 0) {
 				return ret;
+			}
 		}
 	}
 
@@ -821,6 +838,8 @@ static int fbus_usb_probe(struct usb_interface *usb_intf,
 			"failed to initialize miscdevice, ret=%d\n", ret);
 		goto error;
 	}
+
+	mutex_init(&spi_flow_ctrl);
 
 	usb_set_intfdata(usb_intf, &fbus_bridge);
 
