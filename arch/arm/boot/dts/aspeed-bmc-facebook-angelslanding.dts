@@ -242,6 +242,7 @@
 
 &i2c5 {
 	multi-master;
+	bus-frequency = <400000>;
 	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
