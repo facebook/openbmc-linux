@@ -31,9 +31,12 @@
 #define NET_ASIC_DELAY     10
 #define NET_NCSI_MSG_LEN   4
 
-#define HEARTBEAT_REFRESH_INTERVAL (HZ / 10)
-#define NET_ASIC_HEARTBEAT_LSB_REG  0x108
-#define NET_ASIC_HEARTBEAT_MSB_REG  0x10C
+#define NET_ASIC_REG_BASE           0x80000
+#define NET_ASIC_TEMP_REG_BASE      NET_ASIC_REG_BASE
+
+#define HEARTBEAT_REFRESH_INTERVAL  (HZ / 10)
+#define NET_ASIC_HEARTBEAT_LSB_REG  (NET_ASIC_REG_BASE + 0x108)
+#define NET_ASIC_HEARTBEAT_MSB_REG  (NET_ASIC_REG_BASE + 0x10C)
 
 /*
  * This is because net_asic sometimes return random temperatures.
@@ -155,8 +158,11 @@ static ssize_t net_asic_temp_show(struct device *dev, struct device_attribute *d
   struct net_asic_data *data = dev_get_drvdata(dev);
   int value = -1;
 
-  int file_index = attr->index;
-  int reg = file_index * NET_NCSI_MSG_LEN;
+  int file_index = attr->index - 1;
+  if(file_index < 0)
+    return -1;
+
+  int reg = file_index * NET_NCSI_MSG_LEN + NET_ASIC_TEMP_REG_BASE;
 
   /*
    * Check sdk is running or not
@@ -194,6 +200,8 @@ static SENSOR_DEVICE_ATTR(temp7_input, S_IRUGO, net_asic_temp_show, NULL, 7);
 static SENSOR_DEVICE_ATTR(temp8_input, S_IRUGO, net_asic_temp_show, NULL, 8);
 static SENSOR_DEVICE_ATTR(temp9_input, S_IRUGO, net_asic_temp_show, NULL, 9);
 static SENSOR_DEVICE_ATTR(temp10_input, S_IRUGO, net_asic_temp_show, NULL, 10);
+static SENSOR_DEVICE_ATTR(temp11_input, S_IRUGO, net_asic_temp_show, NULL, 11);
+static SENSOR_DEVICE_ATTR(temp12_input, S_IRUGO, net_asic_temp_show, NULL, 12);
 static SENSOR_DEVICE_ATTR(sdk_status, S_IRUGO, net_asic_sdk_status_show, NULL, 0);
 
 static struct attribute *net_asic_attrs[] = {
@@ -207,6 +215,8 @@ static struct attribute *net_asic_attrs[] = {
   &sensor_dev_attr_temp8_input.dev_attr.attr,
   &sensor_dev_attr_temp9_input.dev_attr.attr,
   &sensor_dev_attr_temp10_input.dev_attr.attr,
+  &sensor_dev_attr_temp11_input.dev_attr.attr,
+  &sensor_dev_attr_temp12_input.dev_attr.attr,
   &sensor_dev_attr_sdk_status.dev_attr.attr,
   NULL,
 };
