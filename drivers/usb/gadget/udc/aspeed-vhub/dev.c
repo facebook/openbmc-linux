@@ -569,6 +569,7 @@ int ast_vhub_init_dev(struct ast_vhub *vhub, unsigned int idx)
 	device_initialize(d->port_dev);
 	d->port_dev->release = ast_vhub_dev_release;
 	d->port_dev->parent = parent;
+	d->port_dev->dma_mask = parent->dma_mask;
 	dev_set_name(d->port_dev, "%s:p%d", dev_name(parent), idx + 1);
 	rc = device_add(d->port_dev);
 	if (rc)
