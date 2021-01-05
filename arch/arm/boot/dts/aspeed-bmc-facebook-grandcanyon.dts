@@ -538,7 +538,11 @@
        pinctrl-0 = <&pinctrl_jtagm_default>;
 };
 
+&vhub {
+      status = "okay";
+};
+
 // connect to BIC 
 &ehci1 {
-    status = "okay";
+      status = "okay";
 };
