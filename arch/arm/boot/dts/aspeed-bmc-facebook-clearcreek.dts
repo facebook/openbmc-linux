@@ -263,10 +263,16 @@
 };
 
 &i2c8 {
+	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 	tmp421@4f {
 		compatible = "ti,tmp421";
 		reg = <0x4f>;
+	};
+	eeprom@51 {
+		compatible = "atmel,24c64";
+		reg = <0x51>;
 	};
 };
 
