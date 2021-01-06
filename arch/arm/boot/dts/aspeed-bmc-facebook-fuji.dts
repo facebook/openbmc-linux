@@ -1376,6 +1376,12 @@
 		&pinctrl_adc14_default &pinctrl_adc15_default>;
 };
 
+&syscon {
+        mac3-clk-delay = <0x09 0x04
+                          0x09 0x04
+                          0x09 0x04>;
+};
+
 &fmc {
 	status = "okay";
 	flash@0 {
