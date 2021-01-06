@@ -47,17 +47,25 @@ static int rmnet_unregister_real_device(struct net_device *real_dev)
 	return 0;
 }
 
-static int rmnet_register_real_device(struct net_device *real_dev)
+static int rmnet_register_real_device(struct net_device *real_dev,
+				      struct netlink_ext_ack *extack)
 {
 	struct rmnet_port *port;
 	int rc, entry;
 
 	ASSERT_RTNL();
 
-	if (rmnet_is_real_dev_registered(real_dev))
-		return 0;
+	if (rmnet_is_real_dev_registered(real_dev)) {
+		port = rmnet_get_port_rtnl(real_dev);
+		if (port->rmnet_mode != RMNET_EPMODE_VND) {
+			NL_SET_ERR_MSG_MOD(extack, "bridge device already exists");
+			return -EINVAL;
+		}
 
-	port = kzalloc(sizeof(*port), GFP_ATOMIC);
+		return 0;
+	}
+
+	port = kzalloc(sizeof(*port), GFP_KERNEL);
 	if (!port)
 		return -ENOMEM;
 
@@ -122,24 +130,23 @@ static int rmnet_newlink(struct net *src_net, struct net_device *dev,
 	}
 
 	real_dev = __dev_get_by_index(src_net, nla_get_u32(tb[IFLA_LINK]));
-	if (!real_dev || !dev)
+	if (!real_dev) {
+		NL_SET_ERR_MSG_MOD(extack, "link does not exist");
 		return -ENODEV;
+	}
 
-	if (!data[IFLA_RMNET_MUX_ID])
-		return -EINVAL;
-
-	ep = kzalloc(sizeof(*ep), GFP_ATOMIC);
+	ep = kzalloc(sizeof(*ep), GFP_KERNEL);
 	if (!ep)
 		return -ENOMEM;
 
 	mux_id = nla_get_u16(data[IFLA_RMNET_MUX_ID]);
 
-	err = rmnet_register_real_device(real_dev);
+	err = rmnet_register_real_device(real_dev, extack);
 	if (err)
 		goto err0;
 
 	port = rmnet_get_port_rtnl(real_dev);
-	err = rmnet_vnd_newlink(mux_id, dev, port, real_dev, ep);
+	err = rmnet_vnd_newlink(mux_id, dev, port, real_dev, ep, extack);
 	if (err)
 		goto err1;
 
@@ -263,12 +270,16 @@ static int rmnet_rtnl_validate(struct nlattr *tb[], struct nlattr *data[],
 {
 	u16 mux_id;
 
-	if (!data || !data[IFLA_RMNET_MUX_ID])
+	if (!data || !data[IFLA_RMNET_MUX_ID]) {
+		NL_SET_ERR_MSG_MOD(extack, "MUX ID not specified");
 		return -EINVAL;
+	}
 
 	mux_id = nla_get_u16(data[IFLA_RMNET_MUX_ID]);
-	if (mux_id > (RMNET_MAX_LOGICAL_EP - 1))
+	if (mux_id > (RMNET_MAX_LOGICAL_EP - 1)) {
+		NL_SET_ERR_MSG_MOD(extack, "invalid MUX ID");
 		return -ERANGE;
+	}
 
 	return 0;
 }
@@ -413,16 +424,24 @@ int rmnet_add_bridge(struct net_device *rmnet_dev,
 	/* If there is more than one rmnet dev attached, its probably being
 	 * used for muxing. Skip the briding in that case
 	 */
-	if (port->nr_rmnet_devs > 1)
+	if (port->nr_rmnet_devs > 1) {
+		NL_SET_ERR_MSG_MOD(extack, "more than one rmnet dev attached");
 		return -EINVAL;
+	}
 
-	if (port->rmnet_mode != RMNET_EPMODE_VND)
+	if (port->rmnet_mode != RMNET_EPMODE_VND) {
+		NL_SET_ERR_MSG_MOD(extack, "more than one bridge dev attached");
 		return -EINVAL;
+	}
 
-	if (rmnet_is_real_dev_registered(slave_dev))
+	if (rmnet_is_real_dev_registered(slave_dev)) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "slave cannot be another rmnet dev");
+
 		return -EBUSY;
+	}
 
-	err = rmnet_register_real_device(slave_dev);
+	err = rmnet_register_real_device(slave_dev, extack);
 	if (err)
 		return -EBUSY;
 
@@ -482,4 +501,5 @@ static void __exit rmnet_exit(void)
 
 module_init(rmnet_init)
 module_exit(rmnet_exit)
+MODULE_ALIAS_RTNL_LINK("rmnet");
 MODULE_LICENSE("GPL v2");

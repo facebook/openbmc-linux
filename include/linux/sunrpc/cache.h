@@ -45,7 +45,8 @@
  */
 struct cache_head {
 	struct hlist_node	cache_list;
-	time64_t	expiry_time;	/* After time time, don't use the data */
+	time64_t	expiry_time;	/* After time expiry_time, don't use
+					 * the data */
 	time64_t	last_refresh;   /* If CACHE_PENDING, this is when upcall was
 					 * sent, else this is when update was
 					 * received, though it is alway set to
@@ -179,6 +180,9 @@ sunrpc_cache_update(struct cache_detail *detail,
 
 extern int
 sunrpc_cache_pipe_upcall(struct cache_detail *detail, struct cache_head *h);
+extern int
+sunrpc_cache_pipe_upcall_timeout(struct cache_detail *detail,
+				 struct cache_head *h);
 
 
 extern void cache_clean_deferred(void *owner);
@@ -206,11 +210,11 @@ static inline void cache_put(struct cache_head *h, struct cache_detail *cd)
 
 static inline bool cache_is_expired(struct cache_detail *detail, struct cache_head *h)
 {
+	if (h->expiry_time < seconds_since_boot())
+		return true;
 	if (!test_bit(CACHE_VALID, &h->flags))
 		return false;
-
-	return  (h->expiry_time < seconds_since_boot()) ||
-		(detail->flush_time >= h->last_refresh);
+	return detail->flush_time >= h->last_refresh;
 }
 
 extern int cache_check(struct cache_detail *detail,

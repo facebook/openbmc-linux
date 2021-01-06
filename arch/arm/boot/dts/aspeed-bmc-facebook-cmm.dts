@@ -1280,7 +1280,6 @@
  */
 &i2c8 {
 	status = "okay";
-	base-clock-divisor = <4>;
 
 	i2c-switch@77 {
 		compatible = "nxp,pca9548";

@@ -429,26 +429,7 @@ static void ncsi_request_timeout(struct timer_list *t)
 	struct ncsi_cmd_pkt *cmd;
 	struct ncsi_package *np;
 	struct ncsi_channel *nc;
-	struct ncsi_cmd_oem_pkt *oem_cmd;
-	u8 *oem_data = NULL;
 	unsigned long flags;
-
-	if ((nr->flags == NCSI_REQ_FLAG_EVENT_DRIVEN) && (nr->nca.rexmit-- > 0)) {
-		netdev_warn(ndp->ndev.dev, "NCSI: retransmit cmd 0x%x\n", nr->nca.type);
-		if (nr->nca.type == NCSI_PKT_CMD_OEM) {
-			if (!(oem_data = kzalloc(nr->nca.payload, GFP_ATOMIC))) {
-				netdev_err(ndp->ndev.dev, "NCSI: allocate oem_data failed\n");
-				return;
-			}
-			oem_cmd = (struct ncsi_cmd_oem_pkt *)skb_network_header(nr->cmd);
-			memcpy(oem_data, &oem_cmd->mfr_id, nr->nca.payload);
-			nr->nca.data = oem_data;
-		}
-		ndp->pending_req_num++;
-		ncsi_xmit_cmd(&nr->nca);
-		if (oem_data)
-			kfree(oem_data);
-	}
 
 	/* If the request already had associated response,
 	 * let the response handler to release it.
@@ -490,11 +471,10 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 	nc = ndp->active_channel;
 	nca.ndp = ndp;
 	nca.req_flags = NCSI_REQ_FLAG_EVENT_DRIVEN;
-	nca.rexmit = ndp->rexmit;
 	switch (nd->state) {
 	case ncsi_dev_state_suspend:
 		nd->state = ncsi_dev_state_suspend_select;
-		/* Fall through */
+		fallthrough;
 	case ncsi_dev_state_suspend_select:
 		ndp->pending_req_num = 1;
 
@@ -552,13 +532,6 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 
 		break;
 	case ncsi_dev_state_suspend_dc:
-		if ( ndp->cmd_retry++ < NCSI_CMD_RETRY_MAX ) {
-			printk("Resend DCNT cmd...retry:%d\n", ndp->cmd_retry);
-			nd->state = ncsi_dev_state_suspend_dcnt;
-			schedule_work(&ndp->work);
-			break;
-		}
-
 		ndp->pending_req_num = 1;
 
 		nca.type = NCSI_PKT_CMD_DC;
@@ -972,7 +945,6 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 
 	nca.ndp = ndp;
 	nca.req_flags = NCSI_REQ_FLAG_EVENT_DRIVEN;
-	nca.rexmit = ndp->rexmit;
 	switch (nd->state) {
 	case ncsi_dev_state_config:
 	case ncsi_dev_state_config_sp:
@@ -1181,8 +1153,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 		ndp->hot_channel = hot_nc;
 		spin_unlock_irqrestore(&ndp->lock, flags);
 
-		if (!(ndp->ctrl_flags & NCSI_CTRL_FLAG_NO_CHANNEL_MONITOR))
-			ncsi_start_channel_monitor(nc);
+		ncsi_start_channel_monitor(nc);
 		ncsi_process_next_channel(ndp);
 		break;
 	default:
@@ -1328,18 +1299,17 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 
 	nca.ndp = ndp;
 	nca.req_flags = NCSI_REQ_FLAG_EVENT_DRIVEN;
-	nca.rexmit = ndp->rexmit;
 	switch (nd->state) {
 	case ncsi_dev_state_probe:
 		nd->state = ncsi_dev_state_probe_deselect;
-		/* Fall through */
+		fallthrough;
 	case ncsi_dev_state_probe_deselect:
-		ndp->pending_req_num = ndp->max_package;
+		ndp->pending_req_num = 8;
 
 		/* Deselect all possible packages */
 		nca.type = NCSI_PKT_CMD_DP;
 		nca.channel = NCSI_RESERVED_CHANNEL;
-		for (index = 0; index < ndp->max_package; index++) {
+		for (index = 0; index < 8; index++) {
 			nca.package = index;
 			ret = ncsi_xmit_cmd(&nca);
 			if (ret)
@@ -1403,12 +1373,12 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		break;
 #endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
 	case ncsi_dev_state_probe_cis:
-		ndp->pending_req_num = ndp->max_channel;
+		ndp->pending_req_num = NCSI_RESERVED_CHANNEL;
 
 		/* Clear initial state */
 		nca.type = NCSI_PKT_CMD_CIS;
 		nca.package = ndp->active_package->id;
-		for (index = 0; index < ndp->max_channel; index++) {
+		for (index = 0; index < NCSI_RESERVED_CHANNEL; index++) {
 			nca.channel = index;
 			ret = ncsi_xmit_cmd(&nca);
 			if (ret)
@@ -1453,14 +1423,13 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		nca.type = NCSI_PKT_CMD_DP;
 		nca.package = ndp->package_probe_id;
 		nca.channel = NCSI_RESERVED_CHANNEL;
-		nca.rexmit = 0;
 		ret = ncsi_xmit_cmd(&nca);
 		if (ret)
 			goto error;
 
 		/* Probe next package */
 		ndp->package_probe_id++;
-		if (ndp->package_probe_id >= ndp->max_package) {
+		if (ndp->package_probe_id >= 8) {
 			/* Probe finished */
 			ndp->flags |= NCSI_DEV_PROBED;
 			break;
@@ -1716,7 +1685,6 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 	struct device_node *np;
 	unsigned long flags;
 	int i;
-	u32 property;
 
 	/* Check if the device has been registered or not */
 	nd = ncsi_find_dev(dev);
@@ -1733,12 +1701,10 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 	nd->dev = dev;
 	nd->handler = handler;
 	ndp->pending_req_num = 0;
-	ndp->cmd_retry = 0;
 	INIT_LIST_HEAD(&ndp->channel_queue);
 	INIT_LIST_HEAD(&ndp->vlan_vids);
 	INIT_WORK(&ndp->work, ncsi_dev_work);
 	ndp->package_whitelist = UINT_MAX;
-	ndp->ctrl_flags = 0;
 
 	/* Initialize private NCSI device */
 	spin_lock_init(&ndp->lock);
@@ -1749,8 +1715,6 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 		ndp->requests[i].ndp = ndp;
 		timer_setup(&ndp->requests[i].timer, ncsi_request_timeout, 0);
 	}
-	ndp->max_package = NCSI_MAX_PACKAGE;
-	ndp->max_channel = NCSI_RESERVED_CHANNEL;
 
 	spin_lock_irqsave(&ncsi_dev_lock, flags);
 	list_add_tail_rcu(&ndp->node, &ncsi_dev_list);
@@ -1762,35 +1726,11 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 	ndp->ptype.dev = dev;
 	dev_add_pack(&ndp->ptype);
 
-	/* Set up generic netlink interface */
-	ncsi_init_netlink(dev);
-
 	pdev = to_platform_device(dev->dev.parent);
 	if (pdev) {
 		np = pdev->dev.of_node;
-		if (np) {
-			if (of_get_property(np, "mlx,multi-host", NULL))
-				ndp->mlx_multi_host = true;
-
-			if (of_get_property(np, "ncsi-ctrl,no-channel-monitor", NULL))
-				ndp->ctrl_flags |= NCSI_CTRL_FLAG_NO_CHANNEL_MONITOR;
-
-			if (of_get_property(np, "ncsi-ctrl,start-redo-probe", NULL))
-				ndp->ctrl_flags |= NCSI_CTRL_FLAG_START_REDO_PROBE;
-
-			if (!of_property_read_u32(np, "ncsi-package", &property) &&
-				(property < NCSI_MAX_PACKAGE)) {
-				ndp->max_package = (u8)property;
-			}
-
-			if (!of_property_read_u32(np, "ncsi-channel", &property) &&
-				(property < NCSI_RESERVED_CHANNEL)) {
-				ndp->max_channel = (u8)property;
-			}
-			if (!of_property_read_u32(np, "ncsi-rexmit", &property)) {
-				ndp->rexmit = (u8)property;
-			}
-		}
+		if (np && of_get_property(np, "mlx,multi-host", NULL))
+			ndp->mlx_multi_host = true;
 	}
 
 	return nd;
@@ -1800,24 +1740,10 @@ EXPORT_SYMBOL_GPL(ncsi_register_dev);
 int ncsi_start_dev(struct ncsi_dev *nd)
 {
 	struct ncsi_dev_priv *ndp = TO_NCSI_DEV_PRIV(nd);
-	struct ncsi_package *np, *tmp;
-	unsigned long flags;
 
 	if (nd->state != ncsi_dev_state_registered &&
 	    nd->state != ncsi_dev_state_functional)
 		return -ENOTTY;
-
-	if (ndp->ctrl_flags & NCSI_CTRL_FLAG_START_REDO_PROBE) {
-		nd->state = ncsi_dev_state_probe;
-
-		spin_lock_irqsave(&ndp->lock, flags);
-		ndp->flags &= ~NCSI_DEV_PROBED;
-		ndp->gma_flag = 0;
-		spin_unlock_irqrestore(&ndp->lock, flags);
-
-		list_for_each_entry_safe(np, tmp, &ndp->packages, node)
-			ncsi_remove_package(np);
-	}
 
 	if (!(ndp->flags & NCSI_DEV_PROBED)) {
 		ndp->package_probe_id = 0;
@@ -1941,7 +1867,6 @@ int ncsi_reset_dev(struct ncsi_dev *nd)
 	ndp->flags |= NCSI_DEV_RESET;
 	ndp->active_channel = active;
 	ndp->active_package = active->package;
-	ndp->cmd_retry = 0;
 	spin_unlock_irqrestore(&ndp->lock, flags);
 
 	nd->state = ncsi_dev_state_suspend;
@@ -1963,8 +1888,6 @@ void ncsi_unregister_dev(struct ncsi_dev *nd)
 	spin_lock_irqsave(&ncsi_dev_lock, flags);
 	list_del_rcu(&ndp->node);
 	spin_unlock_irqrestore(&ncsi_dev_lock, flags);
-
-	ncsi_unregister_netlink(nd->dev);
 
 	kfree(ndp);
 }

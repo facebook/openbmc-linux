@@ -51,7 +51,7 @@
 			reg = <0>;
 			enable-method = "psci";
 			next-level-cache = <&L2>;
-			clocks = <&ccu 21>;
+			clocks = <&ccu CLK_CPUX>;
 			clock-names = "cpu";
 			#cooling-cells = <2>;
 		};
@@ -62,7 +62,7 @@
 			reg = <1>;
 			enable-method = "psci";
 			next-level-cache = <&L2>;
-			clocks = <&ccu 21>;
+			clocks = <&ccu CLK_CPUX>;
 			clock-names = "cpu";
 			#cooling-cells = <2>;
 		};
@@ -73,7 +73,7 @@
 			reg = <2>;
 			enable-method = "psci";
 			next-level-cache = <&L2>;
-			clocks = <&ccu 21>;
+			clocks = <&ccu CLK_CPUX>;
 			clock-names = "cpu";
 			#cooling-cells = <2>;
 		};
@@ -84,7 +84,7 @@
 			reg = <3>;
 			enable-method = "psci";
 			next-level-cache = <&L2>;
-			clocks = <&ccu 21>;
+			clocks = <&ccu CLK_CPUX>;
 			clock-names = "cpu";
 			#cooling-cells = <2>;
 		};
@@ -139,10 +139,10 @@
 		simple-audio-card,mclk-fs = <128>;
 		simple-audio-card,aux-devs = <&codec_analog>;
 		simple-audio-card,routing =
-				"Left DAC", "AIF1 Slot 0 Left",
-				"Right DAC", "AIF1 Slot 0 Right",
-				"AIF1 Slot 0 Left ADC", "Left ADC",
-				"AIF1 Slot 0 Right ADC", "Right ADC";
+				"Left DAC", "DACL",
+				"Right DAC", "DACR",
+				"ADCL", "Left ADC",
+				"ADCR", "Right ADC";
 		status = "disabled";
 
 		cpudai: simple-audio-card,cpu {
@@ -154,27 +154,10 @@
 		};
 	};
 
-	sound_spdif {
-		compatible = "simple-audio-card";
-		simple-audio-card,name = "On-board SPDIF";
-
-		simple-audio-card,cpu {
-			sound-dai = <&spdif>;
-		};
-
-		simple-audio-card,codec {
-			sound-dai = <&spdif_out>;
-		};
-	};
-
-	spdif_out: spdif-out {
-		#sound-dai-cells = <0>;
-		compatible = "linux,spdif-dit";
-	};
-
 	timer {
 		compatible = "arm,armv8-timer";
 		allwinner,erratum-unknown1;
+		arm,no-tick-in-suspend;
 		interrupts = <GIC_PPI 13
 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
 			     <GIC_PPI 14
@@ -272,6 +255,18 @@
 				resets = <&ccu RST_BUS_DE>;
 				#clock-cells = <1>;
 				#reset-cells = <1>;
+			};
+
+			rotate: rotate@20000 {
+				compatible = "allwinner,sun50i-a64-de2-rotate",
+					     "allwinner,sun8i-a83t-de2-rotate";
+				reg = <0x20000 0x10000>;
+				interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&display_clocks CLK_BUS_ROT>,
+					 <&display_clocks CLK_ROT>;
+				clock-names = "bus",
+					      "mod";
+				resets = <&display_clocks RST_ROT>;
 			};
 
 			mixer0: mixer@100000 {
@@ -545,6 +540,16 @@
 			resets = <&ccu RST_BUS_CE>;
 		};
 
+		msgbox: mailbox@1c17000 {
+			compatible = "allwinner,sun50i-a64-msgbox",
+				     "allwinner,sun6i-a31-msgbox";
+			reg = <0x01c17000 0x1000>;
+			clocks = <&ccu CLK_BUS_MSGBOX>;
+			resets = <&ccu RST_BUS_MSGBOX>;
+			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+			#mbox-cells = <1>;
+		};
+
 		usb_otg: usb@1c19000 {
 			compatible = "allwinner,sun8i-a33-musb";
 			reg = <0x01c19000 0x0400>;
@@ -669,6 +674,11 @@
 			i2c1_pins: i2c1-pins {
 				pins = "PH2", "PH3";
 				function = "i2c1";
+			};
+
+			i2c2_pins: i2c2-pins {
+				pins = "PE14", "PE15";
+				function = "i2c2";
 			};
 
 			/omit-if-no-ref/
@@ -851,7 +861,8 @@
 
 		codec: codec@1c22e00 {
 			#sound-dai-cells = <0>;
-			compatible = "allwinner,sun8i-a33-codec";
+			compatible = "allwinner,sun50i-a64-codec",
+				     "allwinner,sun8i-a33-codec";
 			reg = <0x01c22e00 0x600>;
 			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
@@ -958,11 +969,12 @@
 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&ccu CLK_BUS_I2C2>;
 			resets = <&ccu RST_BUS_I2C2>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&i2c2_pins>;
 			status = "disabled";
 			#address-cells = <1>;
 			#size-cells = <0>;
 		};
-
 
 		spi0: spi@1c68000 {
 			compatible = "allwinner,sun8i-h3-spi";
@@ -1061,6 +1073,16 @@
 			status = "disabled";
 		};
 
+		mbus: dram-controller@1c62000 {
+			compatible = "allwinner,sun50i-a64-mbus";
+			reg = <0x01c62000 0x1000>;
+			clocks = <&ccu 112>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			dma-ranges = <0x00000000 0x40000000 0xc0000000>;
+			#interconnect-cells = <1>;
+		};
+
 		csi: csi@1cb0000 {
 			compatible = "allwinner,sun50i-a64-csi";
 			reg = <0x01cb0000 0x1000>;
@@ -1104,6 +1126,20 @@
 			resets = <&ccu RST_BUS_MIPI_DSI>;
 			status = "disabled";
 			#phy-cells = <0>;
+		};
+
+		deinterlace: deinterlace@1e00000 {
+			compatible = "allwinner,sun50i-a64-deinterlace",
+				     "allwinner,sun8i-h3-deinterlace";
+			reg = <0x01e00000 0x20000>;
+			clocks = <&ccu CLK_BUS_DEINTERLACE>,
+				 <&ccu CLK_DEINTERLACE>,
+				 <&ccu CLK_DRAM_DEINTERLACE>;
+			clock-names = "bus", "mod", "ram";
+			resets = <&ccu RST_BUS_DEINTERLACE>;
+			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+			interconnects = <&mbus 9>;
+			interconnect-names = "dma-mem";
 		};
 
 		hdmi: hdmi@1ee0000 {

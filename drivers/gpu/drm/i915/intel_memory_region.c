@@ -87,7 +87,7 @@ __intel_memory_region_get_pages_buddy(struct intel_memory_region *mem,
 		min_order = ilog2(size) - ilog2(mem->mm.chunk_size);
 	}
 
-	if (size > BIT(mem->mm.max_order) * mem->mm.chunk_size)
+	if (size > mem->mm.size)
 		return -E2BIG;
 
 	n_pages = size >> ilog2(mem->mm.chunk_size);
@@ -265,7 +265,9 @@ int intel_memory_regions_hw_probe(struct drm_i915_private *i915)
 
 		if (IS_ERR(mem)) {
 			err = PTR_ERR(mem);
-			DRM_ERROR("Failed to setup region(%d) type=%d\n", err, type);
+			drm_err(&i915->drm,
+				"Failed to setup region(%d) type=%d\n",
+				err, type);
 			goto out_cleanup;
 		}
 

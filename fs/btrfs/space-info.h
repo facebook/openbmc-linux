@@ -54,6 +54,13 @@ struct btrfs_space_info {
 	struct list_head ro_bgs;
 	struct list_head priority_tickets;
 	struct list_head tickets;
+
+	/*
+	 * Size of space that needs to be reclaimed in order to satisfy pending
+	 * tickets
+	 */
+	u64 reclaim_size;
+
 	/*
 	 * tickets_id just indicates the next ticket will be handled, so note
 	 * it's not stored per ticket.
@@ -71,6 +78,7 @@ struct btrfs_space_info {
 struct reserve_ticket {
 	u64 bytes;
 	int error;
+	bool steal;
 	struct list_head list;
 	wait_queue_head_t wait;
 };
@@ -141,5 +149,7 @@ static inline void btrfs_space_info_free_bytes_may_use(
 	btrfs_try_granting_tickets(fs_info, space_info);
 	spin_unlock(&space_info->lock);
 }
+int btrfs_reserve_data_bytes(struct btrfs_fs_info *fs_info, u64 bytes,
+			     enum btrfs_reserve_flush_enum flush);
 
 #endif /* BTRFS_SPACE_INFO_H */

@@ -17,6 +17,7 @@
 #include <linux/mtd/rawnand.h>
 #include <linux/of_device.h>
 #include <linux/iopoll.h>
+#include <linux/slab.h>
 
 /*
  * HPNFC can work in 3 modes:
@@ -30,7 +31,6 @@
  * Generic mode is used for executing rest of commands.
  */
 
-#define MAX_OOB_SIZE_PER_SECTOR	32
 #define MAX_ADDRESS_CYC		6
 #define MAX_ERASE_ADDRESS_CYC	3
 #define MAX_DATA_SIZE		0xFFFC
@@ -190,6 +190,7 @@
 
 /* BCH Engine identification register 3. */
 #define BCH_CFG_3				0x844
+#define		BCH_CFG_3_METADATA_SIZE		GENMASK(23, 16)
 
 /* Ready/Busy# line status. */
 #define RBN_SETINGS				0x1004
@@ -499,6 +500,7 @@ struct cdns_nand_ctrl {
 
 	unsigned long assigned_cs;
 	struct list_head chips;
+	u8 bch_metadata_size;
 };
 
 struct cdns_nand_chip {
@@ -1078,6 +1080,14 @@ static int cadence_nand_read_bch_caps(struct cdns_nand_ctrl *cdns_ctrl)
 	int max_step_size = 0, nstrengths, i;
 	u32 reg;
 
+	reg = readl_relaxed(cdns_ctrl->reg + BCH_CFG_3);
+	cdns_ctrl->bch_metadata_size = FIELD_GET(BCH_CFG_3_METADATA_SIZE, reg);
+	if (cdns_ctrl->bch_metadata_size < 4) {
+		dev_err(cdns_ctrl->dev,
+			"Driver needs at least 4 bytes of BCH meta data\n");
+		return -EIO;
+	}
+
 	reg = readl_relaxed(cdns_ctrl->reg + BCH_CFG_0);
 	cdns_ctrl->ecc_strengths[0] = FIELD_GET(BCH_CFG_0_CORR_CAP_0, reg);
 	cdns_ctrl->ecc_strengths[1] = FIELD_GET(BCH_CFG_0_CORR_CAP_1, reg);
@@ -1171,7 +1181,8 @@ static int cadence_nand_hw_init(struct cdns_nand_ctrl *cdns_ctrl)
 	writel_relaxed(0xFFFFFFFF, cdns_ctrl->reg + INTR_STATUS);
 
 	cadence_nand_get_caps(cdns_ctrl);
-	cadence_nand_read_bch_caps(cdns_ctrl);
+	if (cadence_nand_read_bch_caps(cdns_ctrl))
+		return -EIO;
 
 	/*
 	 * Set IO width access to 8.
@@ -2213,10 +2224,12 @@ static int cadence_nand_exec_op(struct nand_chip *chip,
 				const struct nand_operation *op,
 				bool check_only)
 {
-	int status = cadence_nand_select_target(chip);
+	if (!check_only) {
+		int status = cadence_nand_select_target(chip);
 
-	if (status)
-		return status;
+		if (status)
+			return status;
+	}
 
 	return nand_op_parser_exec_op(chip, &cadence_nand_op_parser, op,
 				      check_only);
@@ -2291,8 +2304,8 @@ static inline u32 calc_tdvw(u32 trp_cnt, u32 clk_period, u32 trhoh_min,
 }
 
 static int
-cadence_nand_setup_data_interface(struct nand_chip *chip, int chipnr,
-				  const struct nand_data_interface *conf)
+cadence_nand_setup_interface(struct nand_chip *chip, int chipnr,
+			     const struct nand_interface_config *conf)
 {
 	const struct nand_sdr_timings *sdr;
 	struct cdns_nand_ctrl *cdns_ctrl = to_cdns_nand_ctrl(chip->controller);
@@ -2582,13 +2595,12 @@ cadence_nand_setup_data_interface(struct nand_chip *chip, int chipnr,
 	return 0;
 }
 
-int cadence_nand_attach_chip(struct nand_chip *chip)
+static int cadence_nand_attach_chip(struct nand_chip *chip)
 {
 	struct cdns_nand_ctrl *cdns_ctrl = to_cdns_nand_ctrl(chip->controller);
 	struct cdns_nand_chip *cdns_chip = to_cdns_nand_chip(chip);
 	u32 ecc_size;
 	struct mtd_info *mtd = nand_to_mtd(chip);
-	u32 max_oob_data_size;
 	int ret;
 
 	if (chip->options & NAND_BUSWIDTH_16) {
@@ -2599,7 +2611,7 @@ int cadence_nand_attach_chip(struct nand_chip *chip)
 
 	chip->bbt_options |= NAND_BBT_USE_FLASH;
 	chip->bbt_options |= NAND_BBT_NO_OOB;
-	chip->ecc.mode = NAND_ECC_HW;
+	chip->ecc.engine_type = NAND_ECC_ENGINE_TYPE_ON_HOST;
 
 	chip->options |= NAND_NO_SUBPAGE_WRITE;
 
@@ -2627,10 +2639,8 @@ int cadence_nand_attach_chip(struct nand_chip *chip)
 
 	cdns_chip->avail_oob_size = mtd->oobsize - ecc_size;
 
-	max_oob_data_size = MAX_OOB_SIZE_PER_SECTOR;
-
-	if (cdns_chip->avail_oob_size > max_oob_data_size)
-		cdns_chip->avail_oob_size = max_oob_data_size;
+	if (cdns_chip->avail_oob_size > cdns_ctrl->bch_metadata_size)
+		cdns_chip->avail_oob_size = cdns_ctrl->bch_metadata_size;
 
 	if ((cdns_chip->avail_oob_size + cdns_chip->bbm_len + ecc_size)
 	    > mtd->oobsize)
@@ -2681,7 +2691,7 @@ int cadence_nand_attach_chip(struct nand_chip *chip)
 static const struct nand_controller_ops cadence_nand_controller_ops = {
 	.attach_chip = cadence_nand_attach_chip,
 	.exec_op = cadence_nand_exec_op,
-	.setup_data_interface = cadence_nand_setup_data_interface,
+	.setup_interface = cadence_nand_setup_interface,
 };
 
 static int cadence_nand_chip_init(struct cdns_nand_ctrl *cdns_ctrl,
@@ -2747,7 +2757,7 @@ static int cadence_nand_chip_init(struct cdns_nand_ctrl *cdns_ctrl,
 	 * Default to HW ECC engine mode. If the nand-ecc-mode property is given
 	 * in the DT node, this entry will be overwritten in nand_scan_ident().
 	 */
-	chip->ecc.mode = NAND_ECC_HW;
+	chip->ecc.engine_type = NAND_ECC_ENGINE_TYPE_ON_HOST;
 
 	ret = nand_scan(chip, cdns_chip->nsels);
 	if (ret) {
@@ -2771,9 +2781,14 @@ static int cadence_nand_chip_init(struct cdns_nand_ctrl *cdns_ctrl,
 static void cadence_nand_chips_cleanup(struct cdns_nand_ctrl *cdns_ctrl)
 {
 	struct cdns_nand_chip *entry, *temp;
+	struct nand_chip *chip;
+	int ret;
 
 	list_for_each_entry_safe(entry, temp, &cdns_ctrl->chips, node) {
-		nand_release(&entry->chip);
+		chip = &entry->chip;
+		ret = mtd_device_unregister(nand_to_mtd(chip));
+		WARN_ON(ret);
+		nand_cleanup(chip);
 		list_del(&entry->node);
 	}
 }
@@ -2965,18 +2980,14 @@ static int cadence_nand_dt_probe(struct platform_device *ofdev)
 	dev_info(cdns_ctrl->dev, "IRQ: nr %d\n", cdns_ctrl->irq);
 
 	cdns_ctrl->reg = devm_platform_ioremap_resource(ofdev, 0);
-	if (IS_ERR(cdns_ctrl->reg)) {
-		dev_err(&ofdev->dev, "devm_ioremap_resource res 0 failed\n");
+	if (IS_ERR(cdns_ctrl->reg))
 		return PTR_ERR(cdns_ctrl->reg);
-	}
 
 	res = platform_get_resource(ofdev, IORESOURCE_MEM, 1);
 	cdns_ctrl->io.dma = res->start;
 	cdns_ctrl->io.virt = devm_ioremap_resource(&ofdev->dev, res);
-	if (IS_ERR(cdns_ctrl->io.virt)) {
-		dev_err(cdns_ctrl->dev, "devm_ioremap_resource res 1 failed\n");
+	if (IS_ERR(cdns_ctrl->io.virt))
 		return PTR_ERR(cdns_ctrl->io.virt);
-	}
 
 	dt->clk = devm_clk_get(cdns_ctrl->dev, "nf_clk");
 	if (IS_ERR(dt->clk))

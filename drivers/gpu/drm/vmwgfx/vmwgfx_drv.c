@@ -29,6 +29,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/mem_encrypt.h>
 
 #include <drm/drm_drv.h>
 #include <drm/drm_ioctl.h>
@@ -289,6 +290,8 @@ static void vmw_print_capabilities2(uint32_t capabilities2)
 		DRM_INFO("  Grow oTable.\n");
 	if (capabilities2 & SVGA_CAP2_INTRA_SURFACE_COPY)
 		DRM_INFO("  IntraSurface copy.\n");
+	if (capabilities2 & SVGA_CAP2_DX3)
+		DRM_INFO("  DX3.\n");
 }
 
 static void vmw_print_capabilities(uint32_t capabilities)
@@ -448,7 +451,7 @@ static int vmw_request_device(struct vmw_private *dev_priv)
 	dev_priv->cman = vmw_cmdbuf_man_create(dev_priv);
 	if (IS_ERR(dev_priv->cman)) {
 		dev_priv->cman = NULL;
-		dev_priv->has_dx = false;
+		dev_priv->sm_type = VMW_SM_LEGACY;
 	}
 
 	ret = vmw_request_device_late(dev_priv);
@@ -575,6 +578,10 @@ static int vmw_dma_select_mode(struct vmw_private *dev_priv)
 		[vmw_dma_map_populate] = "Caching DMA mappings.",
 		[vmw_dma_map_bind] = "Giving up DMA mappings early."};
 
+	/* TTM currently doesn't fully support SEV encryption. */
+	if (mem_encrypt_active())
+		return -EINVAL;
+
 	if (vmw_force_coherent)
 		dev_priv->map_mode = vmw_dma_alloc_coherent;
 	else if (vmw_restrict_iommu)
@@ -611,6 +618,28 @@ static int vmw_dma_masks(struct vmw_private *dev_priv)
 	}
 
 	return ret;
+}
+
+static int vmw_vram_manager_init(struct vmw_private *dev_priv)
+{
+	int ret;
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	ret = vmw_thp_init(dev_priv);
+#else
+	ret = ttm_range_man_init(&dev_priv->bdev, TTM_PL_VRAM, false,
+				 dev_priv->vram_size >> PAGE_SHIFT);
+#endif
+	ttm_resource_manager_set_used(ttm_manager_type(&dev_priv->bdev, TTM_PL_VRAM), false);
+	return ret;
+}
+
+static void vmw_vram_manager_fini(struct vmw_private *dev_priv)
+{
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	vmw_thp_fini(dev_priv);
+#else
+	ttm_range_man_fini(&dev_priv->bdev, TTM_PL_VRAM);
+#endif
 }
 
 static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
@@ -682,8 +711,10 @@ static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
 
 	ret = vmw_dma_select_mode(dev_priv);
 	if (unlikely(ret != 0)) {
-		DRM_INFO("Restricting capabilities due to IOMMU setup.\n");
+		DRM_INFO("Restricting capabilities since DMA not available.\n");
 		refuse_dma = true;
+		if (dev_priv->capabilities & SVGA_CAP_GBOBJECTS)
+			DRM_INFO("Disabling 3D acceleration.\n");
 	}
 
 	dev_priv->vram_size = vmw_read(dev_priv, SVGA_REG_VRAM_SIZE);
@@ -711,9 +742,15 @@ static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
 	dev_priv->max_mob_pages = 0;
 	dev_priv->max_mob_size = 0;
 	if (dev_priv->capabilities & SVGA_CAP_GBOBJECTS) {
-		uint64_t mem_size =
-			vmw_read(dev_priv,
-				 SVGA_REG_SUGGESTED_GBOBJECT_MEM_SIZE_KB);
+		uint64_t mem_size;
+
+		if (dev_priv->capabilities2 & SVGA_CAP2_GB_MEMSIZE_2)
+			mem_size = vmw_read(dev_priv,
+					    SVGA_REG_GBOBJECT_MEM_SIZE_KB);
+		else
+			mem_size =
+				vmw_read(dev_priv,
+					 SVGA_REG_SUGGESTED_GBOBJECT_MEM_SIZE_KB);
 
 		/*
 		 * Workaround for low memory 2D VMs to compensate for the
@@ -849,41 +886,64 @@ static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
 	 * Enable VRAM, but initially don't use it until SVGA is enabled and
 	 * unhidden.
 	 */
-	ret = ttm_bo_init_mm(&dev_priv->bdev, TTM_PL_VRAM,
-			     (dev_priv->vram_size >> PAGE_SHIFT));
+
+	ret = vmw_vram_manager_init(dev_priv);
 	if (unlikely(ret != 0)) {
 		DRM_ERROR("Failed initializing memory manager for VRAM.\n");
 		goto out_no_vram;
 	}
-	dev_priv->bdev.man[TTM_PL_VRAM].use_type = false;
 
+	/*
+	 * "Guest Memory Regions" is an aperture like feature with
+	 *  one slot per bo. There is an upper limit of the number of
+	 *  slots as well as the bo size.
+	 */
 	dev_priv->has_gmr = true;
+	/* TODO: This is most likely not correct */
 	if (((dev_priv->capabilities & (SVGA_CAP_GMR | SVGA_CAP_GMR2)) == 0) ||
-	    refuse_dma || ttm_bo_init_mm(&dev_priv->bdev, VMW_PL_GMR,
-					 VMW_PL_GMR) != 0) {
+	    refuse_dma ||
+	    vmw_gmrid_man_init(dev_priv, VMW_PL_GMR) != 0) {
 		DRM_INFO("No GMR memory available. "
 			 "Graphics memory resources are very limited.\n");
 		dev_priv->has_gmr = false;
 	}
 
-	if (dev_priv->capabilities & SVGA_CAP_GBOBJECTS) {
+	if (dev_priv->capabilities & SVGA_CAP_GBOBJECTS && !refuse_dma) {
 		dev_priv->has_mob = true;
-		if (ttm_bo_init_mm(&dev_priv->bdev, VMW_PL_MOB,
-				   VMW_PL_MOB) != 0) {
+
+		if (vmw_gmrid_man_init(dev_priv, VMW_PL_MOB) != 0) {
 			DRM_INFO("No MOB memory available. "
 				 "3D will be disabled.\n");
 			dev_priv->has_mob = false;
 		}
 	}
 
-	if (dev_priv->has_mob) {
+	if (dev_priv->has_mob && (dev_priv->capabilities & SVGA_CAP_DX)) {
 		spin_lock(&dev_priv->cap_lock);
 		vmw_write(dev_priv, SVGA_REG_DEV_CAP, SVGA3D_DEVCAP_DXCONTEXT);
-		dev_priv->has_dx = !!vmw_read(dev_priv, SVGA_REG_DEV_CAP);
+		if (vmw_read(dev_priv, SVGA_REG_DEV_CAP))
+			dev_priv->sm_type = VMW_SM_4;
 		spin_unlock(&dev_priv->cap_lock);
 	}
 
 	vmw_validation_mem_init_ttm(dev_priv, VMWGFX_VALIDATION_MEM_GRAN);
+
+	/* SVGA_CAP2_DX2 (DefineGBSurface_v3) is needed for SM4_1 support */
+	if (has_sm4_context(dev_priv) &&
+	    (dev_priv->capabilities2 & SVGA_CAP2_DX2)) {
+		vmw_write(dev_priv, SVGA_REG_DEV_CAP, SVGA3D_DEVCAP_SM41);
+
+		if (vmw_read(dev_priv, SVGA_REG_DEV_CAP))
+			dev_priv->sm_type = VMW_SM_4_1;
+
+		if (has_sm4_1_context(dev_priv) &&
+		    (dev_priv->capabilities2 & SVGA_CAP2_DX3)) {
+			vmw_write(dev_priv, SVGA_REG_DEV_CAP, SVGA3D_DEVCAP_SM5);
+			if (vmw_read(dev_priv, SVGA_REG_DEV_CAP))
+				dev_priv->sm_type = VMW_SM_5;
+		}
+	}
+
 	ret = vmw_kms_init(dev_priv);
 	if (unlikely(ret != 0))
 		goto out_no_kms;
@@ -893,23 +953,14 @@ static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
 	if (ret)
 		goto out_no_fifo;
 
-	if (dev_priv->has_dx) {
-		/*
-		 * SVGA_CAP2_DX2 (DefineGBSurface_v3) is needed for SM4_1
-		 * support
-		 */
-		if ((dev_priv->capabilities2 & SVGA_CAP2_DX2) != 0) {
-			vmw_write(dev_priv, SVGA_REG_DEV_CAP,
-					SVGA3D_DEVCAP_SM41);
-			dev_priv->has_sm4_1 = vmw_read(dev_priv,
-							SVGA_REG_DEV_CAP);
-		}
-	}
-
-	DRM_INFO("DX: %s\n", dev_priv->has_dx ? "yes." : "no.");
 	DRM_INFO("Atomic: %s\n", (dev->driver->driver_features & DRIVER_ATOMIC)
 		 ? "yes." : "no.");
-	DRM_INFO("SM4_1: %s\n", dev_priv->has_sm4_1 ? "yes." : "no.");
+	if (dev_priv->sm_type == VMW_SM_5)
+		DRM_INFO("SM5 support available.\n");
+	if (dev_priv->sm_type == VMW_SM_4_1)
+		DRM_INFO("SM4_1 support available.\n");
+	if (dev_priv->sm_type == VMW_SM_4)
+		DRM_INFO("SM4 support available.\n");
 
 	snprintf(host_log, sizeof(host_log), "vmwgfx: %s-%s",
 		VMWGFX_REPO, VMWGFX_GIT_VERSION);
@@ -937,10 +988,10 @@ out_no_fifo:
 	vmw_kms_close(dev_priv);
 out_no_kms:
 	if (dev_priv->has_mob)
-		(void) ttm_bo_clean_mm(&dev_priv->bdev, VMW_PL_MOB);
+		vmw_gmrid_man_fini(dev_priv, VMW_PL_MOB);
 	if (dev_priv->has_gmr)
-		(void) ttm_bo_clean_mm(&dev_priv->bdev, VMW_PL_GMR);
-	(void)ttm_bo_clean_mm(&dev_priv->bdev, TTM_PL_VRAM);
+		vmw_gmrid_man_fini(dev_priv, VMW_PL_GMR);
+	vmw_vram_manager_fini(dev_priv);
 out_no_vram:
 	(void)ttm_bo_device_release(&dev_priv->bdev);
 out_no_bdev:
@@ -988,12 +1039,12 @@ static void vmw_driver_unload(struct drm_device *dev)
 	vmw_overlay_close(dev_priv);
 
 	if (dev_priv->has_gmr)
-		(void)ttm_bo_clean_mm(&dev_priv->bdev, VMW_PL_GMR);
-	(void)ttm_bo_clean_mm(&dev_priv->bdev, TTM_PL_VRAM);
+		vmw_gmrid_man_fini(dev_priv, VMW_PL_GMR);
 
 	vmw_release_device_early(dev_priv);
 	if (dev_priv->has_mob)
-		(void) ttm_bo_clean_mm(&dev_priv->bdev, VMW_PL_MOB);
+		vmw_gmrid_man_fini(dev_priv, VMW_PL_MOB);
+	vmw_vram_manager_fini(dev_priv);
 	(void) ttm_bo_device_release(&dev_priv->bdev);
 	drm_vma_offset_manager_destroy(&dev_priv->vma_manager);
 	vmw_release_device_late(dev_priv);
@@ -1105,9 +1156,9 @@ static long vmw_compat_ioctl(struct file *filp, unsigned int cmd,
 }
 #endif
 
-static int vmw_master_set(struct drm_device *dev,
-			  struct drm_file *file_priv,
-			  bool from_open)
+static void vmw_master_set(struct drm_device *dev,
+			   struct drm_file *file_priv,
+			   bool from_open)
 {
 	/*
 	 * Inform a new master that the layout may have changed while
@@ -1115,8 +1166,6 @@ static int vmw_master_set(struct drm_device *dev,
 	 */
 	if (!from_open)
 		drm_sysfs_hotplug_event(dev);
-
-	return 0;
 }
 
 static void vmw_master_drop(struct drm_device *dev,
@@ -1137,10 +1186,12 @@ static void vmw_master_drop(struct drm_device *dev,
  */
 static void __vmw_svga_enable(struct vmw_private *dev_priv)
 {
+	struct ttm_resource_manager *man = ttm_manager_type(&dev_priv->bdev, TTM_PL_VRAM);
+
 	spin_lock(&dev_priv->svga_lock);
-	if (!dev_priv->bdev.man[TTM_PL_VRAM].use_type) {
+	if (!ttm_resource_manager_used(man)) {
 		vmw_write(dev_priv, SVGA_REG_ENABLE, SVGA_REG_ENABLE);
-		dev_priv->bdev.man[TTM_PL_VRAM].use_type = true;
+		ttm_resource_manager_set_used(man, true);
 	}
 	spin_unlock(&dev_priv->svga_lock);
 }
@@ -1166,9 +1217,11 @@ void vmw_svga_enable(struct vmw_private *dev_priv)
  */
 static void __vmw_svga_disable(struct vmw_private *dev_priv)
 {
+	struct ttm_resource_manager *man = ttm_manager_type(&dev_priv->bdev, TTM_PL_VRAM);
+
 	spin_lock(&dev_priv->svga_lock);
-	if (dev_priv->bdev.man[TTM_PL_VRAM].use_type) {
-		dev_priv->bdev.man[TTM_PL_VRAM].use_type = false;
+	if (ttm_resource_manager_used(man)) {
+		ttm_resource_manager_set_used(man, false);
 		vmw_write(dev_priv, SVGA_REG_ENABLE,
 			  SVGA_REG_ENABLE_HIDE |
 			  SVGA_REG_ENABLE_ENABLE);
@@ -1185,6 +1238,7 @@ static void __vmw_svga_disable(struct vmw_private *dev_priv)
  */
 void vmw_svga_disable(struct vmw_private *dev_priv)
 {
+	struct ttm_resource_manager *man = ttm_manager_type(&dev_priv->bdev, TTM_PL_VRAM);
 	/*
 	 * Disabling SVGA will turn off device modesetting capabilities, so
 	 * notify KMS about that so that it doesn't cache atomic state that
@@ -1200,8 +1254,8 @@ void vmw_svga_disable(struct vmw_private *dev_priv)
 	vmw_kms_lost_device(dev_priv->dev);
 	ttm_write_lock(&dev_priv->reservation_sem, false);
 	spin_lock(&dev_priv->svga_lock);
-	if (dev_priv->bdev.man[TTM_PL_VRAM].use_type) {
-		dev_priv->bdev.man[TTM_PL_VRAM].use_type = false;
+	if (ttm_resource_manager_used(man)) {
+		ttm_resource_manager_set_used(man, false);
 		spin_unlock(&dev_priv->svga_lock);
 		if (ttm_bo_evict_mm(&dev_priv->bdev, TTM_PL_VRAM))
 			DRM_ERROR("Failed evicting VRAM buffers.\n");
@@ -1221,6 +1275,18 @@ static void vmw_remove(struct pci_dev *pdev)
 	vmw_driver_unload(dev);
 	drm_dev_put(dev);
 	pci_disable_device(pdev);
+}
+
+static unsigned long
+vmw_get_unmapped_area(struct file *file, unsigned long uaddr,
+		      unsigned long len, unsigned long pgoff,
+		      unsigned long flags)
+{
+	struct drm_file *file_priv = file->private_data;
+	struct vmw_private *dev_priv = vmw_priv(file_priv->minor->dev);
+
+	return drm_get_unmapped_area(file, uaddr, len, pgoff, flags,
+				     &dev_priv->vma_manager);
 }
 
 static int vmwgfx_pm_notifier(struct notifier_block *nb, unsigned long val,
@@ -1318,7 +1384,7 @@ static int vmw_pm_freeze(struct device *kdev)
 	vmw_execbuf_release_pinned_bo(dev_priv);
 	vmw_resource_evict_all(dev_priv);
 	vmw_release_device_early(dev_priv);
-	ttm_bo_swapout_all(&dev_priv->bdev);
+	ttm_bo_swapout_all();
 	if (dev_priv->enable_fb)
 		vmw_fifo_resource_dec(dev_priv);
 	if (atomic_read(&dev_priv->num_fifo_resources) != 0) {
@@ -1394,14 +1460,12 @@ static const struct file_operations vmwgfx_driver_fops = {
 	.compat_ioctl = vmw_compat_ioctl,
 #endif
 	.llseek = noop_llseek,
+	.get_unmapped_area = vmw_get_unmapped_area,
 };
 
 static struct drm_driver driver = {
 	.driver_features =
 	DRIVER_MODESET | DRIVER_RENDER | DRIVER_ATOMIC,
-	.get_vblank_counter = vmw_get_vblank_counter,
-	.enable_vblank = vmw_enable_vblank,
-	.disable_vblank = vmw_disable_vblank,
 	.ioctls = vmw_ioctls,
 	.num_ioctls = ARRAY_SIZE(vmw_ioctls),
 	.master_set = vmw_master_set,

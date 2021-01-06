@@ -14,16 +14,16 @@
 
 #define HANTRO_PP_REG_WRITE(vpu, reg_name, val) \
 { \
-	hantro_reg_write((vpu), \
-			 &((vpu)->variant->postproc_regs->reg_name), \
-			 (val)); \
+	hantro_reg_write(vpu, \
+			 &(vpu)->variant->postproc_regs->reg_name, \
+			 val); \
 }
 
 #define HANTRO_PP_REG_WRITE_S(vpu, reg_name, val) \
 { \
-	hantro_reg_write_s((vpu), \
-			   &((vpu)->variant->postproc_regs->reg_name), \
-			   (val)); \
+	hantro_reg_write_s(vpu, \
+			   &(vpu)->variant->postproc_regs->reg_name, \
+			   val); \
 }
 
 #define VPU_PP_IN_YUYV			0x0
@@ -118,7 +118,9 @@ int hantro_postproc_alloc(struct hantro_ctx *ctx)
 	unsigned int num_buffers = cap_queue->num_buffers;
 	unsigned int i, buf_size;
 
-	buf_size = ctx->dst_fmt.plane_fmt[0].sizeimage;
+	buf_size = ctx->dst_fmt.plane_fmt[0].sizeimage +
+		   hantro_h264_mv_size(ctx->dst_fmt.width,
+				       ctx->dst_fmt.height);
 
 	for (i = 0; i < num_buffers; ++i) {
 		struct hantro_aux_buf *priv = &ctx->postproc.dec_q[i];

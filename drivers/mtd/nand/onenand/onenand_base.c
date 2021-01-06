@@ -1052,16 +1052,11 @@ static int onenand_transfer_auto_oob(struct mtd_info *mtd, uint8_t *buf, int col
 				int thislen)
 {
 	struct onenand_chip *this = mtd->priv;
-	int ret;
 
 	this->read_bufferram(mtd, ONENAND_SPARERAM, this->oob_buf, 0,
 			     mtd->oobsize);
-	ret = mtd_ooblayout_get_databytes(mtd, buf, this->oob_buf,
-					  column, thislen);
-	if (ret)
-		return ret;
-
-	return 0;
+	return mtd_ooblayout_get_databytes(mtd, buf, this->oob_buf,
+					   column, thislen);
 }
 
 /**
@@ -3259,7 +3254,7 @@ static void onenand_check_features(struct mtd_info *mtd)
 	switch (density) {
 	case ONENAND_DEVICE_DENSITY_8Gb:
 		this->options |= ONENAND_HAS_NOP_1;
-		/* fall through */
+		fallthrough;
 	case ONENAND_DEVICE_DENSITY_4Gb:
 		if (ONENAND_IS_DDP(this))
 			this->options |= ONENAND_HAS_2PLANE;

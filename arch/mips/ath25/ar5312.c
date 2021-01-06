@@ -19,6 +19,7 @@
 #include <linux/bitops.h>
 #include <linux/irqdomain.h>
 #include <linux/interrupt.h>
+#include <linux/memblock.h>
 #include <linux/platform_device.h>
 #include <linux/mtd/physmap.h>
 #include <linux/reboot.h>
@@ -67,11 +68,6 @@ static irqreturn_t ar5312_ahb_err_handler(int cpl, void *dev_id)
 	machine_restart("AHB error"); /* Catastrophic failure */
 	return IRQ_HANDLED;
 }
-
-static struct irqaction ar5312_ahb_err_interrupt  = {
-	.handler = ar5312_ahb_err_handler,
-	.name    = "ar5312-ahb-error",
-};
 
 static void ar5312_misc_irq_handler(struct irq_desc *desc)
 {
@@ -154,7 +150,9 @@ void __init ar5312_arch_init_irq(void)
 		panic("Failed to add IRQ domain");
 
 	irq = irq_create_mapping(domain, AR5312_MISC_IRQ_AHB_PROC);
-	setup_irq(irq, &ar5312_ahb_err_interrupt);
+	if (request_irq(irq, ar5312_ahb_err_handler, 0, "ar5312-ahb-error",
+			NULL))
+		pr_err("Failed to register ar5312-ahb-error interrupt\n");
 
 	irq_set_chained_handler_and_data(AR5312_IRQ_MISC,
 					 ar5312_misc_irq_handler, domain);
@@ -366,7 +364,7 @@ void __init ar5312_plat_mem_setup(void)
 	memsize = (bank0_ac ? (1 << (bank0_ac + 1)) : 0) +
 		  (bank1_ac ? (1 << (bank1_ac + 1)) : 0);
 	memsize <<= 20;
-	add_memory_region(0, memsize, BOOT_MEM_RAM);
+	memblock_add(0, memsize);
 	iounmap(sdram_base);
 
 	ar5312_rst_base = ioremap(AR5312_RST_BASE, AR5312_RST_SIZE);

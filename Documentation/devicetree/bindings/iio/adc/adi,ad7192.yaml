@@ -30,6 +30,8 @@ properties:
 
   spi-cpha: true
 
+  spi-max-frequency: true
+
   clocks:
     maxItems: 1
     description: phandle to the master clock (mclk)
@@ -92,6 +94,8 @@ required:
   - spi-cpol
   - spi-cpha
 
+additionalProperties: false
+
 examples:
   - |
     spi0 {
@@ -106,7 +110,6 @@ examples:
         spi-cpha;
         clocks = <&ad7192_mclk>;
         clock-names = "mclk";
-        #interrupt-cells = <2>;
         interrupts = <25 0x2>;
         interrupt-parent = <&gpio>;
         dvdd-supply = <&dvdd>;

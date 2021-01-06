@@ -44,10 +44,9 @@ static bool wait_for_tpm_stat_cond(struct tpm_chip *chip, u8 mask,
 	return false;
 }
 
-static int wait_for_tpm_stat_result(struct tpm_chip *chip, u8 mask,
-				    u8 mask_result, unsigned long timeout,
-				    wait_queue_head_t *queue,
-				    bool check_cancel)
+static int wait_for_tpm_stat(struct tpm_chip *chip, u8 mask,
+		unsigned long timeout, wait_queue_head_t *queue,
+		bool check_cancel)
 {
 	unsigned long stop;
 	long rc;
@@ -56,7 +55,7 @@ static int wait_for_tpm_stat_result(struct tpm_chip *chip, u8 mask,
 
 	/* check current status */
 	status = chip->ops->status(chip);
-	if ((status & mask) == mask_result)
+	if ((status & mask) == mask)
 		return 0;
 
 	stop = jiffies + timeout;
@@ -84,7 +83,7 @@ again:
 			usleep_range(TPM_TIMEOUT_USECS_MIN,
 				     TPM_TIMEOUT_USECS_MAX);
 			status = chip->ops->status(chip);
-			if ((status & mask) == mask_result)
+			if ((status & mask) == mask)
 				return 0;
 		} while (time_before(jiffies, stop));
 	}
@@ -240,16 +239,18 @@ static u8 tpm_tis_status(struct tpm_chip *chip)
 	if (rc < 0)
 		return 0;
 
+	if (unlikely((status & TPM_STS_READ_ZERO) != 0)) {
+		/*
+		 * If this trips, the chances are the read is
+		 * returning 0xff because the locality hasn't been
+		 * acquired.  Usually because tpm_try_get_ops() hasn't
+		 * been called before doing a TPM operation.
+		 */
+		WARN_ONCE(1, "TPM returned invalid status\n");
+		return 0;
+	}
+
 	return status;
-}
-
-static bool tpm_tis_check_data(struct tpm_chip *chip, const u8 *buf, size_t len)
-{
-	struct tpm_tis_data *priv = dev_get_drvdata(&chip->dev);
-
-	if (priv->phy_ops->check_data)
-		return priv->phy_ops->check_data(priv, buf, len);
-	return true;
 }
 
 static void tpm_tis_ready(struct tpm_chip *chip)
@@ -291,11 +292,10 @@ static int recv_data(struct tpm_chip *chip, u8 *buf, size_t count)
 	int size = 0, burstcnt, rc;
 
 	while (size < count) {
-		rc = wait_for_tpm_stat_result(chip,
-					TPM_STS_DATA_AVAIL | TPM_STS_VALID,
-					TPM_STS_DATA_AVAIL | TPM_STS_VALID,
-					chip->timeout_c,
-					&priv->read_queue, true);
+		rc = wait_for_tpm_stat(chip,
+				 TPM_STS_DATA_AVAIL | TPM_STS_VALID,
+				 chip->timeout_c,
+				 &priv->read_queue, true);
 		if (rc < 0)
 			return rc;
 		burstcnt = get_burstcount(chip);
@@ -319,60 +319,47 @@ static int tpm_tis_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 {
 	struct tpm_tis_data *priv = dev_get_drvdata(&chip->dev);
 	int size = 0;
-	int status, i;
+	int status;
 	u32 expected;
-	bool check_data = false;
 
-	for (i = 0; i < TPM_RETRY; i++) {
-		if (count < TPM_HEADER_SIZE) {
-			size = -EIO;
-			goto out;
-		}
-
-		size = recv_data(chip, buf, TPM_HEADER_SIZE);
-		/* read first 10 bytes, including tag, paramsize, and result */
-		if (size < TPM_HEADER_SIZE) {
-			dev_err(&chip->dev, "Unable to read header\n");
-			goto out;
-		}
-
-		expected = be32_to_cpu(*(__be32 *) (buf + 2));
-		if (expected > count || expected < TPM_HEADER_SIZE) {
-			size = -EIO;
-			goto out;
-		}
-
-		size += recv_data(chip, &buf[TPM_HEADER_SIZE],
-				  expected - TPM_HEADER_SIZE);
-		if (size < expected) {
-			dev_err(&chip->dev, "Unable to read remainder of result\n");
-			size = -ETIME;
-			goto out;
-		}
-
-		if (wait_for_tpm_stat_result(chip, TPM_STS_VALID,
-					     TPM_STS_VALID, chip->timeout_c,
-					     &priv->int_queue, false) < 0) {
-			size = -ETIME;
-			goto out;
-		}
-
-		status = tpm_tis_status(chip);
-		if (status & TPM_STS_DATA_AVAIL) {	/* retry? */
-			dev_err(&chip->dev, "Error left over data\n");
-			size = -EIO;
-			goto out;
-		}
-
-		check_data = tpm_tis_check_data(chip, buf, size);
-		if (!check_data)
-			tpm_tis_write8(priv, TPM_STS(priv->locality),
-				       TPM_STS_RESPONSE_RETRY);
-		else
-			break;
-	}
-	if (!check_data)
+	if (count < TPM_HEADER_SIZE) {
 		size = -EIO;
+		goto out;
+	}
+
+	size = recv_data(chip, buf, TPM_HEADER_SIZE);
+	/* read first 10 bytes, including tag, paramsize, and result */
+	if (size < TPM_HEADER_SIZE) {
+		dev_err(&chip->dev, "Unable to read header\n");
+		goto out;
+	}
+
+	expected = be32_to_cpu(*(__be32 *) (buf + 2));
+	if (expected > count || expected < TPM_HEADER_SIZE) {
+		size = -EIO;
+		goto out;
+	}
+
+	size += recv_data(chip, &buf[TPM_HEADER_SIZE],
+			  expected - TPM_HEADER_SIZE);
+	if (size < expected) {
+		dev_err(&chip->dev, "Unable to read remainder of result\n");
+		size = -ETIME;
+		goto out;
+	}
+
+	if (wait_for_tpm_stat(chip, TPM_STS_VALID, chip->timeout_c,
+				&priv->int_queue, false) < 0) {
+		size = -ETIME;
+		goto out;
+	}
+	status = tpm_tis_status(chip);
+	if (status & TPM_STS_DATA_AVAIL) {	/* retry? */
+		dev_err(&chip->dev, "Error left over data\n");
+		size = -EIO;
+		goto out;
+	}
+
 out:
 	tpm_tis_ready(chip);
 	return size;
@@ -388,38 +375,59 @@ static int tpm_tis_send_data(struct tpm_chip *chip, const u8 *buf, size_t len)
 	struct tpm_tis_data *priv = dev_get_drvdata(&chip->dev);
 	int rc, status, burstcnt;
 	size_t count = 0;
+	bool itpm = priv->flags & TPM_TIS_ITPM_WORKAROUND;
 
 	status = tpm_tis_status(chip);
 	if ((status & TPM_STS_COMMAND_READY) == 0) {
 		tpm_tis_ready(chip);
-		if (wait_for_tpm_stat_result(chip, TPM_STS_COMMAND_READY,
-					     TPM_STS_COMMAND_READY,
-					     chip->timeout_b,
-					     &priv->int_queue, false) < 0) {
+		if (wait_for_tpm_stat
+		    (chip, TPM_STS_COMMAND_READY, chip->timeout_b,
+		     &priv->int_queue, false) < 0) {
 			rc = -ETIME;
 			goto out_err;
 		}
 	}
 
-	while (count < len) {
+	while (count < len - 1) {
 		burstcnt = get_burstcount(chip);
 		if (burstcnt < 0) {
 			dev_err(&chip->dev, "Unable to read burstcount\n");
 			rc = burstcnt;
 			goto out_err;
 		}
-		burstcnt = min_t(int, burstcnt, len - count);
+		burstcnt = min_t(int, burstcnt, len - count - 1);
 		rc = tpm_tis_write_bytes(priv, TPM_DATA_FIFO(priv->locality),
 					 burstcnt, buf + count);
 		if (rc < 0)
 			goto out_err;
 
 		count += burstcnt;
+
+		if (wait_for_tpm_stat(chip, TPM_STS_VALID, chip->timeout_c,
+					&priv->int_queue, false) < 0) {
+			rc = -ETIME;
+			goto out_err;
+		}
+		status = tpm_tis_status(chip);
+		if (!itpm && (status & TPM_STS_DATA_EXPECT) == 0) {
+			rc = -EIO;
+			goto out_err;
+		}
 	}
-	if (wait_for_tpm_stat_result(chip, TPM_STS_VALID | TPM_STS_DATA_EXPECT,
-				     TPM_STS_VALID, chip->timeout_a,
-				     &priv->int_queue, false) < 0) {
+
+	/* write last byte */
+	rc = tpm_tis_write8(priv, TPM_DATA_FIFO(priv->locality), buf[count]);
+	if (rc < 0)
+		goto out_err;
+
+	if (wait_for_tpm_stat(chip, TPM_STS_VALID, chip->timeout_c,
+				&priv->int_queue, false) < 0) {
 		rc = -ETIME;
+		goto out_err;
+	}
+	status = tpm_tis_status(chip);
+	if (!itpm && (status & TPM_STS_DATA_EXPECT) != 0) {
+		rc = -EIO;
 		goto out_err;
 	}
 
@@ -459,19 +467,14 @@ static void disable_interrupts(struct tpm_chip *chip)
 static int tpm_tis_send_main(struct tpm_chip *chip, const u8 *buf, size_t len)
 {
 	struct tpm_tis_data *priv = dev_get_drvdata(&chip->dev);
-	int rc, i;
+	int rc;
 	u32 ordinal;
 	unsigned long dur;
-	bool data_valid = false;
 
-	for (i = 0; i < TPM_RETRY && !data_valid; i++) {
-		rc = tpm_tis_send_data(chip, buf, len);
-		if (rc < 0)
-			return rc;
-		data_valid = tpm_tis_check_data(chip, buf, len);
-	}
-	if (!data_valid)
-		return -EIO;
+	rc = tpm_tis_send_data(chip, buf, len);
+	if (rc < 0)
+		return rc;
+
 	/* go and do it */
 	rc = tpm_tis_write8(priv, TPM_STS(priv->locality), TPM_STS_GO);
 	if (rc < 0)
@@ -481,11 +484,9 @@ static int tpm_tis_send_main(struct tpm_chip *chip, const u8 *buf, size_t len)
 		ordinal = be32_to_cpu(*((__be32 *) (buf + 6)));
 
 		dur = tpm_calc_ordinal_duration(chip, ordinal);
-		if (wait_for_tpm_stat_result(chip,
-					     TPM_STS_DATA_AVAIL | TPM_STS_VALID,
-					     TPM_STS_DATA_AVAIL | TPM_STS_VALID,
-					     dur,
-					     &priv->read_queue, false) < 0) {
+		if (wait_for_tpm_stat
+		    (chip, TPM_STS_DATA_AVAIL | TPM_STS_VALID, dur,
+		     &priv->read_queue, false) < 0) {
 			rc = -ETIME;
 			goto out_err;
 		}
@@ -700,10 +701,13 @@ static bool tpm_tis_req_canceled(struct tpm_chip *chip, u8 status)
 	struct tpm_tis_data *priv = dev_get_drvdata(&chip->dev);
 
 	switch (priv->manufacturer_id) {
+	case TPM_VID_WINBOND:
+		return ((status == TPM_STS_VALID) ||
+			(status == (TPM_STS_VALID | TPM_STS_COMMAND_READY)));
 	case TPM_VID_STM:
 		return (status == (TPM_STS_VALID | TPM_STS_COMMAND_READY));
 	default:
-		return ((status & TPM_STS_COMMAND_READY) == TPM_STS_COMMAND_READY);
+		return (status == TPM_STS_COMMAND_READY);
 	}
 }
 
@@ -1092,7 +1096,7 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 
 	return 0;
 out_err:
-	if ((chip->ops != NULL) && (chip->ops->clk_enable != NULL))
+	if (chip->ops->clk_enable != NULL)
 		chip->ops->clk_enable(chip, false);
 
 	tpm_tis_remove(chip);

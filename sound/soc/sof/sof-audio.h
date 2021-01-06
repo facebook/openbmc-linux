@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause) */
+/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-3-Clause) */
 /*
  * This file is provided under a dual BSD/GPLv2 license.  When using or
  * redistributing this file, you may do so under either license.
@@ -10,6 +10,8 @@
 
 #ifndef __SOUND_SOC_SOF_AUDIO_H
 #define __SOUND_SOC_SOF_AUDIO_H
+
+#include <linux/workqueue.h>
 
 #include <sound/soc.h>
 #include <sound/control.h>
@@ -54,7 +56,7 @@ struct snd_sof_pcm {
 struct snd_sof_led_control {
 	unsigned int use_led;
 	unsigned int direction;
-	unsigned int led_value;
+	int led_value;
 };
 
 /* ALSA SOF Kcontrol device */
@@ -81,10 +83,14 @@ struct snd_sof_widget {
 	int comp_id;
 	int pipeline_id;
 	int complete;
+	int core;
 	int id;
 
 	struct snd_soc_dapm_widget *widget;
 	struct list_head list;	/* list in sdev widget list */
+
+	/* extended data for UUID components */
+	struct sof_ipc_comp_ext comp_ext;
 
 	void *private;		/* core does not touch this */
 };
@@ -136,6 +142,8 @@ int snd_sof_bytes_ext_put(struct snd_kcontrol *kcontrol,
 int snd_sof_bytes_ext_get(struct snd_kcontrol *kcontrol,
 			  unsigned int __user *binary_data,
 			  unsigned int size);
+int snd_sof_bytes_ext_volatile_get(struct snd_kcontrol *kcontrol, unsigned int __user *binary_data,
+				   unsigned int size);
 
 /*
  * Topology.
@@ -149,6 +157,8 @@ int snd_sof_complete_pipeline(struct device *dev,
 int sof_load_pipeline_ipc(struct device *dev,
 			  struct sof_ipc_pipe_new *pipeline,
 			  struct sof_ipc_comp_reply *r);
+int sof_pipeline_core_enable(struct snd_sof_dev *sdev,
+			     const struct snd_sof_widget *swidget);
 
 /*
  * Stream IPC
@@ -188,7 +198,10 @@ struct snd_sof_pcm *snd_sof_find_spcm_comp(struct snd_soc_component *scomp,
 					   int *direction);
 struct snd_sof_pcm *snd_sof_find_spcm_pcm_id(struct snd_soc_component *scomp,
 					     unsigned int pcm_id);
+const struct sof_ipc_pipe_new *snd_sof_pipeline_find(struct snd_sof_dev *sdev,
+						     int pipeline_id);
 void snd_sof_pcm_period_elapsed(struct snd_pcm_substream *substream);
+void snd_sof_pcm_period_elapsed_work(struct work_struct *work);
 
 /*
  * Mixer IPC
@@ -202,7 +215,8 @@ int snd_sof_ipc_set_get_comp_data(struct snd_sof_control *scontrol,
 /* PM */
 int sof_restore_pipelines(struct device *dev);
 int sof_set_hw_params_upon_resume(struct device *dev);
-bool snd_sof_dsp_d0i3_on_suspend(struct snd_sof_dev *sdev);
+bool snd_sof_stream_suspend_ignored(struct snd_sof_dev *sdev);
+bool snd_sof_dsp_only_d0i3_compatible_stream_active(struct snd_sof_dev *sdev);
 
 /* Machine driver enumeration */
 int sof_machine_register(struct snd_sof_dev *sdev, void *pdata);

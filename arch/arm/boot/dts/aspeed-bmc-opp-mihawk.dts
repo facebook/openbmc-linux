@@ -7,6 +7,7 @@
 / {
 	model = "Mihawk BMC";
 	compatible = "ibm,mihawk-bmc", "aspeed,ast2500";
+
 	aliases {
 		i2c215 = &bus6_mux215;
 		i2c216 = &bus6_mux216;
@@ -712,7 +713,6 @@
 			#size-cells = <0>;
 			reg = <7>;
 		};
-
 	};
 
 };
@@ -775,7 +775,6 @@
 			#size-cells = <0>;
 			reg = <7>;
 		};
-
 	};
 
 };
@@ -1237,7 +1236,6 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x70>;
-
 		bus13_mux251: i2c@0 {
 			#address-cells = <1>;
 			#size-cells = <0>;

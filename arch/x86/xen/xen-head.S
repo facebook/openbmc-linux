@@ -35,13 +35,8 @@ SYM_CODE_START(startup_xen)
 	rep __ASM_SIZE(stos)
 
 	mov %_ASM_SI, xen_start_info
-#ifdef CONFIG_X86_64
 	mov initial_stack(%rip), %rsp
-#else
-	mov initial_stack, %esp
-#endif
 
-#ifdef CONFIG_X86_64
 	/* Set up %gs.
 	 *
 	 * The base of %gs always points to fixed_percpu_data.  If the
@@ -53,11 +48,20 @@ SYM_CODE_START(startup_xen)
 	movq	$INIT_PER_CPU_VAR(fixed_percpu_data),%rax
 	cdq
 	wrmsr
-#endif
 
 	call xen_start_kernel
 SYM_CODE_END(startup_xen)
 	__FINIT
+
+#ifdef CONFIG_XEN_PV_SMP
+.pushsection .text
+SYM_CODE_START(asm_cpu_bringup_and_idle)
+	UNWIND_HINT_EMPTY
+
+	call cpu_bringup_and_idle
+SYM_CODE_END(asm_cpu_bringup_and_idle)
+.popsection
+#endif
 #endif
 
 .pushsection .text

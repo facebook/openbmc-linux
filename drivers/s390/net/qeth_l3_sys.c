@@ -133,40 +133,6 @@ static ssize_t qeth_l3_dev_route6_store(struct device *dev,
 static DEVICE_ATTR(route6, 0644, qeth_l3_dev_route6_show,
 			qeth_l3_dev_route6_store);
 
-static ssize_t qeth_l3_dev_fake_broadcast_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct qeth_card *card = dev_get_drvdata(dev);
-
-	return sprintf(buf, "%i\n", card->options.fake_broadcast? 1:0);
-}
-
-static ssize_t qeth_l3_dev_fake_broadcast_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct qeth_card *card = dev_get_drvdata(dev);
-	char *tmp;
-	int i, rc = 0;
-
-	mutex_lock(&card->conf_mutex);
-	if (card->state != CARD_STATE_DOWN) {
-		rc = -EPERM;
-		goto out;
-	}
-
-	i = simple_strtoul(buf, &tmp, 16);
-	if ((i == 0) || (i == 1))
-		card->options.fake_broadcast = i;
-	else
-		rc = -EINVAL;
-out:
-	mutex_unlock(&card->conf_mutex);
-	return rc ? rc : count;
-}
-
-static DEVICE_ATTR(fake_broadcast, 0644, qeth_l3_dev_fake_broadcast_show,
-		   qeth_l3_dev_fake_broadcast_store);
-
 static ssize_t qeth_l3_dev_sniffer_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -305,7 +271,6 @@ static DEVICE_ATTR(hsuid, 0644, qeth_l3_dev_hsuid_show,
 static struct attribute *qeth_l3_device_attrs[] = {
 	&dev_attr_route4.attr,
 	&dev_attr_route6.attr,
-	&dev_attr_fake_broadcast.attr,
 	&dev_attr_sniffer.attr,
 	&dev_attr_hsuid.attr,
 	NULL,
@@ -320,7 +285,7 @@ static ssize_t qeth_l3_dev_ipato_enable_show(struct device *dev,
 {
 	struct qeth_card *card = dev_get_drvdata(dev);
 
-	return sprintf(buf, "%i\n", card->ipato.enabled? 1:0);
+	return sprintf(buf, "%u\n", card->ipato.enabled ? 1 : 0);
 }
 
 static ssize_t qeth_l3_dev_ipato_enable_store(struct device *dev,
@@ -336,19 +301,21 @@ static ssize_t qeth_l3_dev_ipato_enable_store(struct device *dev,
 		goto out;
 	}
 
+	mutex_lock(&card->ip_lock);
 	if (sysfs_streq(buf, "toggle")) {
 		enable = !card->ipato.enabled;
 	} else if (kstrtobool(buf, &enable)) {
 		rc = -EINVAL;
-		goto out;
+		goto unlock_ip;
 	}
 
 	if (card->ipato.enabled != enable) {
 		card->ipato.enabled = enable;
-		mutex_lock(&card->ip_lock);
 		qeth_l3_update_ipato(card);
-		mutex_unlock(&card->ip_lock);
 	}
+
+unlock_ip:
+	mutex_unlock(&card->ip_lock);
 out:
 	mutex_unlock(&card->conf_mutex);
 	return rc ? rc : count;
@@ -363,7 +330,7 @@ static ssize_t qeth_l3_dev_ipato_invert4_show(struct device *dev,
 {
 	struct qeth_card *card = dev_get_drvdata(dev);
 
-	return sprintf(buf, "%i\n", card->ipato.invert4? 1:0);
+	return sprintf(buf, "%u\n", card->ipato.invert4 ? 1 : 0);
 }
 
 static ssize_t qeth_l3_dev_ipato_invert4_store(struct device *dev,
@@ -374,7 +341,7 @@ static ssize_t qeth_l3_dev_ipato_invert4_store(struct device *dev,
 	bool invert;
 	int rc = 0;
 
-	mutex_lock(&card->conf_mutex);
+	mutex_lock(&card->ip_lock);
 	if (sysfs_streq(buf, "toggle")) {
 		invert = !card->ipato.invert4;
 	} else if (kstrtobool(buf, &invert)) {
@@ -384,12 +351,11 @@ static ssize_t qeth_l3_dev_ipato_invert4_store(struct device *dev,
 
 	if (card->ipato.invert4 != invert) {
 		card->ipato.invert4 = invert;
-		mutex_lock(&card->ip_lock);
 		qeth_l3_update_ipato(card);
-		mutex_unlock(&card->ip_lock);
 	}
+
 out:
-	mutex_unlock(&card->conf_mutex);
+	mutex_unlock(&card->ip_lock);
 	return rc ? rc : count;
 }
 
@@ -441,29 +407,29 @@ static ssize_t qeth_l3_dev_ipato_add4_show(struct device *dev,
 }
 
 static int qeth_l3_parse_ipatoe(const char *buf, enum qeth_prot_versions proto,
-		  u8 *addr, int *mask_bits)
+				u8 *addr, unsigned int *mask_bits)
 {
-	const char *start, *end;
-	char *tmp;
-	char buffer[40] = {0, };
+	char *sep;
+	int rc;
 
-	start = buf;
-	/* get address string */
-	end = strchr(start, '/');
-	if (!end || (end - start >= 40)) {
+	/* Expected input pattern: %addr/%mask */
+	sep = strnchr(buf, 40, '/');
+	if (!sep)
 		return -EINVAL;
-	}
-	strncpy(buffer, start, end - start);
-	if (qeth_l3_string_to_ipaddr(buffer, proto, addr)) {
+
+	/* Terminate the %addr sub-string, and parse it: */
+	*sep = '\0';
+	rc = qeth_l3_string_to_ipaddr(buf, proto, addr);
+	if (rc)
+		return rc;
+
+	rc = kstrtouint(sep + 1, 10, mask_bits);
+	if (rc)
+		return rc;
+
+	if (*mask_bits > ((proto == QETH_PROT_IPV4) ? 32 : 128))
 		return -EINVAL;
-	}
-	start = end + 1;
-	*mask_bits = simple_strtoul(start, &tmp, 10);
-	if (!strlen(start) ||
-	    (tmp == start) ||
-	    (*mask_bits > ((proto == QETH_PROT_IPV4) ? 32 : 128))) {
-		return -EINVAL;
-	}
+
 	return 0;
 }
 
@@ -471,8 +437,8 @@ static ssize_t qeth_l3_dev_ipato_add_store(const char *buf, size_t count,
 			 struct qeth_card *card, enum qeth_prot_versions proto)
 {
 	struct qeth_ipato_entry *ipatoe;
+	unsigned int mask_bits;
 	u8 addr[16];
-	int mask_bits;
 	int rc = 0;
 
 	rc = qeth_l3_parse_ipatoe(buf, proto, addr, &mask_bits);
@@ -484,7 +450,7 @@ static ssize_t qeth_l3_dev_ipato_add_store(const char *buf, size_t count,
 		return -ENOMEM;
 
 	ipatoe->proto = proto;
-	memcpy(ipatoe->addr, addr, (proto == QETH_PROT_IPV4)? 4:16);
+	memcpy(ipatoe->addr, addr, (proto == QETH_PROT_IPV4) ? 4 : 16);
 	ipatoe->mask_bits = mask_bits;
 
 	rc = qeth_l3_add_ipato_entry(card, ipatoe);
@@ -509,8 +475,8 @@ static QETH_DEVICE_ATTR(ipato_add4, add4, 0644,
 static ssize_t qeth_l3_dev_ipato_del_store(const char *buf, size_t count,
 			 struct qeth_card *card, enum qeth_prot_versions proto)
 {
+	unsigned int mask_bits;
 	u8 addr[16];
-	int mask_bits;
 	int rc = 0;
 
 	rc = qeth_l3_parse_ipatoe(buf, proto, addr, &mask_bits);
@@ -535,7 +501,7 @@ static ssize_t qeth_l3_dev_ipato_invert6_show(struct device *dev,
 {
 	struct qeth_card *card = dev_get_drvdata(dev);
 
-	return sprintf(buf, "%i\n", card->ipato.invert6? 1:0);
+	return sprintf(buf, "%u\n", card->ipato.invert6 ? 1 : 0);
 }
 
 static ssize_t qeth_l3_dev_ipato_invert6_store(struct device *dev,
@@ -545,7 +511,7 @@ static ssize_t qeth_l3_dev_ipato_invert6_store(struct device *dev,
 	bool invert;
 	int rc = 0;
 
-	mutex_lock(&card->conf_mutex);
+	mutex_lock(&card->ip_lock);
 	if (sysfs_streq(buf, "toggle")) {
 		invert = !card->ipato.invert6;
 	} else if (kstrtobool(buf, &invert)) {
@@ -555,12 +521,11 @@ static ssize_t qeth_l3_dev_ipato_invert6_store(struct device *dev,
 
 	if (card->ipato.invert6 != invert) {
 		card->ipato.invert6 = invert;
-		mutex_lock(&card->ip_lock);
 		qeth_l3_update_ipato(card);
-		mutex_unlock(&card->ip_lock);
 	}
+
 out:
-	mutex_unlock(&card->conf_mutex);
+	mutex_unlock(&card->ip_lock);
 	return rc ? rc : count;
 }
 

@@ -30,7 +30,6 @@
 #include "ftgmac100.h"
 
 #define DRV_NAME	"ftgmac100"
-#define DRV_VERSION	"0.7"
 
 /* Arbitrary values, I am not sure the HW has limits */
 #define MAX_RX_QUEUE_ENTRIES	1024
@@ -97,7 +96,6 @@ struct ftgmac100 {
 	int cur_speed;
 	int cur_duplex;
 	bool use_ncsi;
-	bool use_fixed_phy;
 
 	/* Multicast filter settings */
 	u32 maht0;
@@ -224,7 +222,6 @@ static int ftgmac100_set_mac_addr(struct net_device *dev, void *p)
 
 	eth_commit_mac_addr_change(dev, p);
 	ftgmac100_write_mac_addr(netdev_priv(dev), dev->dev_addr);
-	dev->addr_assign_type = NET_ADDR_SET;
 
 	return 0;
 }
@@ -1152,7 +1149,6 @@ static void ftgmac100_get_drvinfo(struct net_device *netdev,
 				  struct ethtool_drvinfo *info)
 {
 	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
-	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
 	strlcpy(info->bus_info, dev_name(&netdev->dev), sizeof(info->bus_info));
 }
 
@@ -1451,9 +1447,6 @@ static int ftgmac100_open(struct net_device *netdev)
 	if (priv->use_ncsi) {
 		priv->cur_duplex = DUPLEX_FULL;
 		priv->cur_speed = SPEED_100;
-	} else if (priv->use_fixed_phy) {
-		priv->cur_duplex = netdev->phydev->duplex;
-		priv->cur_speed = netdev->phydev->speed;
 	} else {
 		priv->cur_duplex = 0;
 		priv->cur_speed = 0;
@@ -1738,7 +1731,7 @@ static int ftgmac100_setup_clk(struct ftgmac100 *priv)
 	if (rc)
 		goto cleanup_clk;
 
-	/* RCLK is for RMII, typically used for NCSI. Optional because its not
+	/* RCLK is for RMII, typically used for NCSI. Optional because it's not
 	 * necessary if it's the AST2400 MAC, or the MAC is configured for
 	 * RGMII, or the controller is not an ASPEED-based controller.
 	 */
@@ -1761,9 +1754,6 @@ static int ftgmac100_probe(struct platform_device *pdev)
 	struct ftgmac100 *priv;
 	struct device_node *np;
 	int err = 0;
-
-	if (!pdev)
-		return -ENODEV;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res)
@@ -1827,6 +1817,11 @@ static int ftgmac100_probe(struct platform_device *pdev)
 		priv->rxdes0_edorr_mask = BIT(30);
 		priv->txdes0_edotr_mask = BIT(30);
 		priv->is_aspeed = true;
+		/* Disable ast2600 problematic HW arbitration */
+		if (of_device_is_compatible(np, "aspeed,ast2600-mac")) {
+			iowrite32(FTGMAC100_TM_DEFAULT,
+				  priv->base + FTGMAC100_OFFSET_TM);
+		}
 	} else {
 		priv->rxdes0_edorr_mask = BIT(15);
 		priv->txdes0_edotr_mask = BIT(15);
@@ -1843,9 +1838,7 @@ static int ftgmac100_probe(struct platform_device *pdev)
 		priv->ndev = ncsi_register_dev(netdev, ftgmac100_ncsi_handler);
 		if (!priv->ndev)
 			goto err_ncsi_dev;
-	} else if (np && (
-		  of_get_property(np, "phy-handle", NULL) ||
-		  (priv->use_fixed_phy = of_phy_is_fixed_link(pdev->dev.of_node)))) {
+	} else if (np && of_get_property(np, "phy-handle", NULL)) {
 		struct phy_device *phy;
 
 		phy = of_phy_get_and_connect(priv->netdev, np,
@@ -1914,6 +1907,8 @@ err_register_netdev:
 	clk_disable_unprepare(priv->rclk);
 	clk_disable_unprepare(priv->clk);
 err_ncsi_dev:
+	if (priv->ndev)
+		ncsi_unregister_dev(priv->ndev);
 	ftgmac100_destroy_mdio(netdev);
 err_setup_mdio:
 	iounmap(priv->base);
@@ -1933,6 +1928,8 @@ static int ftgmac100_remove(struct platform_device *pdev)
 	netdev = platform_get_drvdata(pdev);
 	priv = netdev_priv(netdev);
 
+	if (priv->ndev)
+		ncsi_unregister_dev(priv->ndev);
 	unregister_netdev(netdev);
 
 	clk_disable_unprepare(priv->rclk);

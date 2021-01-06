@@ -74,6 +74,9 @@ void
 drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 					      struct drm_atomic_state *old_state);
 
+void
+drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_state *state);
+
 void drm_atomic_helper_commit_modeset_disables(struct drm_device *dev,
 					       struct drm_atomic_state *state);
 void drm_atomic_helper_commit_modeset_enables(struct drm_device *dev,
@@ -223,5 +226,13 @@ drm_atomic_plane_disabling(struct drm_plane_state *old_plane_state,
 
 	return old_plane_state->crtc && !new_plane_state->crtc;
 }
+
+u32 *
+drm_atomic_helper_bridge_propagate_bus_fmt(struct drm_bridge *bridge,
+					struct drm_bridge_state *bridge_state,
+					struct drm_crtc_state *crtc_state,
+					struct drm_connector_state *conn_state,
+					u32 output_fmt,
+					unsigned int *num_input_fmts);
 
 #endif /* DRM_ATOMIC_HELPER_H_ */

@@ -91,6 +91,11 @@ struct detailed_data_string {
 	u8 str[13];
 } __attribute__((packed));
 
+#define DRM_EDID_DEFAULT_GTF_SUPPORT_FLAG   0x00
+#define DRM_EDID_RANGE_LIMITS_ONLY_FLAG     0x01
+#define DRM_EDID_SECONDARY_GTF_SUPPORT_FLAG 0x02
+#define DRM_EDID_CVT_SUPPORT_FLAG           0x04
+
 struct detailed_data_monitor_range {
 	u8 min_vfreq;
 	u8 max_vfreq;
@@ -354,13 +359,15 @@ drm_load_edid_firmware(struct drm_connector *connector)
 }
 #endif
 
+bool drm_edid_are_equal(const struct edid *edid1, const struct edid *edid2);
+
 int
 drm_hdmi_avi_infoframe_from_display_mode(struct hdmi_avi_infoframe *frame,
-					 struct drm_connector *connector,
+					 const struct drm_connector *connector,
 					 const struct drm_display_mode *mode);
 int
 drm_hdmi_vendor_infoframe_from_display_mode(struct hdmi_vendor_infoframe *frame,
-					    struct drm_connector *connector,
+					    const struct drm_connector *connector,
 					    const struct drm_display_mode *mode);
 
 void
@@ -373,7 +380,7 @@ drm_hdmi_avi_infoframe_bars(struct hdmi_avi_infoframe *frame,
 
 void
 drm_hdmi_avi_infoframe_quant_range(struct hdmi_avi_infoframe *frame,
-				   struct drm_connector *connector,
+				   const struct drm_connector *connector,
 				   const struct drm_display_mode *mode,
 				   enum hdmi_quantization_range rgb_quant_range);
 
@@ -503,4 +510,8 @@ void drm_edid_get_monitor_name(struct edid *edid, char *name,
 struct drm_display_mode *drm_mode_find_dmt(struct drm_device *dev,
 					   int hsize, int vsize, int fresh,
 					   bool rb);
+struct drm_display_mode *
+drm_display_mode_from_cea_vic(struct drm_device *dev,
+			      u8 video_code);
+
 #endif /* __DRM_EDID_H__ */

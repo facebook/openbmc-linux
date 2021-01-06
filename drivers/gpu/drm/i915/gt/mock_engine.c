@@ -28,7 +28,6 @@
 #include "i915_drv.h"
 #include "intel_context.h"
 #include "intel_engine_pm.h"
-#include "intel_engine_pool.h"
 
 #include "mock_engine.h"
 #include "selftests/mock_request.h"
@@ -65,6 +64,9 @@ static struct intel_ring *mock_ring(struct intel_engine_cs *engine)
 		return NULL;
 	}
 	i915_active_init(&ring->vma->active, NULL, NULL);
+	__set_bit(I915_VMA_GGTT_BIT, __i915_vma_flags(ring->vma));
+	__set_bit(DRM_MM_NODE_ALLOCATED_BIT, &ring->vma->node.flags);
+	ring->vma->node.size = sz;
 
 	intel_ring_update_space(ring);
 
@@ -129,6 +131,10 @@ static void mock_context_unpin(struct intel_context *ce)
 {
 }
 
+static void mock_context_post_unpin(struct intel_context *ce)
+{
+}
+
 static void mock_context_destroy(struct kref *ref)
 {
 	struct intel_context *ce = container_of(ref, typeof(*ce), ref);
@@ -150,8 +156,7 @@ static int mock_context_alloc(struct intel_context *ce)
 	if (!ce->ring)
 		return -ENOMEM;
 
-	GEM_BUG_ON(ce->timeline);
-	ce->timeline = intel_timeline_create(ce->engine->gt, NULL);
+	ce->timeline = intel_timeline_create(ce->engine->gt);
 	if (IS_ERR(ce->timeline)) {
 		kfree(ce->engine);
 		return PTR_ERR(ce->timeline);
@@ -162,7 +167,13 @@ static int mock_context_alloc(struct intel_context *ce)
 	return 0;
 }
 
-static int mock_context_pin(struct intel_context *ce)
+static int mock_context_pre_pin(struct intel_context *ce,
+				struct i915_gem_ww_ctx *ww, void **unused)
+{
+	return 0;
+}
+
+static int mock_context_pin(struct intel_context *ce, void *unused)
 {
 	return 0;
 }
@@ -174,8 +185,10 @@ static void mock_context_reset(struct intel_context *ce)
 static const struct intel_context_ops mock_context_ops = {
 	.alloc = mock_context_alloc,
 
+	.pre_pin = mock_context_pre_pin,
 	.pin = mock_context_pin,
 	.unpin = mock_context_unpin,
+	.post_unpin = mock_context_post_unpin,
 
 	.enter = intel_context_enter_engine,
 	.exit = intel_context_exit_engine,
@@ -241,9 +254,7 @@ static void mock_reset_cancel(struct intel_engine_cs *engine)
 
 	/* Mark all submitted requests as skipped. */
 	list_for_each_entry(request, &engine->active.requests, sched.link) {
-		if (!i915_request_signaled(request))
-			dma_fence_set_error(&request->fence, -EIO);
-
+		i915_request_set_error_once(request, -EIO);
 		i915_request_mark_complete(request);
 	}
 
@@ -261,11 +272,12 @@ static void mock_engine_release(struct intel_engine_cs *engine)
 
 	GEM_BUG_ON(timer_pending(&mock->hw_delay));
 
+	intel_breadcrumbs_free(engine->breadcrumbs);
+
 	intel_context_unpin(engine->kernel_context);
 	intel_context_put(engine->kernel_context);
 
 	intel_engine_fini_retire(engine);
-	intel_engine_fini_breadcrumbs(engine);
 }
 
 struct intel_engine_cs *mock_engine(struct drm_i915_private *i915,
@@ -323,21 +335,26 @@ int mock_engine_init(struct intel_engine_cs *engine)
 	struct intel_context *ce;
 
 	intel_engine_init_active(engine, ENGINE_MOCK);
-	intel_engine_init_breadcrumbs(engine);
 	intel_engine_init_execlists(engine);
 	intel_engine_init__pm(engine);
 	intel_engine_init_retire(engine);
-	intel_engine_pool_init(&engine->pool);
+
+	engine->breadcrumbs = intel_breadcrumbs_create(NULL);
+	if (!engine->breadcrumbs)
+		return -ENOMEM;
 
 	ce = create_kernel_context(engine);
 	if (IS_ERR(ce))
 		goto err_breadcrumbs;
 
+	/* We insist the kernel context is using the status_page */
+	engine->status_page.vma = ce->timeline->hwsp_ggtt;
+
 	engine->kernel_context = ce;
 	return 0;
 
 err_breadcrumbs:
-	intel_engine_fini_breadcrumbs(engine);
+	intel_breadcrumbs_free(engine->breadcrumbs);
 	return -ENOMEM;
 }
 

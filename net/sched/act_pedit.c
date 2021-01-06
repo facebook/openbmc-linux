@@ -238,8 +238,6 @@ static int tcf_pedit_init(struct net *net, struct nlattr *nla,
 	spin_unlock_bh(&p->tcf_lock);
 	if (goto_ch)
 		tcf_chain_put_by_act(goto_ch);
-	if (ret == ACT_P_CREATED)
-		tcf_idr_insert(tn, *a);
 	return ret;
 
 put_chain:
@@ -409,6 +407,16 @@ done:
 	return p->tcf_action;
 }
 
+static void tcf_pedit_stats_update(struct tc_action *a, u64 bytes, u64 packets,
+				   u64 drops, u64 lastuse, bool hw)
+{
+	struct tcf_pedit *d = to_pedit(a);
+	struct tcf_t *tm = &d->tcf_tm;
+
+	tcf_action_update_stats(a, bytes, packets, drops, hw);
+	tm->lastuse = max_t(u64, tm->lastuse, lastuse);
+}
+
 static int tcf_pedit_dump(struct sk_buff *skb, struct tc_action *a,
 			  int bind, int ref)
 {
@@ -426,8 +434,7 @@ static int tcf_pedit_dump(struct sk_buff *skb, struct tc_action *a,
 		return -ENOBUFS;
 
 	spin_lock_bh(&p->tcf_lock);
-	memcpy(opt->keys, p->tcfp_keys,
-	       p->tcfp_nkeys * sizeof(struct tc_pedit_key));
+	memcpy(opt->keys, p->tcfp_keys, flex_array_size(opt, keys, p->tcfp_nkeys));
 	opt->index = p->tcf_index;
 	opt->nkeys = p->tcfp_nkeys;
 	opt->flags = p->tcfp_flags;
@@ -485,6 +492,7 @@ static struct tc_action_ops act_pedit_ops = {
 	.id		=	TCA_ID_PEDIT,
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_pedit_act,
+	.stats_update	=	tcf_pedit_stats_update,
 	.dump		=	tcf_pedit_dump,
 	.cleanup	=	tcf_pedit_cleanup,
 	.init		=	tcf_pedit_init,

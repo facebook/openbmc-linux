@@ -8,6 +8,7 @@
 #include <linux/io.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
@@ -19,9 +20,11 @@
 
 struct fsi_master_aspeed {
 	struct fsi_master	master;
+	struct mutex		lock;	/* protect HW access */
 	struct device		*dev;
 	void __iomem		*base;
 	struct clk		*clk;
+	struct gpio_desc	*cfam_reset_gpio;
 };
 
 #define to_fsi_master_aspeed(m) \
@@ -253,6 +256,8 @@ static int aspeed_master_read(struct fsi_master *master, int link,
 	addr |= id << 21;
 	addr += link * FSI_HUB_LINK_SIZE;
 
+	mutex_lock(&aspeed->lock);
+
 	switch (size) {
 	case 1:
 		ret = opb_readb(aspeed, fsi_base + addr, val);
@@ -264,14 +269,14 @@ static int aspeed_master_read(struct fsi_master *master, int link,
 		ret = opb_readl(aspeed, fsi_base + addr, val);
 		break;
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
+		goto done;
 	}
 
 	ret = check_errors(aspeed, ret);
-	if (ret)
-		return ret;
-
-	return 0;
+done:
+	mutex_unlock(&aspeed->lock);
+	return ret;
 }
 
 static int aspeed_master_write(struct fsi_master *master, int link,
@@ -286,6 +291,8 @@ static int aspeed_master_write(struct fsi_master *master, int link,
 	addr |= id << 21;
 	addr += link * FSI_HUB_LINK_SIZE;
 
+	mutex_lock(&aspeed->lock);
+
 	switch (size) {
 	case 1:
 		ret = opb_writeb(aspeed, fsi_base + addr, *(u8 *)val);
@@ -297,43 +304,43 @@ static int aspeed_master_write(struct fsi_master *master, int link,
 		ret = opb_writel(aspeed, fsi_base + addr, *(__be32 *)val);
 		break;
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
+		goto done;
 	}
 
 	ret = check_errors(aspeed, ret);
-	if (ret)
-		return ret;
-
-	return 0;
+done:
+	mutex_unlock(&aspeed->lock);
+	return ret;
 }
 
-static int aspeed_master_link_enable(struct fsi_master *master, int link)
+static int aspeed_master_link_enable(struct fsi_master *master, int link,
+				     bool enable)
 {
 	struct fsi_master_aspeed *aspeed = to_fsi_master_aspeed(master);
 	int idx, bit, ret;
-	__be32 reg, result;
+	__be32 reg;
 
 	idx = link / 32;
 	bit = link % 32;
 
 	reg = cpu_to_be32(0x80000000 >> bit);
 
-	ret = opb_writel(aspeed, ctrl_base + FSI_MSENP0 + (4 * idx), reg);
-	if (ret)
-		return ret;
+	mutex_lock(&aspeed->lock);
 
-	mdelay(FSI_LINK_ENABLE_SETUP_TIME);
-
-	ret = opb_readl(aspeed, ctrl_base + FSI_MENP0 + (4 * idx), &result);
-	if (ret)
-		return ret;
-
-	if (result != reg) {
-		dev_err(aspeed->dev, "%s failed: %08x\n", __func__, result);
-		return -EIO;
+	if (!enable) {
+		ret = opb_writel(aspeed, ctrl_base + FSI_MCENP0 + (4 * idx), reg);
+		goto done;
 	}
 
-	return 0;
+	ret = opb_writel(aspeed, ctrl_base + FSI_MSENP0 + (4 * idx), reg);
+	if (ret)
+		goto done;
+
+	mdelay(FSI_LINK_ENABLE_SETUP_TIME);
+done:
+	mutex_unlock(&aspeed->lock);
+	return ret;
 }
 
 static int aspeed_master_term(struct fsi_master *master, int link, uint8_t id)
@@ -429,6 +436,45 @@ static int aspeed_master_init(struct fsi_master_aspeed *aspeed)
 	return 0;
 }
 
+static ssize_t cfam_reset_store(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct fsi_master_aspeed *aspeed = dev_get_drvdata(dev);
+
+	mutex_lock(&aspeed->lock);
+	gpiod_set_value(aspeed->cfam_reset_gpio, 1);
+	usleep_range(900, 1000);
+	gpiod_set_value(aspeed->cfam_reset_gpio, 0);
+	mutex_unlock(&aspeed->lock);
+
+	return count;
+}
+
+static DEVICE_ATTR(cfam_reset, 0200, NULL, cfam_reset_store);
+
+static int setup_cfam_reset(struct fsi_master_aspeed *aspeed)
+{
+	struct device *dev = aspeed->dev;
+	struct gpio_desc *gpio;
+	int rc;
+
+	gpio = devm_gpiod_get_optional(dev, "cfam-reset", GPIOD_OUT_LOW);
+	if (IS_ERR(gpio))
+		return PTR_ERR(gpio);
+	if (!gpio)
+		return 0;
+
+	aspeed->cfam_reset_gpio = gpio;
+
+	rc = device_create_file(dev, &dev_attr_cfam_reset);
+	if (rc) {
+		devm_gpiod_put(dev, gpio);
+		return rc;
+	}
+
+	return 0;
+}
+
 static int tacoma_cabled_fsi_fixup(struct device *dev)
 {
 	struct gpio_desc *routing_gpio, *mux_gpio;
@@ -511,6 +557,11 @@ static int fsi_master_aspeed_probe(struct platform_device *pdev)
 		return rc;
 	}
 
+	rc = setup_cfam_reset(aspeed);
+	if (rc) {
+		dev_err(&pdev->dev, "CFAM reset GPIO setup failed\n");
+	}
+
 	writel(0x1, aspeed->base + OPB_CLK_SYNC);
 	writel(OPB1_XFER_ACK_EN | OPB0_XFER_ACK_EN,
 			aspeed->base + OPB_IRQ_MASK);
@@ -558,6 +609,7 @@ static int fsi_master_aspeed_probe(struct platform_device *pdev)
 
 	dev_set_drvdata(&pdev->dev, aspeed);
 
+	mutex_init(&aspeed->lock);
 	aspeed_master_init(aspeed);
 
 	rc = fsi_master_register(&aspeed->master);

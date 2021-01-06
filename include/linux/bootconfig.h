@@ -12,6 +12,9 @@
 
 #define BOOTCONFIG_MAGIC	"#BOOTCONFIG\n"
 #define BOOTCONFIG_MAGIC_LEN	12
+#define BOOTCONFIG_ALIGN_SHIFT	2
+#define BOOTCONFIG_ALIGN	(1 << BOOTCONFIG_ALIGN_SHIFT)
+#define BOOTCONFIG_ALIGN_MASK	(BOOTCONFIG_ALIGN - 1)
 
 /* XBC tree node */
 struct xbc_node {
@@ -216,7 +219,8 @@ static inline int __init xbc_node_compose_key(struct xbc_node *node,
 }
 
 /* XBC node initializer */
-int __init xbc_init(char *buf);
+int __init xbc_init(char *buf, const char **emsg, int *epos);
+
 
 /* XBC cleanup data structures */
 void __init xbc_destroy_all(void);

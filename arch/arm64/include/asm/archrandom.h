@@ -4,7 +4,8 @@
 
 #ifdef CONFIG_ARCH_RANDOM
 
-#include <linux/random.h>
+#include <linux/bug.h>
+#include <linux/kernel.h>
 #include <asm/cpufeature.h>
 
 static inline bool __arm64_rndr(unsigned long *v)
@@ -66,10 +67,17 @@ static inline bool __init __early_cpu_has_rndr(void)
 	return (ftr >> ID_AA64ISAR0_RNDR_SHIFT) & 0xf;
 }
 
-#else
+static inline bool __init __must_check
+arch_get_random_seed_long_early(unsigned long *v)
+{
+	WARN_ON(system_state != SYSTEM_BOOTING);
 
-static inline bool __arm64_rndr(unsigned long *v) { return false; }
-static inline bool __init __early_cpu_has_rndr(void) { return false; }
+	if (!__early_cpu_has_rndr())
+		return false;
+
+	return __arm64_rndr(v);
+}
+#define arch_get_random_seed_long_early arch_get_random_seed_long_early
 
 #endif /* CONFIG_ARCH_RANDOM */
 #endif /* _ASM_ARCHRANDOM_H */

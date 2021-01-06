@@ -189,8 +189,8 @@
 		simple-audio-card,mclk-fs = <128>;
 		simple-audio-card,aux-devs = <&codec_analog>;
 		simple-audio-card,routing =
-			"Left DAC", "AIF1 Slot 0 Left",
-			"Right DAC", "AIF1 Slot 0 Right";
+			"Left DAC", "DACL",
+			"Right DAC", "DACR";
 		status = "disabled";
 
 		simple-audio-card,cpu {
@@ -372,8 +372,6 @@
 		      "ram", "sat";
 	resets = <&ccu RST_BUS_DE_BE>, <&ccu RST_BUS_SAT>;
 	reset-names = "be", "sat";
-	assigned-clocks = <&ccu CLK_DE_BE>;
-	assigned-clock-rates = <300000000>;
 };
 
 &ccu {

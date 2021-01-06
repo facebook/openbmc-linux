@@ -15,9 +15,7 @@
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/dma-direct.h>
-#include <linux/dma-mapping.h>
-#include <linux/dma-noncoherent.h>
-#include <linux/dma-contiguous.h>
+#include <linux/dma-map-ops.h>
 #include <linux/highmem.h>
 #include <linux/memblock.h>
 #include <linux/slab.h>
@@ -35,7 +33,6 @@
 #include <asm/dma-iommu.h>
 #include <asm/mach/map.h>
 #include <asm/system_info.h>
-#include <asm/dma-contiguous.h>
 #include <xen/swiotlb-xen.h>
 
 #include "dma.h"
@@ -179,9 +176,28 @@ static void arm_dma_sync_single_for_device(struct device *dev,
 	__dma_page_cpu_to_dev(page, offset, size, dir);
 }
 
+/*
+ * Return whether the given device DMA address mask can be supported
+ * properly.  For example, if your device can only drive the low 24-bits
+ * during bus mastering, then you would pass 0x00ffffff as the mask
+ * to this function.
+ */
+static int arm_dma_supported(struct device *dev, u64 mask)
+{
+	unsigned long max_dma_pfn = min(max_pfn - 1, arm_dma_pfn_limit);
+
+	/*
+	 * Translate the device's DMA mask to a PFN limit.  This
+	 * PFN number includes the page which we can DMA to.
+	 */
+	return dma_to_pfn(dev, mask) >= max_dma_pfn;
+}
+
 const struct dma_map_ops arm_dma_ops = {
 	.alloc			= arm_dma_alloc,
 	.free			= arm_dma_free,
+	.alloc_pages		= dma_direct_alloc_pages,
+	.free_pages		= dma_direct_free_pages,
 	.mmap			= arm_dma_mmap,
 	.get_sgtable		= arm_dma_get_sgtable,
 	.map_page		= arm_dma_map_page,
@@ -209,6 +225,8 @@ static int arm_coherent_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 const struct dma_map_ops arm_coherent_dma_ops = {
 	.alloc			= arm_coherent_dma_alloc,
 	.free			= arm_coherent_dma_free,
+	.alloc_pages		= dma_direct_alloc_pages,
+	.free_pages		= dma_direct_free_pages,
 	.mmap			= arm_coherent_dma_mmap,
 	.get_sgtable		= arm_dma_get_sgtable,
 	.map_page		= arm_coherent_dma_map_page,
@@ -218,49 +236,6 @@ const struct dma_map_ops arm_coherent_dma_ops = {
 	.get_required_mask	= dma_direct_get_required_mask,
 };
 EXPORT_SYMBOL(arm_coherent_dma_ops);
-
-static int __dma_supported(struct device *dev, u64 mask, bool warn)
-{
-	unsigned long max_dma_pfn = min(max_pfn - 1, arm_dma_pfn_limit);
-
-	/*
-	 * Translate the device's DMA mask to a PFN limit.  This
-	 * PFN number includes the page which we can DMA to.
-	 */
-	if (dma_to_pfn(dev, mask) < max_dma_pfn) {
-		if (warn)
-			dev_warn(dev, "Coherent DMA mask %#llx (pfn %#lx-%#lx) covers a smaller range of system memory than the DMA zone pfn 0x0-%#lx\n",
-				 mask,
-				 dma_to_pfn(dev, 0), dma_to_pfn(dev, mask) + 1,
-				 max_dma_pfn + 1);
-		return 0;
-	}
-
-	return 1;
-}
-
-static u64 get_coherent_dma_mask(struct device *dev)
-{
-	u64 mask = (u64)DMA_BIT_MASK(32);
-
-	if (dev) {
-		mask = dev->coherent_dma_mask;
-
-		/*
-		 * Sanity check the DMA mask - it must be non-zero, and
-		 * must be able to be satisfied by a DMA allocation.
-		 */
-		if (mask == 0) {
-			dev_warn(dev, "coherent DMA mask is unset\n");
-			return 0;
-		}
-
-		if (!__dma_supported(dev, mask, true))
-			return 0;
-	}
-
-	return mask;
-}
 
 static void __dma_clear_buffer(struct page *page, size_t size, int coherent_flag)
 {
@@ -688,7 +663,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 			 gfp_t gfp, pgprot_t prot, bool is_coherent,
 			 unsigned long attrs, const void *caller)
 {
-	u64 mask = get_coherent_dma_mask(dev);
+	u64 mask = min_not_zero(dev->coherent_dma_mask, dev->bus_dma_limit);
 	struct page *page = NULL;
 	void *addr;
 	bool allowblock, cma;
@@ -711,9 +686,6 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 		return NULL;
 	}
 #endif
-
-	if (!mask)
-		return NULL;
 
 	buf = kzalloc(sizeof(*buf),
 		      gfp & ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM));
@@ -1085,17 +1057,6 @@ void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
 	for_each_sg(sg, s, nents, i)
 		ops->sync_single_for_device(dev, sg_dma_address(s), s->length,
 					    dir);
-}
-
-/*
- * Return whether the given device DMA address mask can be supported
- * properly.  For example, if your device can only drive the low 24-bits
- * during bus mastering, then you would pass 0x00ffffff as the mask
- * to this function.
- */
-int arm_dma_supported(struct device *dev, u64 mask)
-{
-	return __dma_supported(dev, mask, false);
 }
 
 static const struct dma_map_ops *arm_get_dma_map_ops(bool coherent)

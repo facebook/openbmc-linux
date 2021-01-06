@@ -314,7 +314,7 @@ out:
 
 /**
  *  tcp_delack_timer() - The TCP delayed ACK timeout handler
- *  @data:  Pointer to the current socket. (gets casted to struct sock *)
+ *  @t:  Pointer to the timer. (gets casted to struct sock *)
  *
  *  This function gets (indirectly) called when the kernel timer for a TCP packet
  *  of this socket expires. Calls tcp_delack_timer_handler() to do the actual work.
@@ -331,7 +331,6 @@ static void tcp_delack_timer(struct timer_list *t)
 	if (!sock_owned_by_user(sk)) {
 		tcp_delack_timer_handler(sk);
 	} else {
-		icsk->icsk_ack.blocked = 1;
 		__NET_INC_STATS(sock_net(sk), LINUX_MIB_DELAYEDACKLOCKED);
 		/* deleguate our work to tcp_release_cb() */
 		if (!test_and_set_bit(TCP_DELACK_TIMER_DEFERRED, &sk->sk_tsq_flags))
@@ -753,8 +752,14 @@ static enum hrtimer_restart tcp_compressed_ack_kick(struct hrtimer *timer)
 
 	bh_lock_sock(sk);
 	if (!sock_owned_by_user(sk)) {
-		if (tp->compressed_ack > TCP_FASTRETRANS_THRESH)
+		if (tp->compressed_ack) {
+			/* Since we have to send one ack finally,
+			 * substract one from tp->compressed_ack to keep
+			 * LINUX_MIB_TCPACKCOMPRESSED accurate.
+			 */
+			tp->compressed_ack--;
 			tcp_send_ack(sk);
+		}
 	} else {
 		if (!test_and_set_bit(TCP_DELACK_TIMER_DEFERRED,
 				      &sk->sk_tsq_flags))

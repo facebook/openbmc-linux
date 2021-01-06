@@ -13,13 +13,19 @@
 
 #include <linux/pci.h>
 #include <linux/iommu.h>
+#include <linux/net_tstamp.h>
+#include <linux/ptp_clock_kernel.h>
+#include <linux/timecounter.h>
 
 #include <mbox.h>
 #include "otx2_reg.h"
 #include "otx2_txrx.h"
+#include <rvu_trace.h>
 
 /* PCI device IDs */
 #define PCI_DEVID_OCTEONTX2_RVU_PF              0xA063
+#define PCI_DEVID_OCTEONTX2_RVU_VF		0xA064
+#define PCI_DEVID_OCTEONTX2_RVU_AFVF		0xA0F8
 
 #define PCI_SUBSYS_DEVID_96XX_RVU_PFVF		0xB200
 
@@ -172,9 +178,11 @@ struct otx2_hw {
 	u16			rq_skid;
 	u8			cq_time_wait;
 
-	/* For TSO segmentation */
+	/* Segmentation */
 	u8			lso_tsov4_idx;
 	u8			lso_tsov6_idx;
+	u8			lso_udpv4_idx;
+	u8			lso_udpv6_idx;
 	u8			hw_tso;
 
 	/* MSI-X */
@@ -191,10 +199,32 @@ struct otx2_hw {
 	u64			cgx_tx_stats[CGX_TX_STATS_COUNT];
 };
 
+struct otx2_vf_config {
+	struct otx2_nic *pf;
+	struct delayed_work link_event_work;
+	bool intf_down; /* interface was either configured or not */
+};
+
+struct flr_work {
+	struct work_struct work;
+	struct otx2_nic *pf;
+};
+
 struct refill_work {
 	struct delayed_work pool_refill_work;
 	struct otx2_nic *pf;
 };
+
+struct otx2_ptp {
+	struct ptp_clock_info ptp_info;
+	struct ptp_clock *ptp_clock;
+	struct otx2_nic *nic;
+
+	struct cyclecounter cycle_counter;
+	struct timecounter time_counter;
+};
+
+#define OTX2_HW_TIMESTAMP_LEN	8
 
 struct otx2_nic {
 	void __iomem		*reg_base;
@@ -203,7 +233,11 @@ struct otx2_nic {
 	u16			max_frs;
 	u16			rbsize; /* Receive buffer size */
 
+#define OTX2_FLAG_RX_TSTAMP_ENABLED		BIT_ULL(0)
+#define OTX2_FLAG_TX_TSTAMP_ENABLED		BIT_ULL(1)
 #define OTX2_FLAG_INTF_DOWN			BIT_ULL(2)
+#define OTX2_FLAG_RX_PAUSE_ENABLED		BIT_ULL(9)
+#define OTX2_FLAG_TX_PAUSE_ENABLED		BIT_ULL(10)
 	u64			flags;
 
 	struct otx2_qset	qset;
@@ -213,21 +247,38 @@ struct otx2_nic {
 
 	/* Mbox */
 	struct mbox		mbox;
+	struct mbox		*mbox_pfvf;
 	struct workqueue_struct *mbox_wq;
+	struct workqueue_struct *mbox_pfvf_wq;
 
+	u8			total_vfs;
 	u16			pcifunc; /* RVU PF_FUNC */
+	u16			bpid[NIX_MAX_BPID_CHAN];
+	struct otx2_vf_config	*vf_configs;
 	struct cgx_link_user_info linfo;
 
 	u64			reset_count;
 	struct work_struct	reset_task;
+	struct workqueue_struct	*flr_wq;
+	struct flr_work		*flr_wrk;
 	struct refill_work	*refill_wrk;
+	struct workqueue_struct	*otx2_wq;
+	struct work_struct	rx_mode_work;
 
 	/* Ethtool stuff */
 	u32			msg_enable;
 
 	/* Block address of NIX either BLKADDR_NIX0 or BLKADDR_NIX1 */
 	int			nix_blkaddr;
+
+	struct otx2_ptp		*ptp;
+	struct hwtstamp_config	tstamp;
 };
+
+static inline bool is_otx2_lbkvf(struct pci_dev *pdev)
+{
+	return pdev->device == PCI_DEVID_OCTEONTX2_RVU_AFVF;
+}
 
 static inline bool is_96xx_A0(struct pci_dev *pdev)
 {
@@ -280,7 +331,7 @@ static inline void __iomem *otx2_get_regaddr(struct otx2_nic *nic, u64 offset)
 	default:
 		blkaddr = BLKADDR_RVUM;
 		break;
-	};
+	}
 
 	offset &= ~(RVU_FUNC_BLKADDR_MASK << RVU_FUNC_BLKADDR_SHIFT);
 	offset |= (blkaddr << RVU_FUNC_BLKADDR_SHIFT);
@@ -348,21 +399,6 @@ static inline void otx2_sync_mbox_bbuf(struct otx2_mbox *mbox, int devid)
 	       hw_mbase + mbox->rx_start, msg_size + msgs_offset);
 }
 
-static inline void otx2_mbox_lock_init(struct mbox *mbox)
-{
-	mutex_init(&mbox->lock);
-}
-
-static inline void otx2_mbox_lock(struct mbox *mbox)
-{
-	mutex_lock(&mbox->lock);
-}
-
-static inline void otx2_mbox_unlock(struct mbox *mbox)
-{
-	mutex_unlock(&mbox->lock);
-}
-
 /* With the absence of API for 128-bit IO memory access for arm64,
  * implement required operations at place.
  */
@@ -418,18 +454,6 @@ static inline void otx2_aura_freeptr(struct otx2_nic *pfvf,
 {
 	otx2_write128((u64)buf, (u64)aura | BIT_ULL(63),
 		      otx2_get_regaddr(pfvf, NPA_LF_AURA_OP_FREE0));
-}
-
-/* Update page ref count */
-static inline void otx2_get_page(struct otx2_pool *pool)
-{
-	if (!pool->page)
-		return;
-
-	if (pool->pageref)
-		page_ref_add(pool->page, pool->pageref);
-	pool->pageref = 0;
-	pool->page = NULL;
 }
 
 static inline int otx2_get_pool_idx(struct otx2_nic *pfvf, int type, int idx)
@@ -500,6 +524,7 @@ static struct _req_type __maybe_unused					\
 		return NULL;						\
 	req->hdr.sig = OTX2_MBOX_REQ_SIG;				\
 	req->hdr.id = _id;						\
+	trace_otx2_msg_alloc(mbox->mbox.pdev, _id, sizeof(*req));	\
 	return req;							\
 }
 
@@ -558,6 +583,8 @@ int otx2_hw_set_mtu(struct otx2_nic *pfvf, int mtu);
 void otx2_tx_timeout(struct net_device *netdev, unsigned int txq);
 void otx2_get_mac_from_af(struct net_device *netdev);
 void otx2_config_irq_coalescing(struct otx2_nic *pfvf, int qidx);
+int otx2_config_pause_frm(struct otx2_nic *pfvf);
+void otx2_setup_segmentation(struct otx2_nic *pfvf);
 
 /* RVU block related APIs */
 int otx2_attach_npa_nix(struct otx2_nic *pfvf);
@@ -574,10 +601,10 @@ int otx2_txschq_config(struct otx2_nic *pfvf, int lvl);
 int otx2_txsch_alloc(struct otx2_nic *pfvf);
 int otx2_txschq_stop(struct otx2_nic *pfvf);
 void otx2_sqb_flush(struct otx2_nic *pfvf);
-dma_addr_t otx2_alloc_rbuf(struct otx2_nic *pfvf, struct otx2_pool *pool,
-			   gfp_t gfp);
+dma_addr_t __otx2_alloc_rbuf(struct otx2_nic *pfvf, struct otx2_pool *pool);
 int otx2_rxtx_enable(struct otx2_nic *pfvf, bool enable);
 void otx2_ctx_disable(struct mbox *mbox, int type, bool npa);
+int otx2_nix_config_bp(struct otx2_nic *pfvf, bool enable);
 void otx2_cleanup_rx_cqes(struct otx2_nic *pfvf, struct otx2_cq_queue *cq);
 void otx2_cleanup_tx_cqes(struct otx2_nic *pfvf, struct otx2_cq_queue *cq);
 
@@ -598,6 +625,8 @@ void mbox_handler_nix_txsch_alloc(struct otx2_nic *pf,
 				  struct nix_txsch_alloc_rsp *rsp);
 void mbox_handler_cgx_stats(struct otx2_nic *pfvf,
 			    struct cgx_stats_rsp *rsp);
+void mbox_handler_nix_bp_enable(struct otx2_nic *pfvf,
+				struct nix_bp_cfg_rsp *rsp);
 
 /* Device stats APIs */
 void otx2_get_dev_stats(struct otx2_nic *pfvf);
@@ -607,6 +636,7 @@ void otx2_update_lmac_stats(struct otx2_nic *pfvf);
 int otx2_update_rq_stats(struct otx2_nic *pfvf, int qidx);
 int otx2_update_sq_stats(struct otx2_nic *pfvf, int qidx);
 void otx2_set_ethtool_ops(struct net_device *netdev);
+void otx2vf_set_ethtool_ops(struct net_device *netdev);
 
 int otx2_open(struct net_device *netdev);
 int otx2_stop(struct net_device *netdev);

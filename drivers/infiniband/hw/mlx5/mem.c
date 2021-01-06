@@ -169,8 +169,8 @@ void mlx5_ib_populate_pas(struct mlx5_ib_dev *dev, struct ib_umem *umem,
 			  int page_shift, __be64 *pas, int access_flags)
 {
 	return __mlx5_ib_populate_pas(dev, umem, page_shift, 0,
-				      ib_umem_num_pages(umem), pas,
-				      access_flags);
+				      ib_umem_num_dma_blocks(umem, PAGE_SIZE),
+				      pas, access_flags);
 }
 int mlx5_ib_get_buf_offset(u64 addr, int page_shift, u32 *offset)
 {
@@ -316,7 +316,7 @@ int mlx5_ib_test_wc(struct mlx5_ib_dev *dev)
 	if (!dev->mdev->roce.roce_en &&
 	    port_type_cap == MLX5_CAP_PORT_TYPE_ETH) {
 		if (mlx5_core_is_pf(dev->mdev))
-			dev->wc_support = true;
+			dev->wc_support = arch_can_pci_mmap_wc();
 		return 0;
 	}
 

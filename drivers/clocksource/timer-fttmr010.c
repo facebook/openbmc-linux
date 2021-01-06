@@ -38,9 +38,9 @@
 #define TIMER_CR		(0x30)
 
 /*
-  Control register set to clear for ast2600 only.
+ * Control register set to clear for ast2600 only.
  */
-#define TIMER_CR_CLR		(0x3c)
+#define AST2600_TIMER_CR_CLR	(0x3c)
 
 /*
  * Control register (TMC30) bit fields for fttmr010/gemini/moxart timers.
@@ -173,7 +173,7 @@ static int ast2600_timer_shutdown(struct clock_event_device *evt)
 	struct fttmr010 *fttmr010 = to_fttmr010(evt);
 
 	/* Stop */
-	writel(fttmr010->t1_enable_val, fttmr010->base + TIMER_CR_CLR);
+	writel(fttmr010->t1_enable_val, fttmr010->base + AST2600_TIMER_CR_CLR);
 
 	return 0;
 }
@@ -273,7 +273,7 @@ static irqreturn_t ast2600_timer_interrupt(int irq, void *dev_id)
 static int __init fttmr010_common_init(struct device_node *np,
 		bool is_aspeed,
 		int (*timer_shutdown)(struct clock_event_device *),
-		irq_handler_t handler)
+		irq_handler_t irq_handler)
 {
 	struct fttmr010 *fttmr010;
 	int irq;
@@ -383,7 +383,7 @@ static int __init fttmr010_common_init(struct device_node *np,
 	writel(0, fttmr010->base + TIMER1_LOAD);
 	writel(0, fttmr010->base + TIMER1_MATCH1);
 	writel(0, fttmr010->base + TIMER1_MATCH2);
-	ret = request_irq(irq, handler, IRQF_TIMER,
+	ret = request_irq(irq, irq_handler, IRQF_TIMER,
 			  "FTTMR010-TIMER1", &fttmr010->clkevt);
 	if (ret) {
 		pr_err("FTTMR010-TIMER1 no IRQ\n");

@@ -107,7 +107,7 @@ struct axp288_extcon_info {
 };
 
 static const struct x86_cpu_id cherry_trail_cpu_ids[] = {
-	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ATOM_AIRMONT, X86_FEATURE_ANY },
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_AIRMONT,	NULL),
 	{}
 };
 
@@ -491,18 +491,7 @@ static struct platform_driver axp288_extcon_driver = {
 		.pm = &axp288_extcon_pm_ops,
 	},
 };
-
-static int __init axp288_extcon_init(void)
-{
-	return platform_driver_register(&axp288_extcon_driver);
-}
-module_init(axp288_extcon_init);
-
-static void __exit axp288_extcon_exit(void)
-{
-	platform_driver_unregister(&axp288_extcon_driver);
-}
-module_exit(axp288_extcon_exit);
+module_platform_driver(axp288_extcon_driver);
 
 MODULE_AUTHOR("Ramakrishna Pallala <ramakrishna.pallala@intel.com>");
 MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");

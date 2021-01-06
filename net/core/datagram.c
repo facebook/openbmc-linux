@@ -167,8 +167,6 @@ done:
 struct sk_buff *__skb_try_recv_from_queue(struct sock *sk,
 					  struct sk_buff_head *queue,
 					  unsigned int flags,
-					  void (*destructor)(struct sock *sk,
-							   struct sk_buff *skb),
 					  int *off, int *err,
 					  struct sk_buff **last)
 {
@@ -199,8 +197,6 @@ struct sk_buff *__skb_try_recv_from_queue(struct sock *sk,
 			refcount_inc(&skb->users);
 		} else {
 			__skb_unlink(skb, queue);
-			if (destructor)
-				destructor(sk, skb);
 		}
 		*off = _off;
 		return skb;
@@ -213,7 +209,6 @@ struct sk_buff *__skb_try_recv_from_queue(struct sock *sk,
  *	@sk: socket
  *	@queue: socket queue from which to receive
  *	@flags: MSG\_ flags
- *	@destructor: invoked under the receive lock on successful dequeue
  *	@off: an offset in bytes to peek skb from. Returns an offset
  *	      within an skb where data actually starts
  *	@err: error code returned
@@ -246,10 +241,7 @@ struct sk_buff *__skb_try_recv_from_queue(struct sock *sk,
  */
 struct sk_buff *__skb_try_recv_datagram(struct sock *sk,
 					struct sk_buff_head *queue,
-					unsigned int flags,
-					void (*destructor)(struct sock *sk,
-							   struct sk_buff *skb),
-					int *off, int *err,
+					unsigned int flags, int *off, int *err,
 					struct sk_buff **last)
 {
 	struct sk_buff *skb;
@@ -270,8 +262,8 @@ struct sk_buff *__skb_try_recv_datagram(struct sock *sk,
 		 * However, this function was correct in any case. 8)
 		 */
 		spin_lock_irqsave(&queue->lock, cpu_flags);
-		skb = __skb_try_recv_from_queue(sk, queue, flags, destructor,
-						off, &error, last);
+		skb = __skb_try_recv_from_queue(sk, queue, flags, off, &error,
+						last);
 		spin_unlock_irqrestore(&queue->lock, cpu_flags);
 		if (error)
 			goto no_packet;
@@ -294,10 +286,7 @@ EXPORT_SYMBOL(__skb_try_recv_datagram);
 
 struct sk_buff *__skb_recv_datagram(struct sock *sk,
 				    struct sk_buff_head *sk_queue,
-				    unsigned int flags,
-				    void (*destructor)(struct sock *sk,
-						       struct sk_buff *skb),
-				    int *off, int *err)
+				    unsigned int flags, int *off, int *err)
 {
 	struct sk_buff *skb, *last;
 	long timeo;
@@ -305,8 +294,8 @@ struct sk_buff *__skb_recv_datagram(struct sock *sk,
 	timeo = sock_rcvtimeo(sk, flags & MSG_DONTWAIT);
 
 	do {
-		skb = __skb_try_recv_datagram(sk, sk_queue, flags, destructor,
-					      off, err, &last);
+		skb = __skb_try_recv_datagram(sk, sk_queue, flags, off, err,
+					      &last);
 		if (skb)
 			return skb;
 
@@ -327,7 +316,7 @@ struct sk_buff *skb_recv_datagram(struct sock *sk, unsigned int flags,
 
 	return __skb_recv_datagram(sk, &sk->sk_receive_queue,
 				   flags | (noblock ? MSG_DONTWAIT : 0),
-				   NULL, &off, err);
+				   &off, err);
 }
 EXPORT_SYMBOL(skb_recv_datagram);
 
@@ -634,10 +623,11 @@ int __zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
 
 	while (length && iov_iter_count(from)) {
 		struct page *pages[MAX_SKB_FRAGS];
+		struct page *last_head = NULL;
 		size_t start;
 		ssize_t copied;
 		unsigned long truesize;
-		int n = 0;
+		int refs, n = 0;
 
 		if (frag == MAX_SKB_FRAGS)
 			return -EMSGSIZE;
@@ -660,13 +650,37 @@ int __zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
 		} else {
 			refcount_add(truesize, &skb->sk->sk_wmem_alloc);
 		}
-		while (copied) {
+		for (refs = 0; copied != 0; start = 0) {
 			int size = min_t(int, copied, PAGE_SIZE - start);
-			skb_fill_page_desc(skb, frag++, pages[n], start, size);
-			start = 0;
+			struct page *head = compound_head(pages[n]);
+
+			start += (pages[n] - head) << PAGE_SHIFT;
 			copied -= size;
 			n++;
+			if (frag) {
+				skb_frag_t *last = &skb_shinfo(skb)->frags[frag - 1];
+
+				if (head == skb_frag_page(last) &&
+				    start == skb_frag_off(last) + skb_frag_size(last)) {
+					skb_frag_size_add(last, size);
+					/* We combined this page, we need to release
+					 * a reference. Since compound pages refcount
+					 * is shared among many pages, batch the refcount
+					 * adjustments to limit false sharing.
+					 */
+					last_head = head;
+					refs++;
+					continue;
+				}
+			}
+			if (refs) {
+				page_ref_sub(last_head, refs);
+				refs = 0;
+			}
+			skb_fill_page_desc(skb, frag++, head, start, size);
 		}
+		if (refs)
+			page_ref_sub(last_head, refs);
 	}
 	return 0;
 }

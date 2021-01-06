@@ -25,7 +25,6 @@ config MACH_ASPEED_G4
 
 config MACH_ASPEED_G5
 	bool "Aspeed SoC 5th Generation"
-	# This implies ARMv6K which covers the ARM1176
 	depends on ARCH_MULTI_V6
 	select PINCTRL_ASPEED_G5
 	select FTTMR010_TIMER
@@ -40,7 +39,6 @@ config MACH_ASPEED_G6
 	select PINCTRL_ASPEED_G6
 	select ARM_GIC
 	select HAVE_ARM_ARCH_TIMER
-	select HAVE_SMP
 	help
 	 Say yes if you intend to run on an Aspeed ast2600 or similar
 	 sixth generation Aspeed BMCs.

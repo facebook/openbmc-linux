@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
+// SPDX-License-Identifier: (GPL-2.0-only OR BSD-3-Clause)
 //
 // This file is provided under a dual BSD/GPLv2 license.  When using or
 // redistributing this file, you may do so under either license.
@@ -54,6 +54,7 @@ static void ipc_log_header(struct device *dev, u8 *text, u32 cmd)
 	u8 *str2 = NULL;
 	u32 glb;
 	u32 type;
+	bool vdbg = false;
 
 	glb = cmd & SOF_GLB_TYPE_MASK;
 	type = cmd & SOF_CMD_TYPE_MASK;
@@ -146,6 +147,7 @@ static void ipc_log_header(struct device *dev, u8 *text, u32 cmd)
 		case SOF_IPC_STREAM_TRIG_XRUN:
 			str2 = "TRIG_XRUN"; break;
 		case SOF_IPC_STREAM_POSITION:
+			vdbg = true;
 			str2 = "POSITION"; break;
 		case SOF_IPC_STREAM_VORBIS_PARAMS:
 			str2 = "VORBIS_PARAMS"; break;
@@ -183,10 +185,14 @@ static void ipc_log_header(struct device *dev, u8 *text, u32 cmd)
 		str = "unknown GLB command"; break;
 	}
 
-	if (str2)
-		dev_dbg(dev, "%s: 0x%x: %s: %s\n", text, cmd, str, str2);
-	else
+	if (str2) {
+		if (vdbg)
+			dev_vdbg(dev, "%s: 0x%x: %s: %s\n", text, cmd, str, str2);
+		else
+			dev_dbg(dev, "%s: 0x%x: %s: %s\n", text, cmd, str, str2);
+	} else {
 		dev_dbg(dev, "%s: 0x%x: %s\n", text, cmd, str);
+	}
 }
 #else
 static inline void ipc_log_header(struct device *dev, u8 *text, u32 cmd)
@@ -214,15 +220,17 @@ static int tx_wait_done(struct snd_sof_ipc *ipc, struct snd_sof_ipc_msg *msg,
 		snd_sof_handle_fw_exception(ipc->sdev);
 		ret = -ETIMEDOUT;
 	} else {
-		/* copy the data returned from DSP */
 		ret = msg->reply_error;
-		if (msg->reply_size)
-			memcpy(reply_data, msg->reply_data, msg->reply_size);
-		if (ret < 0)
+		if (ret < 0) {
 			dev_err(sdev->dev, "error: ipc error for 0x%x size %zu\n",
 				hdr->cmd, msg->reply_size);
-		else
+		} else {
 			ipc_log_header(sdev->dev, "ipc tx succeeded", hdr->cmd);
+			if (msg->reply_size)
+				/* copy the data returned from DSP */
+				memcpy(reply_data, msg->reply_data,
+				       msg->reply_size);
+		}
 	}
 
 	return ret;
@@ -268,7 +276,6 @@ static int sof_ipc_tx_message_unlocked(struct snd_sof_ipc *ipc, u32 header,
 	spin_unlock_irq(&sdev->ipc_lock);
 
 	if (ret < 0) {
-		/* So far IPC TX never fails, consider making the above void */
 		dev_err_ratelimited(sdev->dev,
 				    "error: ipc tx failed with error %d\n",
 				    ret);
@@ -289,6 +296,32 @@ int sof_ipc_tx_message(struct snd_sof_ipc *ipc, u32 header,
 		       void *msg_data, size_t msg_bytes, void *reply_data,
 		       size_t reply_bytes)
 {
+	const struct sof_dsp_power_state target_state = {
+		.state = SOF_DSP_PM_D0,
+	};
+	int ret;
+
+	/* ensure the DSP is in D0 before sending a new IPC */
+	ret = snd_sof_dsp_set_power_state(ipc->sdev, &target_state);
+	if (ret < 0) {
+		dev_err(ipc->sdev->dev, "error: resuming DSP %d\n", ret);
+		return ret;
+	}
+
+	return sof_ipc_tx_message_no_pm(ipc, header, msg_data, msg_bytes,
+					reply_data, reply_bytes);
+}
+EXPORT_SYMBOL(sof_ipc_tx_message);
+
+/*
+ * send IPC message from host to DSP without modifying the DSP state.
+ * This will be used for IPC's that can be handled by the DSP
+ * even in a low-power D0 substate.
+ */
+int sof_ipc_tx_message_no_pm(struct snd_sof_ipc *ipc, u32 header,
+			     void *msg_data, size_t msg_bytes,
+			     void *reply_data, size_t reply_bytes)
+{
 	int ret;
 
 	if (msg_bytes > SOF_IPC_MSG_MAX_SIZE ||
@@ -305,24 +338,23 @@ int sof_ipc_tx_message(struct snd_sof_ipc *ipc, u32 header,
 
 	return ret;
 }
-EXPORT_SYMBOL(sof_ipc_tx_message);
+EXPORT_SYMBOL(sof_ipc_tx_message_no_pm);
 
 /* handle reply message from DSP */
-int snd_sof_ipc_reply(struct snd_sof_dev *sdev, u32 msg_id)
+void snd_sof_ipc_reply(struct snd_sof_dev *sdev, u32 msg_id)
 {
 	struct snd_sof_ipc_msg *msg = &sdev->ipc->msg;
 
 	if (msg->ipc_complete) {
-		dev_err(sdev->dev, "error: no reply expected, received 0x%x",
+		dev_dbg(sdev->dev,
+			"no reply expected, received 0x%x, will be ignored",
 			msg_id);
-		return -EINVAL;
+		return;
 	}
 
 	/* wake up and return the error if we have waiters on this message ? */
 	msg->ipc_complete = true;
 	wake_up(&msg->waitq);
-
-	return 0;
 }
 EXPORT_SYMBOL(snd_sof_ipc_reply);
 
@@ -423,8 +455,8 @@ static void ipc_period_elapsed(struct snd_sof_dev *sdev, u32 msg_id)
 	stream = &spcm->stream[direction];
 	snd_sof_ipc_msg_data(sdev, stream->substream, &posn, sizeof(posn));
 
-	dev_dbg(sdev->dev, "posn : host 0x%llx dai 0x%llx wall 0x%llx\n",
-		posn.host_posn, posn.dai_posn, posn.wallclock);
+	dev_vdbg(sdev->dev, "posn : host 0x%llx dai 0x%llx wall 0x%llx\n",
+		 posn.host_posn, posn.dai_posn, posn.wallclock);
 
 	memcpy(&stream->posn, &posn, sizeof(posn));
 

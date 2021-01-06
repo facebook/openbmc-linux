@@ -34,10 +34,9 @@ struct dc_info_packet;
 struct mod_vrr_params;
 
 void mod_build_vsc_infopacket(const struct dc_stream_state *stream,
-		struct dc_info_packet *info_packet,
-		bool *use_vsc_sdp_for_colorimetry);
+		struct dc_info_packet *info_packet);
 
 void mod_build_hf_vsif_infopacket(const struct dc_stream_state *stream,
-		struct dc_info_packet *info_packet, int ALLMEnabled, int ALLMValue);
+		struct dc_info_packet *info_packet);
 
 #endif

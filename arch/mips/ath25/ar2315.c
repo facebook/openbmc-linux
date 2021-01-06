@@ -19,6 +19,7 @@
 #include <linux/bitops.h>
 #include <linux/irqdomain.h>
 #include <linux/interrupt.h>
+#include <linux/memblock.h>
 #include <linux/platform_device.h>
 #include <linux/reboot.h>
 #include <asm/bootinfo.h>
@@ -63,11 +64,6 @@ static irqreturn_t ar2315_ahb_err_handler(int cpl, void *dev_id)
 
 	return IRQ_HANDLED;
 }
-
-static struct irqaction ar2315_ahb_err_interrupt  = {
-	.handler	= ar2315_ahb_err_handler,
-	.name		= "ar2315-ahb-error",
-};
 
 static void ar2315_misc_irq_handler(struct irq_desc *desc)
 {
@@ -159,7 +155,9 @@ void __init ar2315_arch_init_irq(void)
 		panic("Failed to add IRQ domain");
 
 	irq = irq_create_mapping(domain, AR2315_MISC_IRQ_AHB);
-	setup_irq(irq, &ar2315_ahb_err_interrupt);
+	if (request_irq(irq, ar2315_ahb_err_handler, 0, "ar2315-ahb-error",
+			NULL))
+		pr_err("Failed to register ar2315-ahb-error interrupt\n");
 
 	irq_set_chained_handler_and_data(AR2315_IRQ_MISC,
 					 ar2315_misc_irq_handler, domain);
@@ -269,7 +267,7 @@ void __init ar2315_plat_mem_setup(void)
 	memsize <<= 1 + ATH25_REG_MS(memcfg, AR2315_MEM_CFG_COL_WIDTH);
 	memsize <<= 1 + ATH25_REG_MS(memcfg, AR2315_MEM_CFG_ROW_WIDTH);
 	memsize <<= 3;
-	add_memory_region(0, memsize, BOOT_MEM_RAM);
+	memblock_add(0, memsize);
 	iounmap(sdram_base);
 
 	ar2315_rst_base = ioremap(AR2315_RST_BASE, AR2315_RST_SIZE);

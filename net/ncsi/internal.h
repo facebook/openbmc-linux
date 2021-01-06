@@ -246,24 +246,6 @@ struct ncsi_package {
 	struct ncsi_channel  *preferred_channel; /* Primary channel      */
 };
 
-struct ncsi_cmd_arg {
-	struct ncsi_dev_priv *ndp;        /* Associated NCSI device        */
-	unsigned char        type;        /* Command in the NCSI packet    */
-	unsigned char        id;          /* Request ID (sequence number)  */
-	unsigned char        package;     /* Destination package ID        */
-	unsigned char        channel;     /* Detination channel ID or 0x1f */
-	unsigned short       payload;     /* Command packet payload length */
-	unsigned int         req_flags;   /* NCSI request properties       */
-	union {
-		unsigned char  bytes[16]; /* Command packet specific data  */
-		unsigned short words[8];
-		unsigned int   dwords[4];
-	};
-	unsigned char        *data;       /* NCSI OEM data                 */
-	struct genl_info     *info;       /* Netlink information           */
-	int                  rexmit;      /* Retransmit when timeout       */
-};
-
 struct ncsi_request {
 	unsigned char        id;      /* Request ID - 0 to 255           */
 	bool                 used;    /* Request that has been assigned  */
@@ -278,7 +260,6 @@ struct ncsi_request {
 	u32                  snd_seq;     /* netlink sending sequence number */
 	u32                  snd_portid;  /* netlink portid of sender        */
 	struct nlmsghdr      nlhdr;       /* netlink message header          */
-	struct ncsi_cmd_arg  nca;
 };
 
 enum {
@@ -322,11 +303,6 @@ struct vlan_vid {
 	u16 vid;
 };
 
-enum {
-	NCSI_CTRL_FLAG_NO_CHANNEL_MONITOR	= 0x0001,
-	NCSI_CTRL_FLAG_START_REDO_PROBE		= 0x0002,
-};
-
 struct ncsi_dev_priv {
 	struct ncsi_dev     ndev;            /* Associated NCSI device     */
 	unsigned int        flags;           /* NCSI device flags          */
@@ -334,8 +310,6 @@ struct ncsi_dev_priv {
 #define NCSI_DEV_HWA		2            /* Enabled HW arbitration     */
 #define NCSI_DEV_RESHUFFLE	4
 #define NCSI_DEV_RESET		8            /* Reset state of NC          */
-#define NCSI_CMD_RETRY_MAX      3
-	unsigned int        cmd_retry;       /* Retry command              */
 	unsigned int        gma_flag;        /* OEM GMA flag               */
 	spinlock_t          lock;            /* Protect the NCSI device    */
 	unsigned int        package_probe_id;/* Current ID during probe    */
@@ -358,12 +332,24 @@ struct ncsi_dev_priv {
 	bool                multi_package;   /* Enable multiple packages   */
 	bool                mlx_multi_host;  /* Enable multi host Mellanox */
 	u32                 package_whitelist; /* Packages to configure    */
-	unsigned char       max_package;     /* Num of packages to probe   */
-	unsigned char       max_channel;     /* Num of channels to probe   */
-	unsigned char       rexmit;          /* Retransmit when timeout    */
-	unsigned int        ctrl_flags;      /* NCSI control flags         */
 };
 
+struct ncsi_cmd_arg {
+	struct ncsi_dev_priv *ndp;        /* Associated NCSI device        */
+	unsigned char        type;        /* Command in the NCSI packet    */
+	unsigned char        id;          /* Request ID (sequence number)  */
+	unsigned char        package;     /* Destination package ID        */
+	unsigned char        channel;     /* Detination channel ID or 0x1f */
+	unsigned short       payload;     /* Command packet payload length */
+	unsigned int         req_flags;   /* NCSI request properties       */
+	union {
+		unsigned char  bytes[16]; /* Command packet specific data  */
+		unsigned short words[8];
+		unsigned int   dwords[4];
+	};
+	unsigned char        *data;       /* NCSI OEM data                 */
+	struct genl_info     *info;       /* Netlink information           */
+};
 
 extern struct list_head ncsi_dev_list;
 extern spinlock_t ncsi_dev_lock;

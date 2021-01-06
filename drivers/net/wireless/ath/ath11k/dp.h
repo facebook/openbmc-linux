@@ -8,6 +8,8 @@
 
 #include "hal_rx.h"
 
+#define MAX_RXDMA_PER_PDEV     2
+
 struct ath11k_base;
 struct ath11k_peer;
 struct ath11k_dp;
@@ -22,9 +24,23 @@ struct dp_rx_tid {
 	u32 size;
 	u32 ba_win_sz;
 	bool active;
+
+	/* Info related to rx fragments */
+	u32 cur_sn;
+	u16 last_frag_no;
+	u16 rx_frag_bitmap;
+
+	struct sk_buff_head rx_frags;
+	struct hal_reo_dest_ring *dst_ring_desc;
+
+	/* Timer info related to fragments */
+	struct timer_list frag_timer;
+	struct ath11k_base *ab;
 };
 
+#define DP_REO_DESC_FREE_THRESHOLD  64
 #define DP_REO_DESC_FREE_TIMEOUT_MS 1000
+#define DP_MON_SERVICE_BUDGET       128
 
 struct dp_reo_cache_flush_elem {
 	struct list_head list;
@@ -128,14 +144,14 @@ struct ath11k_pdev_dp {
 	u32 mac_id;
 	atomic_t num_tx_pending;
 	wait_queue_head_t tx_empty_waitq;
-	struct dp_srng reo_dst_ring;
 	struct dp_rxdma_ring rx_refill_buf_ring;
-	struct dp_srng rxdma_err_dst_ring;
+	struct dp_srng rx_mac_buf_ring[MAX_RXDMA_PER_PDEV];
+	struct dp_srng rxdma_err_dst_ring[MAX_RXDMA_PER_PDEV];
 	struct dp_srng rxdma_mon_dst_ring;
 	struct dp_srng rxdma_mon_desc_ring;
 
 	struct dp_rxdma_ring rxdma_mon_buf_ring;
-	struct dp_rxdma_ring rx_mon_status_refill_ring;
+	struct dp_rxdma_ring rx_mon_status_refill_ring[MAX_RXDMA_PER_PDEV];
 	struct ieee80211_rx_status rx_status;
 	struct ath11k_mon_data mon_data;
 };
@@ -148,7 +164,7 @@ struct ath11k_pdev_dp {
 #define DP_AVG_MPDUS_PER_TID_MAX 128
 #define DP_AVG_MSDUS_PER_MPDU 4
 
-#define DP_RX_HASH_ENABLE	0 /* Disable hash based Rx steering */
+#define DP_RX_HASH_ENABLE	1 /* Enable hash based Rx steering */
 
 #define DP_BA_WIN_SZ_MAX	256
 
@@ -158,8 +174,8 @@ struct ath11k_pdev_dp {
 
 #define DP_WBM_RELEASE_RING_SIZE	64
 #define DP_TCL_DATA_RING_SIZE		512
-#define DP_TX_COMP_RING_SIZE		8192
-#define DP_TX_IDR_SIZE			(DP_TX_COMP_RING_SIZE << 1)
+#define DP_TX_COMP_RING_SIZE		32768
+#define DP_TX_IDR_SIZE			DP_TX_COMP_RING_SIZE
 #define DP_TCL_CMD_RING_SIZE		32
 #define DP_TCL_STATUS_RING_SIZE		32
 #define DP_REO_DST_RING_MAX		4
@@ -168,7 +184,7 @@ struct ath11k_pdev_dp {
 #define DP_RX_RELEASE_RING_SIZE		1024
 #define DP_REO_EXCEPTION_RING_SIZE	128
 #define DP_REO_CMD_RING_SIZE		128
-#define DP_REO_STATUS_RING_SIZE		256
+#define DP_REO_STATUS_RING_SIZE		2048
 #define DP_RXDMA_BUF_RING_SIZE		4096
 #define DP_RXDMA_REFILL_RING_SIZE	2048
 #define DP_RXDMA_ERR_DST_RING_SIZE	1024
@@ -190,6 +206,20 @@ struct ath11k_pdev_dp {
 #define DP_TX_DESC_ID_MSDU_ID GENMASK(18, 2)
 #define DP_TX_DESC_ID_POOL_ID GENMASK(20, 19)
 
+#define ATH11K_SHADOW_DP_TIMER_INTERVAL 20
+#define ATH11K_SHADOW_CTRL_TIMER_INTERVAL 10
+
+struct ath11k_hp_update_timer {
+	struct timer_list timer;
+	bool started;
+	bool init;
+	u32 tx_num;
+	u32 timer_tx_num;
+	u32 ring_id;
+	u32 interval;
+	struct ath11k_base *ab;
+};
+
 struct ath11k_dp {
 	struct ath11k_base *ab;
 	enum ath11k_htc_ep_id eid;
@@ -206,12 +236,21 @@ struct ath11k_dp {
 	struct dp_srng reo_except_ring;
 	struct dp_srng reo_cmd_ring;
 	struct dp_srng reo_status_ring;
+	struct dp_srng reo_dst_ring[DP_REO_DST_RING_MAX];
 	struct dp_tx_ring tx_ring[DP_TCL_NUM_RING_MAX];
 	struct hal_wbm_idle_scatter_list scatter_list[DP_IDLE_SCATTER_BUFS_MAX];
 	struct list_head reo_cmd_list;
 	struct list_head reo_cmd_cache_flush_list;
-	/* protects access to reo_cmd_list and reo_cmd_cache_flush_list */
+	u32 reo_cmd_cache_flush_count;
+	/**
+	 * protects access to below fields,
+	 * - reo_cmd_list
+	 * - reo_cmd_cache_flush_list
+	 * - reo_cmd_cache_flush_count
+	 */
 	spinlock_t reo_cmd_lock;
+	struct ath11k_hp_update_timer reo_cmd_timer;
+	struct ath11k_hp_update_timer tx_ring_timer[DP_TCL_NUM_RING_MAX];
 };
 
 /* HTT definitions */
@@ -475,7 +514,7 @@ struct htt_ppdu_stats_cfg_cmd {
 } __packed;
 
 #define HTT_PPDU_STATS_CFG_MSG_TYPE		GENMASK(7, 0)
-#define HTT_PPDU_STATS_CFG_PDEV_ID		GENMASK(16, 9)
+#define HTT_PPDU_STATS_CFG_PDEV_ID		GENMASK(15, 8)
 #define HTT_PPDU_STATS_CFG_TLV_TYPE_BITMASK	GENMASK(31, 16)
 
 enum htt_ppdu_stats_tag_type {
@@ -917,13 +956,16 @@ struct htt_rx_ring_tlv_filter {
 
 enum htt_t2h_msg_type {
 	HTT_T2H_MSG_TYPE_VERSION_CONF,
+	HTT_T2H_MSG_TYPE_PEER_MAP	= 0x3,
+	HTT_T2H_MSG_TYPE_PEER_UNMAP	= 0x4,
 	HTT_T2H_MSG_TYPE_RX_ADDBA	= 0x5,
 	HTT_T2H_MSG_TYPE_PKTLOG		= 0x8,
 	HTT_T2H_MSG_TYPE_SEC_IND	= 0xb,
-	HTT_T2H_MSG_TYPE_PEER_MAP	= 0x1e,
-	HTT_T2H_MSG_TYPE_PEER_UNMAP	= 0x1f,
+	HTT_T2H_MSG_TYPE_PEER_MAP2	= 0x1e,
+	HTT_T2H_MSG_TYPE_PEER_UNMAP2	= 0x1f,
 	HTT_T2H_MSG_TYPE_PPDU_STATS_IND = 0x1d,
 	HTT_T2H_MSG_TYPE_EXT_STATS_CONF = 0x1c,
+	HTT_T2H_MSG_TYPE_BKPRESSURE_EVENT_IND = 0x24,
 };
 
 #define HTT_TARGET_VERSION_MAJOR 3
@@ -971,6 +1013,55 @@ struct htt_resp_msg {
 		struct htt_t2h_peer_unmap_event peer_unmap_ev;
 	};
 } __packed;
+
+#define HTT_BACKPRESSURE_EVENT_PDEV_ID_M GENMASK(15, 8)
+#define HTT_BACKPRESSURE_EVENT_RING_TYPE_M GENMASK(23, 16)
+#define HTT_BACKPRESSURE_EVENT_RING_ID_M GENMASK(31, 24)
+
+#define HTT_BACKPRESSURE_EVENT_HP_M GENMASK(15, 0)
+#define HTT_BACKPRESSURE_EVENT_TP_M GENMASK(31, 16)
+
+#define HTT_BACKPRESSURE_UMAC_RING_TYPE	0
+#define HTT_BACKPRESSURE_LMAC_RING_TYPE	1
+
+enum htt_backpressure_umac_ringid {
+	HTT_SW_RING_IDX_REO_REO2SW1_RING,
+	HTT_SW_RING_IDX_REO_REO2SW2_RING,
+	HTT_SW_RING_IDX_REO_REO2SW3_RING,
+	HTT_SW_RING_IDX_REO_REO2SW4_RING,
+	HTT_SW_RING_IDX_REO_WBM2REO_LINK_RING,
+	HTT_SW_RING_IDX_REO_REO2TCL_RING,
+	HTT_SW_RING_IDX_REO_REO2FW_RING,
+	HTT_SW_RING_IDX_REO_REO_RELEASE_RING,
+	HTT_SW_RING_IDX_WBM_PPE_RELEASE_RING,
+	HTT_SW_RING_IDX_TCL_TCL2TQM_RING,
+	HTT_SW_RING_IDX_WBM_TQM_RELEASE_RING,
+	HTT_SW_RING_IDX_WBM_REO_RELEASE_RING,
+	HTT_SW_RING_IDX_WBM_WBM2SW0_RELEASE_RING,
+	HTT_SW_RING_IDX_WBM_WBM2SW1_RELEASE_RING,
+	HTT_SW_RING_IDX_WBM_WBM2SW2_RELEASE_RING,
+	HTT_SW_RING_IDX_WBM_WBM2SW3_RELEASE_RING,
+	HTT_SW_RING_IDX_REO_REO_CMD_RING,
+	HTT_SW_RING_IDX_REO_REO_STATUS_RING,
+	HTT_SW_UMAC_RING_IDX_MAX,
+};
+
+enum htt_backpressure_lmac_ringid {
+	HTT_SW_RING_IDX_FW2RXDMA_BUF_RING,
+	HTT_SW_RING_IDX_FW2RXDMA_STATUS_RING,
+	HTT_SW_RING_IDX_FW2RXDMA_LINK_RING,
+	HTT_SW_RING_IDX_SW2RXDMA_BUF_RING,
+	HTT_SW_RING_IDX_WBM2RXDMA_LINK_RING,
+	HTT_SW_RING_IDX_RXDMA2FW_RING,
+	HTT_SW_RING_IDX_RXDMA2SW_RING,
+	HTT_SW_RING_IDX_RXDMA2RELEASE_RING,
+	HTT_SW_RING_IDX_RXDMA2REO_RING,
+	HTT_SW_RING_IDX_MONITOR_STATUS_RING,
+	HTT_SW_RING_IDX_MONITOR_BUF_RING,
+	HTT_SW_RING_IDX_MONITOR_DESC_RING,
+	HTT_SW_RING_IDX_MONITOR_DEST_RING,
+	HTT_SW_LMAC_RING_IDX_MAX,
+};
 
 /* ppdu stats
  *
@@ -1066,6 +1157,13 @@ struct htt_ppdu_stats_common {
 	u16 bw_mhz;
 } __packed;
 
+enum htt_ppdu_stats_gi {
+	HTT_PPDU_STATS_SGI_0_8_US,
+	HTT_PPDU_STATS_SGI_0_4_US,
+	HTT_PPDU_STATS_SGI_1_6_US,
+	HTT_PPDU_STATS_SGI_3_2_US,
+};
+
 #define HTT_PPDU_STATS_USER_RATE_INFO0_USER_POS_M	GENMASK(3, 0)
 #define HTT_PPDU_STATS_USER_RATE_INFO0_MU_GROUP_ID_M	GENMASK(11, 4)
 
@@ -1094,6 +1192,8 @@ struct htt_ppdu_stats_common {
 		FIELD_GET(HTT_PPDU_STATS_USER_RATE_FLAGS_MCS_M, _val)
 #define HTT_USR_RATE_GI(_val) \
 		FIELD_GET(HTT_PPDU_STATS_USER_RATE_FLAGS_GI_M, _val)
+#define HTT_USR_RATE_DCM(_val) \
+		FIELD_GET(HTT_PPDU_STATS_USER_RATE_FLAGS_DCM_M, _val)
 
 #define HTT_PPDU_STATS_USER_RATE_RESP_FLAGS_LTF_SIZE_M		GENMASK(1, 0)
 #define HTT_PPDU_STATS_USER_RATE_RESP_FLAGS_STBC_M		BIT(2)
@@ -1481,6 +1581,7 @@ struct htt_ext_stats_cfg_params {
  *       4 bytes.
  */
 
+#define HTT_T2H_EXT_STATS_INFO1_DONE	BIT(11)
 #define HTT_T2H_EXT_STATS_INFO1_LENGTH   GENMASK(31, 16)
 
 struct ath11k_htt_extd_stats_msg {
@@ -1531,5 +1632,13 @@ int ath11k_dp_link_desc_setup(struct ath11k_base *ab,
 			      struct dp_link_desc_bank *link_desc_banks,
 			      u32 ring_type, struct hal_srng *srng,
 			      u32 n_link_desc);
+void ath11k_dp_shadow_start_timer(struct ath11k_base *ab,
+				  struct hal_srng	*srng,
+				  struct ath11k_hp_update_timer *update_timer);
+void ath11k_dp_shadow_stop_timer(struct ath11k_base *ab,
+				 struct ath11k_hp_update_timer *update_timer);
+void ath11k_dp_shadow_init_timer(struct ath11k_base *ab,
+				 struct ath11k_hp_update_timer *update_timer,
+				 u32 interval, u32 ring_id);
 
 #endif

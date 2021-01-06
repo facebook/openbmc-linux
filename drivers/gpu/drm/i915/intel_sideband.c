@@ -60,7 +60,7 @@ static void __vlv_punit_get(struct drm_i915_private *i915)
 	 * to the Valleyview P-unit and not all sideband communications.
 	 */
 	if (IS_VALLEYVIEW(i915)) {
-		pm_qos_update_request(&i915->sb_qos, 0);
+		cpu_latency_qos_update_request(&i915->sb_qos, 0);
 		on_each_cpu(ping, NULL, 1);
 	}
 }
@@ -68,7 +68,8 @@ static void __vlv_punit_get(struct drm_i915_private *i915)
 static void __vlv_punit_put(struct drm_i915_private *i915)
 {
 	if (IS_VALLEYVIEW(i915))
-		pm_qos_update_request(&i915->sb_qos, PM_QOS_DEFAULT_VALUE);
+		cpu_latency_qos_update_request(&i915->sb_qos,
+					       PM_QOS_DEFAULT_VALUE);
 
 	iosf_mbi_punit_release();
 }
@@ -230,9 +231,21 @@ void vlv_ccu_write(struct drm_i915_private *i915, u32 reg, u32 val)
 			SB_CRWRDA_NP, reg, &val);
 }
 
+static u32 vlv_dpio_phy_iosf_port(struct drm_i915_private *i915, enum dpio_phy phy)
+{
+	/*
+	 * IOSF_PORT_DPIO: VLV x2 PHY (DP/HDMI B and C), CHV x1 PHY (DP/HDMI D)
+	 * IOSF_PORT_DPIO_2: CHV x2 PHY (DP/HDMI B and C)
+	 */
+	if (IS_CHERRYVIEW(i915))
+		return phy == DPIO_PHY0 ? IOSF_PORT_DPIO_2 : IOSF_PORT_DPIO;
+	else
+		return IOSF_PORT_DPIO;
+}
+
 u32 vlv_dpio_read(struct drm_i915_private *i915, enum pipe pipe, int reg)
 {
-	int port = i915->dpio_phy_iosf_port[DPIO_PHY(pipe)];
+	u32 port = vlv_dpio_phy_iosf_port(i915, DPIO_PHY(pipe));
 	u32 val = 0;
 
 	vlv_sideband_rw(i915, DPIO_DEVFN, port, SB_MRD_NP, reg, &val);
@@ -241,8 +254,9 @@ u32 vlv_dpio_read(struct drm_i915_private *i915, enum pipe pipe, int reg)
 	 * FIXME: There might be some registers where all 1's is a valid value,
 	 * so ideally we should check the register offset instead...
 	 */
-	WARN(val == 0xffffffff, "DPIO read pipe %c reg 0x%x == 0x%x\n",
-	     pipe_name(pipe), reg, val);
+	drm_WARN(&i915->drm, val == 0xffffffff,
+		 "DPIO read pipe %c reg 0x%x == 0x%x\n",
+		 pipe_name(pipe), reg, val);
 
 	return val;
 }
@@ -250,7 +264,7 @@ u32 vlv_dpio_read(struct drm_i915_private *i915, enum pipe pipe, int reg)
 void vlv_dpio_write(struct drm_i915_private *i915,
 		    enum pipe pipe, int reg, u32 val)
 {
-	int port = i915->dpio_phy_iosf_port[DPIO_PHY(pipe)];
+	u32 port = vlv_dpio_phy_iosf_port(i915, DPIO_PHY(pipe));
 
 	vlv_sideband_rw(i915, DPIO_DEVFN, port, SB_MWR_NP, reg, &val);
 }
@@ -334,7 +348,7 @@ void intel_sbi_write(struct drm_i915_private *i915, u16 reg, u32 value,
 	intel_sbi_rw(i915, reg, destination, &value, false);
 }
 
-static inline int gen6_check_mailbox_status(u32 mbox)
+static int gen6_check_mailbox_status(u32 mbox)
 {
 	switch (mbox & GEN6_PCODE_ERROR_MASK) {
 	case GEN6_PCODE_SUCCESS:
@@ -354,7 +368,7 @@ static inline int gen6_check_mailbox_status(u32 mbox)
 	}
 }
 
-static inline int gen7_check_mailbox_status(u32 mbox)
+static int gen7_check_mailbox_status(u32 mbox)
 {
 	switch (mbox & GEN6_PCODE_ERROR_MASK) {
 	case GEN6_PCODE_SUCCESS:
@@ -365,6 +379,12 @@ static inline int gen7_check_mailbox_status(u32 mbox)
 		return -ETIMEDOUT;
 	case GEN7_PCODE_ILLEGAL_DATA:
 		return -EINVAL;
+	case GEN11_PCODE_ILLEGAL_SUBCOMMAND:
+		return -ENXIO;
+	case GEN11_PCODE_LOCKED:
+		return -EBUSY;
+	case GEN11_PCODE_REJECTED:
+		return -EACCES;
 	case GEN7_PCODE_MIN_FREQ_TABLE_GT_RATIO_OUT_OF_RANGE:
 		return -EOVERFLOW;
 	default:
@@ -423,7 +443,7 @@ int sandybridge_pcode_read(struct drm_i915_private *i915, u32 mbox,
 
 	mutex_lock(&i915->sb_lock);
 	err = __sandybridge_pcode_rw(i915, mbox, val, val1,
-				     500, 0,
+				     500, 20,
 				     true);
 	mutex_unlock(&i915->sb_lock);
 
@@ -525,7 +545,7 @@ int skl_pcode_request(struct drm_i915_private *i915, u32 mbox, u32 request,
 	 */
 	drm_dbg_kms(&i915->drm,
 		    "PCODE timeout, retrying with preemption disabled\n");
-	WARN_ON_ONCE(timeout_base_ms > 3);
+	drm_WARN_ON_ONCE(&i915->drm, timeout_base_ms > 3);
 	preempt_disable();
 	ret = wait_for_atomic(COND, 50);
 	preempt_enable();

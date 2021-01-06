@@ -4,6 +4,7 @@
 
 #include "aspeed-g6.dtsi"
 #include <dt-bindings/gpio/aspeed-gpio.h>
+#include <dt-bindings/i2c/i2c.h>
 #include <dt-bindings/leds/leds-pca955x.h>
 
 / {
@@ -25,7 +26,7 @@
 		#size-cells = <1>;
 		ranges;
 
-		flash_memory: region@ba000000 {
+		flash_memory: region@b8000000 {
 			no-map;
 			reg = <0xb8000000 0x4000000>; /* 64M */
 		};
@@ -95,6 +96,10 @@
 	};
 };
 
+&ehci1 {
+	status = "okay";
+};
+
 &gpio0 {
 	gpio-line-names =
 	/*A0-A7*/	"","","","","","","","",
@@ -111,7 +116,7 @@
 	/*L0-L7*/	"","","","","","","","",
 	/*M0-M7*/	"","","","","","","","",
 	/*N0-N7*/	"","","","","","","","",
-	/*O0-O7*/	"led-rear-power","led-rear-id","","","","","","",
+	/*O0-O7*/	"led-rear-power","led-rear-id","","usb-power","","","","",
 	/*P0-P7*/	"","","","","","","","",
 	/*Q0-Q7*/	"cfam-reset","","","","","","","fsi-routing",
 	/*R0-R7*/	"","","","","","","","",
@@ -185,6 +190,7 @@
 
 	fsi-routing-gpios = <&gpio0 ASPEED_GPIO(Q, 7) GPIO_ACTIVE_HIGH>;
 	fsi-mux-gpios = <&gpio0 ASPEED_GPIO(B, 0) GPIO_ACTIVE_HIGH>;
+	cfam-reset-gpios = <&gpio0 ASPEED_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
 
 	cfam@0,0 {
 		reg = <0 0>;
@@ -433,7 +439,13 @@
 };
 
 &i2c0 {
+	multi-master;
 	status = "okay";
+
+	ibm-panel@62 {
+		compatible = "ibm,op-panel";
+		reg = <(0x62 | I2C_OWN_SLAVE_ADDRESS)>;
+	};
 };
 
 &i2c1 {
@@ -857,12 +869,4 @@
 &xdma {
 	status = "okay";
 	memory-region = <&vga_memory>;
-};
-
-&lpc_host {
-       kcs4: kcs4@0 {
-               compatible = "openbmc,mctp-lpc";
-               interrupts = <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>;
-               status = "okay";
-       };
 };

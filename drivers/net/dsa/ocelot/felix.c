@@ -1,17 +1,26 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright 2019 NXP Semiconductors
+ *
+ * This is an umbrella module for all network switches that are
+ * register-compatible with Ocelot and that perform I/O to their host CPU
+ * through an NPI (Node Processor Interface) Ethernet port.
  */
 #include <uapi/linux/if_bridge.h>
+#include <soc/mscc/ocelot_vcap.h>
 #include <soc/mscc/ocelot_qsys.h>
 #include <soc/mscc/ocelot_sys.h>
 #include <soc/mscc/ocelot_dev.h>
 #include <soc/mscc/ocelot_ana.h>
+#include <soc/mscc/ocelot_ptp.h>
 #include <soc/mscc/ocelot.h>
+#include <linux/platform_device.h>
 #include <linux/packing.h>
 #include <linux/module.h>
 #include <linux/of_net.h>
 #include <linux/pci.h>
 #include <linux/of.h>
+#include <linux/pcs-lynx.h>
+#include <net/pkt_sched.h>
 #include <net/dsa.h>
 #include "felix.h"
 
@@ -56,6 +65,29 @@ static int felix_fdb_del(struct dsa_switch *ds, int port,
 	return ocelot_fdb_del(ocelot, port, addr, vid);
 }
 
+/* This callback needs to be present */
+static int felix_mdb_prepare(struct dsa_switch *ds, int port,
+			     const struct switchdev_obj_port_mdb *mdb)
+{
+	return 0;
+}
+
+static void felix_mdb_add(struct dsa_switch *ds, int port,
+			  const struct switchdev_obj_port_mdb *mdb)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	ocelot_port_mdb_add(ocelot, port, mdb);
+}
+
+static int felix_mdb_del(struct dsa_switch *ds, int port,
+			 const struct switchdev_obj_port_mdb *mdb)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	return ocelot_port_mdb_del(ocelot, port, mdb);
+}
+
 static void felix_bridge_stp_state_set(struct dsa_switch *ds, int port,
 				       u8 state)
 {
@@ -87,13 +119,12 @@ static int felix_vlan_prepare(struct dsa_switch *ds, int port,
 	return 0;
 }
 
-static int felix_vlan_filtering(struct dsa_switch *ds, int port, bool enabled)
+static int felix_vlan_filtering(struct dsa_switch *ds, int port, bool enabled,
+				struct switchdev_trans *trans)
 {
 	struct ocelot *ocelot = ds->priv;
 
-	ocelot_port_vlan_filtering(ocelot, port, enabled);
-
-	return 0;
+	return ocelot_port_vlan_filtering(ocelot, port, enabled, trans);
 }
 
 static void felix_vlan_add(struct dsa_switch *ds, int port,
@@ -159,48 +190,10 @@ static void felix_phylink_validate(struct dsa_switch *ds, int port,
 				   struct phylink_link_state *state)
 {
 	struct ocelot *ocelot = ds->priv;
-	struct ocelot_port *ocelot_port = ocelot->ports[port];
-	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
-
-	if (state->interface != PHY_INTERFACE_MODE_NA &&
-	    state->interface != ocelot_port->phy_mode) {
-		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
-		return;
-	}
-
-	/* No half-duplex. */
-	phylink_set_port_modes(mask);
-	phylink_set(mask, Autoneg);
-	phylink_set(mask, Pause);
-	phylink_set(mask, Asym_Pause);
-	phylink_set(mask, 10baseT_Full);
-	phylink_set(mask, 100baseT_Full);
-	phylink_set(mask, 1000baseT_Full);
-
-	/* The internal ports that run at 2.5G are overclocked GMII */
-	if (state->interface == PHY_INTERFACE_MODE_GMII ||
-	    state->interface == PHY_INTERFACE_MODE_2500BASEX ||
-	    state->interface == PHY_INTERFACE_MODE_USXGMII) {
-		phylink_set(mask, 2500baseT_Full);
-		phylink_set(mask, 2500baseX_Full);
-	}
-
-	bitmap_and(supported, supported, mask,
-		   __ETHTOOL_LINK_MODE_MASK_NBITS);
-	bitmap_and(state->advertising, state->advertising, mask,
-		   __ETHTOOL_LINK_MODE_MASK_NBITS);
-}
-
-static int felix_phylink_mac_pcs_get_state(struct dsa_switch *ds, int port,
-					   struct phylink_link_state *state)
-{
-	struct ocelot *ocelot = ds->priv;
 	struct felix *felix = ocelot_to_felix(ocelot);
 
-	if (felix->info->pcs_link_state)
-		felix->info->pcs_link_state(ocelot, port, state);
-
-	return 0;
+	if (felix->info->phylink_validate)
+		felix->info->phylink_validate(ocelot, port, supported, state);
 }
 
 static void felix_phylink_mac_config(struct dsa_switch *ds, int port,
@@ -208,46 +201,11 @@ static void felix_phylink_mac_config(struct dsa_switch *ds, int port,
 				     const struct phylink_link_state *state)
 {
 	struct ocelot *ocelot = ds->priv;
-	struct ocelot_port *ocelot_port = ocelot->ports[port];
 	struct felix *felix = ocelot_to_felix(ocelot);
-	u32 mac_fc_cfg;
+	struct dsa_port *dp = dsa_to_port(ds, port);
 
-	/* Take port out of reset by clearing the MAC_TX_RST, MAC_RX_RST and
-	 * PORT_RST bits in CLOCK_CFG
-	 */
-	ocelot_port_writel(ocelot_port, DEV_CLOCK_CFG_LINK_SPEED(state->speed),
-			   DEV_CLOCK_CFG);
-
-	/* Flow control. Link speed is only used here to evaluate the time
-	 * specification in incoming pause frames.
-	 */
-	mac_fc_cfg = SYS_MAC_FC_CFG_FC_LINK_SPEED(state->speed);
-
-	/* handle Rx pause in all cases, with 2500base-X this is used for rate
-	 * adaptation.
-	 */
-	mac_fc_cfg |= SYS_MAC_FC_CFG_RX_FC_ENA;
-
-	if (state->pause & MLO_PAUSE_TX)
-		mac_fc_cfg |= SYS_MAC_FC_CFG_TX_FC_ENA |
-			      SYS_MAC_FC_CFG_PAUSE_VAL_CFG(0xffff) |
-			      SYS_MAC_FC_CFG_FC_LATENCY_CFG(0x7) |
-			      SYS_MAC_FC_CFG_ZERO_PAUSE_ENA;
-	ocelot_write_rix(ocelot, mac_fc_cfg, SYS_MAC_FC_CFG, port);
-
-	ocelot_write_rix(ocelot, 0, ANA_POL_FLOWC, port);
-
-	if (felix->info->pcs_init)
-		felix->info->pcs_init(ocelot, port, link_an_mode, state);
-}
-
-static void felix_phylink_mac_an_restart(struct dsa_switch *ds, int port)
-{
-	struct ocelot *ocelot = ds->priv;
-	struct felix *felix = ocelot_to_felix(ocelot);
-
-	if (felix->info->pcs_an_restart)
-		felix->info->pcs_an_restart(ocelot, port);
+	if (felix->pcs[port])
+		phylink_set_pcs(dp->pl, &felix->pcs[port]->pcs);
 }
 
 static void felix_phylink_mac_link_down(struct dsa_switch *ds, int port,
@@ -258,19 +216,70 @@ static void felix_phylink_mac_link_down(struct dsa_switch *ds, int port,
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
 
 	ocelot_port_writel(ocelot_port, 0, DEV_MAC_ENA_CFG);
-	ocelot_rmw_rix(ocelot, 0, QSYS_SWITCH_PORT_MODE_PORT_ENA,
-		       QSYS_SWITCH_PORT_MODE, port);
+	ocelot_fields_write(ocelot, port, QSYS_SWITCH_PORT_MODE_PORT_ENA, 0);
 }
 
 static void felix_phylink_mac_link_up(struct dsa_switch *ds, int port,
 				      unsigned int link_an_mode,
 				      phy_interface_t interface,
-				      struct phy_device *phydev)
+				      struct phy_device *phydev,
+				      int speed, int duplex,
+				      bool tx_pause, bool rx_pause)
 {
 	struct ocelot *ocelot = ds->priv;
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
+	struct felix *felix = ocelot_to_felix(ocelot);
+	u32 mac_fc_cfg;
 
-	/* Enable MAC module */
+	/* Take port out of reset by clearing the MAC_TX_RST, MAC_RX_RST and
+	 * PORT_RST bits in DEV_CLOCK_CFG. Note that the way this system is
+	 * integrated is that the MAC speed is fixed and it's the PCS who is
+	 * performing the rate adaptation, so we have to write "1000Mbps" into
+	 * the LINK_SPEED field of DEV_CLOCK_CFG (which is also its default
+	 * value).
+	 */
+	ocelot_port_writel(ocelot_port,
+			   DEV_CLOCK_CFG_LINK_SPEED(OCELOT_SPEED_1000),
+			   DEV_CLOCK_CFG);
+
+	switch (speed) {
+	case SPEED_10:
+		mac_fc_cfg = SYS_MAC_FC_CFG_FC_LINK_SPEED(3);
+		break;
+	case SPEED_100:
+		mac_fc_cfg = SYS_MAC_FC_CFG_FC_LINK_SPEED(2);
+		break;
+	case SPEED_1000:
+	case SPEED_2500:
+		mac_fc_cfg = SYS_MAC_FC_CFG_FC_LINK_SPEED(1);
+		break;
+	default:
+		dev_err(ocelot->dev, "Unsupported speed on port %d: %d\n",
+			port, speed);
+		return;
+	}
+
+	/* handle Rx pause in all cases, with 2500base-X this is used for rate
+	 * adaptation.
+	 */
+	mac_fc_cfg |= SYS_MAC_FC_CFG_RX_FC_ENA;
+
+	if (tx_pause)
+		mac_fc_cfg |= SYS_MAC_FC_CFG_TX_FC_ENA |
+			      SYS_MAC_FC_CFG_PAUSE_VAL_CFG(0xffff) |
+			      SYS_MAC_FC_CFG_FC_LATENCY_CFG(0x7) |
+			      SYS_MAC_FC_CFG_ZERO_PAUSE_ENA;
+
+	/* Flow control. Link speed is only used here to evaluate the time
+	 * specification in incoming pause frames.
+	 */
+	ocelot_write_rix(ocelot, mac_fc_cfg, SYS_MAC_FC_CFG, port);
+
+	ocelot_write_rix(ocelot, 0, ANA_POL_FLOWC, port);
+
+	/* Undo the effects of felix_phylink_mac_link_down:
+	 * enable MAC module
+	 */
 	ocelot_port_writel(ocelot_port, DEV_MAC_ENA_CFG_RX_ENA |
 			   DEV_MAC_ENA_CFG_TX_ENA, DEV_MAC_ENA_CFG);
 
@@ -283,10 +292,32 @@ static void felix_phylink_mac_link_up(struct dsa_switch *ds, int port,
 			 ANA_PORT_PORT_CFG, port);
 
 	/* Core: Enable port for frame transfer */
-	ocelot_write_rix(ocelot, QSYS_SWITCH_PORT_MODE_INGRESS_DROP_MODE |
-			 QSYS_SWITCH_PORT_MODE_SCH_NEXT_CFG(1) |
-			 QSYS_SWITCH_PORT_MODE_PORT_ENA,
-			 QSYS_SWITCH_PORT_MODE, port);
+	ocelot_fields_write(ocelot, port,
+			    QSYS_SWITCH_PORT_MODE_PORT_ENA, 1);
+
+	if (felix->info->port_sched_speed_set)
+		felix->info->port_sched_speed_set(ocelot, port, speed);
+}
+
+static void felix_port_qos_map_init(struct ocelot *ocelot, int port)
+{
+	int i;
+
+	ocelot_rmw_gix(ocelot,
+		       ANA_PORT_QOS_CFG_QOS_PCP_ENA,
+		       ANA_PORT_QOS_CFG_QOS_PCP_ENA,
+		       ANA_PORT_QOS_CFG,
+		       port);
+
+	for (i = 0; i < FELIX_NUM_TC * 2; i++) {
+		ocelot_rmw_ix(ocelot,
+			      (ANA_PORT_PCP_DEI_MAP_DP_PCP_DEI_VAL & i) |
+			      ANA_PORT_PCP_DEI_MAP_QOS_PCP_DEI_VAL(i),
+			      ANA_PORT_PCP_DEI_MAP_DP_PCP_DEI_VAL |
+			      ANA_PORT_PCP_DEI_MAP_QOS_PCP_DEI_VAL_M,
+			      ANA_PORT_PCP_DEI_MAP,
+			      port, i);
+	}
 }
 
 static void felix_get_strings(struct dsa_switch *ds, int port,
@@ -354,6 +385,7 @@ static int felix_parse_ports_node(struct felix *felix,
 		if (err < 0) {
 			dev_err(dev, "Unsupported PHY mode %s on port %d\n",
 				phy_modes(phy_mode), port);
+			of_node_put(child);
 			return err;
 		}
 
@@ -388,7 +420,6 @@ static int felix_init_structs(struct felix *felix, int num_phys_ports)
 {
 	struct ocelot *ocelot = &felix->ocelot;
 	phy_interface_t *port_phy_modes;
-	resource_size_t switch_base;
 	struct resource res;
 	int port, i, err;
 
@@ -403,7 +434,10 @@ static int felix_init_structs(struct felix *felix, int num_phys_ports)
 	ocelot->num_stats	= felix->info->num_stats;
 	ocelot->shared_queue_sz	= felix->info->shared_queue_sz;
 	ocelot->num_mact_rows	= felix->info->num_mact_rows;
+	ocelot->vcap		= felix->info->vcap;
 	ocelot->ops		= felix->info->ops;
+	ocelot->inj_prefix	= OCELOT_TAG_PREFIX_SHORT;
+	ocelot->xtr_prefix	= OCELOT_TAG_PREFIX_SHORT;
 
 	port_phy_modes = kcalloc(num_phys_ports, sizeof(phy_interface_t),
 				 GFP_KERNEL);
@@ -416,9 +450,6 @@ static int felix_init_structs(struct felix *felix, int num_phys_ports)
 		return err;
 	}
 
-	switch_base = pci_resource_start(felix->pdev,
-					 felix->info->switch_pci_bar);
-
 	for (i = 0; i < TARGET_MAX; i++) {
 		struct regmap *target;
 
@@ -427,8 +458,8 @@ static int felix_init_structs(struct felix *felix, int num_phys_ports)
 
 		memcpy(&res, &felix->info->target_io_res[i], sizeof(res));
 		res.flags = IORESOURCE_MEM;
-		res.start += switch_base;
-		res.end += switch_base;
+		res.start += felix->switch_base;
+		res.end += felix->switch_base;
 
 		target = ocelot_regmap_init(ocelot, &res);
 		if (IS_ERR(target)) {
@@ -450,7 +481,8 @@ static int felix_init_structs(struct felix *felix, int num_phys_ports)
 
 	for (port = 0; port < num_phys_ports; port++) {
 		struct ocelot_port *ocelot_port;
-		void __iomem *port_regs;
+		struct regmap *target;
+		u8 *template;
 
 		ocelot_port = devm_kzalloc(ocelot->dev,
 					   sizeof(struct ocelot_port),
@@ -464,21 +496,34 @@ static int felix_init_structs(struct felix *felix, int num_phys_ports)
 
 		memcpy(&res, &felix->info->port_io_res[port], sizeof(res));
 		res.flags = IORESOURCE_MEM;
-		res.start += switch_base;
-		res.end += switch_base;
+		res.start += felix->switch_base;
+		res.end += felix->switch_base;
 
-		port_regs = devm_ioremap_resource(ocelot->dev, &res);
-		if (IS_ERR(port_regs)) {
+		target = ocelot_regmap_init(ocelot, &res);
+		if (IS_ERR(target)) {
 			dev_err(ocelot->dev,
-				"failed to map registers for port %d\n", port);
+				"Failed to map memory space for port %d\n",
+				port);
 			kfree(port_phy_modes);
-			return PTR_ERR(port_regs);
+			return PTR_ERR(target);
+		}
+
+		template = devm_kzalloc(ocelot->dev, OCELOT_TOTAL_TAG_LEN,
+					GFP_KERNEL);
+		if (!template) {
+			dev_err(ocelot->dev,
+				"Failed to allocate memory for DSA tag\n");
+			kfree(port_phy_modes);
+			return -ENOMEM;
 		}
 
 		ocelot_port->phy_mode = port_phy_modes[port];
 		ocelot_port->ocelot = ocelot;
-		ocelot_port->regs = port_regs;
+		ocelot_port->target = target;
+		ocelot_port->xmit_template = template;
 		ocelot->ports[port] = ocelot_port;
+
+		felix->info->xmit_template_populate(ocelot, port);
 	}
 
 	kfree(port_phy_modes);
@@ -490,6 +535,28 @@ static int felix_init_structs(struct felix *felix, int num_phys_ports)
 	}
 
 	return 0;
+}
+
+/* The CPU port module is connected to the Node Processor Interface (NPI). This
+ * is the mode through which frames can be injected from and extracted to an
+ * external CPU, over Ethernet.
+ */
+static void felix_npi_port_init(struct ocelot *ocelot, int port)
+{
+	ocelot->npi = port;
+
+	ocelot_write(ocelot, QSYS_EXT_CPU_CFG_EXT_CPUQ_MSK_M |
+		     QSYS_EXT_CPU_CFG_EXT_CPU_PORT(port),
+		     QSYS_EXT_CPU_CFG);
+
+	/* NPI port Injection/Extraction configuration */
+	ocelot_fields_write(ocelot, port, SYS_PORT_MODE_INCL_XTR_HDR,
+			    ocelot->xtr_prefix);
+	ocelot_fields_write(ocelot, port, SYS_PORT_MODE_INCL_INJ_HDR,
+			    ocelot->inj_prefix);
+
+	/* Disable transmission of pause frames */
+	ocelot_fields_write(ocelot, port, SYS_PAUSE_CFG_PAUSE_ENA, 0);
 }
 
 /* Hardware initialization done here so that we can allocate structures with
@@ -507,22 +574,42 @@ static int felix_setup(struct dsa_switch *ds)
 	if (err)
 		return err;
 
-	ocelot_init(ocelot);
+	err = ocelot_init(ocelot);
+	if (err)
+		return err;
+
+	if (ocelot->ptp) {
+		err = ocelot_init_timestamp(ocelot, felix->info->ptp_caps);
+		if (err) {
+			dev_err(ocelot->dev,
+				"Timestamp initialization failed\n");
+			ocelot->ptp = 0;
+		}
+	}
 
 	for (port = 0; port < ds->num_ports; port++) {
 		ocelot_init_port(ocelot, port);
 
 		if (dsa_is_cpu_port(ds, port))
-			ocelot_set_cpu_port(ocelot, port,
-					    OCELOT_TAG_PREFIX_NONE,
-					    OCELOT_TAG_PREFIX_LONG);
+			felix_npi_port_init(ocelot, port);
+
+		/* Set the default QoS Classification based on PCP and DEI
+		 * bits of vlan tag.
+		 */
+		felix_port_qos_map_init(ocelot, port);
 	}
 
-	/* It looks like the MAC/PCS interrupt register - PM0_IEVENT (0x8040)
-	 * isn't instantiated for the Felix PF.
-	 * In-band AN may take a few ms to complete, so we need to poll.
+	/* Include the CPU port module in the forwarding mask for unknown
+	 * unicast - the hardware default value for ANA_FLOODING_FLD_UNICAST
+	 * excludes BIT(ocelot->num_phys_ports), and so does ocelot_init, since
+	 * Ocelot relies on whitelisting MAC addresses towards PGID_CPU.
 	 */
-	ds->pcs_poll = true;
+	ocelot_write_rix(ocelot,
+			 ANA_PGID_PGID_PGID(GENMASK(ocelot->num_phys_ports, 0)),
+			 ANA_PGID_PGID, PGID_UC);
+
+	ds->mtu_enforcement_ingress = true;
+	ds->configure_vlan_while_not_filtering = true;
 
 	return 0;
 }
@@ -531,10 +618,14 @@ static void felix_teardown(struct dsa_switch *ds)
 {
 	struct ocelot *ocelot = ds->priv;
 	struct felix *felix = ocelot_to_felix(ocelot);
+	int port;
 
 	if (felix->info->mdio_bus_free)
 		felix->info->mdio_bus_free(ocelot);
 
+	for (port = 0; port < ocelot->num_phys_ports; port++)
+		ocelot_deinit_port(ocelot, port);
+	ocelot_deinit_timestamp(ocelot);
 	/* stop workqueue thread */
 	ocelot_deinit(ocelot);
 }
@@ -589,13 +680,88 @@ static bool felix_txtstamp(struct dsa_switch *ds, int port,
 	struct ocelot *ocelot = ds->priv;
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
 
-	if (!ocelot_port_add_txtstamp_skb(ocelot_port, clone))
+	if (ocelot->ptp && (skb_shinfo(clone)->tx_flags & SKBTX_HW_TSTAMP) &&
+	    ocelot_port->ptp_cmd == IFH_REW_OP_TWO_STEP_PTP) {
+		ocelot_port_add_txtstamp_skb(ocelot, port, clone);
 		return true;
+	}
 
 	return false;
 }
 
-static const struct dsa_switch_ops felix_switch_ops = {
+static int felix_change_mtu(struct dsa_switch *ds, int port, int new_mtu)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	ocelot_port_set_maxlen(ocelot, port, new_mtu);
+
+	return 0;
+}
+
+static int felix_get_max_mtu(struct dsa_switch *ds, int port)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	return ocelot_get_max_mtu(ocelot, port);
+}
+
+static int felix_cls_flower_add(struct dsa_switch *ds, int port,
+				struct flow_cls_offload *cls, bool ingress)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	return ocelot_cls_flower_replace(ocelot, port, cls, ingress);
+}
+
+static int felix_cls_flower_del(struct dsa_switch *ds, int port,
+				struct flow_cls_offload *cls, bool ingress)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	return ocelot_cls_flower_destroy(ocelot, port, cls, ingress);
+}
+
+static int felix_cls_flower_stats(struct dsa_switch *ds, int port,
+				  struct flow_cls_offload *cls, bool ingress)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	return ocelot_cls_flower_stats(ocelot, port, cls, ingress);
+}
+
+static int felix_port_policer_add(struct dsa_switch *ds, int port,
+				  struct dsa_mall_policer_tc_entry *policer)
+{
+	struct ocelot *ocelot = ds->priv;
+	struct ocelot_policer pol = {
+		.rate = div_u64(policer->rate_bytes_per_sec, 1000) * 8,
+		.burst = policer->burst,
+	};
+
+	return ocelot_port_policer_add(ocelot, port, &pol);
+}
+
+static void felix_port_policer_del(struct dsa_switch *ds, int port)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	ocelot_port_policer_del(ocelot, port);
+}
+
+static int felix_port_setup_tc(struct dsa_switch *ds, int port,
+			       enum tc_setup_type type,
+			       void *type_data)
+{
+	struct ocelot *ocelot = ds->priv;
+	struct felix *felix = ocelot_to_felix(ocelot);
+
+	if (felix->info->port_setup_tc)
+		return felix->info->port_setup_tc(ds, port, type, type_data);
+	else
+		return -EOPNOTSUPP;
+}
+
+const struct dsa_switch_ops felix_switch_ops = {
 	.get_tag_protocol	= felix_get_tag_protocol,
 	.setup			= felix_setup,
 	.teardown		= felix_teardown,
@@ -605,9 +771,7 @@ static const struct dsa_switch_ops felix_switch_ops = {
 	.get_sset_count		= felix_get_sset_count,
 	.get_ts_info		= felix_get_ts_info,
 	.phylink_validate	= felix_phylink_validate,
-	.phylink_mac_link_state	= felix_phylink_mac_pcs_get_state,
 	.phylink_mac_config	= felix_phylink_mac_config,
-	.phylink_mac_an_restart	= felix_phylink_mac_an_restart,
 	.phylink_mac_link_down	= felix_phylink_mac_link_down,
 	.phylink_mac_link_up	= felix_phylink_mac_link_up,
 	.port_enable		= felix_port_enable,
@@ -615,6 +779,9 @@ static const struct dsa_switch_ops felix_switch_ops = {
 	.port_fdb_dump		= felix_fdb_dump,
 	.port_fdb_add		= felix_fdb_add,
 	.port_fdb_del		= felix_fdb_del,
+	.port_mdb_prepare	= felix_mdb_prepare,
+	.port_mdb_add		= felix_mdb_add,
+	.port_mdb_del		= felix_mdb_del,
 	.port_bridge_join	= felix_bridge_join,
 	.port_bridge_leave	= felix_bridge_leave,
 	.port_stp_state_set	= felix_bridge_stp_state_set,
@@ -626,145 +793,34 @@ static const struct dsa_switch_ops felix_switch_ops = {
 	.port_hwtstamp_set	= felix_hwtstamp_set,
 	.port_rxtstamp		= felix_rxtstamp,
 	.port_txtstamp		= felix_txtstamp,
+	.port_change_mtu	= felix_change_mtu,
+	.port_max_mtu		= felix_get_max_mtu,
+	.port_policer_add	= felix_port_policer_add,
+	.port_policer_del	= felix_port_policer_del,
+	.cls_flower_add		= felix_cls_flower_add,
+	.cls_flower_del		= felix_cls_flower_del,
+	.cls_flower_stats	= felix_cls_flower_stats,
+	.port_setup_tc		= felix_port_setup_tc,
 };
 
-static struct felix_info *felix_instance_tbl[] = {
-	[FELIX_INSTANCE_VSC9959] = &felix_info_vsc9959,
-};
-
-static irqreturn_t felix_irq_handler(int irq, void *data)
+struct net_device *felix_port_to_netdev(struct ocelot *ocelot, int port)
 {
-	struct ocelot *ocelot = (struct ocelot *)data;
+	struct felix *felix = ocelot_to_felix(ocelot);
+	struct dsa_switch *ds = felix->ds;
 
-	/* The INTB interrupt is used for both PTP TX timestamp interrupt
-	 * and preemption status change interrupt on each port.
-	 *
-	 * - Get txtstamp if have
-	 * - TODO: handle preemption. Without handling it, driver may get
-	 *   interrupt storm.
-	 */
+	if (!dsa_is_user_port(ds, port))
+		return NULL;
 
-	ocelot_get_txtstamp(ocelot);
-
-	return IRQ_HANDLED;
+	return dsa_to_port(ds, port)->slave;
 }
 
-static int felix_pci_probe(struct pci_dev *pdev,
-			   const struct pci_device_id *id)
+int felix_netdev_to_port(struct net_device *dev)
 {
-	enum felix_instance instance = id->driver_data;
-	struct dsa_switch *ds;
-	struct ocelot *ocelot;
-	struct felix *felix;
-	int err;
+	struct dsa_port *dp;
 
-	err = pci_enable_device(pdev);
-	if (err) {
-		dev_err(&pdev->dev, "device enable failed\n");
-		goto err_pci_enable;
-	}
+	dp = dsa_port_from_netdev(dev);
+	if (IS_ERR(dp))
+		return -EINVAL;
 
-	/* set up for high or low dma */
-	err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-	if (err) {
-		err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-		if (err) {
-			dev_err(&pdev->dev,
-				"DMA configuration failed: 0x%x\n", err);
-			goto err_dma;
-		}
-	}
-
-	felix = kzalloc(sizeof(struct felix), GFP_KERNEL);
-	if (!felix) {
-		err = -ENOMEM;
-		dev_err(&pdev->dev, "Failed to allocate driver memory\n");
-		goto err_alloc_felix;
-	}
-
-	pci_set_drvdata(pdev, felix);
-	ocelot = &felix->ocelot;
-	ocelot->dev = &pdev->dev;
-	felix->pdev = pdev;
-	felix->info = felix_instance_tbl[instance];
-
-	pci_set_master(pdev);
-
-	err = devm_request_threaded_irq(&pdev->dev, pdev->irq, NULL,
-					&felix_irq_handler, IRQF_ONESHOT,
-					"felix-intb", ocelot);
-	if (err) {
-		dev_err(&pdev->dev, "Failed to request irq\n");
-		goto err_alloc_irq;
-	}
-
-	ocelot->ptp = 1;
-
-	ds = kzalloc(sizeof(struct dsa_switch), GFP_KERNEL);
-	if (!ds) {
-		err = -ENOMEM;
-		dev_err(&pdev->dev, "Failed to allocate DSA switch\n");
-		goto err_alloc_ds;
-	}
-
-	ds->dev = &pdev->dev;
-	ds->num_ports = felix->info->num_ports;
-	ds->ops = &felix_switch_ops;
-	ds->priv = ocelot;
-	felix->ds = ds;
-
-	err = dsa_register_switch(ds);
-	if (err) {
-		dev_err(&pdev->dev, "Failed to register DSA switch: %d\n", err);
-		goto err_register_ds;
-	}
-
-	return 0;
-
-err_register_ds:
-	kfree(ds);
-err_alloc_ds:
-err_alloc_irq:
-err_alloc_felix:
-	kfree(felix);
-err_dma:
-	pci_disable_device(pdev);
-err_pci_enable:
-	return err;
+	return dp->index;
 }
-
-static void felix_pci_remove(struct pci_dev *pdev)
-{
-	struct felix *felix;
-
-	felix = pci_get_drvdata(pdev);
-
-	dsa_unregister_switch(felix->ds);
-
-	kfree(felix->ds);
-	kfree(felix);
-
-	pci_disable_device(pdev);
-}
-
-static struct pci_device_id felix_ids[] = {
-	{
-		/* NXP LS1028A */
-		PCI_DEVICE(PCI_VENDOR_ID_FREESCALE, 0xEEF0),
-		.driver_data = FELIX_INSTANCE_VSC9959,
-	},
-	{ 0, }
-};
-MODULE_DEVICE_TABLE(pci, felix_ids);
-
-static struct pci_driver felix_pci_driver = {
-	.name		= KBUILD_MODNAME,
-	.id_table	= felix_ids,
-	.probe		= felix_pci_probe,
-	.remove		= felix_pci_remove,
-};
-
-module_pci_driver(felix_pci_driver);
-
-MODULE_DESCRIPTION("Felix Switch driver");
-MODULE_LICENSE("GPL v2");

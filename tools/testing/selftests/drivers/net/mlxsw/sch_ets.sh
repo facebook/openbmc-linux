@@ -27,11 +27,17 @@ switch_create()
 	# amount of traffic that is admitted to the shared buffers. This makes
 	# sure that there is always enough traffic of all types to select from
 	# for the DWRR process.
+	devlink_port_pool_th_save $swp1 0
 	devlink_port_pool_th_set $swp1 0 12
+	devlink_tc_bind_pool_th_save $swp1 0 ingress
 	devlink_tc_bind_pool_th_set $swp1 0 ingress 0 12
+	devlink_port_pool_th_save $swp2 4
 	devlink_port_pool_th_set $swp2 4 12
+	devlink_tc_bind_pool_th_save $swp2 7 egress
 	devlink_tc_bind_pool_th_set $swp2 7 egress 4 5
+	devlink_tc_bind_pool_th_save $swp2 6 egress
 	devlink_tc_bind_pool_th_set $swp2 6 egress 4 5
+	devlink_tc_bind_pool_th_save $swp2 5 egress
 	devlink_tc_bind_pool_th_set $swp2 5 egress 4 5
 
 	# Note: sch_ets_core.sh uses VLAN ingress-qos-map to assign packet
@@ -56,11 +62,19 @@ switch_destroy()
 }
 
 # Callback from sch_ets_tests.sh
-get_stats()
+collect_stats()
 {
-	local band=$1; shift
+	local -a streams=("$@")
+	local stream
 
-	ethtool_stats_get "$h2" rx_octets_prio_$band
+	# Wait for qdisc counter update so that we don't get it mid-way through.
+	busywait_for_counter 1000 +1 \
+		qdisc_parent_stats_get $swp2 10:$((${streams[0]} + 1)) .bytes \
+		> /dev/null
+
+	for stream in ${streams[@]}; do
+		qdisc_parent_stats_get $swp2 10:$((stream + 1)) .bytes
+	done
 }
 
 bail_on_lldpad

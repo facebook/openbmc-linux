@@ -210,7 +210,7 @@
 			ranges;
 
 			edac: memory-controller@1e6e0000 {
-				compatible = "aspeed,ast2500-sdram-edac", "syscon";
+				compatible = "aspeed,ast2500-sdram-edac";
 				reg = <0x1e6e0000 0x174>;
 				interrupts = <0>;
 				status = "disabled";
@@ -225,27 +225,24 @@
 				#clock-cells = <1>;
 				#reset-cells = <1>;
 
+				scu_ic: interrupt-controller@18 {
+					#interrupt-cells = <1>;
+					compatible = "aspeed,ast2500-scu-ic";
+					reg = <0x18 0x4>;
+					interrupts = <21>;
+					interrupt-controller;
+				};
+
 				p2a: p2a-control@2c {
 					compatible = "aspeed,ast2500-p2a-ctrl";
 					reg = <0x2c 0x4>;
 					status = "disabled";
 				};
 
-				scu_ic: interrupt-controller@18 {
-					#interrupt-cells = <1>;
-					compatible = "aspeed,ast2500-scu-ic";
-					interrupts = <21>;
-					interrupt-controller;
-				};
-
 				pinctrl: pinctrl@80 {
 					compatible = "aspeed,ast2500-pinctrl";
 					reg = <0x80 0x18>, <0xa0 0x10>;
 					aspeed,external-nodes = <&gfx>, <&lhc>;
-				};
-
-				vga_scratch: scratch {
-					compatible = "aspeed,bmc-misc";
 				};
 			};
 
@@ -254,15 +251,6 @@
 				reg = <0x1e6e2078 0x4>;
 				period = <1>;
 				quality = <100>;
-			};
-
-			jtag: jtag@1e6e4000 {
-				compatible = "aspeed,ast2500-jtag";
-				reg = <0x1e6e4000 0x1c 0x1e6e2004 0x04>;
-				clocks = <&syscon ASPEED_CLK_APB>;
-				resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
-				interrupts = <43>;
-				status = "disabled";
 			};
 
 			gfx: display@1e6e6000 {
@@ -283,7 +271,6 @@
 				interrupts-extended = <&vic 6>, <&scu_ic ASPEED_AST2500_SCU_IC_PCIE_RESET_LO_TO_HI>;
 				aspeed,pcie-device = "bmc";
 				aspeed,scu = <&syscon>;
-				sdmc = <&edac>;
 				status = "disabled";
 			};
 
@@ -438,7 +425,6 @@
 				interrupts = <8>;
 				clocks = <&syscon ASPEED_CLK_APB>;
 				no-loopback-test;
-				aspeed,sirq-polarity-sense = <&syscon 0x70 25>;
 				status = "disabled";
 			};
 
@@ -459,22 +445,22 @@
 					#size-cells = <1>;
 					ranges = <0x0 0x0 0x80>;
 
-					kcs1: kcs1@0 {
-						compatible = "aspeed,ast2500-kcs-bmc";
+					kcs1: kcs@24 {
+						compatible = "aspeed,ast2500-kcs-bmc-v2";
+						reg = <0x24 0x1>, <0x30 0x1>, <0x3c 0x1>;
 						interrupts = <8>;
-						kcs_chan = <1>;
 						status = "disabled";
 					};
-					kcs2: kcs2@0 {
-						compatible = "aspeed,ast2500-kcs-bmc";
+					kcs2: kcs@28 {
+						compatible = "aspeed,ast2500-kcs-bmc-v2";
+						reg = <0x28 0x1>, <0x34 0x1>, <0x40 0x1>;
 						interrupts = <8>;
-						kcs_chan = <2>;
 						status = "disabled";
 					};
-					kcs3: kcs3@0 {
-						compatible = "aspeed,ast2500-kcs-bmc";
+					kcs3: kcs@2c {
+						compatible = "aspeed,ast2500-kcs-bmc-v2";
+						reg = <0x2c 0x1>, <0x38 0x1>, <0x44 0x1>;
 						interrupts = <8>;
-						kcs_chan = <3>;
 						status = "disabled";
 					};
 				};
@@ -488,10 +474,10 @@
 					#size-cells = <1>;
 					ranges = <0x0 0x80 0x1e0>;
 
-					kcs4: kcs4@0 {
-						compatible = "aspeed,ast2500-kcs-bmc";
+					kcs4: kcs@94 {
+						compatible = "aspeed,ast2500-kcs-bmc-v2";
+						reg = <0x94 0x1>, <0x98 0x1>, <0x9c 0x1>;
 						interrupts = <8>;
-						kcs_chan = <4>;
 						status = "disabled";
 					};
 
@@ -527,18 +513,7 @@
 						interrupts = <8>;
 						status = "disabled";
 					};
-
-					sio_regs: regs {
-						compatible = "aspeed,bmc-misc";
-					};
 				};
-			};
-
-			peci: bus@1e78b000 {
-				compatible = "simple-bus";
-				#address-cells = <1>;
-				#size-cells = <1>;
-				ranges = <0x0 0x1e78b000 0x60>;
 			};
 
 			uart2: serial@1e78d000 {
@@ -581,24 +556,6 @@
 				ranges = <0 0x1e78a000 0x1000>;
 			};
 		};
-	};
-};
-
-&peci {
-	peci0: peci-bus@0 {
-		compatible = "aspeed,ast2500-peci";
-		reg = <0x0 0x60>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		interrupts = <15>;
-		clocks = <&syscon ASPEED_CLK_GATE_REFCLK>;
-		resets = <&syscon ASPEED_RESET_PECI>;
-		clock-frequency = <24000000>;
-		msg-timing = <1>;
-		addr-timing = <1>;
-		rd-sampling-point = <8>;
-		cmd-timeout-ms = <1000>;
-		status = "disabled";
 	};
 };
 
@@ -1677,136 +1634,5 @@
 	pinctrl_wdtrst2_default: wdtrst2_default {
 		function = "WDTRST2";
 		groups = "WDTRST2";
-	};
-};
-
-&vga_scratch {
-	dac_mux {
-		offset = <0x2c>;
-		bit-mask = <0x3>;
-		bit-shift = <16>;
-	};
-	vga0 {
-		offset = <0x50>;
-		bit-mask = <0xffffffff>;
-		bit-shift = <0>;
-	};
-	vga1 {
-		offset = <0x54>;
-		bit-mask = <0xffffffff>;
-		bit-shift = <0>;
-	};
-	vga2 {
-		offset = <0x58>;
-		bit-mask = <0xffffffff>;
-		bit-shift = <0>;
-	};
-	vga3 {
-		offset = <0x5c>;
-		bit-mask = <0xffffffff>;
-		bit-shift = <0>;
-	};
-	vga4 {
-		offset = <0x60>;
-		bit-mask = <0xffffffff>;
-		bit-shift = <0>;
-	};
-	vga5 {
-		offset = <0x64>;
-		bit-mask = <0xffffffff>;
-		bit-shift = <0>;
-	};
-	vga6 {
-		offset = <0x68>;
-		bit-mask = <0xffffffff>;
-		bit-shift = <0>;
-	};
-	vga7 {
-		offset = <0x6c>;
-		bit-mask = <0xffffffff>;
-		bit-shift = <0>;
-	};
-};
-
-&sio_regs {
-	sio_2b {
-		offset = <0xf0>;
-		bit-mask = <0xff>;
-		bit-shift = <24>;
-	};
-	sio_2a {
-		offset = <0xf0>;
-		bit-mask = <0xff>;
-		bit-shift = <16>;
-	};
-	sio_29 {
-		offset = <0xf0>;
-		bit-mask = <0xff>;
-		bit-shift = <8>;
-	};
-	sio_28 {
-		offset = <0xf0>;
-		bit-mask = <0xff>;
-		bit-shift = <0>;
-	};
-	sio_2f {
-		offset = <0xf4>;
-		bit-mask = <0xff>;
-		bit-shift = <24>;
-	};
-	sio_2e {
-		offset = <0xf4>;
-		bit-mask = <0xff>;
-		bit-shift = <16>;
-	};
-	sio_2d {
-		offset = <0xf4>;
-		bit-mask = <0xff>;
-		bit-shift = <8>;
-	};
-	sio_2c {
-		offset = <0xf4>;
-		bit-mask = <0xff>;
-		bit-shift = <0>;
-	};
-	sio_23 {
-		offset = <0xf8>;
-		bit-mask = <0xff>;
-		bit-shift = <24>;
-	};
-	sio_22 {
-		offset = <0xf8>;
-		bit-mask = <0xff>;
-		bit-shift = <16>;
-	};
-	sio_21 {
-		offset = <0xf8>;
-		bit-mask = <0xff>;
-		bit-shift = <8>;
-	};
-	sio_20 {
-		offset = <0xf8>;
-		bit-mask = <0xff>;
-		bit-shift = <0>;
-	};
-	sio_27 {
-		offset = <0xfc>;
-		bit-mask = <0xff>;
-		bit-shift = <24>;
-	};
-	sio_26 {
-		offset = <0xfc>;
-		bit-mask = <0xff>;
-		bit-shift = <16>;
-	};
-	sio_25 {
-		offset = <0xfc>;
-		bit-mask = <0xff>;
-		bit-shift = <8>;
-	};
-	sio_24 {
-		offset = <0xfc>;
-		bit-mask = <0xff>;
-		bit-shift = <0>;
 	};
 };

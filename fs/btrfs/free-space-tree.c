@@ -22,6 +22,10 @@ void set_free_space_tree_thresholds(struct btrfs_block_group *cache)
 	size_t bitmap_size;
 	u64 num_bitmaps, total_bitmap_size;
 
+	if (WARN_ON(cache->length == 0))
+		btrfs_warn(cache->fs_info, "block group %llu length is zero",
+			   cache->start);
+
 	/*
 	 * We convert to bitmaps when the disk space required for using extents
 	 * exceeds that required for using bitmaps.
@@ -1251,9 +1255,7 @@ int btrfs_clear_free_space_tree(struct btrfs_fs_info *fs_info)
 	btrfs_free_tree_block(trans, free_space_root, free_space_root->node,
 			      0, 1);
 
-	free_extent_buffer(free_space_root->node);
-	free_extent_buffer(free_space_root->commit_root);
-	kfree(free_space_root);
+	btrfs_put_root(free_space_root);
 
 	return btrfs_commit_transaction(trans);
 

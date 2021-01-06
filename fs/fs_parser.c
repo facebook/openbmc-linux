@@ -189,7 +189,7 @@ out:
 }
 EXPORT_SYMBOL(fs_lookup_param);
 
-int fs_param_bad_value(struct p_log *log, struct fs_parameter *param)
+static int fs_param_bad_value(struct p_log *log, struct fs_parameter *param)
 {
 	return inval_plog(log, "Bad value for '%s'", param->key);
 }
@@ -367,8 +367,6 @@ bool fs_validate_description(const char *name,
 {
 	const struct fs_parameter_spec *param, *p2;
 	bool good = true;
-
-	pr_notice("*** VALIDATE %s ***\n", name);
 
 	for (param = desc; param->name; param++) {
 		/* Check for duplicate parameter names */

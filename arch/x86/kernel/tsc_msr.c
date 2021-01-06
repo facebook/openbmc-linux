@@ -7,6 +7,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/thread_info.h>
 
 #include <asm/apic.h>
 #include <asm/cpu_device_id.h>
@@ -133,21 +134,26 @@ static const struct freq_desc freq_desc_ann = {
 	.mask = 0x0f,
 };
 
-/* 24 MHz crystal? : 24 * 13 / 4 = 78 MHz */
+/*
+ * 24 MHz crystal? : 24 * 13 / 4 = 78 MHz
+ * Frequency step for Lightning Mountain SoC is fixed to 78 MHz,
+ * so all the frequency entries are 78000.
+ */
 static const struct freq_desc freq_desc_lgm = {
 	.use_msr_plat = true,
-	.freqs = { 78000, 78000, 78000, 78000, 78000, 78000, 78000, 78000 },
+	.freqs = { 78000, 78000, 78000, 78000, 78000, 78000, 78000, 78000,
+		   78000, 78000, 78000, 78000, 78000, 78000, 78000, 78000 },
 	.mask = 0x0f,
 };
 
 static const struct x86_cpu_id tsc_msr_cpu_ids[] = {
-	INTEL_CPU_FAM6(ATOM_SALTWELL_MID,	freq_desc_pnw),
-	INTEL_CPU_FAM6(ATOM_SALTWELL_TABLET,	freq_desc_clv),
-	INTEL_CPU_FAM6(ATOM_SILVERMONT,		freq_desc_byt),
-	INTEL_CPU_FAM6(ATOM_SILVERMONT_MID,	freq_desc_tng),
-	INTEL_CPU_FAM6(ATOM_AIRMONT,		freq_desc_cht),
-	INTEL_CPU_FAM6(ATOM_AIRMONT_MID,	freq_desc_ann),
-	INTEL_CPU_FAM6(ATOM_AIRMONT_NP,		freq_desc_lgm),
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_SALTWELL_MID,	&freq_desc_pnw),
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_SALTWELL_TABLET,&freq_desc_clv),
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_SILVERMONT,	&freq_desc_byt),
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_SILVERMONT_MID,	&freq_desc_tng),
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_AIRMONT,	&freq_desc_cht),
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_AIRMONT_MID,	&freq_desc_ann),
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_AIRMONT_NP,	&freq_desc_lgm),
 	{}
 };
 

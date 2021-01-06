@@ -26,13 +26,29 @@ static int __dso_id__cmp(struct dso_id *a, struct dso_id *b)
 	return 0;
 }
 
+static bool dso_id__empty(struct dso_id *id)
+{
+	if (!id)
+		return true;
+
+	return !id->maj && !id->min && !id->ino && !id->ino_generation;
+}
+
+static void dso__inject_id(struct dso *dso, struct dso_id *id)
+{
+	dso->id.maj = id->maj;
+	dso->id.min = id->min;
+	dso->id.ino = id->ino;
+	dso->id.ino_generation = id->ino_generation;
+}
+
 static int dso_id__cmp(struct dso_id *a, struct dso_id *b)
 {
 	/*
 	 * The second is always dso->id, so zeroes if not set, assume passing
 	 * NULL for a means a zeroed id
 	 */
-	if (a == NULL)
+	if (dso_id__empty(a) || dso_id__empty(b))
 		return 0;
 
 	return __dso_id__cmp(a, b);
@@ -57,8 +73,7 @@ bool __dsos__read_build_ids(struct list_head *head, bool with_hits)
 			continue;
 		}
 		nsinfo__mountns_enter(pos->nsinfo, &nsc);
-		if (filename__read_build_id(pos->long_name, pos->build_id,
-					    sizeof(pos->build_id)) > 0) {
+		if (filename__read_build_id(pos->long_name, &pos->bid) > 0) {
 			have_build_id	  = true;
 			pos->has_build_id = true;
 		}
@@ -249,6 +264,10 @@ struct dso *__dsos__addnew(struct dsos *dsos, const char *name)
 static struct dso *__dsos__findnew_id(struct dsos *dsos, const char *name, struct dso_id *id)
 {
 	struct dso *dso = __dsos__find_id(dsos, name, id, false);
+
+	if (dso && dso_id__empty(&dso->id) && !dso_id__empty(id))
+		dso__inject_id(dso, id);
+
 	return dso ? dso : __dsos__addnew_id(dsos, name, id);
 }
 
@@ -268,10 +287,12 @@ size_t __dsos__fprintf_buildid(struct list_head *head, FILE *fp,
 	size_t ret = 0;
 
 	list_for_each_entry(pos, head, node) {
+		char sbuild_id[SBUILD_ID_SIZE];
+
 		if (skip && skip(pos, parm))
 			continue;
-		ret += dso__fprintf_buildid(pos, fp);
-		ret += fprintf(fp, " %s\n", pos->long_name);
+		build_id__sprintf(&pos->bid, sbuild_id);
+		ret += fprintf(fp, "%-40s %s\n", sbuild_id, pos->long_name);
 	}
 	return ret;
 }

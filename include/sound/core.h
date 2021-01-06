@@ -266,6 +266,7 @@ void snd_device_disconnect(struct snd_card *card, void *device_data);
 void snd_device_disconnect_all(struct snd_card *card);
 void snd_device_free(struct snd_card *card, void *device_data);
 void snd_device_free_all(struct snd_card *card);
+int snd_device_get_state(struct snd_card *card, void *device_data);
 
 /* isadma.c */
 
@@ -331,7 +332,8 @@ void __snd_printk(unsigned int level, const char *file, int line,
 #define snd_BUG()		WARN(1, "BUG?\n")
 
 /**
- * Suppress high rates of output when CONFIG_SND_DEBUG is enabled.
+ * snd_printd_ratelimit - Suppress high rates of output when
+ * 			  CONFIG_SND_DEBUG is enabled.
  */
 #define snd_printd_ratelimit() printk_ratelimit()
 

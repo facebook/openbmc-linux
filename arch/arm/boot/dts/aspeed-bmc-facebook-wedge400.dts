@@ -49,7 +49,6 @@
 		i2c38 = &imux38;
 		i2c39 = &imux39;
 
-		spi1 = &spi1;
 		spi2 = &spi_gpio;
 	};
 
@@ -63,6 +62,11 @@
 		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>, <&adc 4>;
 	};
 
+	/*
+	 * GPIO-based SPI Master is required to access SPI TPM, because
+	 * full-duplex SPI transactions are not supported by ASPEED SPI
+	 * Controllers.
+	 */
 	spi_gpio: spi-gpio {
 		status = "okay";
 		compatible = "spi-gpio";
@@ -83,8 +87,57 @@
 	};
 };
 
+/*
+ * Both firmware flashes are 128MB on Wedge400 BMC.
+ */
 &fmc_flash0 {
-#include "facebook-bmc-flash-layout-128.dtsi"
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/*
+		 * u-boot partition: 384KB.
+		 */
+		u-boot@0 {
+			reg = <0x0 0x60000>;
+			label = "u-boot";
+		};
+
+		/*
+		 * u-boot environment variables: 128KB.
+		 */
+		u-boot-env@60000 {
+			reg = <0x60000 0x20000>;
+			label = "env";
+		};
+
+		/*
+		 * FIT image: 123.5 MB.
+		 */
+		fit@80000 {
+			reg = <0x80000 0x7b80000>;
+			label = "fit";
+		};
+
+		/*
+		 * "data0" partition (4MB) is reserved for persistent
+		 * data store.
+		 */
+		data0@3800000 {
+			reg = <0x7c00000 0x800000>;
+			label = "data0";
+		};
+
+		/*
+		 * "flash0" partition (covering the entire flash) is
+		 * explicitly created to avoid breaking legacy applications.
+		 */
+		flash0@0 {
+			reg = <0x0 0x8000000>;
+			label = "flash0";
+		};
+	};
 };
 
 &fmc_flash1 {
@@ -97,17 +150,6 @@
 			reg = <0x0 0x8000000>;
 			label = "flash1";
 		};
-	};
-};
-
-&spi1 {
-	status = "okay";
-	compatible = "aspeed,ast2500-spi-master";
-
-	spidev@0 {
-		compatible = "rohm,dh2228fv";
-		spi-max-frequency = <24750000>;
-		reg = <0>;
 	};
 };
 
@@ -133,7 +175,6 @@
 	status = "okay";
 	multi-master;
 	bus-frequency = <1000000>;
-	aspeed,hw-timeout-ms = <1000>;
 };
 
 &i2c1 {
@@ -371,14 +412,9 @@
 };
 
 &sdhci1 {
-	max-frequency = <25000000>;
 	/*
-	 * DMA mode needs to be disabled due to its conflicts with UHCI
+	 * DMA mode needs to be disabled to avoid conflicts with UHCI
 	 * Controller in AST2500 SoC.
 	 */
 	sdhci-caps-mask = <0x0 0x580000>;
-};
-
-&jtag {
-    status = "okay";
 };

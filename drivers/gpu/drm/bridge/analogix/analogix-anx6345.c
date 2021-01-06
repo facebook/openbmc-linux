@@ -507,10 +507,6 @@ static const struct drm_connector_helper_funcs anx6345_connector_helper_funcs = 
 static void
 anx6345_connector_destroy(struct drm_connector *connector)
 {
-	struct anx6345 *anx6345 = connector_to_anx6345(connector);
-
-	if (anx6345->panel)
-		drm_panel_detach(anx6345->panel);
 	drm_connector_cleanup(connector);
 }
 
@@ -522,10 +518,16 @@ static const struct drm_connector_funcs anx6345_connector_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
-static int anx6345_bridge_attach(struct drm_bridge *bridge)
+static int anx6345_bridge_attach(struct drm_bridge *bridge,
+				 enum drm_bridge_attach_flags flags)
 {
 	struct anx6345 *anx6345 = bridge_to_anx6345(bridge);
 	int err;
+
+	if (flags & DRM_BRIDGE_ATTACH_NO_CONNECTOR) {
+		DRM_ERROR("Fix bridge driver to make connector optional!");
+		return -EINVAL;
+	}
 
 	if (!bridge->encoder) {
 		DRM_ERROR("Parent encoder object not found");
@@ -569,19 +571,12 @@ static int anx6345_bridge_attach(struct drm_bridge *bridge)
 		return err;
 	}
 
-	if (anx6345->panel) {
-		err = drm_panel_attach(anx6345->panel, &anx6345->connector);
-		if (err) {
-			DRM_ERROR("Failed to attach panel: %d\n", err);
-			return err;
-		}
-	}
-
 	return 0;
 }
 
 static enum drm_mode_status
 anx6345_bridge_mode_valid(struct drm_bridge *bridge,
+			  const struct drm_display_info *info,
 			  const struct drm_display_mode *mode)
 {
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
@@ -716,14 +711,18 @@ static int anx6345_i2c_probe(struct i2c_client *client,
 	/* 1.2V digital core power regulator  */
 	anx6345->dvdd12 = devm_regulator_get(dev, "dvdd12");
 	if (IS_ERR(anx6345->dvdd12)) {
-		DRM_ERROR("dvdd12-supply not found\n");
+		if (PTR_ERR(anx6345->dvdd12) != -EPROBE_DEFER)
+			DRM_ERROR("Failed to get dvdd12 supply (%ld)\n",
+				  PTR_ERR(anx6345->dvdd12));
 		return PTR_ERR(anx6345->dvdd12);
 	}
 
 	/* 2.5V digital core power regulator  */
 	anx6345->dvdd25 = devm_regulator_get(dev, "dvdd25");
 	if (IS_ERR(anx6345->dvdd25)) {
-		DRM_ERROR("dvdd25-supply not found\n");
+		if (PTR_ERR(anx6345->dvdd25) != -EPROBE_DEFER)
+			DRM_ERROR("Failed to get dvdd25 supply (%ld)\n",
+				  PTR_ERR(anx6345->dvdd25));
 		return PTR_ERR(anx6345->dvdd25);
 	}
 

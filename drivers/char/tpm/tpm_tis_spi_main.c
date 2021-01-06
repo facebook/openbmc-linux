@@ -53,8 +53,6 @@ static int tpm_tis_spi_flow_control(struct tpm_tis_spi_phy *phy,
 
 	if ((phy->iobuf[3] & 0x01) == 0) {
 		// handle SPI wait states
-		phy->iobuf[0] = 0;
-
 		for (i = 0; i < TPM_RETRY; i++) {
 			spi_xfer->len = 1;
 			spi_message_init(&m);
@@ -104,17 +102,19 @@ int tpm_tis_spi_transfer(struct tpm_tis_data *data, u32 addr, u16 len,
 		if (ret < 0)
 			goto exit;
 
+		/* Flow control transfers are receive only */
+		spi_xfer.tx_buf = NULL;
 		ret = phy->flow_control(phy, &spi_xfer);
 		if (ret < 0)
 			goto exit;
 
 		spi_xfer.cs_change = 0;
 		spi_xfer.len = transfer_len;
-		spi_xfer.delay_usecs = 5;
+		spi_xfer.delay.value = 5;
+		spi_xfer.delay.unit = SPI_DELAY_UNIT_USECS;
 
-		if (in) {
-			spi_xfer.tx_buf = NULL;
-		} else if (out) {
+		if (out) {
+			spi_xfer.tx_buf = phy->iobuf;
 			spi_xfer.rx_buf = NULL;
 			memcpy(phy->iobuf, out, transfer_len);
 			out += transfer_len;
@@ -152,6 +152,44 @@ static int tpm_tis_spi_write_bytes(struct tpm_tis_data *data, u32 addr,
 	return tpm_tis_spi_transfer(data, addr, len, NULL, value);
 }
 
+int tpm_tis_spi_read16(struct tpm_tis_data *data, u32 addr, u16 *result)
+{
+	__le16 result_le;
+	int rc;
+
+	rc = data->phy_ops->read_bytes(data, addr, sizeof(u16),
+				       (u8 *)&result_le);
+	if (!rc)
+		*result = le16_to_cpu(result_le);
+
+	return rc;
+}
+
+int tpm_tis_spi_read32(struct tpm_tis_data *data, u32 addr, u32 *result)
+{
+	__le32 result_le;
+	int rc;
+
+	rc = data->phy_ops->read_bytes(data, addr, sizeof(u32),
+				       (u8 *)&result_le);
+	if (!rc)
+		*result = le32_to_cpu(result_le);
+
+	return rc;
+}
+
+int tpm_tis_spi_write32(struct tpm_tis_data *data, u32 addr, u32 value)
+{
+	__le32 value_le;
+	int rc;
+
+	value_le = cpu_to_le32(value);
+	rc = data->phy_ops->write_bytes(data, addr, sizeof(u32),
+					(u8 *)&value_le);
+
+	return rc;
+}
+
 int tpm_tis_spi_init(struct spi_device *spi, struct tpm_tis_spi_phy *phy,
 		     int irq, const struct tpm_tis_phy_ops *phy_ops)
 {
@@ -167,6 +205,9 @@ int tpm_tis_spi_init(struct spi_device *spi, struct tpm_tis_spi_phy *phy,
 static const struct tpm_tis_phy_ops tpm_spi_phy_ops = {
 	.read_bytes = tpm_tis_spi_read_bytes,
 	.write_bytes = tpm_tis_spi_write_bytes,
+	.read16 = tpm_tis_spi_read16,
+	.read32 = tpm_tis_spi_read32,
+	.write32 = tpm_tis_spi_write32,
 };
 
 static int tpm_tis_spi_probe(struct spi_device *dev)
@@ -246,6 +287,7 @@ static struct spi_driver tpm_tis_spi_driver = {
 		.pm = &tpm_tis_pm,
 		.of_match_table = of_match_ptr(of_tis_spi_match),
 		.acpi_match_table = ACPI_PTR(acpi_tis_spi_match),
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe = tpm_tis_spi_driver_probe,
 	.remove = tpm_tis_spi_remove,

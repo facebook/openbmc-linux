@@ -78,8 +78,7 @@ static struct pmbus_driver_info pxe1610_info = {
 	.identify = pxe1610_identify,
 };
 
-static int pxe1610_probe(struct i2c_client *client,
-			  const struct i2c_device_id *id)
+static int pxe1610_probe(struct i2c_client *client)
 {
 	struct pmbus_driver_info *info;
 	u8 buf[I2C_SMBUS_BLOCK_MAX];
@@ -115,35 +114,23 @@ static int pxe1610_probe(struct i2c_client *client,
 	if (!info)
 		return -ENOMEM;
 
-	return pmbus_do_probe(client, id, info);
+	return pmbus_do_probe(client, info);
 }
 
 static const struct i2c_device_id pxe1610_id[] = {
 	{"pxe1610", 0},
 	{"pxe1110", 0},
 	{"pxm1310", 0},
-	{"pxe1211", 0},
 	{}
 };
 
 MODULE_DEVICE_TABLE(i2c, pxe1610_id);
 
-static const struct of_device_id pxe1610_of_match[] = {
-	{.compatible = "infineon,pxe1610"},
-	{.compatible = "infineon,pxe1110"},
-	{.compatible = "infineon,pxe1310"},
-	{.compatible = "infineon,pxe1211"},
-	{}
-};
-
-MODULE_DEVICE_TABLE(of, pxe1610_of_match);
-
 static struct i2c_driver pxe1610_driver = {
 	.driver = {
-		.name = "pxe1610",
-		.of_match_table = of_match_ptr(pxe1610_of_match),
-	},
-	.probe = pxe1610_probe,
+			.name = "pxe1610",
+			},
+	.probe_new = pxe1610_probe,
 	.remove = pmbus_do_remove,
 	.id_table = pxe1610_id,
 };
@@ -151,5 +138,5 @@ static struct i2c_driver pxe1610_driver = {
 module_i2c_driver(pxe1610_driver);
 
 MODULE_AUTHOR("Vijay Khemka <vijaykhemka@fb.com>");
-MODULE_DESCRIPTION("PMBus driver for Infineon PXE1610, PXE1110, PXE1211 and PXM1310");
+MODULE_DESCRIPTION("PMBus driver for Infineon PXE1610, PXE1110 and PXM1310");
 MODULE_LICENSE("GPL");

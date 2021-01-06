@@ -703,11 +703,6 @@ static int fsi_i2c_probe(struct device *dev)
 
 	for (port_no = 0; port_no < ports; port_no++) {
 		np = fsi_i2c_find_port_of_node(dev->of_node, port_no);
-		/* Do not add port if it is not described in the device tree */
-		if (!np)
-			continue;
-
-		/* Do not add port if it is described as disabled */
 		if (!of_device_is_available(np))
 			continue;
 

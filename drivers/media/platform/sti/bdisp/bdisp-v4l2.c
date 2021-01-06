@@ -1066,7 +1066,7 @@ static int bdisp_register_device(struct bdisp_dev *bdisp)
 		return PTR_ERR(bdisp->m2m.m2m_dev);
 	}
 
-	ret = video_register_device(&bdisp->vdev, VFL_TYPE_GRABBER, -1);
+	ret = video_register_device(&bdisp->vdev, VFL_TYPE_VIDEO, -1);
 	if (ret) {
 		dev_err(bdisp->dev,
 			"%s(): failed to register video device\n", __func__);
@@ -1360,18 +1360,14 @@ static int bdisp_probe(struct platform_device *pdev)
 	}
 
 	/* Debug */
-	ret = bdisp_debugfs_create(bdisp);
-	if (ret) {
-		dev_err(dev, "failed to create debugfs\n");
-		goto err_v4l2;
-	}
+	bdisp_debugfs_create(bdisp);
 
 	/* Power management */
 	pm_runtime_enable(dev);
 	ret = pm_runtime_get_sync(dev);
 	if (ret < 0) {
 		dev_err(dev, "failed to set PM\n");
-		goto err_dbg;
+		goto err_pm;
 	}
 
 	/* Filters */
@@ -1399,9 +1395,7 @@ err_filter:
 	bdisp_hw_free_filters(bdisp->dev);
 err_pm:
 	pm_runtime_put(dev);
-err_dbg:
 	bdisp_debugfs_remove(bdisp);
-err_v4l2:
 	v4l2_device_unregister(&bdisp->v4l2_dev);
 err_clk:
 	if (!IS_ERR(bdisp->clock))

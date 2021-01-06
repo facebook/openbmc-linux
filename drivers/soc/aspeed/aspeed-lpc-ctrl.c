@@ -4,7 +4,6 @@
  */
 
 #include <linux/clk.h>
-#include <linux/log2.h>
 #include <linux/mfd/syscon.h>
 #include <linux/miscdevice.h>
 #include <linux/mm.h>
@@ -22,9 +21,6 @@
 #define HICR5_ENL2H	BIT(8)
 #define HICR5_ENFWH	BIT(10)
 
-#define HICR6 0x4
-#define SW_FWH2AHB	BIT(17)
-
 #define HICR7 0x8
 #define HICR8 0xc
 
@@ -36,7 +32,6 @@ struct aspeed_lpc_ctrl {
 	resource_size_t		mem_size;
 	u32		pnor_size;
 	u32		pnor_base;
-	bool			fwh2ahb;
 };
 
 static struct aspeed_lpc_ctrl *file_aspeed_lpc_ctrl(struct file *file)
@@ -182,16 +177,6 @@ static long aspeed_lpc_ctrl_ioctl(struct file *file, unsigned int cmd,
 			return rc;
 
 		/*
-		 * Switch to FWH2AHB mode, AST2600 only.
-		 *
-		 * The other bits in this register are interrupt status bits
-		 * that are cleared by writing 1. As we don't want to clear
-		 * them, set only the bit of interest.
-		 */
-		if (lpc_ctrl->fwh2ahb)
-			regmap_write(lpc_ctrl->regmap, HICR6, SW_FWH2AHB);
-
-		/*
 		 * Enable LPC FHW cycles. This is required for the host to
 		 * access the regions specified.
 		 */
@@ -256,18 +241,6 @@ static int aspeed_lpc_ctrl_probe(struct platform_device *pdev)
 
 		lpc_ctrl->mem_size = resource_size(&resm);
 		lpc_ctrl->mem_base = resm.start;
-
-		if (!is_power_of_2(lpc_ctrl->mem_size)) {
-			dev_err(dev, "Reserved memory size must be a power of 2, got %zu\n",
-			       lpc_ctrl->mem_size);
-			return -EINVAL;
-		}
-
-		if (!IS_ALIGNED(lpc_ctrl->mem_base, lpc_ctrl->mem_size)) {
-			dev_err(dev, "Reserved memory must be naturally aligned for size %zu\n",
-			       lpc_ctrl->mem_size);
-			return -EINVAL;
-		}
 	}
 
 	lpc_ctrl->regmap = syscon_node_to_regmap(
@@ -287,9 +260,6 @@ static int aspeed_lpc_ctrl_probe(struct platform_device *pdev)
 		dev_err(dev, "couldn't enable clock\n");
 		return rc;
 	}
-
-	if (of_device_is_compatible(dev->of_node, "aspeed,ast2600-lpc-ctrl"))
-		lpc_ctrl->fwh2ahb = true;
 
 	lpc_ctrl->miscdev.minor = MISC_DYNAMIC_MINOR;
 	lpc_ctrl->miscdev.name = DEVICE_NAME;
@@ -321,7 +291,6 @@ static int aspeed_lpc_ctrl_remove(struct platform_device *pdev)
 static const struct of_device_id aspeed_lpc_ctrl_match[] = {
 	{ .compatible = "aspeed,ast2400-lpc-ctrl" },
 	{ .compatible = "aspeed,ast2500-lpc-ctrl" },
-	{ .compatible = "aspeed,ast2600-lpc-ctrl" },
 	{ },
 };
 

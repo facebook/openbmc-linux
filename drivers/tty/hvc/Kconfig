@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0
-if TTY
 
 config HVC_DRIVER
 	bool
@@ -82,6 +81,7 @@ config HVC_DCC
 	bool "ARM JTAG DCC console"
 	depends on ARM || ARM64
 	select HVC_DRIVER
+	select SERIAL_CORE_CONSOLE
 	help
 	  This console uses the JTAG DCC on ARM to create a console under the HVC
 	  driver. This console is used through a JTAG only on ARM. If you don't have
@@ -89,7 +89,7 @@ config HVC_DCC
 
 config HVC_RISCV_SBI
 	bool "RISC-V SBI console support"
-	depends on RISCV_SBI
+	depends on RISCV_SBI_V01
 	select HVC_DRIVER
 	help
 	  This enables support for console output via RISC-V SBI calls, which
@@ -113,5 +113,3 @@ config HVCS
 	  will depend on arch specific APIs exported from hvcserver.ko
 	  which will also be compiled when this driver is built as a
 	  module.
-
-endif # TTY

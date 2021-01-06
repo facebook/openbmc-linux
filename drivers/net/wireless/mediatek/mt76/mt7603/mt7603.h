@@ -15,7 +15,10 @@
 
 #define MT7603_RATE_RETRY	2
 
+#define MT7603_MCU_RX_RING_SIZE	64
 #define MT7603_RX_RING_SIZE     128
+#define MT7603_TX_RING_SIZE	256
+#define MT7603_PSD_RING_SIZE	128
 
 #define MT7603_FIRMWARE_E1	"mt7603_e1.bin"
 #define MT7603_FIRMWARE_E2	"mt7603_e2.bin"
@@ -98,13 +101,14 @@ enum mt7603_reset_cause {
 };
 
 struct mt7603_dev {
-	struct mt76_dev mt76; /* must be first */
+	union { /* must be first */
+		struct mt76_dev mt76;
+		struct mt76_phy mphy;
+	};
 
 	const struct mt76_bus_ops *bus_ops;
 
 	u32 rxfilter;
-
-	u8 vif_mask;
 
 	struct list_head sta_poll_list;
 	spinlock_t sta_poll_lock;
@@ -115,6 +119,7 @@ struct mt7603_dev {
 	u32 false_cca_ofdm, false_cca_cck;
 	unsigned long last_cca_adj;
 
+	u32 ampdu_ref;
 	__le32 rx_ampdu_ts;
 	u8 rssi_offset[3];
 
@@ -137,7 +142,9 @@ struct mt7603_dev {
 	u8 ed_strict_mode;
 	u8 ed_strong_signal;
 
+	bool dynamic_sensitivity;
 	s8 sensitivity;
+	u8 sensitivity_limit;
 
 	u8 beacon_check;
 	u8 tx_hang_check;
@@ -236,8 +243,7 @@ int mt7603_tx_prepare_skb(struct mt76_dev *mdev, void *txwi_ptr,
 			  struct ieee80211_sta *sta,
 			  struct mt76_tx_info *tx_info);
 
-void mt7603_tx_complete_skb(struct mt76_dev *mdev, enum mt76_txq_id qid,
-			    struct mt76_queue_entry *e);
+void mt7603_tx_complete_skb(struct mt76_dev *mdev, struct mt76_queue_entry *e);
 
 void mt7603_queue_rx_skb(struct mt76_dev *mdev, enum mt76_rxq_id q,
 			 struct sk_buff *skb);
