@@ -352,6 +352,14 @@
 		compatible = "mps,mp5920";
 		reg = <0x43>;
 	};
+	tmp421@4c {
+		compatible = "ti,tmp421";
+		reg = <0x4c>;
+	};
+	tmp421@4d {
+		compatible = "ti,tmp421";
+		reg = <0x4d>;
+	};
 };
 
 &pwm_tacho {
