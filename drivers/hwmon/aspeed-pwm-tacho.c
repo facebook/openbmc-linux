@@ -167,6 +167,8 @@
 
 #define MAX_CDEV_NAME_LEN 16
 
+static DEFINE_MUTEX(rpm_lock);
+
 struct aspeed_cooling_device {
 	char name[16];
 	struct aspeed_pwm_tacho_data *priv;
@@ -528,8 +530,14 @@ static int aspeed_get_fan_tach_ch_rpm(struct aspeed_pwm_tacho_data *priv,
 	u8 fan_tach_ch_source, type, mode, both;
 	int ret;
 
+	mutex_lock(&rpm_lock);
 	regmap_write(priv->regmap, ASPEED_PTCR_TRIGGER, 0);
 	regmap_write(priv->regmap, ASPEED_PTCR_TRIGGER, 0x1 << fan_tach_ch);
+
+    //Wait for a while after specifying which channel will be used
+    //(which is done by the register write above), so that Aspeed SoC
+    //have enough time to configure its internal mux.
+    msleep(10);
 
 	fan_tach_ch_source = priv->fan_tach_ch_source[fan_tach_ch];
 	type = priv->pwm_port_type[fan_tach_ch_source];
@@ -544,6 +552,8 @@ static int aspeed_get_fan_tach_ch_rpm(struct aspeed_pwm_tacho_data *priv,
 		(val & RESULT_STATUS_MASK),
 		ASPEED_RPM_STATUS_SLEEP_USEC,
 		usec);
+
+	mutex_unlock(&rpm_lock);
 
 	/* return -ETIMEDOUT if we didn't get an answer. */
 	if (ret)
