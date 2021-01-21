@@ -386,12 +386,6 @@
 	};
 };
 
-&uhci {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_usb2bh_default>;
-};
-
 &vhub {
 	status = "okay";
 };
