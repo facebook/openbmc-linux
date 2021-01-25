@@ -32,24 +32,24 @@
 		              <&adc 12>, <&adc 13>, <&adc 14>, <&adc 15>;
 	};
 
-	//spi_gpio: spi-gpio {
-	//	status = "okay";
-	//	compatible = "spi-gpio";
-	//	#address-cells = <1>;
-	//	#size-cells = <0>;
+	spi_gpio: spi-gpio {
+		status = "okay";
+		compatible = "spi-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
 
-	//	gpio-sck = <&gpio ASPEED_GPIO(I, 5) GPIO_ACTIVE_HIGH>;
-	//	gpio-mosi = <&gpio ASPEED_GPIO(I, 6) GPIO_ACTIVE_HIGH>;
-	//	gpio-miso = <&gpio ASPEED_GPIO(I, 7) GPIO_ACTIVE_HIGH>;
-	//	num-chipselects = <1>;
-	//	cs-gpios = <&gpio ASPEED_GPIO(I, 4) GPIO_ACTIVE_LOW>;
+		gpio-sck = <&gpio ASPEED_GPIO(I, 5) GPIO_ACTIVE_HIGH>;
+		gpio-mosi = <&gpio ASPEED_GPIO(I, 6) GPIO_ACTIVE_HIGH>;
+		gpio-miso = <&gpio ASPEED_GPIO(I, 7) GPIO_ACTIVE_HIGH>;
+		num-chipselects = <1>;
+		cs-gpios = <&gpio ASPEED_GPIO(I, 4) GPIO_ACTIVE_LOW>;
 
-	//	tpmdev@0 {
-	//		compatible = "tcg,tpm_tis-spi";
-	//		spi-max-frequency = <33000000>;
-	//		reg = <0>;
-	//	};
-	//};
+		tpmdev@0 {
+			compatible = "tcg,tpm_tis-spi";
+			spi-max-frequency = <33000000>;
+			reg = <0>;
+		};
+	};
 };
 
 &wdt1 {
@@ -190,15 +190,19 @@
 		compatible = "st,24c128";
 		reg = <0x51>;
     };
+	pca9537@49 {
+		compatible = "nxp,pca9537";
+		reg = <0x49>;
+	};
 };
 
 &i2c9 {
 	status = "okay";
 	// TPM (0x40)
-	tpm@20 {
-		compatible = "infineon,slb9645tt";
-		reg = <0x20>;
-	};
+	//tpm@20 {
+	//	compatible = "infineon,slb9645tt";
+	//	reg = <0x20>;
+	//};
 	// INLET TEMP Sensor (0x9C)
 	tmp421@4e {
 		compatible = "ti,tmp421";
