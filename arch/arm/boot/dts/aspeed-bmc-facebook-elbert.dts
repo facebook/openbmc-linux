@@ -59,7 +59,7 @@
         // GPIOV0 controls another mux beyond this Chip select on SCM2
 	spidev@0 {
 		compatible = "rohm,dh2228fv";
-		spi-max-frequency = <33000000>;
+		spi-max-frequency = <5000000>;
 		reg = <0>;
 	};
 
