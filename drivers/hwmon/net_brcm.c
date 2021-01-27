@@ -127,9 +127,10 @@ static ssize_t net_brcm_temp_show(struct device *dev,
 
 	/*
 	 * return the temperature
-	 * Temp = -0.23734 * value + 356.07
+	 * Temp = -0.23751 * value + 356.01
+	 * To keep the accuracy, it is expanded 100000 times
 	 */
-	return sprintf(buf, "%d\n", -237 * value + 356070);
+	return sprintf(buf, "%d\n", -23751 * value + 35601000);
 
 err_exit:
 	return -1;
