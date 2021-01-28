@@ -172,8 +172,8 @@
 	use-ncsi;
 	ncsi-ctrl,start-redo-probe;
 	ncsi-ctrl,no-channel-monitor;
-	ncsi-package = <2>;
-	ncsi-channel = <2>;
+	ncsi-package = <1>;
+	ncsi-channel = <1>;
 	ncsi-rexmit = <1>;
 };
 
@@ -184,7 +184,7 @@
 	ncsi-ctrl,start-redo-probe;
 	ncsi-ctrl,no-channel-monitor;
 	ncsi-package = <2>;
-	ncsi-channel = <2>;
+	ncsi-channel = <1>;
 	ncsi-rexmit = <1>;
 };
 
