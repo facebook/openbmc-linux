@@ -70,14 +70,14 @@
 		status = "okay";
 		m25p,fast-read;
 		label = "spi0.1";
-#include "facebook-bmc-vboot2-flash1-layout.dtsi"
+#include "facebook-bmc-vboot2-flash1-32MB-layout.dtsi"
 	};
 	flash@1 {
 		reg = < 0 >;
 		status = "okay";
 		m25p,fast-read;
 		label = "spi0.0";
-#include "facebook-bmc-vboot2-flash0-layout.dtsi"
+#include "facebook-bmc-vboot2-flash0-32MB-layout.dtsi"
 	};
 };
 
