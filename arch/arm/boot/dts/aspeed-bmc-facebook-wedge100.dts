@@ -10,6 +10,19 @@
 	compatible = "facebook,wedge100-bmc", "aspeed,ast2400";
 
 	aliases {
+		/*
+		 * NOTE: spi1 and spi2 shares exactly the same (4) pins,
+		 * so technically they are the same bus. But we have to
+		 * create 2 logical buses due to hardware limitations:
+		 *  - backup bios flash:
+		 *    registered under spi1 and controlled by aspeed spi
+		 *    controller.
+		 *  - internal switch eeprom:
+		 *    registered under spi2 and controlled by spi-gpio.
+		 *    The eeprom is not compatible with aspeed spi master
+		 *    due to clock/speed mismatch.
+		 */
+		spi1 = &spi;
 		spi2 = &spi_gpio;
 	};
 
@@ -25,9 +38,9 @@
 		#size-cells = <0>;
 
 		cs-gpios = <&gpio ASPEED_GPIO(I, 4) GPIO_ACTIVE_HIGH>;
-		gpio-sck = <&gpio ASPEED_GPIO(I, 5) GPIO_ACTIVE_HIGH>;
-		gpio-mosi = <&gpio ASPEED_GPIO(I, 6) GPIO_ACTIVE_HIGH>;
-		gpio-miso = <&gpio ASPEED_GPIO(I, 7) GPIO_ACTIVE_HIGH>;
+		sck-gpios = <&gpio ASPEED_GPIO(I, 5) GPIO_ACTIVE_HIGH>;
+		mosi-gpios = <&gpio ASPEED_GPIO(I, 6) GPIO_ACTIVE_HIGH>;
+		miso-gpios = <&gpio ASPEED_GPIO(I, 7) GPIO_ACTIVE_HIGH>;
 		num-chipselects = <1>;
 
 		eeprom@0 {
@@ -91,4 +104,17 @@
 &kcs3 {
 	status = "okay";
 	aspeed,lpc-io-reg = <0xca2>;
+};
+
+&spi {
+	status = "okay";
+	compatible = "aspeed,ast2400-spi-master";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi1_default>;
+
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <24750000>;
+		reg = <0>;
+	};
 };
