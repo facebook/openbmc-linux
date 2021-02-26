@@ -295,6 +295,11 @@
 		compatible = "ti,tmp421";
 		reg = <0x4f>;
 	};
+	// RTC
+	rtc@51 {
+		compatible = "nxp,pcf85263";
+		reg = <0x51>;
+	};
 };
 
 &i2c5 {
