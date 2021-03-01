@@ -52,8 +52,8 @@
 #define ASPEED_CTRL_STOP_ACTIVE		BIT(2)
 #define ASPEED_CTRL_CLK_MODE_3		BIT(4)
 #define ASPEED_CTRL_CLK_DIV_MAX		16
-#define AST2500_CTRL_CLK_DIV_MASK	(0xF << 8)
-#define AST2500_CTRL_CLK_DIV(d)		(((d) & 0xF) << 8)
+#define AST2400_CTRL_CLK_DIV_MASK	(0xF << 8)
+#define AST2400_CTRL_CLK_DIV(d)		(((d) & 0xF) << 8)
 #define AST2600_CTRL_CLK_DIV_MASK    ((0xF << 24) | (0xF << 8))
 #define AST2600_CTRL_CLK_DIV(d)      (((d) & 0xF) << 8) | (((d) & 0xF0) << 20)
 
@@ -131,10 +131,26 @@ struct aspeed_spi_priv {
 };
 #define SPI_CS_INFO(_priv, _cs)		(&((_priv)->config.cs_info[_cs]))
 
+static int ast2400_addr_range_setup(struct aspeed_spi_priv *priv, u16 cs);
+static int ast2400_clk_setup(struct aspeed_spi_priv *priv, u16 cs, u32 freq);
 static int ast2500_addr_range_setup(struct aspeed_spi_priv *priv, u16 cs);
 static int ast2500_clk_setup(struct aspeed_spi_priv *priv, u16 cs, u32 freq);
 static int ast2600_addr_range_setup(struct aspeed_spi_priv *priv, u16 cs);
 static int ast2600_clk_setup(struct aspeed_spi_priv *priv, u16 cs, u32 freq);
+
+static const struct aspeed_spi_config ast2400_config = {
+	.clk_setup = ast2400_clk_setup,
+	.addr_range_setup = ast2400_addr_range_setup,
+
+	.num_chipselect = 1,
+	.cs_info = {
+		[0] = {
+			.ctrl_reg = 0x4,
+			.addr_range_reg = 0xFF,	/* UNUSED */
+			.enable_write_bit = 0,
+		},
+	},
+};
 
 static const struct aspeed_spi_config ast2500_config = {
 	.clk_setup = ast2500_clk_setup,
@@ -184,6 +200,7 @@ static const struct aspeed_spi_config ast2600_config = {
 };
 
 static const struct of_device_id aspeed_spi_of_match[] = {
+	{ .compatible = "aspeed,ast2400-spi-master", .data = &ast2400_config},
 	{ .compatible = "aspeed,ast2500-spi-master", .data = &ast2500_config},
 	{ .compatible = "aspeed,ast2600-spi-master", .data = &ast2600_config},
 	{}
@@ -236,10 +253,12 @@ static bool ast2500_check_set_div2(struct aspeed_spi_priv *priv,
 }
 
 /*
- * Calculate spi clock frequency divisor. Refer to AST2500 datasheet,
- * Chapter 14, CE# Control Register, bit 11:8 for details.
+ * Calculate spi clock frequency divisor. AST2400 and AST2500 share the
+ * same logic:
+ *   - AST2400: Datasheet Chapter 9, SPIR04[11:8].
+ *   - AST2500: Datasheet Chapter 14, SPIR10|SPIR14[11:8].
  */
-static u32 ast2500_spi_clk_div(unsigned long ahb_clk_freq,
+static u32 ast2400_spi_clk_div(unsigned long ahb_clk_freq,
 			       u32 spi_max_freq)
 {
 	unsigned long i;
@@ -259,6 +278,21 @@ static u32 ast2500_spi_clk_div(unsigned long ahb_clk_freq,
 	return div_val;
 }
 
+static int ast2400_clk_setup(struct aspeed_spi_priv *priv, u16 cs, u32 freq)
+{
+	u32 val, div;
+	struct spi_cs_info *cs_info = SPI_CS_INFO(priv, cs);
+
+	val = aspeed_reg_read(priv, cs_info->ctrl_reg);
+
+	val &= ~AST2400_CTRL_CLK_DIV_MASK;
+	div = ast2400_spi_clk_div(priv->ahb_clk_freq, freq);
+	val |= AST2400_CTRL_CLK_DIV(div);
+
+	aspeed_reg_write(priv, cs_info->ctrl_reg, val);
+	return 0;
+}
+
 static int ast2500_clk_setup(struct aspeed_spi_priv *priv, u16 cs, u32 freq)
 {
 	u32 val, div;
@@ -266,14 +300,14 @@ static int ast2500_clk_setup(struct aspeed_spi_priv *priv, u16 cs, u32 freq)
 
 	val = aspeed_reg_read(priv, cs_info->ctrl_reg);
 
-	val &= ~AST2500_CTRL_CLK_DIV_MASK;
+	val &= ~AST2400_CTRL_CLK_DIV_MASK;
 	if (ast2500_check_set_div2(priv, cs, freq)) {
 		// SPI clock divided by 4
 		val |= AST2500_CTRL_CLK_DIV4_MODE;
 		freq = freq >> 2;
 	}
-	div = ast2500_spi_clk_div(priv->ahb_clk_freq, freq);
-	val |= AST2500_CTRL_CLK_DIV(div);
+	div = ast2400_spi_clk_div(priv->ahb_clk_freq, freq);
+	val |= AST2400_CTRL_CLK_DIV(div);
 
 	aspeed_reg_write(priv, cs_info->ctrl_reg, val);
 	return 0;
@@ -413,6 +447,15 @@ static void aspeed_spi_enable_user_mode(struct aspeed_spi_priv *priv, u16 cs)
 	u32 mask = (ASPEED_CTRL_STOP_ACTIVE | ASPEED_CTRL_USER_MODE);
 
 	aspeed_reg_set_mask(priv, cs_info->ctrl_reg, mask);
+}
+
+static int ast2400_addr_range_setup(struct aspeed_spi_priv *priv, u16 cs)
+{
+	struct spi_cs_info *cs_info = SPI_CS_INFO(priv, cs);
+
+	cs_info->io_mem_base = priv->flash_mem_base;
+	cs_info->io_mem_size = resource_size(priv->flash_mem_res);
+	return 0;
 }
 
 static int ast2500_addr_range_setup(struct aspeed_spi_priv *priv, u16 cs)
