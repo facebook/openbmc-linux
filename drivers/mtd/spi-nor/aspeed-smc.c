@@ -1246,6 +1246,7 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 	struct device_node *child;
 	unsigned int cs;
 	int ret = -ENODEV;
+	u8 chip_num = 0;
 
 	for_each_available_child_of_node(np, child) {
 		struct aspeed_smc_chip *chip;
@@ -1311,8 +1312,12 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 		 * by of property.
 		 */
 		ret = spi_nor_scan(nor, NULL, &hwcaps);
-		if (ret)
-			break;
+		if (ret) {
+			devm_kfree(controller->dev, chip);
+			if (chip_num)
+				ret = 0;
+			continue;
+		}
 
 		ret = aspeed_smc_chip_setup_finish(chip);
 		if (ret)
@@ -1323,6 +1328,7 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 			break;
 
 		controller->chips[cs] = chip;
+		chip_num++;
 	}
 
 	if (ret) {
