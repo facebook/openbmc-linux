@@ -1893,6 +1893,9 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 			if (of_get_property(np, "ncsi-ctrl,start-redo-probe", NULL))
 				ndp->ctrl_flags |= NCSI_CTRL_FLAG_START_REDO_PROBE;
 
+			if (of_get_property(np, "ncsi-ctrl,skip-aen-handler", NULL))
+				ndp->ctrl_flags |= NCSI_CTRL_FLAG_SKIP_AEN_HANDLER;
+
 			if (!of_property_read_u32(np, "ncsi-package", &property) &&
 				(property < NCSI_MAX_PACKAGE)) {
 				ndp->max_package = (u8)property;
