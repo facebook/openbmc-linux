@@ -244,7 +244,8 @@
 			compatible = "atmel,at93c46d";
 			data-size = <16>;
 			spi-cs-high;
-			spi-max-frequency = <33000000>;
+			/* According HW SI, max freq should be no more than 250khz */
+			spi-max-frequency = <250000>;
 			reg = <2>;
 		};
 	};
