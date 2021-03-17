@@ -136,6 +136,7 @@
 	mlx,multi-host;
 	ncsi-ctrl,start-redo-probe;
 	ncsi-ctrl,no-channel-monitor;
+	ncsi-ctrl,skip-aen-handler;
 	ncsi-package = <1>;
 	ncsi-channel = <1>;
 	ncsi-rexmit = <1>;
