@@ -51,6 +51,11 @@
 			spi-cs-high;
 		};
 	};
+
+	ast-adc-hwmon {
+		compatible = "iio-hwmon";
+		io-channels = <&adc 5>, <&adc 6>, <&adc 7>, <&adc 8>, <&adc 9>;
+	};
 };
 
 &wdt2 {
@@ -117,4 +122,8 @@
 		spi-max-frequency = <24750000>;
 		reg = <0>;
 	};
+};
+
+&adc {
+	status = "okay";
 };
