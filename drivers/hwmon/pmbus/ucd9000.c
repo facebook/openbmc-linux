@@ -16,7 +16,6 @@
 #include <linux/i2c.h>
 #include <linux/pmbus.h>
 #include <linux/gpio/driver.h>
-#include <linux/delay.h>
 #include "pmbus.h"
 
 enum chips { ucd9000, ucd90120, ucd90124, ucd90160, ucd90320, ucd9090,
@@ -46,9 +45,6 @@ enum chips { ucd9000, ucd90120, ucd90124, ucd90160, ucd90320, ucd9090,
 #define UCD9000_MON_TEMPERATURE		2
 #define UCD9000_MON_CURRENT		3
 #define UCD9000_MON_VOLTAGE_HW		4
-#define UCD9000_MON_INPUT_VOLTAGE	5
-#define UCD9000_MON_VOLTAGE_AVS		6
-#define UCD9000_MON_INPUT_VOLTAGE_AVS	7
 
 #define UCD9000_NUM_FAN		4
 
@@ -131,15 +127,6 @@ static int ucd9000_read_byte_data(struct i2c_client *client, int page, int reg)
 		break;
 	}
 	return ret;
-}
-
-static int ucd90320_read_byte_data(struct i2c_client *client, int page, int reg)
-{
-	// Add a delay before vout_mode command to prevent corrupted value
-	// causing unscaled voltage readings.
-	if (reg == PMBUS_VOUT_MODE)
-		usleep_range(500, 550);
-	return pmbus_read_byte_data(client, page, reg);
 }
 
 static const struct i2c_device_id ucd9000_id[] = {
@@ -580,9 +567,6 @@ static int ucd9000_probe(struct i2c_client *client,
 		switch (UCD9000_MON_TYPE(block_buffer[i])) {
 		case UCD9000_MON_VOLTAGE:
 		case UCD9000_MON_VOLTAGE_HW:
-		case UCD9000_MON_INPUT_VOLTAGE:
-		case UCD9000_MON_VOLTAGE_AVS:
-		case UCD9000_MON_INPUT_VOLTAGE_AVS:
 			info->func[page] |= PMBUS_HAVE_VOUT
 			  | PMBUS_HAVE_STATUS_VOUT;
 			break;
@@ -615,8 +599,6 @@ static int ucd9000_probe(struct i2c_client *client,
 		info->read_byte_data = ucd9000_read_byte_data;
 		info->func[0] |= PMBUS_HAVE_FAN12 | PMBUS_HAVE_STATUS_FAN12
 		  | PMBUS_HAVE_FAN34 | PMBUS_HAVE_STATUS_FAN34;
-	} else if (mid->driver_data == ucd90320) {
-		info->read_byte_data = ucd90320_read_byte_data;
 	}
 
 	ucd9000_probe_gpio(client, mid, data);
