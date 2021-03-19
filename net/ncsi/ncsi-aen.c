@@ -245,12 +245,26 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb)
 		return -ENOENT;
 	}
 
-	ret = ncsi_validate_aen_pkt(h, nah->payload);
+	if (h->type == NCSI_PKT_AEN_OEM0 &&
+		ntohl(*(__be32 *)(h + 1)) == NCSI_OEM_MFR_BCM_ID) {
+		/* Variable length */
+		ret = ncsi_validate_aen_pkt(h, ntohs(h->common.length)); 
+	} else {
+		ret = ncsi_validate_aen_pkt(h, nah->payload);
+	}
+
 	if (ret) {
 		netdev_warn(ndp->ndev.dev,
 			    "NCSI: 'bad' packet ignored for AEN type 0x%x\n",
 			    h->type);
 		goto out;
+	}
+
+	if (ndp->ctrl_flags & NCSI_CTRL_FLAG_SKIP_AEN_HANDLER) {
+		netdev_dbg(ndp->ndev.dev,
+				"NCSI: skip AEN handler by ncsi-ctrl flag, AEN type 0x%x\n",
+				h->type);
+		goto netlink_event;
 	}
 
 	ret = nah->handler(ndp, h);
@@ -259,6 +273,7 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb)
 			   "NCSI: Handler for AEN type 0x%x returned %d\n",
 			   h->type, ret);
 
+netlink_event:
     ncsi_generate_aen_netlink_event(ndp, h);
 out:
 	consume_skb(skb);
