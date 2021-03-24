@@ -315,6 +315,14 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0>;
+
+			adm1278@10 {
+				compatible = "adi,adm1278";
+				reg = <0x10>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				shunt-resistor-micro-ohms = <1500>;
+			};
 		};
 
 		imux17: i2c@1 {
@@ -654,6 +662,14 @@
 					#address-cells = <1>;
 					#size-cells = <0>;
 					reg = <3>;
+
+					adm1278@10 {
+						compatible = "adi,adm1278";
+						reg = <0x10>;
+						#address-cells = <1>;
+						#size-cells = <0>;
+						shunt-resistor-micro-ohms = <250>;
+					};
 				};
 
 				imux68: i2c@4 {
@@ -717,6 +733,14 @@
 					#address-cells = <1>;
 					#size-cells = <0>;
 					reg = <3>;
+
+					adm1278@10 {
+						compatible = "adi,adm1278";
+						reg = <0x10>;
+						#address-cells = <1>;
+						#size-cells = <0>;
+						shunt-resistor-micro-ohms = <250>;
+					};
 				};
 
 				imux76: i2c@4 {
