@@ -172,6 +172,22 @@
 			};
 		};
 	};
+
+	flash@1 {
+		status = "okay";
+		m25p,fast-read;
+		label = "flash1";
+		spi-max-frequency = <50000000>;
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			flash1@0 {
+				reg = <0x0 0x4000000>;
+				label = "spi0.1";
+			};
+		};
+	};
 };
 
 &pwm_tacho {
@@ -193,7 +209,7 @@
 	bus-frequency = <400000>;
 };
 
-&i2c1 {	
+&i2c1 {
 	status = "okay";
 	bus-frequency = <400000>;
 };
@@ -554,7 +570,7 @@
       status = "okay";
 };
 
-// connect to BIC 
+// connect to BIC
 &ehci1 {
       status = "okay";
 };
