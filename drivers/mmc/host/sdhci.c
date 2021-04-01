@@ -3171,9 +3171,15 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 		if (host->pending_reset)
 			return;
 
-		pr_err("%s: Got data interrupt 0x%08x even though no data operation was in progress.\n",
-		       mmc_hostname(host->mmc), (unsigned)intmask);
-		sdhci_dumpregs(host);
+		/*
+		 * Aspeed SOC sometimes will issue infinite SDHCI_INT_DATA_TIMEOUT interrupt,
+		 * this will result in watchdog timeout because of too many kernel log.
+		 */
+		if (intmask & (~SDHCI_INT_DATA_TIMEOUT)) {
+			pr_err("%s: Got data interrupt 0x%08x even though no data operation was in progress.\n",
+			       mmc_hostname(host->mmc), (unsigned)intmask);
+			sdhci_dumpregs(host);
+		}
 
 		return;
 	}
