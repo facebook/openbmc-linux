@@ -370,9 +370,11 @@
 			jtag1: jtag@1e6e4100 {
 				compatible = "aspeed,ast2600-jtag";
 				reg = <0x1e6e4100 0x40 0x1e6e2050 0x8 0x1e6e2418 0x4>;
-				clocks = <&syscon ASPEED_CLK_APB2>;
+				clocks = <&syscon ASPEED_CLK_AHB>;
 				resets = <&syscon ASPEED_RESET_JTAG_MASTER2>;
-				interrupts = <53>;
+				interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_jtagm_default>;
 				status = "disabled";
 			};
 
