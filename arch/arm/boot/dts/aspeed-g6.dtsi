@@ -150,7 +150,7 @@
 				0x50000000 0x10000000 >;
 			#address-cells = <1>;
 			#size-cells = <0>;
-			compatible = "aspeed,ast2600-spi";
+			compatible = "aspeed,ast2600-spi2";
 			clocks = <&syscon ASPEED_CLK_AHB>;
 			status = "disabled";
 			flash@0 {
