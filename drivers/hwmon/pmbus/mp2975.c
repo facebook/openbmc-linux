@@ -10,6 +10,7 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/pmbus.h>
 #include "pmbus.h"
 
 /* Vendor specific registers. */
@@ -66,6 +67,16 @@ struct mp2975_data {
 	int vout_ov_fixed[MP2975_PAGE_NUM];
 	int vout_format[MP2975_PAGE_NUM];
 	int curr_sense_gain[MP2975_PAGE_NUM];
+};
+
+/*
+ * Disable status check for mp2975/mp2978 devices, because some devices report
+ * communication error (invalid command) for VOUT_MODE command (0x20)
+ * although correct VOUT_MODE (0x16) is returned: it leads to incorrect
+ * exponent in linear mode.
+ */
+static struct pmbus_platform_data mp29xx_plat_data = {
+	.flags = PMBUS_SKIP_STATUS_CHECK,
 };
 
 #define to_mp2975_data(x)  container_of(x, struct mp2975_data, info)
@@ -686,6 +697,14 @@ static int mp2975_probe(struct i2c_client *client)
 	struct mp2975_data *data;
 	int ret;
 
+	/*
+	 * MP2975/MP2978 devices may not stay in page 0 during device
+	 * probe which leads to probe failure (read status word failed).
+	 * So let's set the device to page 0 at the beginning.
+	 */
+	client->dev.platform_data = &mp29xx_plat_data;
+	i2c_smbus_write_byte_data(client, PMBUS_PAGE, 0);
+
 	data = devm_kzalloc(&client->dev, sizeof(struct mp2975_data),
 			    GFP_KERNEL);
 	if (!data)
@@ -741,6 +760,7 @@ static int mp2975_probe(struct i2c_client *client)
 
 static const struct i2c_device_id mp2975_id[] = {
 	{"mp2975", 0},
+	{"mp2978", 0},
 	{}
 };
 
@@ -748,6 +768,7 @@ MODULE_DEVICE_TABLE(i2c, mp2975_id);
 
 static const struct of_device_id __maybe_unused mp2975_of_match[] = {
 	{.compatible = "mps,mp2975"},
+	{.compatible = "mps,mp2978"},
 	{}
 };
 MODULE_DEVICE_TABLE(of, mp2975_of_match);
@@ -765,5 +786,5 @@ static struct i2c_driver mp2975_driver = {
 module_i2c_driver(mp2975_driver);
 
 MODULE_AUTHOR("Vadim Pasternak <vadimp@nvidia.com>");
-MODULE_DESCRIPTION("PMBus driver for MPS MP2975 device");
+MODULE_DESCRIPTION("PMBus driver for MPS MP2975/MP2978 device");
 MODULE_LICENSE("GPL");
