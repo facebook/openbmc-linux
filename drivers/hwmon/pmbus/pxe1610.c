@@ -121,6 +121,7 @@ static const struct i2c_device_id pxe1610_id[] = {
 	{"pxe1610", 0},
 	{"pxe1110", 0},
 	{"pxm1310", 0},
+	{"pxe1211", 0},
 	{}
 };
 
@@ -138,5 +139,5 @@ static struct i2c_driver pxe1610_driver = {
 module_i2c_driver(pxe1610_driver);
 
 MODULE_AUTHOR("Vijay Khemka <vijaykhemka@fb.com>");
-MODULE_DESCRIPTION("PMBus driver for Infineon PXE1610, PXE1110 and PXM1310");
+MODULE_DESCRIPTION("PMBus driver for Infineon PXE1610, PXE1110, PXE1211 and PXM1310");
 MODULE_LICENSE("GPL");
