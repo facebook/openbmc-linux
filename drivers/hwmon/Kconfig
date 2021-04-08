@@ -1482,6 +1482,17 @@ config SENSORS_NET_BRCM
 	  This driver can also be built as a module. If so, the module
 	  will be called net_brcm.
 
+config SENSORS_NET_CASIC
+	tristate "WEDGE400C NET_CASIC"
+	depends on I2C
+	help
+	  If you say yes here you get support for the WEDGE400C NET_CASIC
+	  hardware monitoring chip, including manual fan speed control.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called net_casic.
+
+
 config SENSORS_NPCM7XX
 	tristate "Nuvoton NPCM750 and compatible PWM and Fan controllers"
 	imply THERMAL
