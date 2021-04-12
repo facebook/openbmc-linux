@@ -49,6 +49,7 @@ struct aspeed_smc_info {
 	int (*calibrate)(struct aspeed_smc_chip *chip, u32 hdiv,
 			 const u8 *golden_buf, u8 *test_buf);
 
+	void __iomem * (*chip_base)(struct aspeed_smc_chip *chip, struct resource *res);
 	u32 (*segment_start)(struct aspeed_smc_controller *controller, u32 reg);
 	u32 (*segment_end)(struct aspeed_smc_controller *controller, u32 reg);
 	u32 (*segment_reg)(struct aspeed_smc_controller *controller,
@@ -68,6 +69,11 @@ static u32 aspeed_smc_segment_end(
 	struct aspeed_smc_controller *controller, u32 reg);
 static u32 aspeed_smc_segment_reg(
 	struct aspeed_smc_controller *controller, u32 start, u32 end);
+static void __iomem * aspeed_smc_chip_base(struct aspeed_smc_chip *chip,
+					  struct resource *res);
+
+static void __iomem * aspeed_smc_chip_base_ast2600(struct aspeed_smc_chip *chip,
+					  struct resource *res);
 
 static const struct aspeed_smc_info fmc_2400_info = {
 	.maxsize = 64 * 1024 * 1024,
@@ -81,6 +87,7 @@ static const struct aspeed_smc_info fmc_2400_info = {
 	.set_4b = aspeed_smc_chip_set_4b,
 	.optimize_read = aspeed_smc_optimize_read,
 	.calibrate = aspeed_smc_calibrate_reads,
+	.chip_base = aspeed_smc_chip_base,
 	.segment_start = aspeed_smc_segment_start,
 	.segment_end = aspeed_smc_segment_end,
 	.segment_reg = aspeed_smc_segment_reg,
@@ -98,6 +105,7 @@ static const struct aspeed_smc_info spi_2400_info = {
 	.set_4b = aspeed_smc_chip_set_4b_spi_2400,
 	.optimize_read = aspeed_smc_optimize_read,
 	.calibrate = aspeed_smc_calibrate_reads,
+	.chip_base = aspeed_smc_chip_base,
 	/* No segment registers */
 };
 
@@ -113,6 +121,7 @@ static const struct aspeed_smc_info fmc_2500_info = {
 	.set_4b = aspeed_smc_chip_set_4b,
 	.optimize_read = aspeed_smc_optimize_read,
 	.calibrate = aspeed_smc_calibrate_reads,
+	.chip_base = aspeed_smc_chip_base,
 	.segment_start = aspeed_smc_segment_start,
 	.segment_end = aspeed_smc_segment_end,
 	.segment_reg = aspeed_smc_segment_reg,
@@ -157,6 +166,7 @@ static const struct aspeed_smc_info fmc_2600_info = {
 	.set_4b = aspeed_smc_chip_set_4b,
 	.optimize_read = aspeed_smc_optimize_read,
 	.calibrate = aspeed_smc_calibrate_reads_ast2600,
+	.chip_base = aspeed_smc_chip_base_ast2600,
 	.segment_start = aspeed_smc_segment_start_ast2600,
 	.segment_end = aspeed_smc_segment_end_ast2600,
 	.segment_reg = aspeed_smc_segment_reg_ast2600,
@@ -174,6 +184,7 @@ static const struct aspeed_smc_info spi_2600_info = {
 	.set_4b = aspeed_smc_chip_set_4b,
 	.optimize_read = aspeed_smc_optimize_read,
 	.calibrate = aspeed_smc_calibrate_reads_ast2600,
+	.chip_base = aspeed_smc_chip_base_ast2600,
 	.segment_start = aspeed_smc_segment_start_ast2600,
 	.segment_end = aspeed_smc_segment_end_ast2600,
 	.segment_reg = aspeed_smc_segment_reg_ast2600,
@@ -675,6 +686,39 @@ MODULE_DEVICE_TABLE(of, aspeed_smc_matches);
  * contiguous memory region across chips. For the moment, we only
  * check that each chip segment is valid.
  */
+static void __iomem * aspeed_smc_chip_base_ast2600(struct aspeed_smc_chip *chip,
+					  struct resource *res)
+{
+	struct aspeed_smc_controller *controller = chip->controller;
+	const struct aspeed_smc_info *info = controller->info;
+	u32 offset = 0;
+	u32 reg, pre_reg;
+	u32 next_end;
+
+	reg = readl(SEGMENT_ADDR_REG(controller, chip->cs));
+	if (info->nce > 1) {
+		if ((!reg) && (chip->cs > 0)) {
+			//for ast2600 setting, use 64MB 0x4000000 for default
+			pre_reg = readl(SEGMENT_ADDR_REG(controller, chip->cs - 1));
+			next_end = pre_reg + 0x100000 + 0x4000000;
+			if (0x0FF00000 < next_end || 0x0FF00000 <= pre_reg)
+				return 0;
+			//for current cs start
+			reg = ((next_end) & 0xffff0000) | ((pre_reg + 0x100000) >> 16);
+			writel(reg, SEGMENT_ADDR_REG(controller, chip->cs));
+		}
+
+		if (info->segment_start(controller, reg) >=
+		    info->segment_end(controller, reg)) {
+			return 0;
+		}
+
+		offset = info->segment_start(controller, reg) - res->start;
+	}
+
+	return controller->ahb_base + offset;
+}
+
 static void __iomem *aspeed_smc_chip_base(struct aspeed_smc_chip *chip,
 					  struct resource *res)
 {
@@ -907,7 +951,7 @@ static int aspeed_smc_chip_setup_init(struct aspeed_smc_chip *chip,
 	/*
 	 * Configure chip base address in memory
 	 */
-	chip->ahb_base = aspeed_smc_chip_base(chip, res);
+	chip->ahb_base = info->chip_base(chip, res);
 	if (!chip->ahb_base) {
 		dev_warn(chip->nor.dev, "CE%d window closed", chip->cs);
 		return -EINVAL;
