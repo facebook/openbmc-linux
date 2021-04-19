@@ -303,6 +303,9 @@
 };
 
 &jtag1 {
+	/* JTAG programming is done via bit-banging rather than through
+	the driver, so prevent the driver from controlling GPIOs */
+	pinctrl-0 = <>;
 	status = "okay";
 };
 
