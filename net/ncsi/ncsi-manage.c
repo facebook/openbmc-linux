@@ -752,6 +752,28 @@ static int ncsi_oem_gma_handler_bcm(struct ncsi_cmd_arg *nca)
 	return ret;
 }
 
+static int ncsi_oem_gmac16_handler_bcm(struct ncsi_cmd_arg *nca)
+{
+	unsigned char data[NCSI_OEM_BCM_CMD_GMAC16_LEN];
+	int ret = 0;
+
+	nca->payload = NCSI_OEM_BCM_CMD_GMAC16_LEN;
+
+	memset(data, 0, NCSI_OEM_BCM_CMD_GMAC16_LEN);
+	*(unsigned int *)data = ntohl(NCSI_OEM_MFR_BCM_ID);
+	data[5] = NCSI_OEM_BCM_CMD_GMAC16;
+	data[7] = NCSI_OEM_BCM_OEM_PAYLOAD_LEN;
+
+	nca->data = data;
+
+	ret = ncsi_xmit_cmd(nca);
+	if (ret)
+		netdev_err(nca->ndp->ndev.dev,
+			   "NCSI: Failed to transmit cmd 0x%x during configure\n",
+			   nca->type);
+	return ret;
+}
+
 static int ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
 {
 	union {
@@ -782,7 +804,11 @@ static struct ncsi_oem_gma_handler {
 	unsigned int	mfr_id;
 	int		(*handler)(struct ncsi_cmd_arg *nca);
 } ncsi_oem_gma_handlers[] = {
+#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_BCM_GMAC16)
+	{ NCSI_OEM_MFR_BCM_ID, ncsi_oem_gmac16_handler_bcm },
+#else
 	{ NCSI_OEM_MFR_BCM_ID, ncsi_oem_gma_handler_bcm },
+#endif
 	{ NCSI_OEM_MFR_MLX_ID, ncsi_oem_gma_handler_mlx }
 };
 
