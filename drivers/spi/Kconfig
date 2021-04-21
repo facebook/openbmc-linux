@@ -313,6 +313,12 @@ config SPI_EP93XX
 	  This enables using the Cirrus EP93xx SPI controller in master
 	  mode.
 
+config SPI_FACEBOOK_U2S
+	tristate "Facebook USB-SPI Adapter"
+	depends on USB
+	help
+	  This enables support for Facebook USB-to-SPI FPGA Adapter.
+
 config SPI_FALCON
 	bool "Falcon SPI controller support"
 	depends on SOC_FALCON
