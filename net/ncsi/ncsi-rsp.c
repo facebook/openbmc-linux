@@ -653,7 +653,7 @@ static int ncsi_rsp_handler_oem_mlx(struct ncsi_request *nr)
 	return 0;
 }
 
-/* Response handler for Broadcom command Get Mac Address */
+/* Response handler for Broadcom legacy Get Mac Address command */
 static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 {
 	struct ncsi_dev_priv *ndp = nr->ndp;
@@ -679,8 +679,10 @@ static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 	 */
 	while (mac_offset-- > 0)
 		eth_addr_inc((u8 *)saddr.sa_data);
-	if (!is_valid_ether_addr((const u8 *)saddr.sa_data))
+	if (!is_valid_ether_addr((const u8 *)saddr.sa_data)) {
+		netdev_warn(ndev, "NCSI: bcm_gma invalid mac addr %pM\n", (const u8 *)saddr.sa_data);
 		return -ENXIO;
+	}
 
 	/* Set the flag for GMA command which should only be called once */
 	ndp->gma_flag = 1;
@@ -688,6 +690,42 @@ static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 	ret = ops->ndo_set_mac_address(ndev, &saddr);
 	if (ret < 0)
 		netdev_warn(ndev, "NCSI: 'Writing mac address to device failed\n");
+	netdev_info(ndev, "NCSI: bcm_gma MAC %pM\n", ndev->dev_addr);
+
+	return ret;
+}
+
+/* Response handler for Broadcom Get Mac Address command */
+static int ncsi_rsp_handler_oem_bcm_gmac16(struct ncsi_request *nr)
+{
+	struct ncsi_dev_priv *ndp = nr->ndp;
+	struct net_device *ndev = ndp->ndev.dev;
+	const struct net_device_ops *ops = ndev->netdev_ops;
+	struct ncsi_rsp_oem_pkt *rsp;
+	struct sockaddr saddr;
+	int ret = 0;
+	int i = 0;
+
+	/* Get the response header */
+	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
+
+	saddr.sa_family = ndev->type;
+	ndev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
+
+	/* Management Controller's MAC address is stored in reverse order,
+	 * e.g. byte5, byte4, byte3, byte2, byte1, byte0
+	 */
+	for (i = 0; i < ETH_ALEN; i++)
+		saddr.sa_data[i] = rsp->data[BCM_MACC16_ADDR_OFFSET + ETH_ALEN - 1 - i];
+	if (!is_valid_ether_addr((const u8 *)saddr.sa_data)) {
+		netdev_warn(ndev, "NCSI: bcm_gmac16 invalid mac addr %pM\n", (const u8 *)saddr.sa_data);
+		return -ENXIO;
+	}
+
+	ret = ops->ndo_set_mac_address(ndev, &saddr);
+	if (ret < 0)
+		netdev_warn(ndev, "NCSI: gmac16 Writing mac address to device failed\n");
+	netdev_info(ndev, "NCSI: bcm_gmac16 MAC %pM\n", ndev->dev_addr);
 
 	return ret;
 }
@@ -702,8 +740,15 @@ static int ncsi_rsp_handler_oem_bcm(struct ncsi_request *nr)
 	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
 	bcm = (struct ncsi_rsp_oem_bcm_pkt *)(rsp->data);
 
-	if (bcm->type == NCSI_OEM_BCM_CMD_GMA)
-		return ncsi_rsp_handler_oem_bcm_gma(nr);
+	switch (bcm->type)
+	{
+		case NCSI_OEM_BCM_CMD_GMA:
+			return ncsi_rsp_handler_oem_bcm_gma(nr);
+		case NCSI_OEM_BCM_CMD_GMAC16:
+			return ncsi_rsp_handler_oem_bcm_gmac16(nr);
+		default:
+			return 0;
+	}
 	return 0;
 }
 
