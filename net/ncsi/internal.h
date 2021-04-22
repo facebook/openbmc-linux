@@ -80,6 +80,8 @@ enum {
 #define NCSI_OEM_MFR_BCM_ID             0x113d
 /* Broadcom specific OEM Command */
 #define NCSI_OEM_BCM_CMD_GMA            0x01   /* CMD ID for Get MAC */
+#define NCSI_OEM_BCM_CMD_GMAC16         0x16   /* CMD ID for Get MAC_C16 */
+#define NCSI_OEM_BCM_OEM_PAYLOAD_LEN    0x4    /* Get MAC_C16 payload length */
 /* Mellanox specific OEM Command */
 #define NCSI_OEM_MLX_CMD_GMA            0x00   /* CMD ID for Get MAC */
 #define NCSI_OEM_MLX_CMD_GMA_PARAM      0x1b   /* Parameter for GMA  */
@@ -87,13 +89,15 @@ enum {
 #define NCSI_OEM_MLX_CMD_SMAF_PARAM     0x07   /* Parameter for SMAF         */
 /* OEM Command payload lengths*/
 #define NCSI_OEM_BCM_CMD_GMA_LEN        12
+#define NCSI_OEM_BCM_CMD_GMAC16_LEN     16
 #define NCSI_OEM_MLX_CMD_GMA_LEN        8
-#define NCSI_OEM_MLX_CMD_SMAF_LEN        60
+#define NCSI_OEM_MLX_CMD_SMAF_LEN       60
 /* Offset in OEM request */
 #define MLX_SMAF_MAC_ADDR_OFFSET         8     /* Offset for MAC in SMAF    */
 #define MLX_SMAF_MED_SUPPORT_OFFSET      14    /* Offset for medium in SMAF */
 /* Mac address offset in OEM response */
 #define BCM_MAC_ADDR_OFFSET             28
+#define BCM_MACC16_ADDR_OFFSET          8
 #define MLX_MAC_ADDR_OFFSET             8
 
 

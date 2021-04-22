@@ -17,6 +17,12 @@ config NCSI_OEM_CMD_GET_MAC
 	---help---
 	  This allows to get MAC address from NCSI firmware and set them back to
 		controller.
+config NCSI_OEM_CMD_BCM_GMAC16
+	bool "Use BCM OEM GMA C16 cmd to retrieve MAC Address "
+	depends on NET_NCSI
+	---help---
+	  This uses BCM C16 OEM command to get provisioned MAC address from NCSI firmware
+
 config NET_NCSI_MC_MAC_OFFSET
 	int
 	prompt "Offset of Management Controller's MAC Address"
