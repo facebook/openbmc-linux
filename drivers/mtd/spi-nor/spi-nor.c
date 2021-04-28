@@ -5196,7 +5196,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 	else
 		mtd->_write = spi_nor_write;
 
-	if (info->flags & USE_FSR)
+	if ((info->flags & USE_FSR) && !of_property_read_bool(np, "unuse-fsr"))
 		nor->flags |= SNOR_F_USE_FSR;
 	if (info->flags & SPI_NOR_HAS_TB) {
 		nor->flags |= SNOR_F_HAS_SR_TB;
