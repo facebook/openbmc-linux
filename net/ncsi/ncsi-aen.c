@@ -251,13 +251,13 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb)
 		return -ENOENT;
 	}
 
-  if (h->type == NCSI_PKT_AEN_OEM0 &&
-      ntohl(*(__be32 *)(h + 1)) == NCSI_OEM_MFR_BCM_ID) {
-    /* Variable length */
-    ret = ncsi_validate_aen_pkt(h, ntohs(h->common.length)); 
-  } else {  
-	  ret = ncsi_validate_aen_pkt(h, nah->payload);
-  }
+	if (h->type == NCSI_PKT_AEN_OEM0 &&
+		ntohl(*(__be32 *)(h + 1)) == NCSI_OEM_MFR_BCM_ID) {
+		/* Variable length */
+		ret = ncsi_validate_aen_pkt(h, ntohs(h->common.length));
+	} else {
+		ret = ncsi_validate_aen_pkt(h, nah->payload);
+	}
 	if (ret) {
 		netdev_warn(ndp->ndev.dev,
 			    "NCSI: 'bad' packet ignored for AEN type 0x%x\n",
