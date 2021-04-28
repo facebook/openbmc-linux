@@ -42,7 +42,14 @@
 #define ASPEED_G6_STRAP1		0x500
 
 #define ASPEED_MAC12_CLK_DLY		0x340
+#define ASPEED_MAC12_CLK_DLY_100M	0x348
+#define ASPEED_MAC12_CLK_DLY_10M	0x34C
 #define ASPEED_MAC34_CLK_DLY		0x350
+#define ASPEED_MAC34_CLK_DLY_100M	0x358
+#define ASPEED_MAC34_CLK_DLY_10M	0x35C
+
+#define BYTE2(x) ((unsigned char)((x) >> 16))
+#define ASPEED_AST262X_A1		0x01
 
 /* Globally visible clocks */
 static DEFINE_SPINLOCK(aspeed_g6_clk_lock);
@@ -51,6 +58,46 @@ static DEFINE_SPINLOCK(aspeed_g6_clk_lock);
 static struct clk_hw_onecell_data *aspeed_g6_clk_data;
 
 static void __iomem *scu_g6_base;
+
+struct mac_delay_config {
+	u32 tx_delay_1000;
+	u32 rx_delay_1000;
+	u32 tx_delay_100;
+	u32 rx_delay_100;
+	u32 tx_delay_10;
+	u32 rx_delay_10;
+};
+
+union mac_delay_1g {
+	u32 w;
+	struct {
+		unsigned int tx_delay_1		: 6;	/* bit[5:0] */
+		unsigned int tx_delay_2		: 6;	/* bit[11:6] */
+		unsigned int rx_delay_1		: 6;	/* bit[17:12] */
+		unsigned int rx_delay_2		: 6;	/* bit[23:18] */
+		unsigned int rx_clk_inv_1	: 1;	/* bit[24] */
+		unsigned int rx_clk_inv_2	: 1;	/* bit[25] */
+		unsigned int rmii_tx_data_at_falling_1 : 1; /* bit[26] */
+		unsigned int rmii_tx_data_at_falling_2 : 1; /* bit[27] */
+		unsigned int reserved	: 1;	/* bit[28] */
+		unsigned int rmii_50m_oe_1	: 1;	/* bit[29] */
+		unsigned int rmii_50m_oe_2	: 1;	/* bit[30] */
+		unsigned int rgmii_125m_o_sel	: 1;	/* bit[31] */
+	} b;
+};
+
+union mac_delay_100_10 {
+	u32 w;
+	struct {
+		unsigned int tx_delay_1		: 6;	/* bit[5:0] */
+		unsigned int tx_delay_2		: 6;	/* bit[11:6] */
+		unsigned int rx_delay_1		: 6;	/* bit[17:12] */
+		unsigned int rx_delay_2		: 6;	/* bit[23:18] */
+		unsigned int rx_clk_inv_1	: 1;	/* bit[24] */
+		unsigned int rx_clk_inv_2	: 1;	/* bit[25] */
+		unsigned int reserved_0		: 6;	/* bit[31:26] */
+	} b;
+};
 
 /*
  * Clocks marked with CLK_IS_CRITICAL:
@@ -779,6 +826,10 @@ static void __init aspeed_g6_cc_init(struct device_node *np)
 	struct regmap *map;
 	int ret;
 	int i;
+	u32 chip_id;
+	struct mac_delay_config mac_cfg;
+	union mac_delay_1g reg_1g;
+	union mac_delay_100_10 reg_100, reg_10;
 
 	scu_g6_base = of_iomap(np, 0);
 	if (!scu_g6_base)
@@ -806,6 +857,70 @@ static void __init aspeed_g6_cc_init(struct device_node *np)
 	if (IS_ERR(map)) {
 		pr_err("no syscon regmap\n");
 		return;
+	}
+
+	regmap_read(map, ASPEED_G6_SILICON_REV, &chip_id);
+
+	/* From ASPEED AST2620 A3 Datasheet ?C V0.8,
+	 * the RGMII timing's step delay is difference,
+	 * A0/A1 is 0.18ns, A2/A3 is 0.25ns.
+	 */
+	if (BYTE2(chip_id) > ASPEED_AST262X_A1) {
+		regmap_read(map, ASPEED_MAC12_CLK_DLY, &reg_1g.w);
+		regmap_read(map, ASPEED_MAC12_CLK_DLY_100M, &reg_100.w);
+		regmap_read(map, ASPEED_MAC12_CLK_DLY_10M, &reg_10.w);
+
+		if (!of_property_read_u32_array(np, "mac0-clk-delay",
+							(u32 *)&mac_cfg, 6)) {
+			reg_1g.b.tx_delay_1 = mac_cfg.tx_delay_1000;
+			reg_1g.b.rx_delay_1 = mac_cfg.rx_delay_1000;
+			reg_100.b.tx_delay_1 = mac_cfg.tx_delay_100;
+			reg_100.b.rx_delay_1 = mac_cfg.rx_delay_100;
+			reg_10.b.tx_delay_1 = mac_cfg.tx_delay_10;
+			reg_10.b.rx_delay_1 = mac_cfg.rx_delay_10;
+		}
+
+		if (!of_property_read_u32_array(np, "mac1-clk-delay",
+							(u32 *)&mac_cfg, 6)) {
+			reg_1g.b.tx_delay_2 = mac_cfg.tx_delay_1000;
+			reg_1g.b.rx_delay_2 = mac_cfg.rx_delay_1000;
+			reg_100.b.tx_delay_2 = mac_cfg.tx_delay_100;
+			reg_100.b.rx_delay_2 = mac_cfg.rx_delay_100;
+			reg_10.b.tx_delay_2 = mac_cfg.tx_delay_10;
+			reg_10.b.rx_delay_2 = mac_cfg.rx_delay_10;
+		}
+
+		regmap_write(map, ASPEED_MAC12_CLK_DLY, reg_1g.w);
+		regmap_write(map, ASPEED_MAC12_CLK_DLY_100M, reg_100.w);
+		regmap_write(map, ASPEED_MAC12_CLK_DLY_10M, reg_10.w);
+
+		regmap_read(map, ASPEED_MAC34_CLK_DLY, &reg_1g.w);
+		regmap_read(map, ASPEED_MAC34_CLK_DLY_100M, &reg_100.w);
+		regmap_read(map, ASPEED_MAC34_CLK_DLY_10M, &reg_10.w);
+
+		if (!of_property_read_u32_array(np, "mac2-clk-delay",
+							(u32 *)&mac_cfg, 6)) {
+			reg_1g.b.tx_delay_1 = mac_cfg.tx_delay_1000;
+			reg_1g.b.rx_delay_1 = mac_cfg.rx_delay_1000;
+			reg_100.b.tx_delay_1 = mac_cfg.tx_delay_100;
+			reg_100.b.rx_delay_1 = mac_cfg.rx_delay_100;
+			reg_10.b.tx_delay_1 = mac_cfg.tx_delay_10;
+			reg_10.b.rx_delay_1 = mac_cfg.rx_delay_10;
+		}
+
+		if (!of_property_read_u32_array(np, "mac3-clk-delay",
+							(u32 *)&mac_cfg, 6)) {
+			reg_1g.b.tx_delay_2 = mac_cfg.tx_delay_1000;
+			reg_1g.b.rx_delay_2 = mac_cfg.rx_delay_1000;
+			reg_100.b.tx_delay_2 = mac_cfg.tx_delay_100;
+			reg_100.b.rx_delay_2 = mac_cfg.rx_delay_100;
+			reg_10.b.tx_delay_2 = mac_cfg.tx_delay_10;
+			reg_10.b.rx_delay_2 = mac_cfg.rx_delay_10;
+		}
+
+		regmap_write(map, ASPEED_MAC34_CLK_DLY, reg_1g.w);
+		regmap_write(map, ASPEED_MAC34_CLK_DLY_100M, reg_100.w);
+		regmap_write(map, ASPEED_MAC34_CLK_DLY_10M, reg_10.w);
 	}
 
 	aspeed_g6_cc(map);
