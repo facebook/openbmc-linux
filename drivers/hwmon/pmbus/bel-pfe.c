@@ -22,7 +22,7 @@ enum chips {pfe1100, pfe3000};
  * although correct VOUT_MODE (0x16) is returned: it leads to incorrect
  * exponent in linear mode.
  */
-static struct pmbus_platform_data pfe3000_plat_data = {
+static struct pmbus_platform_data pfe_plat_data = {
 	.flags = PMBUS_SKIP_STATUS_CHECK,
 };
 
@@ -100,11 +100,10 @@ static int pfe_pmbus_probe(struct i2c_client *client)
 	 * probe which leads to probe failure (read status word failed).
 	 * So let's set the device to page 0 at the beginning.
 	 */
-	if (model == pfe3000) {
-		client->dev.platform_data = &pfe3000_plat_data;
+	if (model == pfe3000)
 		i2c_smbus_write_byte_data(client, PMBUS_PAGE, 0);
-	}
 
+	client->dev.platform_data = &pfe_plat_data;
 	return pmbus_do_probe(client, &pfe_driver_info[model]);
 }
 
