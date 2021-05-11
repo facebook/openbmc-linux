@@ -398,7 +398,6 @@ aspeed_spi_remove(struct platform_device *pdev)
 		return -1;
 
 	platform_set_drvdata(pdev, NULL);
-	spi_master_put(priv->master);
 	return 0;
 }
 
