@@ -855,6 +855,9 @@ static int aspeed_create_fan(struct device *dev,
 			     struct aspeed_pwm_tacho_data *priv)
 {
 	u8 *fan_tach_ch;
+	u8 pwm_tach_mode;
+	u8 pwm_tach_clk_div;
+	u16 pwm_tach_unit;
 	u32 pwm_port;
 	int ret, count;
 
@@ -884,6 +887,25 @@ static int aspeed_create_fan(struct device *dev,
 	if (ret)
 		return ret;
 	aspeed_create_fan_tach_channel(priv, fan_tach_ch, count, pwm_port);
+
+	// Reconfigure the Type M PWM TACH settings by the platform.
+	ret = of_property_read_u8(child, "aspeed,pwm-typem-tach-mode", &pwm_tach_mode);
+	if (ret != 0) {
+		pwm_tach_mode = M_TACH_MODE;
+	}
+	priv->type_fan_tach_mode[TYPEM] = pwm_tach_mode;
+	of_property_read_u16(child, "aspeed,pwm-typem-tach-unit", &pwm_tach_unit);
+	if (ret != 0) {
+		pwm_tach_unit = M_TACH_UNIT;
+	}
+	priv->type_fan_tach_unit[TYPEM] = pwm_tach_unit;
+	of_property_read_u8(child, "aspeed,pwm-typem-tach-clk-div", &pwm_tach_clk_div);
+	if (ret != 0) {
+		pwm_tach_clk_div = M_TACH_CLK_DIV;
+	}
+	priv->type_fan_tach_clock_division[TYPEM] = pwm_tach_clk_div;
+	aspeed_set_tacho_type_values(priv->regmap, TYPEM, pwm_tach_mode,
+				     pwm_tach_unit, pwm_tach_clk_div);
 
 	return 0;
 }
