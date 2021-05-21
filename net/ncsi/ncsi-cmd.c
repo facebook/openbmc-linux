@@ -324,6 +324,7 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	unsigned char type;
 	struct ethhdr *eh;
 	int i, ret;
+	unsigned char timeout_sec = 1;
 
 	/* Use OEM generic handler for Netlink request */
 	if (nca->req_flags == NCSI_REQ_FLAG_NETLINK_DRIVEN)
@@ -398,7 +399,13 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	 * connection a 1 second delay should be sufficient.
 	 */
 	nr->enabled = true;
-	mod_timer(&nr->timer, jiffies + 1 * HZ);
+
+	/* Setting timeout by DTS configuration */
+	if (nca->ndp->timeout > 0) {
+		timeout_sec = nca->ndp->timeout;
+	}
+
+	mod_timer(&nr->timer, jiffies + timeout_sec * HZ);
 
 	/* Send NCSI packet */
 	skb_get(nr->cmd);

@@ -1819,6 +1819,9 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 			if (!of_property_read_u32(np, "ncsi-rexmit", &property)) {
 				ndp->rexmit = (u8)property;
 			}
+			if (!of_property_read_u32(np, "ncsi-timeout", &property)) {
+				ndp->timeout = (u8)property;
+			}
 		}
 	}
 

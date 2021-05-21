@@ -366,6 +366,7 @@ struct ncsi_dev_priv {
 	unsigned char       max_package;     /* Num of packages to probe   */
 	unsigned char       max_channel;     /* Num of channels to probe   */
 	unsigned char       rexmit;          /* Retransmit when timeout    */
+	unsigned char       timeout;         /* Timeout sec for ncsi timer */
 	unsigned int        ctrl_flags;      /* NCSI control flags         */
 };
 
