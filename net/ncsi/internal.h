@@ -44,7 +44,7 @@ enum {
 	NCSI_CAP_AEN_LSC                 = 0x01, /* Link status change       */
 	NCSI_CAP_AEN_CR                  = 0x02, /* Configuration required   */
 	NCSI_CAP_AEN_HDS                 = 0x04, /* HNC driver status        */
-	NCSI_CAP_AEN_MASK                = 0x07,
+	NCSI_CAP_AEN_MASK                = 0xFFFF0007,
 	NCSI_CAP_VLAN_ONLY               = 0x01, /* Filter VLAN packet only  */
 	NCSI_CAP_VLAN_NO                 = 0x02, /* Filter VLAN and non-VLAN */
 	NCSI_CAP_VLAN_ANY                = 0x04, /* Filter Any-and-non-VLAN  */
