@@ -21,6 +21,8 @@
 		i2c16 = &imux16;
 		i2c17 = &imux17;
 		i2c18 = &imux18;
+
+		spi3 = &spi2_gpio;
 	};
 
 	chosen {
@@ -54,6 +56,27 @@
 			compatible = "tcg,tpm_tis-spi";
 			spi-max-frequency = <33000000>;
 			reg = <0>;
+		};
+	};
+	spi2_gpio: spi2-gpio {
+		status = "okay";
+		compatible = "spi-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gpio-sck = <&gpio ASPEED_GPIO(R, 3) GPIO_ACTIVE_HIGH>;
+		gpio-mosi = <&gpio ASPEED_GPIO(R, 4) GPIO_ACTIVE_HIGH>;
+		gpio-miso = <&gpio ASPEED_GPIO(R, 5) GPIO_ACTIVE_HIGH>;
+		num-chipselects = <1>;
+		cs-gpios = <&gpio ASPEED_GPIO(R, 2) GPIO_ACTIVE_LOW>;
+
+		flash@0 {
+			reg = < 0 >;
+			status = "okay";
+			compatible = "jedec,spi-nor";
+			m25p,fast-read;
+			spi-max-frequency = <12000000>;
+			label = "switch0";
 		};
 	};
 };
