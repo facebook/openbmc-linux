@@ -261,12 +261,31 @@
 
 &spi1 {
 	status = "okay";
-	compatible = "aspeed,ast2600-spi-master";
 
-	spidev@0 {
-		compatible = "rohm,dh2228fv";
-		spi-max-frequency = <8250000>;
-		reg = <0>;
+	/* Given Fuji max flash size is 32MB, overwrite reg resource size to
+	 * save memory and avoid vmap allocation issue
+	 */
+	reg = < 0x1e630000 0xc4
+		0x30000000 0x2000000 >;
+
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		label = "spi1.0";
+		/* SPI bus width 1 */
+		spi-bus-width = <1>;
+		spi-max-frequency = <5000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			flash1@0 {
+				reg = <0x0 0x2000000>;
+				label = "spi-flash";
+			};
+		};
 	};
 };
 
