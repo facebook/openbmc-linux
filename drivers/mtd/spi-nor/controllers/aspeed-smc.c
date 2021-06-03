@@ -1237,7 +1237,7 @@ static const struct spi_nor_controller_ops aspeed_smc_controller_ops = {
 static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 				  struct device_node *np, struct resource *r)
 {
-	const struct spi_nor_hwcaps hwcaps = {
+	struct spi_nor_hwcaps hwcaps = {
 		.mask = SNOR_HWCAPS_READ |
 			SNOR_HWCAPS_READ_FAST |
 			SNOR_HWCAPS_READ_1_1_2 |
@@ -1247,6 +1247,7 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 	struct device *dev = controller->dev;
 	struct device_node *child;
 	unsigned int cs;
+	u32 width;
 	int ret = -ENODEV;
 
 	for_each_available_child_of_node(np, child) {
@@ -1257,6 +1258,13 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 		/* This driver does not support NAND or NOR flash devices. */
 		if (!of_device_is_compatible(child, "jedec,spi-nor"))
 			continue;
+
+		if (of_property_read_u32(child, "spi-rx-bus-width", &width))
+			width = 2;
+
+		/* TODO: to support READ_QUAD */
+		if (width == 1)
+			hwcaps.mask &= ~SNOR_HWCAPS_READ_1_1_2;
 
 		ret = of_property_read_u32(child, "reg", &cs);
 		if (ret) {
@@ -1288,8 +1296,8 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 					 &chip->clk_rate)) {
 			chip->clk_rate = ASPEED_SPI_DEFAULT_FREQ;
 		}
-		dev_info(dev, "Using %d MHz SPI frequency\n",
-			 chip->clk_rate / 1000000);
+		dev_info(dev, "Using bus width %d and %d MHz SPI frequency\n",
+			width , chip->clk_rate / 1000000);
 
 		chip->controller = controller;
 		chip->ctl = controller->regs + info->ctl0 + cs * 4;
