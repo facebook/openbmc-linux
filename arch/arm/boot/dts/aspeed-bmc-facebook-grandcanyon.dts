@@ -169,12 +169,10 @@
 
 &i2c0 {
 	status = "okay";
-	bus-frequency = <400000>;
 };
 
 &i2c1 {
 	status = "okay";
-	bus-frequency = <400000>;
 };
 
 // To BIC
@@ -188,12 +186,10 @@
 // To FPGA of Barton Springs
 &i2c3 {
 	status = "okay";
-	bus-frequency = <400000>;
 };
 
 &i2c4 {
 	status = "okay";
-	bus-frequency = <400000>;
 	// UIC FRU
 	eeprom@50 {
 		compatible = "atmel,24c64";
@@ -208,13 +204,11 @@
 
 // To FPGA of UIC (PFR)
 &i2c5 {
-	bus-frequency = <400000>;
 	status = "okay";
 };
 
 &i2c6 {
 	status = "okay";
-	bus-frequency = <400000>;
 
 	// BSM FRU
 	eeprom@54 {
@@ -227,14 +221,12 @@
 &i2c7 {
 	status = "okay";
 	multi-master;
-	bus-frequency = <400000>;
 	aspeed,hw-timeout-ms = <1000>;
 };
 
 // To NIC
 &i2c8 {
 	status = "okay";
-	bus-frequency = <400000>;
 	// MEZZ EEPROM
 	eeprom@50 {
 		compatible = "st,24c64";
@@ -244,7 +236,6 @@
 
 &i2c9 {
 	status = "okay";
-	bus-frequency = <400000>;
 
 	// Voltage sensor for E1.S
 	adc128@1d {
@@ -439,7 +430,6 @@
 // To expander
 &i2c10 {
 	multi-master;
-	bus-frequency = <400000>;
 	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
@@ -447,19 +437,16 @@
 // To IOC
 &i2c11 {
 	status = "okay";
-	bus-frequency = <400000>;
 };
 
 // [T5]: To E1.S SSD_1 [T7]: To IOCM
 &i2c12 {
 	status = "okay";
-	bus-frequency = <100000>;
 };
 
 // [T5]: To E1.S SSD_2 [T7]: To IOCM
 &i2c13 {
 	status = "okay";
-	bus-frequency = <100000>;
 
 	// Voltage sensor for IOCM
 	ads1015@49 {
@@ -498,12 +485,10 @@
 
 &i2c14 {
 	status = "okay";
-	bus-frequency = <400000>;
 };
 
 &i2c15 {
 	status = "okay";
-	bus-frequency = <400000>;
 };
 
 &adc0 {
