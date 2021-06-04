@@ -163,6 +163,12 @@ static int xdpe132_probe(struct i2c_client *client)
 	if (!info)
 		return -ENOMEM;
 
+	/*
+	 * Sometimes the device stays at page "0xff" which leads to
+	 * probe failure, so let's set page to 0 at the beginning.
+	 */
+	i2c_smbus_write_byte_data(client, PMBUS_PAGE, 0);
+
 	return pmbus_do_probe(client, info);
 }
 
