@@ -1642,7 +1642,7 @@ void Set_MAC_Affinity_mlx(struct net_device *dev)
 		lp->Payload_Data[4] = 0x00;
 		lp->Payload_Data[5] = 0x01;
 		lp->Payload_Data[6] = 0x07;
-		lp->Payload_Data[7] = 0x00;
+		lp->Payload_Data[7] = 0xff; // set BMC as chassis manager
 
 		for (i = 0; i < 6; i++) {
 			lp->Payload_Data[8+i] = lp->NCSI_Request.SA[i];
