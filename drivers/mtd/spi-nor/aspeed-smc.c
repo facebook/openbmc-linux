@@ -8,8 +8,6 @@
 #include <linux/bug.h>
 #include <linux/clk.h>
 #include <linux/device.h>
-#include <linux/dma-mapping.h>
-#include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -31,11 +29,6 @@ enum aspeed_smc_flash_type {
 	smc_type_nor  = 0,
 	smc_type_nand = 1,
 	smc_type_spi  = 2,
-};
-
-enum aspeed_smc_data_dir {
-	SMC_DATA_IN  = 0,
-	SMC_DATA_OUT,
 };
 
 struct aspeed_smc_chip;
@@ -61,9 +54,6 @@ struct aspeed_smc_info {
 	u32 (*segment_end)(struct aspeed_smc_controller *controller, u32 reg);
 	u32 (*segment_reg)(struct aspeed_smc_controller *controller,
 			   u32 start, u32 end);
-	void (*safs_support)(struct aspeed_smc_controller *controller,
-		enum aspeed_smc_data_dir dir, uint8_t cmd, uint8_t addr_len,
-		uint8_t bus_width);
 };
 
 static void aspeed_smc_chip_set_4b_spi_2400(struct aspeed_smc_chip *chip);
@@ -149,7 +139,6 @@ static const struct aspeed_smc_info spi_2500_info = {
 	.set_4b = aspeed_smc_chip_set_4b,
 	.optimize_read = aspeed_smc_optimize_read,
 	.calibrate = aspeed_smc_calibrate_reads,
-	.chip_base = aspeed_smc_chip_base,
 	.segment_start = aspeed_smc_segment_start,
 	.segment_end = aspeed_smc_segment_end,
 	.segment_reg = aspeed_smc_segment_reg,
@@ -164,10 +153,6 @@ static u32 aspeed_smc_segment_reg_ast2600(
 
 static int aspeed_smc_calibrate_reads_ast2600(struct aspeed_smc_chip *chip,
 	      u32 hdiv, const u8 *golden_buf, u8 *test_buf);
-
-void aspeed_2600_spi_fill_safs_cmd(struct aspeed_smc_controller *controller,
-		enum aspeed_smc_data_dir dir, uint8_t cmd,
-		uint8_t addr_len, uint8_t bus_width);
 
 static const struct aspeed_smc_info fmc_2600_info = {
 	.maxsize = 256 * 1024 * 1024,
@@ -203,7 +188,6 @@ static const struct aspeed_smc_info spi_2600_info = {
 	.segment_start = aspeed_smc_segment_start_ast2600,
 	.segment_end = aspeed_smc_segment_end_ast2600,
 	.segment_reg = aspeed_smc_segment_reg_ast2600,
-	.safs_support = aspeed_2600_spi_fill_safs_cmd,
 };
 
 static const struct aspeed_smc_info spi2_2600_info = {
@@ -252,12 +236,8 @@ struct aspeed_smc_controller {
 	const struct aspeed_smc_info *info;	/* type info of controller */
 	void __iomem *regs;			/* controller registers */
 	void __iomem *ahb_base;			/* per-chip window resource */
-	uint8_t *write_buf;
-	dma_addr_t dma_addr_phy;
 	u32 ahb_base_phy;			/* phys addr of AHB window  */
 	u32 ahb_window_size;			/* full mapping window size */
-	int irq; /* for dma write */
-	struct completion dma_done;
 
 	unsigned long	clk_frequency;
 
@@ -338,28 +318,6 @@ struct aspeed_smc_controller {
 #define SEGMENT_ADDR_REG0		0x30
 #define SEGMENT_ADDR_REG(controller, cs)	\
 	((controller)->regs + SEGMENT_ADDR_REG0 + (cs) * 4)
-
-#define CALIBRATE_BUF_SIZE 0x4000
-
-#define OFFSET_HOST_DIRECT_ACCESS_CMD_CTRL4	0x6c
-#define OFFSET_HOST_DIRECT_ACCESS_CMD_CTRL2	0x74
-
-#define OFFSET_INTR_CTRL_STATUS	0x08
-#define OFFSET_DMA_CTRL		0x80
-#define OFFSET_DMA_FLASH_ADDR_REG	0x84
-#define OFFSET_DMA_RAM_ADDR_REG	0x88
-#define OFFSET_DMA_LEN_REG		0x8c
-
-#define SPI_DMA_IRQ_EN		BIT(3)
-#define CONTROL_DAM_REQUEST		BIT(31)
-#define CONTROL_DAM_GRANT		BIT(30)
-#define CONTROL_DMA_CALIB_MODE	BIT(3)
-#define CONTROL_DMA_CALC_CKSUM	BIT(2)
-#define CONTROL_DMA_ENABLE		BIT(0)
-#define CONTROL_DMA_STATUS		BIT(11)
-#define DMA_GET_REQ_MAGIC		0xaeed0000
-#define DMA_DISCARD_REQ_MAGIC		0xdeea0000
-#define WRITTEN_DMA_BUF_LEN		0x400
 
 /*
  * The Segment Registers of the AST2400 and AST2500 have a 8MB
@@ -555,7 +513,8 @@ static void aspeed_smc_unprep(struct spi_nor *nor)
 	mutex_unlock(&chip->controller->mutex);
 }
 
-static int aspeed_smc_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, size_t len)
+static int aspeed_smc_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
+			       size_t len)
 {
 	struct aspeed_smc_chip *chip = nor->priv;
 
@@ -613,27 +572,9 @@ static int aspeed_smc_get_io_mode(struct aspeed_smc_chip *chip)
 		return CONTROL_IO_DUAL_DATA;
 	case SNOR_PROTO_1_2_2:
 		return CONTROL_IO_DUAL_ADDR_DATA;
-	case SNOR_PROTO_1_1_4:
-		return CONTROL_IO_QUAD_DATA;
-	case SNOR_PROTO_1_4_4:
-		return CONTROL_IO_QUAD_ADDR_DATA;
 	default:
 		dev_err(chip->nor.dev, "unsupported SPI read mode\n");
 		return -EINVAL;
-	}
-}
-
-uint32_t aspeed_spi_get_io_mode(uint32_t bus_width)
-{
-	switch (bus_width) {
-	case 1:
-		return 0;
-	case 2:
-		return CONTROL_IO_DUAL_DATA;
-	case 4:
-		return CONTROL_IO_QUAD_DATA;
-	default:
-		return 0;
 	}
 }
 
@@ -662,7 +603,7 @@ static ssize_t aspeed_smc_read_user(struct spi_nor *nor, loff_t from,
 		aspeed_smc_write_to_ahb(chip->ahb_base, &dummy, sizeof(dummy));
 
 	/* Set IO mode only for data */
-	if ((io_mode == CONTROL_IO_DUAL_DATA) || (io_mode == CONTROL_IO_QUAD_DATA))
+	if (io_mode == CONTROL_IO_DUAL_DATA)
 		aspeed_smc_set_io_mode(chip, io_mode);
 
 	aspeed_smc_read_from_ahb(read_buf, chip->ahb_base, len);
@@ -670,104 +611,16 @@ static ssize_t aspeed_smc_read_user(struct spi_nor *nor, loff_t from,
 	return len;
 }
 
-static ssize_t aspeed_smc_write(struct spi_nor *nor, loff_t to,
+static ssize_t aspeed_smc_write_user(struct spi_nor *nor, loff_t to,
 				     size_t len, const u_char *write_buf)
 {
-	int ret = 0;
-	struct aspeed_smc_chip *chip = NULL;
-	struct aspeed_smc_controller *controller = NULL;
-	const struct aspeed_smc_info *info = NULL;
-	uint32_t decoded_reg_val = 0;
-	uint32_t chip_ahb_start = 0;
-	uint32_t reg_val = 0;
- 
-	if ((nor == NULL) || (write_buf == NULL)) {
-		return 0;
-	}
+	struct aspeed_smc_chip *chip = nor->priv;
 
-	if (len < 1)
-		return 0;
-
-	if (len > WRITTEN_DMA_BUF_LEN) {
-		dev_info(nor->dev,
-			 "written length exceeds expected value (0x%x)\n", len);
-		return 0;
-	}
-
-	chip = nor->priv;
-	controller = chip->controller;
-	info = controller->info;
-
-	writel(DMA_GET_REQ_MAGIC, controller->regs + OFFSET_DMA_CTRL);
-	if (readl(controller->regs + OFFSET_DMA_CTRL) & CONTROL_DAM_REQUEST) {
-		while (!(readl(controller->regs + OFFSET_DMA_CTRL) &
-			 CONTROL_DAM_GRANT))
-			;
-	}
-
-	decoded_reg_val = readl(controller->regs + SEGMENT_ADDR_REG0 + chip->cs * 4);
-	chip_ahb_start = info->segment_start(controller, decoded_reg_val);
-
-	writel((chip->ctl_val[smc_write] & (~0x0f000f00)) | 0x03000000, chip->ctl);
-
-	/* don't use dma_map_single here, since we cannot make sure the buf's
-	 * start address is 4-byte-aligned.
-	 */
-	memcpy(controller->write_buf, write_buf, len);
-
-	writel(0x0, controller->regs + OFFSET_DMA_CTRL);
-	writel(controller->dma_addr_phy, controller->regs + OFFSET_DMA_RAM_ADDR_REG);
-	writel(chip_ahb_start + to, controller->regs + OFFSET_DMA_FLASH_ADDR_REG);
-	writel(len - 1, controller->regs + OFFSET_DMA_LEN_REG);
-
-	/* enable DMA irq */
-	reg_val = readl(controller->regs + OFFSET_INTR_CTRL_STATUS);
-	reg_val |= SPI_DMA_IRQ_EN;
-	writel(reg_val, controller->regs + OFFSET_INTR_CTRL_STATUS);
-
-	reinit_completion(&controller->dma_done);
-
-	/* enable write DMA */
-	writel(0x3, controller->regs + OFFSET_DMA_CTRL);
-	ret = wait_for_completion_timeout(&controller->dma_done, msecs_to_jiffies(2000));
-	if (ret == 0) {
-		writel(0x0, controller->regs + OFFSET_DMA_CTRL);
-		writel(DMA_DISCARD_REQ_MAGIC, controller->regs + OFFSET_DMA_CTRL);
-		dev_err(nor->dev, "write data timeout %d\n", ret);
-		return 0;
-	}
-
-	writel(0x0, controller->regs + OFFSET_DMA_CTRL);
-	writel(DMA_DISCARD_REQ_MAGIC, controller->regs + OFFSET_DMA_CTRL);
-
-	writel(chip->ctl_val[smc_read], chip->ctl);
-
+	aspeed_smc_start_user(nor);
+	aspeed_smc_send_cmd_addr(nor, nor->program_opcode, to);
+	aspeed_smc_write_to_ahb(chip->ahb_base, write_buf, len);
+	aspeed_smc_stop_user(nor);
 	return len;
-}
-
-static irqreturn_t aspeed_spi_dma_isr(int irq, void *dev_id)
-{
-	struct aspeed_smc_controller *controller = NULL;
-	uint32_t reg_val = 0;
-
-	if ((dev_id == NULL)) {
-		return 0;
-	}
-
-	controller = (struct aspeed_smc_controller *)dev_id;
-	if (!(readl(controller->regs + OFFSET_INTR_CTRL_STATUS) & 0x800))
-		return IRQ_NONE;
-
-	reg_val = readl(controller->regs + OFFSET_INTR_CTRL_STATUS);
-	reg_val &= ~SPI_DMA_IRQ_EN;
-	writel(reg_val, controller->regs + OFFSET_INTR_CTRL_STATUS);
-
-	writel(0x0, controller->regs + OFFSET_DMA_CTRL);
-	writel(DMA_DISCARD_REQ_MAGIC, controller->regs + OFFSET_DMA_CTRL);
-
-	complete(&controller->dma_done);
-
-	return IRQ_HANDLED;
 }
 
 static ssize_t aspeed_smc_read(struct spi_nor *nor, loff_t from, size_t len,
@@ -793,44 +646,6 @@ static ssize_t aspeed_smc_read(struct spi_nor *nor, loff_t from, size_t len,
 
 out:
 	return len;
-}
-
-void aspeed_2600_spi_fill_safs_cmd(struct aspeed_smc_controller *controller,
-		enum aspeed_smc_data_dir dir, uint8_t cmd,
-		uint8_t addr_len, uint8_t bus_width)
-{
-	uint32_t tmp_val = 0;
-
-	if (controller == NULL) {
-		return;
-	}
-
-	if (dir == SMC_DATA_IN) {
-		tmp_val = readl(controller->regs + OFFSET_HOST_DIRECT_ACCESS_CMD_CTRL4);
-		if (addr_len == 4)
-			tmp_val = (tmp_val & 0xffff00ff) | (cmd << 8);
-		else
-			tmp_val = (tmp_val & 0xffffff00) | cmd;
-
-		tmp_val = (tmp_val & 0x0fffffff) | aspeed_spi_get_io_mode(bus_width);
-
-		writel(tmp_val, controller->regs + OFFSET_HOST_DIRECT_ACCESS_CMD_CTRL4);
-
-	} else if (dir == SMC_DATA_OUT) {
-		tmp_val = readl(controller->regs + OFFSET_HOST_DIRECT_ACCESS_CMD_CTRL4);
-		tmp_val = (tmp_val & 0xf0ffffff) |
-				(aspeed_spi_get_io_mode(bus_width) >> 4);
-
-		writel(tmp_val, controller->regs + OFFSET_HOST_DIRECT_ACCESS_CMD_CTRL4);
-
-		tmp_val = readl(controller->regs + OFFSET_HOST_DIRECT_ACCESS_CMD_CTRL2);
-		if (addr_len == 4)
-			tmp_val = (tmp_val & 0xffff00ff) | (cmd << 8);
-		else
-			tmp_val = (tmp_val & 0xffffff00) | cmd;
-
-		writel(tmp_val, controller->regs + OFFSET_HOST_DIRECT_ACCESS_CMD_CTRL2);
-	}
 }
 
 static int aspeed_smc_unregister(struct aspeed_smc_controller *controller)
@@ -1176,6 +991,9 @@ static int aspeed_smc_chip_setup_init(struct aspeed_smc_chip *chip,
 	return 0;
 }
 
+
+#define CALIBRATE_BUF_SIZE 16384
+
 static bool aspeed_smc_check_reads(struct aspeed_smc_chip *chip,
 				  const u8 *golden_buf, u8 *test_buf)
 {
@@ -1356,7 +1174,6 @@ static int aspeed_smc_optimize_read(struct aspeed_smc_chip *chip,
 		dev_dbg(chip->nor.dev, "Found good read timings at HCLK/%d",
 			best_div);
 		chip->ctl_val[smc_read] |= ASPEED_SMC_HCLK_DIV(best_div);
-		chip->ctl_val[smc_write] |= ASPEED_SMC_HCLK_DIV(best_div);
 	}
 
 	writel(chip->ctl_val[smc_read], chip->ctl);
@@ -1441,7 +1258,7 @@ static int aspeed_smc_chip_setup_finish(struct aspeed_smc_chip *chip)
 		chip->nor.program_opcode << CONTROL_COMMAND_SHIFT |
 		CONTROL_COMMAND_MODE_WRITE;
 
-	dev_dbg(controller->dev, "write control register: [%08x]\n",
+	dev_dbg(controller->dev, "write control register: %08x\n",
 		chip->ctl_val[smc_write]);
 
 	/*
@@ -1461,7 +1278,7 @@ static int aspeed_smc_chip_setup_finish(struct aspeed_smc_chip *chip)
 		chip->nor.read_opcode << CONTROL_COMMAND_SHIFT |
 		CONTROL_IO_DUMMY_SET(chip->nor.read_dummy / 8);
 
-	dev_info(controller->dev, "read control register: [%08x]\n",
+	dev_info(controller->dev, "read control register: %08x\n",
 		chip->ctl_val[smc_read]);
 
 	if (optimize_read && info->optimize_read)
@@ -1475,13 +1292,13 @@ static const struct spi_nor_controller_ops aspeed_smc_controller_ops = {
 	.read_reg = aspeed_smc_read_reg,
 	.write_reg = aspeed_smc_write_reg,
 	.read = aspeed_smc_read,
-	.write = aspeed_smc_write,
+	.write = aspeed_smc_write_user,
 };
 
 static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 				  struct device_node *np, struct resource *r)
 {
-	struct spi_nor_hwcaps hwcaps = {
+	const struct spi_nor_hwcaps hwcaps = {
 		.mask = SNOR_HWCAPS_READ |
 			SNOR_HWCAPS_READ_FAST |
 			SNOR_HWCAPS_READ_1_1_2 |
@@ -1491,8 +1308,8 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 	struct device *dev = controller->dev;
 	struct device_node *child;
 	unsigned int cs;
-	u32 width = 0;
 	int ret = -ENODEV;
+	u8 chip_num = 0;
 
 	for_each_available_child_of_node(np, child) {
 		struct aspeed_smc_chip *chip;
@@ -1502,15 +1319,6 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 		/* This driver does not support NAND or NOR flash devices. */
 		if (!of_device_is_compatible(child, "jedec,spi-nor"))
 			continue;
-
-		if (of_property_read_u32(child, "spi-bus-width", &width))
-			width = 2;
-
-		hwcaps.mask &= ~SNOR_HWCAPS_READ_1_1_4;
-		if (width == 1)
-			hwcaps.mask &= ~SNOR_HWCAPS_READ_1_1_2;
-		else if (width == 4)
-			hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4;
 
 		ret = of_property_read_u32(child, "reg", &cs);
 		if (ret) {
@@ -1542,8 +1350,8 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 					 &chip->clk_rate)) {
 			chip->clk_rate = ASPEED_SPI_DEFAULT_FREQ;
 		}
-		dev_info(dev, "bus_width %d, Using %d MHz SPI frequency\n",
-			width, chip->clk_rate / 1000000);
+		dev_info(dev, "Using %d MHz SPI frequency\n",
+			 chip->clk_rate / 1000000);
 
 		chip->controller = controller;
 		chip->ctl = controller->regs + info->ctl0 + cs * 4;
@@ -1568,14 +1376,10 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 		 */
 		ret = spi_nor_scan(nor, NULL, &hwcaps);
 		if (ret) {
-			/* Skip if current flash does not exist. */
-			if (nor->info == NULL) {
-				dev_info(dev, "chip %d does not exist.\n", cs);
-				devm_kfree(controller->dev, chip);
+			devm_kfree(controller->dev, chip);
+			if (chip_num)
 				ret = 0;
-				continue;
-			} else
-				break;
+			continue;
 		}
 
 		ret = aspeed_smc_chip_setup_finish(chip);
@@ -1587,17 +1391,13 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 			break;
 
 		controller->chips[cs] = chip;
-
-		if (info->safs_support) {
-			info->safs_support(controller, SMC_DATA_IN,
-				nor->read_opcode, nor->addr_width, width);
-			info->safs_support(controller, SMC_DATA_OUT,
-				nor->program_opcode, nor->addr_width, 1);
-		}
+		chip_num++;
 	}
 
-	if (ret)
+	if (ret) {
+		of_node_put(child);
 		aspeed_smc_unregister(controller);
+	}
 
 	return ret;
 }
@@ -1641,28 +1441,6 @@ static int aspeed_smc_probe(struct platform_device *pdev)
 		return PTR_ERR(controller->ahb_base);
 
 	controller->ahb_window_size = resource_size(res);
-
-	controller->write_buf = (uint8_t *)dma_alloc_coherent(&pdev->dev,
-		WRITTEN_DMA_BUF_LEN, &controller->dma_addr_phy, GFP_DMA | GFP_KERNEL);
-	if (!controller->write_buf) {
-		dev_err(dev, "fail to alloc write_buf.\n");
-		return -ENOMEM;
-	}
-
-	controller->irq = platform_get_irq(pdev, 0);
-	if (controller->irq < 0) {
-		dev_err(dev, "fail to get irq (%d)\n", controller->irq);
-		return controller->irq;
-	}
-
-	ret = devm_request_irq(dev, controller->irq, aspeed_spi_dma_isr,
-					IRQF_SHARED, dev_name(dev), controller);
-	if (ret < 0) {
-		dev_err(dev, "fail to request irq (%d)\n", ret);
-		return ret;
-	}
-
-	init_completion(&controller->dma_done);
 
 	clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(clk))
