@@ -137,8 +137,6 @@
         m25p,fast-read;
         label = "spi0.1";
         spi-max-frequency = <50000000>;
-        spi-tx-bus-width = <1>;
-        spi-rx-bus-width = <4>;
 #include "facebook-bmc-vboot2-flash1-layout.dtsi"
     };
     flash@1 {
@@ -147,8 +145,6 @@
         m25p,fast-read;
         label = "spi0.0";
         spi-max-frequency = <50000000>;
-        spi-tx-bus-width = <1>;
-        spi-rx-bus-width = <4>;
 #include "facebook-bmc-vboot2-flash0-layout.dtsi"
     };
 };
