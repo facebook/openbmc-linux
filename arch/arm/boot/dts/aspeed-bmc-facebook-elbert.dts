@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2020 Facebook Inc.
+
+/dts-v1/;
+
+#include "ast2600-facebook-netbmc-common.dtsi"
+
+/ {
+	model = "Facebook Elbert BMC";
+	compatible = "facebook,elbert-bmc", "aspeed,ast2600";
+
+	aliases {
+		serial0 = &uart5;
+		serial1 = &uart1;
+		serial2 = &uart2;
+		serial3 = &uart3;
+	};
+
+	chosen {
+		stdout-path = &uart5;
+	};
+
+	spi_gpio: spi-gpio {
+		num-chipselects = <1>;
+		cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>;
+	};
+};
+
+&spi1 {
+	status = "okay";
+	compatible = "aspeed,ast2600-spi-master";
+
+	/* GPIOV0 controls another mux beyond this Chip select on SCM2 */
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <5000000>;
+		reg = <0>;
+	};
+
+	spidev@1 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <5000000>;
+		reg = <1>;
+	};
+};
+
+&lpc_ctrl {
+	status = "okay";
+};
+
+&kcs2 {
+	status = "okay";
+	kcs_addr = <0xca8>;
+};
+
+&kcs3 {
+	status = "okay";
+	kcs_addr = <0xca2>;
+};
+
+&mdio0 {
+	ethphy3: ethernet-phy@13 {
+		compatible = "ethernet-phy-ieee802.3-c22";
+		reg = <0x0d>;
+	};
+};
+
+&mac3 {
+	phy-handle = <&ethphy3>;
+
+	fixed-link {
+		speed = <1000>;
+		full-duplex;
+	};
+};
+
+&syscon {
+	mac3-clk-delay = <0x09 0x04 0x09 0x04 0x09 0x04>;
+};
+
+&i2c2 {
+	i2c-switch@75 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x75>;
+	};
+};
+
+&i2c5 {
+	i2c-switch@75 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x75>;
+	};
+};
+
+&i2c11 {
+	status = "okay";
+};
+
+&jtag1 {
+	/*
+	 * JTAG programming is done via bit-banging rather than through
+	 * the driver, so prevent the driver from controlling GPIOs.
+	 */
+	status = "okay";
+	pinctrl-0 = <>;
+};
