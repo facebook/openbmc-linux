@@ -1,23 +1,16 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0+
 // Copyright (c) 2020 Facebook Inc.
 
 /dts-v1/;
 
-#include "aspeed-g6.dtsi"
-#include <dt-bindings/gpio/aspeed-gpio.h>
 #include <dt-bindings/leds/common.h>
+#include "ast2600-facebook-netbmc-common.dtsi"
 
 / {
 	model = "Facebook Cloudripper BMC";
 	compatible = "facebook,cloudripper-bmc", "aspeed,ast2600";
 
 	aliases {
-		serial0 = &uart1;
-
-		mmc0 = &emmc;
-		spi1 = &spi1;
-		spi2 = &spi_gpio;
-
 		/*
 		 * PCA9548 (1-0070) provides 8 channels connecting to
 		 * SMB (Switch Main Board).
@@ -84,40 +77,16 @@
 		i2c55 = &imux55;
 	};
 
-	chosen {
-		bootargs = "console=ttyS0,9600n8 root=/dev/ram rw vmalloc=640M";
-	};
-
-	memory@80000000 {
-		device_type = "memory";
-		reg = <0x80000000 0x80000000>;
-	};
-
 	spi_gpio: spi-gpio {
-		status = "okay";
-		compatible = "spi-gpio";
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		gpio-sck = <&gpio0 ASPEED_GPIO(X, 3) GPIO_ACTIVE_HIGH>;
-		gpio-mosi = <&gpio0 ASPEED_GPIO(X, 4) GPIO_ACTIVE_HIGH>;
-		gpio-miso = <&gpio0 ASPEED_GPIO(X, 5) GPIO_ACTIVE_HIGH>;
-
-		num-chipselects = <3>;
-		cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>, <&gpio0 ASPEED_GPIO(X, 1) GPIO_ACTIVE_HIGH>, <0>;
-
-		tpmdev@0 {
-			compatible = "tcg,tpm_tis-spi";
-			spi-max-frequency = <33000000>;
-			reg = <0>;
-		};
+		num-chipselects = <2>;
+		cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>,
+			   <&gpio0 ASPEED_GPIO(X, 1) GPIO_ACTIVE_HIGH>;
 
 		eeprom@1 {
 			compatible = "atmel,at93c46d";
+			spi-max-frequency = <250000>;
 			data-size = <16>;
 			spi-cs-high;
-			/* According HW SI, max freq should be no more than 250khz */
-			spi-max-frequency = <250000>;
 			reg = <1>;
 		};
 	};
@@ -136,9 +105,9 @@
 	status = "okay";
 
 	pinctrl-0 = <&pinctrl_adc0_default &pinctrl_adc1_default
-				 &pinctrl_adc2_default &pinctrl_adc3_default
-				 &pinctrl_adc4_default &pinctrl_adc5_default
-				 &pinctrl_adc6_default &pinctrl_adc7_default>;
+			&pinctrl_adc2_default &pinctrl_adc3_default
+			&pinctrl_adc4_default &pinctrl_adc5_default
+			&pinctrl_adc6_default &pinctrl_adc7_default>;
 };
 
 &adc1 {
@@ -146,16 +115,17 @@
 	status = "okay";
 
 	pinctrl-0 = <&pinctrl_adc8_default &pinctrl_adc9_default
-				 &pinctrl_adc10_default &pinctrl_adc11_default
-				 &pinctrl_adc12_default &pinctrl_adc13_default
-				 &pinctrl_adc14_default &pinctrl_adc15_default>;
+			&pinctrl_adc10_default &pinctrl_adc11_default
+			&pinctrl_adc12_default &pinctrl_adc13_default
+			&pinctrl_adc14_default &pinctrl_adc15_default>;
 };
 
 &spi1 {
 	status = "okay";
 
-	/* Given Cloudripper max flash size is 16MB, overwrite reg resource size to
-	 * save memory and avoid vmap allocation issue
+	/*
+	 * Customize reg resource size to 16MB (maximum flash size on the
+	 * bus) to avoid wasting vmalloc space.
 	 */
 	reg = < 0x1e630000 0xc4
 		0x30000000 0x1000000 >;
@@ -164,7 +134,6 @@
 		status = "okay";
 		m25p,fast-read;
 		label = "spi1.0";
-		/* SPI bus width 1 */
 		spi-rx-bus-width = <1>;
 		spi-max-frequency = <5000000>;
 
@@ -181,43 +150,8 @@
 	};
 };
 
-&uart1 {
-	status = "okay";
-};
-
-&uart2 {
-	status = "okay";
-};
-
-&uart5 {
-	status = "okay";
-};
-
-&wdt1 {
-	status = "okay";
-};
-
-&vhub {
-	status = "okay";
-};
-
 &ehci1 {
 	status = "okay";
-};
-
-&emmc_controller {
-	status = "okay";
-};
-
-&emmc {
-	status = "okay";
-
-	non-removable;
-	max-frequency = <25000000>;
-	/* AST2600 A0 only support PIO mode */
-	// sdhci-caps-mask = <0x0 0x580000>;
-	bus-width = <4>;
-	clock-phase = <0x10>;
 };
 
 &mdio1 {
@@ -234,59 +168,20 @@
 };
 
 &mac3 {
-	status = "okay";
-
-	phy-mode = "rgmii";
 	phy-handle = <&ethphy1>;
-
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rgmii4_default>;
-};
-
-&rtc {
-	status = "okay";
-};
-
-&fmc {
-	status = "okay";
-	flash@0 {
-		status = "okay";
-		m25p,fast-read;
-		label = "spi0.0";
-		spi-max-frequency = <50000000>;
-
-#include "facebook-bmc-flash-layout-128.dtsi"
-	};
-
-	flash@1 {
-		status = "okay";
-		m25p,fast-read;
-		label = "spi0.1";
-		spi-max-frequency = <50000000>;
-
-		partitions {
-			compatible = "fixed-partitions";
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			flash1@0 {
-				reg = <0x0 0x8000000>;
-				label = "flash1";
-			};
-		};
-	};
 };
 
 &i2c0 {
-	status = "okay";
 	multi-master;
 	bus-frequency = <1000000>;
 	aspeed,hw-timeout-ms = <1000>;
 };
 
 &i2c1 {
-	status = "okay";
-
+	/*
+	 * PCA9548 (1-0070) provides 8 channels connecting to SMB (Switch
+	 * Main Board).
+	 */
 	i2c-switch@70 {
 		compatible = "nxp,pca9548";
 		#address-cells = <1>;
@@ -345,8 +240,10 @@
 };
 
 &i2c2 {
-	status = "okay";
-
+	/*
+	 * PCA9548 (2-0070) provides 8 channels connecting to SCM (System
+	 * Controller Module).
+	 */
 	i2c-switch@70 {
 		compatible = "nxp,pca9548";
 		#address-cells = <1>;
@@ -405,8 +302,10 @@
 };
 
 &i2c3 {
-	status = "okay";
-
+	/*
+	 * PCA9548 (3-0070) provides 8 channels connecting to SMB (Switch
+	 * Main Board).
+	 */
 	i2c-switch@70 {
 		compatible = "nxp,pca9548";
 		#address-cells = <1>;
@@ -464,17 +363,7 @@
 	};
 };
 
-&i2c4 {
-	status = "okay";
-};
-
-&i2c5 {
-	status = "okay";
-};
-
 &i2c6 {
-	status = "okay";
-
 	lp5012@14 {
 		compatible = "ti,lp5012";
 		reg = <0x14>;
@@ -579,13 +468,11 @@
 	};
 };
 
-&i2c7 {
-	status = "okay";
-};
-
 &i2c8 {
-	status = "okay";
-
+	/*
+	 * PCA9548 (8-0070) provides 8 channels connecting to PDB (Power
+	 * Delivery Board).
+	 */
 	i2c-switch@70 {
 		compatible = "nxp,pca9548";
 		#address-cells = <1>;
@@ -644,25 +531,11 @@
 	};
 };
 
-&i2c9 {
-	status = "okay";
-};
-
-&i2c10 {
-	status = "okay";
-};
-
-&i2c12 {
-	status = "okay";
-};
-
-&i2c13 {
-	status = "okay";
-};
-
 &i2c15 {
-	status = "okay";
-
+	/*
+	 * PCA9548 (15-0076) provides 8 channels connecting to FCM (Fan
+	 * Controller Module).
+	 */
 	i2c-switch@76 {
 		compatible = "nxp,pca9548";
 		#address-cells = <1>;
