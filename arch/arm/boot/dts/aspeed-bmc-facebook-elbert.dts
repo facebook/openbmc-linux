@@ -8,7 +8,11 @@
 
 / {
 	model = "Facebook Elbert BMC";
+#ifdef CONFIG_ELBERTVBOOT
+	compatible = "facebook,elbertvboot-bmc", "aspeed,ast2600";
+#else
 	compatible = "facebook,elbert-bmc", "aspeed,ast2600";
+#endif
 
 	aliases {
 		serial0 = &uart5;
@@ -107,6 +111,16 @@
 
 &wdt1 {
 	status = "okay";
+#ifdef CONFIG_ELBERTVBOOT
+	/* Enable WDTRST for TPM reset */
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_wdtrst1_default>;
+	aspeed,reset-type = "soc";
+	aspeed,external-signal;
+	aspeed,ext-push-pull;
+	aspeed,ext-active-high;
+	aspeed,ext-pulse-duration = <256>;
+#endif
 };
 
 &mdio0 {
@@ -245,6 +259,30 @@
                           0x09 0x04>;
 };
 
+#ifdef CONFIG_ELBERTVBOOT
+/* Use verified boot partition table */
+&fmc {
+    status = "okay";
+    flash@0 {
+        reg = < 1 >;
+        status = "okay";
+        m25p,fast-read;
+        label = "spi0.1";
+        spi-max-frequency = <50000000>;
+#include "facebook-bmc-vboot2-flash1-32MB-layout.dtsi"
+    };
+    flash@1 {
+        reg = < 0 >;
+        status = "okay";
+        m25p,fast-read;
+        label = "spi0.0";
+        spi-max-frequency = <50000000>;
+#include "facebook-bmc-vboot2-flash0-32MB-layout.dtsi"
+    };
+};
+
+#else
+
 &fmc {
 	status = "okay";
 	flash@0 {
@@ -252,7 +290,6 @@
 		m25p,fast-read;
 		label = "bmc";
 		spi-max-frequency = <50000000>;
-
 		partitions {
 			compatible = "fixed-partitions";
 			#address-cells = <1>;
@@ -307,6 +344,7 @@
 		};
 	};
 };
+#endif
 
 &jtag1 {
 	/* JTAG programming is done via bit-banging rather than through
@@ -314,4 +352,3 @@
 	pinctrl-0 = <>;
 	status = "okay";
 };
-
