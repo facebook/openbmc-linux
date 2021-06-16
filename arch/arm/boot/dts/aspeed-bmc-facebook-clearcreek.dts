@@ -311,39 +311,6 @@
 		reg = <0x54>;
 	};
 
-	// Voltage regulators
-	VDD@0x31 {
-		compatible = "mps,mpq8645p";
-		reg = <0x31>;
-	};
-	VDD@0x30 {
-		compatible = "mps,mpq8645p";
-		reg = <0x30>;
-	};
-	VDD@0x32 {
-		compatible = "mps,mpq8645p";
-		reg = <0x32>;
-	};
-	VDD@0x33 {
-		compatible = "mps,mpq8645p";
-		reg = <0x33>;
-	};
-	AVD@0x34 {
-		compatible = "mps,mpq8645p";
-		reg = <0x34>;
-	};
-	AVD@0x35 {
-		compatible = "mps,mpq8645p";
-		reg = <0x35>;
-	};
-	AVD@0x36 {
-		compatible = "mps,mpq8645p";
-		reg = <0x36>;
-	};
-	VDD@0x3B {
-		compatible = "mps,mpq8645p";
-		reg = <0x3B>;
-	};
 	mp5920@0x44 {
 		compatible = "mps,mp5920";
 		reg = <0x44>;
