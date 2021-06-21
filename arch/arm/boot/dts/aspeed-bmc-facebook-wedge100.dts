@@ -10,46 +10,12 @@
 	compatible = "facebook,wedge100-bmc", "aspeed,ast2400";
 
 	aliases {
-		/*
-		 * NOTE: spi1 and spi2 shares exactly the same (4) pins,
-		 * so technically they are the same bus. But we have to
-		 * create 2 logical buses due to hardware limitations:
-		 *  - backup bios flash:
-		 *    registered under spi1 and controlled by aspeed spi
-		 *    controller.
-		 *  - internal switch eeprom:
-		 *    registered under spi2 and controlled by spi-gpio.
-		 *    The eeprom is not compatible with aspeed spi master
-		 *    due to clock/speed mismatch.
-		 */
 		spi1 = &spi;
-		spi2 = &spi_gpio;
 	};
 
 	chosen {
 		stdout-path = &uart3;
 		bootargs = "console=ttyS2,9600n8 root=/dev/ram rw";
-	};
-
-	spi_gpio: spi-gpio {
-		status = "okay";
-		compatible = "spi-gpio";
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		cs-gpios = <&gpio ASPEED_GPIO(I, 4) GPIO_ACTIVE_HIGH>;
-		sck-gpios = <&gpio ASPEED_GPIO(I, 5) GPIO_ACTIVE_HIGH>;
-		mosi-gpios = <&gpio ASPEED_GPIO(I, 6) GPIO_ACTIVE_HIGH>;
-		miso-gpios = <&gpio ASPEED_GPIO(I, 7) GPIO_ACTIVE_HIGH>;
-		num-chipselects = <1>;
-
-		eeprom@0 {
-			compatible = "atmel,at93c46d";
-			reg = <0>;
-			spi-max-frequency = <1000000>;
-			data-size = <16>;
-			spi-cs-high;
-		};
 	};
 
 	ast-adc-hwmon {
