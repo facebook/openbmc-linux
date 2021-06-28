@@ -104,6 +104,7 @@
 	ncsi-package = <1>;
 	ncsi-channel = <1>;
 	ncsi-rexmit = <1>;
+	ncsi-timeout = <2>;
 };
 
 &rtc {
