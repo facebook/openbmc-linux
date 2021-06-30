@@ -1155,8 +1155,10 @@ static void dev_deactivate_queue(struct net_device *dev,
 		qdisc_reset(qdisc);
 
 		spin_unlock_bh(qdisc_lock(qdisc));
-		if (nolock)
+		if (nolock) {
+			clear_bit(__QDISC_STATE_MISSED, &qdisc->state);
 			spin_unlock_bh(&qdisc->seqlock);
+		}
 	}
 }
 
