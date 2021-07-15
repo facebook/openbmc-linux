@@ -47,6 +47,7 @@ struct aspeed_smc_info {
 	u32 hdiv_max;           /* Max HCLK divisor on read timing reg */
 
 	void (*set_4b)(struct aspeed_smc_chip *chip);
+	void (*set_3b)(struct aspeed_smc_chip *chip);
 	int (*optimize_read)(struct aspeed_smc_chip *chip, u32 max_freq);
 	int (*calibrate)(struct aspeed_smc_chip *chip, u32 hdiv,
 			 const u8 *golden_buf, u8 *test_buf);
@@ -137,6 +138,8 @@ static const struct aspeed_smc_info spi_2500_info = {
 	.segment_reg = aspeed_smc_segment_reg,
 };
 
+static void aspeed_smc_chip_set_3b_spi_2600(
+	struct aspeed_smc_chip *chip);
 static u32 aspeed_smc_segment_start_ast2600(
 	struct aspeed_smc_controller *controller, u32 reg);
 static u32 aspeed_smc_segment_end_ast2600(
@@ -156,6 +159,7 @@ static const struct aspeed_smc_info fmc_2600_info = {
 	.timing = 0x94,
 	.hclk_mask = 0xf0fff0ff,
 	.hdiv_max = 2,
+	.set_3b = aspeed_smc_chip_set_3b_spi_2600,
 	.set_4b = aspeed_smc_chip_set_4b,
 	.optimize_read = aspeed_smc_optimize_read,
 	.calibrate = aspeed_smc_calibrate_reads_ast2600,
@@ -173,6 +177,7 @@ static const struct aspeed_smc_info spi_2600_info = {
 	.timing = 0x94,
 	.hclk_mask = 0xf0fff0ff,
 	.hdiv_max = 2,
+	.set_3b = aspeed_smc_chip_set_3b_spi_2600,
 	.set_4b = aspeed_smc_chip_set_4b,
 	.optimize_read = aspeed_smc_optimize_read,
 	.calibrate = aspeed_smc_calibrate_reads_ast2600,
@@ -845,6 +850,21 @@ static void aspeed_smc_chip_set_type(struct aspeed_smc_chip *chip, int type)
 }
 
 /*
+ * The first chip of the AST2600 FMC flash controller is strapped by
+ * hardware, or autodetected, but other chips need to be set. Enforce
+ * the 3B setting for all chips.
+ */
+static void aspeed_smc_chip_set_3b_spi_2600(struct aspeed_smc_chip *chip)
+{
+	struct aspeed_smc_controller *controller = chip->controller;
+	u32 reg;
+
+	reg = readl(controller->regs + CE_CONTROL_REG);
+	reg &= ~(0x01 << chip->cs);
+	writel(reg, controller->regs + CE_CONTROL_REG);
+}
+
+/*
  * The first chip of the AST2500 FMC flash controller is strapped by
  * hardware, or autodetected, but other chips need to be set. Enforce
  * the 4B setting for all chips.
@@ -1186,6 +1206,8 @@ static int aspeed_smc_chip_setup_finish(struct aspeed_smc_chip *chip)
 
 	if (chip->nor.addr_width == 4 && info->set_4b)
 		info->set_4b(chip);
+	else
+		info->set_3b(chip);
 
 	/* This is for direct AHB access when using Command Mode. */
 	chip->ahb_window_size = aspeed_smc_chip_set_segment(chip);
