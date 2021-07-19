@@ -139,6 +139,7 @@ static const struct aspeed_smc_info spi_2500_info = {
 	.set_4b = aspeed_smc_chip_set_4b,
 	.optimize_read = aspeed_smc_optimize_read,
 	.calibrate = aspeed_smc_calibrate_reads,
+	.chip_base = aspeed_smc_chip_base,
 	.segment_start = aspeed_smc_segment_start,
 	.segment_end = aspeed_smc_segment_end,
 	.segment_reg = aspeed_smc_segment_reg,
