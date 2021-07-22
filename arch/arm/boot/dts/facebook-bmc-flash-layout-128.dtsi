@@ -7,10 +7,10 @@ partitions {
 	#size-cells = <1>;
 
 	/*
-	 * u-boot partition: 892KB.
+	 * u-boot partition: 896KB.
 	 */
 	u-boot@0 {
-		reg = <0x0 0xdf000>;
+		reg = <0x0 0xe0000>;
 		label = "u-boot";
 	};
 
@@ -23,7 +23,8 @@ partitions {
 	};
 
 	/*
-	 * u-boot environment variables: 64KB.
+	 * image metadata partition (64KB), used by Facebook internal
+	 * tools.
 	 */
 	image-meta@f0000 {
 		reg = <0xf0000 0x10000>;
