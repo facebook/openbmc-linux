@@ -940,6 +940,7 @@ static int aspeed_pwm_create_fan(struct device *dev,
 	u32 fan_min_rpm = 0;	
 	u32 pwm_channel;
 	u32 target_pwm_freq = 0;
+	u32 duty_pt;
 	int ret, count;
 
 	ret = of_property_read_u32(child, "reg", &pwm_channel);
@@ -949,6 +950,11 @@ static int aspeed_pwm_create_fan(struct device *dev,
 	ret = of_property_read_u32(child, "aspeed,target_pwm", &target_pwm_freq);
 	if (ret)
 		target_pwm_freq = DEFAULT_TARGET_PWM_FREQ;
+
+	ret = of_property_read_u32(child, "aspeed,default-duty-point",
+                                   &duty_pt);
+	if (!ret)
+		priv->pwm_channel[pwm_channel].falling = duty_pt;
 
 	aspeed_create_pwm_channel(priv, (u8)pwm_channel);
 
