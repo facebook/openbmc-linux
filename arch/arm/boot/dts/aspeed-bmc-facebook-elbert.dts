@@ -82,16 +82,7 @@
 	aspeed,lpc-io-reg = <0xca2>;
 };
 
-&mdio0 {
-	ethphy3: ethernet-phy@13 {
-		compatible = "ethernet-phy-ieee802.3-c22";
-		reg = <0x0d>;
-	};
-};
-
 &mac3 {
-	phy-handle = <&ethphy3>;
-
 	fixed-link {
 		speed = <1000>;
 		full-duplex;
