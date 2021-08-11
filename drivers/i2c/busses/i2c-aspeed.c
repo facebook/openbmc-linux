@@ -892,6 +892,11 @@ static u32 aspeed_i2c_get_clk_reg_val(struct device *dev,
 			clk_low--;
 	}
 
+        if (!device_property_read_u32(dev, "tck-high", &tmp))
+                clk_high = tmp;
+
+        if (!device_property_read_u32(dev, "tck-low", &tmp))
+                clk_low = tmp;
 
 	return ((clk_high << ASPEED_I2CD_TIME_SCL_HIGH_SHIFT)
 		& ASPEED_I2CD_TIME_SCL_HIGH_MASK)
