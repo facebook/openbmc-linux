@@ -171,6 +171,10 @@
 	phy-handle = <&ethphy1>;
 };
 
+&syscon {
+	mac3-clk-delay = <0x08 0x04 0x08 0x04 0x08 0x04>;
+};
+
 &i2c0 {
 	multi-master;
 	bus-frequency = <1000000>;
