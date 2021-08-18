@@ -1312,3 +1312,10 @@
 		&pinctrl_adc12_default &pinctrl_adc13_default
 		&pinctrl_adc14_default &pinctrl_adc15_default>;
 };
+
+&emmc {
+	clk-phase-legacy = <180 180>;
+	clk-phase-mmc-hs = <180 180>;
+	clk-phase-mmc-hs200 = <180 180>;
+	clk-phase-mmc-hs400 = <180 180>;
+};
