@@ -600,3 +600,11 @@
 &jtag1 {
 	status = "okay";
 };
+
+&emmc {
+       clk-phase-legacy = <180 180>;
+       clk-phase-mmc-hs = <180 180>;
+       clk-phase-mmc-hs200 = <180 180>;
+       clk-phase-mmc-hs400 = <180 180>;
+};
+
