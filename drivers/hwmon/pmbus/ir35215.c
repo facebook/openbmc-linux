@@ -155,6 +155,12 @@ static struct pmbus_driver_info ir35215_info = {
 
 static int ir35215_probe(struct i2c_client *client)
 {
+	/*
+	 * IR35215 devices may not stay in page 0 during device
+	 * probe which leads to probe failure (read status word failed).
+	 * So let's set the device to page 0 at the beginning.
+	 */
+	i2c_smbus_write_byte_data(client, PMBUS_PAGE, 0);
 	return pmbus_do_probe(client, &ir35215_info);
 }
 
