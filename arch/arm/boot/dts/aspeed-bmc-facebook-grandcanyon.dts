@@ -177,6 +177,8 @@
 	multi-master;
 	bus-frequency = <1000000>;
 	aspeed,hw-timeout-ms = <1000>;
+	tck-high = <10>;
+	tck-low = <14>;
 };
 
 // To FPGA of Barton Springs
