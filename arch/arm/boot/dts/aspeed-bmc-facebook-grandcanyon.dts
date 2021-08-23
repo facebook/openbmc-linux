@@ -434,11 +434,15 @@
 
 // To IOC
 &i2c11 {
+	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
 // [T5]: To E1.S SSD_1 [T7]: To IOCM
 &i2c12 {
+	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
 };
 
