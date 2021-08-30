@@ -419,6 +419,14 @@ config MFD_EXYNOS_LPASS
 	  Select this option to enable support for Samsung Exynos Low Power
 	  Audio Subsystem.
 
+config MFD_FACEBOOK_USMC
+	tristate "Facebook USB System Management Controller"
+	select MFD_CORE
+	depends on USB
+	help
+	  Select the option to enable support for the Facebook USB System
+	  Management Controller.
+
 config MFD_GATEWORKS_GSC
 	tristate "Gateworks System Controller"
 	depends on (I2C && OF)
