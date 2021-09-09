@@ -54,6 +54,7 @@ struct heart_beat {
    * When SDK is running, the heart beat value should keep increasing
    * every 100ms, or it should be keep the same.
    */
+  struct mutex update_lock; /* mutex protect HB updates */
   u_int64_t curr;
   u_int64_t last;
 };
@@ -117,6 +118,7 @@ static int net_asic_heartbeat_update(struct net_asic_data *data)
 {
   u_int32_t lsb, msb;
 
+  mutex_lock(&data->heartbeat.update_lock);
   if(time_after(jiffies, data->last_updated + HEARTBEAT_REFRESH_INTERVAL)) {
     if(net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_LSB_REG, &lsb))
       goto err_exit;
@@ -132,10 +134,11 @@ static int net_asic_heartbeat_update(struct net_asic_data *data)
     }
     data->heartbeat.last = data->heartbeat.curr;
   }
-
+  mutex_unlock(&data->heartbeat.update_lock);
   return 0;
 
 err_exit:
+  mutex_unlock(&data->heartbeat.update_lock);
   return -1;
 }
 
@@ -240,6 +243,7 @@ static int net_asic_probe(struct i2c_client *client,
   }
   data->client = client;
   mutex_init(&data->update_lock);
+  mutex_init(&data->heartbeat.update_lock);
 
   net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_LSB_REG, &lsb);
   net_asic_i2c_read(data, NET_ASIC_HEARTBEAT_MSB_REG, &msb);
