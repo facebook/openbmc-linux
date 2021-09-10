@@ -44,7 +44,7 @@ enum {
 	NCSI_CAP_AEN_LSC                 = 0x01, /* Link status change       */
 	NCSI_CAP_AEN_CR                  = 0x02, /* Configuration required   */
 	NCSI_CAP_AEN_HDS                 = 0x04, /* HNC driver status        */
-	NCSI_CAP_AEN_MASK                = 0xFFFF0007,
+	NCSI_CAP_AEN_MASK                = 0x07,
 	NCSI_CAP_VLAN_ONLY               = 0x01, /* Filter VLAN packet only  */
 	NCSI_CAP_VLAN_NO                 = 0x02, /* Filter VLAN and non-VLAN */
 	NCSI_CAP_VLAN_ANY                = 0x04, /* Filter Any-and-non-VLAN  */
@@ -78,33 +78,33 @@ enum {
 /* OEM Vendor Manufacture ID */
 #define NCSI_OEM_MFR_MLX_ID             0x8119
 #define NCSI_OEM_MFR_BCM_ID             0x113d
+#define NCSI_OEM_MFR_INTEL_ID           0x157
+/* Intel specific OEM command */
+#define NCSI_OEM_INTEL_CMD_KEEP_PHY     0x20   /* CMD ID for Keep PHY up */
 /* Broadcom specific OEM Command */
 #define NCSI_OEM_BCM_CMD_GMA            0x01   /* CMD ID for Get MAC */
-#define NCSI_OEM_BCM_CMD_GMAC16         0x16   /* CMD ID for Get MAC_C16 */
-#define NCSI_OEM_BCM_OEM_PAYLOAD_LEN    0x4    /* Get MAC_C16 payload length */
 /* Mellanox specific OEM Command */
 #define NCSI_OEM_MLX_CMD_GMA            0x00   /* CMD ID for Get MAC */
 #define NCSI_OEM_MLX_CMD_GMA_PARAM      0x1b   /* Parameter for GMA  */
 #define NCSI_OEM_MLX_CMD_SMAF           0x01   /* CMD ID for Set MC Affinity */
 #define NCSI_OEM_MLX_CMD_SMAF_PARAM     0x07   /* Parameter for SMAF         */
 /* OEM Command payload lengths*/
+#define NCSI_OEM_INTEL_CMD_KEEP_PHY_LEN 7
 #define NCSI_OEM_BCM_CMD_GMA_LEN        12
-#define NCSI_OEM_BCM_CMD_GMAC16_LEN     16
 #define NCSI_OEM_MLX_CMD_GMA_LEN        8
-#define NCSI_OEM_MLX_CMD_SMAF_LEN       60
+#define NCSI_OEM_MLX_CMD_SMAF_LEN        60
 /* Offset in OEM request */
 #define MLX_SMAF_MAC_ADDR_OFFSET         8     /* Offset for MAC in SMAF    */
 #define MLX_SMAF_MED_SUPPORT_OFFSET      14    /* Offset for medium in SMAF */
 /* Mac address offset in OEM response */
 #define BCM_MAC_ADDR_OFFSET             28
-#define BCM_MACC16_ADDR_OFFSET          8
 #define MLX_MAC_ADDR_OFFSET             8
 
 
 struct ncsi_channel_version {
 	u32 version;		/* Supported BCD encoded NCSI version */
 	u32 alpha2;		/* Supported BCD encoded NCSI version */
-	u8  fw_name[12];	/* Firware name string                */
+	u8  fw_name[12];	/* Firmware name string                */
 	u32 fw_version;		/* Firmware version                   */
 	u16 pci_ids[4];		/* PCI identification                 */
 	u32 mf_id;		/* Manufacture ID                     */
@@ -242,7 +242,7 @@ struct ncsi_package {
 	struct ncsi_dev_priv *ndp;        /* NCSI device            */
 	spinlock_t           lock;        /* Protect the package    */
 	unsigned int         channel_num; /* Number of channels     */
-	struct list_head     channels;    /* List of chanels        */
+	struct list_head     channels;    /* List of channels        */
 	struct list_head     node;        /* Form list of packages  */
 
 	bool                 multi_channel; /* Enable multiple channels  */
@@ -275,6 +275,7 @@ enum {
 	ncsi_dev_state_probe_mlx_gma,
 	ncsi_dev_state_probe_mlx_smaf,
 	ncsi_dev_state_probe_cis,
+	ncsi_dev_state_probe_keep_phy,
 	ncsi_dev_state_probe_gvi,
 	ncsi_dev_state_probe_gc,
 	ncsi_dev_state_probe_gls,
@@ -343,7 +344,7 @@ struct ncsi_cmd_arg {
 	unsigned char        type;        /* Command in the NCSI packet    */
 	unsigned char        id;          /* Request ID (sequence number)  */
 	unsigned char        package;     /* Destination package ID        */
-	unsigned char        channel;     /* Detination channel ID or 0x1f */
+	unsigned char        channel;     /* Destination channel ID or 0x1f */
 	unsigned short       payload;     /* Command packet payload length */
 	unsigned int         req_flags;   /* NCSI request properties       */
 	union {

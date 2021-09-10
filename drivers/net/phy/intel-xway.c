@@ -11,6 +11,18 @@
 
 #define XWAY_MDIO_IMASK			0x19	/* interrupt mask */
 #define XWAY_MDIO_ISTAT			0x1A	/* interrupt status */
+#define XWAY_MDIO_LED			0x1B	/* led control */
+
+/* bit 15:12 are reserved */
+#define XWAY_MDIO_LED_LED3_EN		BIT(11)	/* Enable the integrated function of LED3 */
+#define XWAY_MDIO_LED_LED2_EN		BIT(10)	/* Enable the integrated function of LED2 */
+#define XWAY_MDIO_LED_LED1_EN		BIT(9)	/* Enable the integrated function of LED1 */
+#define XWAY_MDIO_LED_LED0_EN		BIT(8)	/* Enable the integrated function of LED0 */
+/* bit 7:4 are reserved */
+#define XWAY_MDIO_LED_LED3_DA		BIT(3)	/* Direct Access to LED3 */
+#define XWAY_MDIO_LED_LED2_DA		BIT(2)	/* Direct Access to LED2 */
+#define XWAY_MDIO_LED_LED1_DA		BIT(1)	/* Direct Access to LED1 */
+#define XWAY_MDIO_LED_LED0_DA		BIT(0)	/* Direct Access to LED0 */
 
 #define XWAY_MDIO_INIT_WOL		BIT(15)	/* Wake-On-LAN */
 #define XWAY_MDIO_INIT_MSRE		BIT(14)
@@ -159,6 +171,15 @@ static int xway_gphy_config_init(struct phy_device *phydev)
 	/* Clear all pending interrupts */
 	phy_read(phydev, XWAY_MDIO_ISTAT);
 
+	/* Ensure that integrated led function is enabled for all leds */
+	err = phy_write(phydev, XWAY_MDIO_LED,
+			XWAY_MDIO_LED_LED0_EN |
+			XWAY_MDIO_LED_LED1_EN |
+			XWAY_MDIO_LED_LED2_EN |
+			XWAY_MDIO_LED_LED3_EN);
+	if (err)
+		return err;
+
 	phy_write_mmd(phydev, MDIO_MMD_VEND2, XWAY_MMD_LEDCH,
 		      XWAY_MMD_LEDCH_NACS_NONE |
 		      XWAY_MMD_LEDCH_SBF_F02HZ |
@@ -209,22 +230,45 @@ static int xway_gphy_ack_interrupt(struct phy_device *phydev)
 	return (reg < 0) ? reg : 0;
 }
 
-static int xway_gphy_did_interrupt(struct phy_device *phydev)
-{
-	int reg;
-
-	reg = phy_read(phydev, XWAY_MDIO_ISTAT);
-	return reg & XWAY_MDIO_INIT_MASK;
-}
-
 static int xway_gphy_config_intr(struct phy_device *phydev)
 {
 	u16 mask = 0;
+	int err;
 
-	if (phydev->interrupts == PHY_INTERRUPT_ENABLED)
+	if (phydev->interrupts == PHY_INTERRUPT_ENABLED) {
+		err = xway_gphy_ack_interrupt(phydev);
+		if (err)
+			return err;
+
 		mask = XWAY_MDIO_INIT_MASK;
+		err = phy_write(phydev, XWAY_MDIO_IMASK, mask);
+	} else {
+		err = phy_write(phydev, XWAY_MDIO_IMASK, mask);
+		if (err)
+			return err;
 
-	return phy_write(phydev, XWAY_MDIO_IMASK, mask);
+		err = xway_gphy_ack_interrupt(phydev);
+	}
+
+	return err;
+}
+
+static irqreturn_t xway_gphy_handle_interrupt(struct phy_device *phydev)
+{
+	int irq_status;
+
+	irq_status = phy_read(phydev, XWAY_MDIO_ISTAT);
+	if (irq_status < 0) {
+		phy_error(phydev);
+		return IRQ_NONE;
+	}
+
+	if (!(irq_status & XWAY_MDIO_INIT_MASK))
+		return IRQ_NONE;
+
+	phy_trigger_machine(phydev);
+
+	return IRQ_HANDLED;
 }
 
 static struct phy_driver xway_gphy[] = {
@@ -235,8 +279,7 @@ static struct phy_driver xway_gphy[] = {
 		/* PHY_GBIT_FEATURES */
 		.config_init	= xway_gphy_config_init,
 		.config_aneg	= xway_gphy14_config_aneg,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
@@ -247,8 +290,7 @@ static struct phy_driver xway_gphy[] = {
 		/* PHY_BASIC_FEATURES */
 		.config_init	= xway_gphy_config_init,
 		.config_aneg	= xway_gphy14_config_aneg,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
@@ -259,8 +301,7 @@ static struct phy_driver xway_gphy[] = {
 		/* PHY_GBIT_FEATURES */
 		.config_init	= xway_gphy_config_init,
 		.config_aneg	= xway_gphy14_config_aneg,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
@@ -271,8 +312,7 @@ static struct phy_driver xway_gphy[] = {
 		/* PHY_BASIC_FEATURES */
 		.config_init	= xway_gphy_config_init,
 		.config_aneg	= xway_gphy14_config_aneg,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
@@ -282,8 +322,7 @@ static struct phy_driver xway_gphy[] = {
 		.name		= "Intel XWAY PHY11G (PEF 7071/PEF 7072) v1.5 / v1.6",
 		/* PHY_GBIT_FEATURES */
 		.config_init	= xway_gphy_config_init,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
@@ -293,8 +332,7 @@ static struct phy_driver xway_gphy[] = {
 		.name		= "Intel XWAY PHY22F (PEF 7061) v1.5 / v1.6",
 		/* PHY_BASIC_FEATURES */
 		.config_init	= xway_gphy_config_init,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
@@ -304,8 +342,7 @@ static struct phy_driver xway_gphy[] = {
 		.name		= "Intel XWAY PHY11G (xRX v1.1 integrated)",
 		/* PHY_GBIT_FEATURES */
 		.config_init	= xway_gphy_config_init,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
@@ -315,8 +352,7 @@ static struct phy_driver xway_gphy[] = {
 		.name		= "Intel XWAY PHY22F (xRX v1.1 integrated)",
 		/* PHY_BASIC_FEATURES */
 		.config_init	= xway_gphy_config_init,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
@@ -326,8 +362,7 @@ static struct phy_driver xway_gphy[] = {
 		.name		= "Intel XWAY PHY11G (xRX v1.2 integrated)",
 		/* PHY_GBIT_FEATURES */
 		.config_init	= xway_gphy_config_init,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
@@ -337,8 +372,7 @@ static struct phy_driver xway_gphy[] = {
 		.name		= "Intel XWAY PHY22F (xRX v1.2 integrated)",
 		/* PHY_BASIC_FEATURES */
 		.config_init	= xway_gphy_config_init,
-		.ack_interrupt	= xway_gphy_ack_interrupt,
-		.did_interrupt	= xway_gphy_did_interrupt,
+		.handle_interrupt = xway_gphy_handle_interrupt,
 		.config_intr	= xway_gphy_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,

@@ -226,9 +226,6 @@
 		i2c141 = &imux141;
 		i2c142 = &imux142;
 		i2c143 = &imux143;
-
-		spi1 = &spi1;
-		spi2 = &spi2;
 	};
 
 	chosen {
@@ -268,19 +265,19 @@
 		};
 
 		/*
-		 * FIT image: 55.5 MB.
+		 * FIT image: 59.5 MB.
 		 */
 		fit@80000 {
-			reg = <0x80000 0x3780000>;
+			reg = <0x80000 0x3b80000>;
 			label = "fit";
 		};
 
 		/*
-		 * "data0" partition (8MB) is reserved for persistent
+		 * "data0" partition (4MB) is reserved for persistent
 		 * data store.
 		 */
 		data0@3800000 {
-			reg = <0x3800000 0x800000>;
+			reg = <0x3c00000 0x400000>;
 			label = "data0";
 		};
 
@@ -304,44 +301,6 @@
 		flash1@0 {
 			reg = <0x0 0x4000000>;
 		};
-	};
-};
-
-&spi1 {
-	status = "okay";
-	compatible = "aspeed,ast2500-spi-master";
-
-	spidev@0 {
-		compatible = "rohm,dh2228fv";
-		spi-max-frequency = <24750000>;
-		reg = <0>;
-	};
-};
-
-&spi2 {
-	status = "okay";
-	compatible = "aspeed,ast2500-spi-master";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi2ck_default
-		     &pinctrl_spi2cs0_default
-		     &pinctrl_spi2cs1_default
-		     &pinctrl_spi2miso_default
-		     &pinctrl_spi2mosi_default>;
-
-	spidev@0 {
-		compatible = "rohm,dh2228fv";
-		spi-max-frequency = <24750000>;
-		reg = <0>;
-	};
-
-	eeprom@1 {
-		compatible = "atmel,at25";
-		spi-max-frequency = <5000000>;
-		reg = <1>;
-
-		at25,addr-mode = <4>;
-		at25,page-size = <256>;
-		at25,byte-len = <0x40000>;
 	};
 };
 
@@ -372,7 +331,6 @@
 	status = "okay";
 	bus-frequency = <400000>;
 	multi-master;
-	aspeed,hw-timeout-ms = <1000>;
 };
 
 &i2c1 {

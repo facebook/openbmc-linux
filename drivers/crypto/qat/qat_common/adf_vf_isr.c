@@ -156,6 +156,7 @@ static irqreturn_t adf_isr(int irq, void *privdata)
 {
 	struct adf_accel_dev *accel_dev = privdata;
 	struct adf_hw_device_data *hw_data = accel_dev->hw_device;
+	struct adf_hw_csr_ops *csr_ops = &hw_data->csr_ops;
 	struct adf_bar *pmisc =
 			&GET_BARS(accel_dev)[hw_data->get_misc_bar_id(hw_data)];
 	void __iomem *pmisc_bar_addr = pmisc->virt_addr;
@@ -180,8 +181,8 @@ static irqreturn_t adf_isr(int irq, void *privdata)
 		struct adf_etr_bank_data *bank = &etr_data->banks[0];
 
 		/* Disable Flag and Coalesce Ring Interrupts */
-		WRITE_CSR_INT_FLAG_AND_COL(bank->csr_addr, bank->bank_number,
-					   0);
+		csr_ops->write_csr_int_flag_and_col(bank->csr_addr,
+						    bank->bank_number, 0);
 		tasklet_hi_schedule(&bank->resp_handler);
 		return IRQ_HANDLED;
 	}
@@ -260,17 +261,26 @@ int adf_vf_isr_resource_alloc(struct adf_accel_dev *accel_dev)
 		goto err_out;
 
 	if (adf_setup_pf2vf_bh(accel_dev))
-		goto err_out;
+		goto err_disable_msi;
 
 	if (adf_setup_bh(accel_dev))
-		goto err_out;
+		goto err_cleanup_pf2vf_bh;
 
 	if (adf_request_msi_irq(accel_dev))
-		goto err_out;
+		goto err_cleanup_bh;
 
 	return 0;
+
+err_cleanup_bh:
+	adf_cleanup_bh(accel_dev);
+
+err_cleanup_pf2vf_bh:
+	adf_cleanup_pf2vf_bh(accel_dev);
+
+err_disable_msi:
+	adf_disable_msi(accel_dev);
+
 err_out:
-	adf_vf_isr_resource_free(accel_dev);
 	return -EFAULT;
 }
 EXPORT_SYMBOL_GPL(adf_vf_isr_resource_alloc);

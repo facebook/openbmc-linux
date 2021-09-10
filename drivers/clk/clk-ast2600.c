@@ -42,14 +42,7 @@
 #define ASPEED_G6_STRAP1		0x500
 
 #define ASPEED_MAC12_CLK_DLY		0x340
-#define ASPEED_MAC12_CLK_DLY_100M	0x348
-#define ASPEED_MAC12_CLK_DLY_10M	0x34C
 #define ASPEED_MAC34_CLK_DLY		0x350
-#define ASPEED_MAC34_CLK_DLY_100M	0x358
-#define ASPEED_MAC34_CLK_DLY_10M	0x35C
-
-#define BYTE2(x) ((unsigned char)((x) >> 16))
-#define ASPEED_AST262X_A1		0x01
 
 /* Globally visible clocks */
 static DEFINE_SPINLOCK(aspeed_g6_clk_lock);
@@ -58,46 +51,6 @@ static DEFINE_SPINLOCK(aspeed_g6_clk_lock);
 static struct clk_hw_onecell_data *aspeed_g6_clk_data;
 
 static void __iomem *scu_g6_base;
-
-struct mac_delay_config {
-	u32 tx_delay_1000;
-	u32 rx_delay_1000;
-	u32 tx_delay_100;
-	u32 rx_delay_100;
-	u32 tx_delay_10;
-	u32 rx_delay_10;
-};
-
-union mac_delay_1g {
-	u32 w;
-	struct {
-		unsigned int tx_delay_1		: 6;	/* bit[5:0] */
-		unsigned int tx_delay_2		: 6;	/* bit[11:6] */
-		unsigned int rx_delay_1		: 6;	/* bit[17:12] */
-		unsigned int rx_delay_2		: 6;	/* bit[23:18] */
-		unsigned int rx_clk_inv_1	: 1;	/* bit[24] */
-		unsigned int rx_clk_inv_2	: 1;	/* bit[25] */
-		unsigned int rmii_tx_data_at_falling_1 : 1; /* bit[26] */
-		unsigned int rmii_tx_data_at_falling_2 : 1; /* bit[27] */
-		unsigned int reserved	: 1;	/* bit[28] */
-		unsigned int rmii_50m_oe_1	: 1;	/* bit[29] */
-		unsigned int rmii_50m_oe_2	: 1;	/* bit[30] */
-		unsigned int rgmii_125m_o_sel	: 1;	/* bit[31] */
-	} b;
-};
-
-union mac_delay_100_10 {
-	u32 w;
-	struct {
-		unsigned int tx_delay_1		: 6;	/* bit[5:0] */
-		unsigned int tx_delay_2		: 6;	/* bit[11:6] */
-		unsigned int rx_delay_1		: 6;	/* bit[17:12] */
-		unsigned int rx_delay_2		: 6;	/* bit[23:18] */
-		unsigned int rx_clk_inv_1	: 1;	/* bit[24] */
-		unsigned int rx_clk_inv_2	: 1;	/* bit[25] */
-		unsigned int reserved_0		: 6;	/* bit[31:26] */
-	} b;
-};
 
 /*
  * Clocks marked with CLK_IS_CRITICAL:
@@ -108,11 +61,11 @@ union mac_delay_100_10 {
 static const struct aspeed_gate_data aspeed_g6_gates[] = {
 	/*				    clk rst  name		parent	 flags */
 	[ASPEED_CLK_GATE_MCLK]		= {  0, -1, "mclk-gate",	"mpll",	 CLK_IS_CRITICAL }, /* SDRAM */
-	[ASPEED_CLK_GATE_ECLK]		= {  1, -1, "eclk-gate",	"eclk",	 0 },	/* Video Engine */
+	[ASPEED_CLK_GATE_ECLK]		= {  1,  6, "eclk-gate",	"eclk",	 0 },	/* Video Engine */
 	[ASPEED_CLK_GATE_GCLK]		= {  2,  7, "gclk-gate",	NULL,	 0 },	/* 2D engine */
 	/* vclk parent - dclk/d1clk/hclk/mclk */
-	[ASPEED_CLK_GATE_VCLK]		= {  3,  6, "vclk-gate",	NULL,	 0 },	/* Video Capture */
-	[ASPEED_CLK_GATE_BCLK]		= {  4,  8, "bclk-gate",	"bclk",	 CLK_IS_CRITICAL }, /* PCIe/PCI */
+	[ASPEED_CLK_GATE_VCLK]		= {  3, -1, "vclk-gate",	NULL,	 0 },	/* Video Capture */
+	[ASPEED_CLK_GATE_BCLK]		= {  4,  8, "bclk-gate",	"bclk",	 0 }, /* PCIe/PCI */
 	/* From dpll */
 	[ASPEED_CLK_GATE_DCLK]		= {  5, -1, "dclk-gate",	NULL,	 CLK_IS_CRITICAL }, /* DAC */
 	[ASPEED_CLK_GATE_REF0CLK]	= {  6, -1, "ref0clk-gate",	"clkin", CLK_IS_CRITICAL },
@@ -188,30 +141,6 @@ static const struct clk_div_table ast2600_emmc_extclk_div_table[] = {
 	{ 0x5, 12 },
 	{ 0x6, 14 },
 	{ 0x7, 16 },
-	{ 0 }
-};
-
-static const struct clk_div_table ast2600_sd_div_a1_table[] = {
-	{ 0x0, 2 },
-	{ 0x1, 4 },
-	{ 0x2, 6 },
-	{ 0x3, 8 },
-	{ 0x4, 10 },
-	{ 0x5, 12 },
-	{ 0x6, 14 },
-	{ 0x7, 16 },
-	{ 0 }
-};
-
-static const struct clk_div_table ast2600_sd_div_a2_table[] = {
-	{ 0x0, 2 },
-	{ 0x1, 4 },
-	{ 0x2, 6 },
-	{ 0x3, 8 },
-	{ 0x4, 10 },
-	{ 0x5, 12 },
-	{ 0x6, 14 },
-	{ 0x7, 1 },
 	{ 0 }
 };
 
@@ -564,83 +493,48 @@ static int aspeed_g6_clk_probe(struct platform_device *pdev)
 		return PTR_ERR(hw);
 	aspeed_g6_clk_data->hws[ASPEED_CLK_UARTX] = hw;
 
-	regmap_read(map, 0x04, &val);
-	if ((val & GENMASK(23, 16)) >> 16) {
-		//A1 use mpll for fit 200Mhz
-		regmap_update_bits(map, ASPEED_G6_CLK_SELECTION1, GENMASK(14, 11), BIT(11));
+	/* EMMC ext clock */
+	hw = clk_hw_register_fixed_factor(dev, "emmc_extclk_hpll_in", "hpll",
+					  0, 1, 2);
+	if (IS_ERR(hw))
+		return PTR_ERR(hw);
 
-		/* EMMC ext clock divider */
-		hw = clk_hw_register_gate(dev, "emmc_extclk_gate", "mpll", 0,
-						scu_g6_base + ASPEED_G6_CLK_SELECTION1, 15, 0,
-						&aspeed_g6_clk_lock);
-		if (IS_ERR(hw))
-			return PTR_ERR(hw);
+	hw = clk_hw_register_mux(dev, "emmc_extclk_mux",
+				 emmc_extclk_parent_names,
+				 ARRAY_SIZE(emmc_extclk_parent_names), 0,
+				 scu_g6_base + ASPEED_G6_CLK_SELECTION1, 11, 1,
+				 0, &aspeed_g6_clk_lock);
+	if (IS_ERR(hw))
+		return PTR_ERR(hw);
 
-	//ast2600 emmc clk should under 200Mhz
-		hw = clk_hw_register_divider_table(dev, "emmc_extclk", "emmc_extclk_gate", 0,
-						scu_g6_base + ASPEED_G6_CLK_SELECTION1, 12, 3, 0,
-						ast2600_emmc_extclk_div_table,
-						&aspeed_g6_clk_lock);
-		if (IS_ERR(hw))
-			return PTR_ERR(hw);
-		aspeed_g6_clk_data->hws[ASPEED_CLK_EMMC] = hw;
-	} else {
-		/* EMMC ext clock divider */
-		hw = clk_hw_register_gate(dev, "emmc_extclk_gate", "hpll", 0,
-						scu_g6_base + ASPEED_G6_CLK_SELECTION1, 15, 0,
-						&aspeed_g6_clk_lock);
-		if (IS_ERR(hw))
-			return PTR_ERR(hw);
+	hw = clk_hw_register_gate(dev, "emmc_extclk_gate", "emmc_extclk_mux",
+				  0, scu_g6_base + ASPEED_G6_CLK_SELECTION1,
+				  15, 0, &aspeed_g6_clk_lock);
+	if (IS_ERR(hw))
+		return PTR_ERR(hw);
 
-		//ast2600 emmc clk should under 200Mhz
-		hw = clk_hw_register_divider_table(dev, "emmc_extclk",
-						"emmc_extclk_gate", 0,
-						scu_g6_base +
+	hw = clk_hw_register_divider_table(dev, "emmc_extclk",
+					   "emmc_extclk_gate", 0,
+					   scu_g6_base +
 						ASPEED_G6_CLK_SELECTION1, 12,
-						3, 0, ast2600_emmc_extclk_div_table,
-						&aspeed_g6_clk_lock);
-		if (IS_ERR(hw))
-			return PTR_ERR(hw);
-		aspeed_g6_clk_data->hws[ASPEED_CLK_EMMC] = hw;
-	}
+					   3, 0, ast2600_emmc_extclk_div_table,
+					   &aspeed_g6_clk_lock);
+	if (IS_ERR(hw))
+		return PTR_ERR(hw);
+	aspeed_g6_clk_data->hws[ASPEED_CLK_EMMC] = hw;
 
-	clk_hw_register_fixed_rate(NULL, "hclk", NULL, 0, 200000000);
-
-	regmap_read(map, 0x310, &val);
-	if (val & BIT(8)) {
-		/* SD/SDIO clock divider and gate */
-		hw = clk_hw_register_gate(dev, "sd_extclk_gate", "apll", 0,
-						scu_g6_base + ASPEED_G6_CLK_SELECTION4, 31, 0,
-						&aspeed_g6_clk_lock);
-		if (IS_ERR(hw))
-			return PTR_ERR(hw);
-	} else {
-		/* SD/SDIO clock divider and gate */
-		hw = clk_hw_register_gate(dev, "sd_extclk_gate", "hclk", 0,
-						scu_g6_base + ASPEED_G6_CLK_SELECTION4, 31, 0,
-						&aspeed_g6_clk_lock);
-		if (IS_ERR(hw))
-			return PTR_ERR(hw);
-	}
-
-	regmap_read(map, 0x14, &val);
-	if (((val & GENMASK(23, 16)) >> 16) >= 2) {
-		/* A2 clock divisor is different from A1/A0 */
-		hw = clk_hw_register_divider_table(dev, "sd_extclk", "sd_extclk_gate",
-					0, scu_g6_base + ASPEED_G6_CLK_SELECTION4, 28, 3, 0,
-					ast2600_sd_div_a2_table,
-					&aspeed_g6_clk_lock);
-		if (IS_ERR(hw))
-			return PTR_ERR(hw);
-	} else {
-		hw = clk_hw_register_divider_table(dev, "sd_extclk", "sd_extclk_gate",
-					0, scu_g6_base + ASPEED_G6_CLK_SELECTION4, 28, 3, 0,
-					ast2600_sd_div_a1_table,
-					&aspeed_g6_clk_lock);
-		if (IS_ERR(hw))
-			return PTR_ERR(hw);
-	}
-
+	/* SD/SDIO clock divider and gate */
+	hw = clk_hw_register_gate(dev, "sd_extclk_gate", "hpll", 0,
+			scu_g6_base + ASPEED_G6_CLK_SELECTION4, 31, 0,
+			&aspeed_g6_clk_lock);
+	if (IS_ERR(hw))
+		return PTR_ERR(hw);
+	hw = clk_hw_register_divider_table(dev, "sd_extclk", "sd_extclk_gate",
+			0, scu_g6_base + ASPEED_G6_CLK_SELECTION4, 28, 3, 0,
+			ast2600_div_table,
+			&aspeed_g6_clk_lock);
+	if (IS_ERR(hw))
+		return PTR_ERR(hw);
 	aspeed_g6_clk_data->hws[ASPEED_CLK_SDIO] = hw;
 
 	/* MAC1/2 RMII 50MHz RCLK */
@@ -885,10 +779,6 @@ static void __init aspeed_g6_cc_init(struct device_node *np)
 	struct regmap *map;
 	int ret;
 	int i;
-	u32 chip_id;
-	struct mac_delay_config mac_cfg;
-	union mac_delay_1g reg_1g;
-	union mac_delay_100_10 reg_100, reg_10;
 
 	scu_g6_base = of_iomap(np, 0);
 	if (!scu_g6_base)
@@ -916,70 +806,6 @@ static void __init aspeed_g6_cc_init(struct device_node *np)
 	if (IS_ERR(map)) {
 		pr_err("no syscon regmap\n");
 		return;
-	}
-
-	regmap_read(map, ASPEED_G6_SILICON_REV, &chip_id);
-
-	/* From ASPEED AST2620 A3 Datasheet ?C V0.8,
-	 * the RGMII timing's step delay is difference,
-	 * A0/A1 is 0.18ns, A2/A3 is 0.25ns.
-	 */
-	if (BYTE2(chip_id) > ASPEED_AST262X_A1) {
-		regmap_read(map, ASPEED_MAC12_CLK_DLY, &reg_1g.w);
-		regmap_read(map, ASPEED_MAC12_CLK_DLY_100M, &reg_100.w);
-		regmap_read(map, ASPEED_MAC12_CLK_DLY_10M, &reg_10.w);
-
-		if (!of_property_read_u32_array(np, "mac0-clk-delay",
-							(u32 *)&mac_cfg, 6)) {
-			reg_1g.b.tx_delay_1 = mac_cfg.tx_delay_1000;
-			reg_1g.b.rx_delay_1 = mac_cfg.rx_delay_1000;
-			reg_100.b.tx_delay_1 = mac_cfg.tx_delay_100;
-			reg_100.b.rx_delay_1 = mac_cfg.rx_delay_100;
-			reg_10.b.tx_delay_1 = mac_cfg.tx_delay_10;
-			reg_10.b.rx_delay_1 = mac_cfg.rx_delay_10;
-		}
-
-		if (!of_property_read_u32_array(np, "mac1-clk-delay",
-							(u32 *)&mac_cfg, 6)) {
-			reg_1g.b.tx_delay_2 = mac_cfg.tx_delay_1000;
-			reg_1g.b.rx_delay_2 = mac_cfg.rx_delay_1000;
-			reg_100.b.tx_delay_2 = mac_cfg.tx_delay_100;
-			reg_100.b.rx_delay_2 = mac_cfg.rx_delay_100;
-			reg_10.b.tx_delay_2 = mac_cfg.tx_delay_10;
-			reg_10.b.rx_delay_2 = mac_cfg.rx_delay_10;
-		}
-
-		regmap_write(map, ASPEED_MAC12_CLK_DLY, reg_1g.w);
-		regmap_write(map, ASPEED_MAC12_CLK_DLY_100M, reg_100.w);
-		regmap_write(map, ASPEED_MAC12_CLK_DLY_10M, reg_10.w);
-
-		regmap_read(map, ASPEED_MAC34_CLK_DLY, &reg_1g.w);
-		regmap_read(map, ASPEED_MAC34_CLK_DLY_100M, &reg_100.w);
-		regmap_read(map, ASPEED_MAC34_CLK_DLY_10M, &reg_10.w);
-
-		if (!of_property_read_u32_array(np, "mac2-clk-delay",
-							(u32 *)&mac_cfg, 6)) {
-			reg_1g.b.tx_delay_1 = mac_cfg.tx_delay_1000;
-			reg_1g.b.rx_delay_1 = mac_cfg.rx_delay_1000;
-			reg_100.b.tx_delay_1 = mac_cfg.tx_delay_100;
-			reg_100.b.rx_delay_1 = mac_cfg.rx_delay_100;
-			reg_10.b.tx_delay_1 = mac_cfg.tx_delay_10;
-			reg_10.b.rx_delay_1 = mac_cfg.rx_delay_10;
-		}
-
-		if (!of_property_read_u32_array(np, "mac3-clk-delay",
-							(u32 *)&mac_cfg, 6)) {
-			reg_1g.b.tx_delay_2 = mac_cfg.tx_delay_1000;
-			reg_1g.b.rx_delay_2 = mac_cfg.rx_delay_1000;
-			reg_100.b.tx_delay_2 = mac_cfg.tx_delay_100;
-			reg_100.b.rx_delay_2 = mac_cfg.rx_delay_100;
-			reg_10.b.tx_delay_2 = mac_cfg.tx_delay_10;
-			reg_10.b.rx_delay_2 = mac_cfg.rx_delay_10;
-		}
-
-		regmap_write(map, ASPEED_MAC34_CLK_DLY, reg_1g.w);
-		regmap_write(map, ASPEED_MAC34_CLK_DLY_100M, reg_100.w);
-		regmap_write(map, ASPEED_MAC34_CLK_DLY_10M, reg_10.w);
 	}
 
 	aspeed_g6_cc(map);

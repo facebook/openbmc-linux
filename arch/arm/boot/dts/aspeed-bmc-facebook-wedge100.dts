@@ -2,25 +2,15 @@
 // Copyright (c) 2018 Facebook Inc.
 /dts-v1/;
 
-#include <dt-bindings/gpio/aspeed-gpio.h>
 #include "ast2400-facebook-netbmc-common.dtsi"
 
 / {
 	model = "Facebook Wedge 100 BMC";
 	compatible = "facebook,wedge100-bmc", "aspeed,ast2400";
 
-	aliases {
-		spi1 = &spi;
-	};
-
 	chosen {
 		stdout-path = &uart3;
 		bootargs = "console=ttyS2,9600n8 root=/dev/ram rw";
-	};
-
-	ast-adc-hwmon {
-		compatible = "iio-hwmon";
-		io-channels = <&adc 5>, <&adc 6>, <&adc 7>, <&adc 8>, <&adc 9>;
 	};
 };
 
@@ -64,32 +54,5 @@
 
 
 &vhub {
-	status = "okay";
-};
-
-&kcs2 {
-	status = "okay";
-	aspeed,lpc-io-reg = <0xca8>;
-};
-
-&kcs3 {
-	status = "okay";
-	aspeed,lpc-io-reg = <0xca2>;
-};
-
-&spi {
-	status = "okay";
-	compatible = "aspeed,ast2400-spi-master";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi1_default>;
-
-	spidev@0 {
-		compatible = "rohm,dh2228fv";
-		spi-max-frequency = <24750000>;
-		reg = <0>;
-	};
-};
-
-&adc {
 	status = "okay";
 };

@@ -98,7 +98,7 @@ struct cpuset {
 	 * and if it ends up empty, it will inherit the parent's mask.
 	 *
 	 *
-	 * On legacy hierachy:
+	 * On legacy hierarchy:
 	 *
 	 * The user-configured masks are always the same with effective masks.
 	 */
@@ -585,7 +585,7 @@ static int validate_change(struct cpuset *cur, struct cpuset *trial)
 
 	par = parent_cs(cur);
 
-	/* On legacy hiearchy, we must be a subset of our parent cpuset. */
+	/* On legacy hierarchy, we must be a subset of our parent cpuset. */
 	ret = -EACCES;
 	if (!is_in_v2_mode() && !is_cpuset_subset(trial, par))
 		goto out;
@@ -1309,10 +1309,10 @@ static int update_parent_subparts_cpumask(struct cpuset *cpuset, int cmd,
  * @cs:  the cpuset to consider
  * @tmp: temp variables for calculating effective_cpus & partition setup
  *
- * When congifured cpumask is changed, the effective cpumasks of this cpuset
+ * When configured cpumask is changed, the effective cpumasks of this cpuset
  * and all its descendants need to be updated.
  *
- * On legacy hierachy, effective_cpus will be the same with cpu_allowed.
+ * On legacy hierarchy, effective_cpus will be the same with cpu_allowed.
  *
  * Called with cpuset_mutex held
  */
@@ -1726,7 +1726,7 @@ static void update_tasks_nodemask(struct cpuset *cs)
  * When configured nodemask is changed, the effective nodemasks of this cpuset
  * and all its descendants need to be updated.
  *
- * On legacy hiearchy, effective_mems will be the same with mems_allowed.
+ * On legacy hierarchy, effective_mems will be the same with mems_allowed.
  *
  * Called with cpuset_mutex held
  */
@@ -2500,7 +2500,7 @@ static s64 cpuset_read_s64(struct cgroup_subsys_state *css, struct cftype *cft)
 		BUG();
 	}
 
-	/* Unrechable but makes gcc happy */
+	/* Unreachable but makes gcc happy */
 	return 0;
 }
 
@@ -3376,7 +3376,7 @@ nodemask_t cpuset_mems_allowed(struct task_struct *tsk)
 }
 
 /**
- * cpuset_nodemask_valid_mems_allowed - check nodemask vs. curremt mems_allowed
+ * cpuset_nodemask_valid_mems_allowed - check nodemask vs. current mems_allowed
  * @nodemask: the nodemask to be checked
  *
  * Are any of the nodes in the nodemask allowed in current->mems_allowed?

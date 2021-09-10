@@ -41,7 +41,6 @@
 
 #include <trace/events/neigh.h>
 
-#define DEBUG
 #define NEIGH_DEBUG 1
 #define neigh_dbg(level, fmt, ...)		\
 do {						\
@@ -132,6 +131,9 @@ static void neigh_update_gc_list(struct neighbour *n)
 	write_lock_bh(&n->tbl->lock);
 	write_lock(&n->lock);
 
+	if (n->dead)
+		goto out;
+
 	/* remove from the gc list if new state is permanent or if neighbor
 	 * is externally learned; otherwise entry should be on the gc list
 	 */
@@ -148,6 +150,7 @@ static void neigh_update_gc_list(struct neighbour *n)
 		atomic_inc(&n->tbl->gc_entries);
 	}
 
+out:
 	write_unlock(&n->lock);
 	write_unlock_bh(&n->tbl->lock);
 }
@@ -235,6 +238,7 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 
 			write_lock(&n->lock);
 			if ((n->nud_state == NUD_FAILED) ||
+			    (n->nud_state == NUD_NOARP) ||
 			    (tbl->is_multicast &&
 			     tbl->is_multicast(n->primary_key)) ||
 			    time_after(tref, n->updated))
@@ -1380,7 +1384,7 @@ static int __neigh_update(struct neighbour *neigh, const u8 *lladdr,
 			 * we can reinject the packet there.
 			 */
 			n2 = NULL;
-			if (dst) {
+			if (dst && dst->obsolete != DST_OBSOLETE_DEAD) {
 				n2 = dst_neigh_lookup_skb(dst, skb);
 				if (n2)
 					n1 = n2;
@@ -1570,10 +1574,8 @@ static void neigh_proxy_process(struct timer_list *t)
 void pneigh_enqueue(struct neigh_table *tbl, struct neigh_parms *p,
 		    struct sk_buff *skb)
 {
-	unsigned long now = jiffies;
-
-	unsigned long sched_next = now + (prandom_u32() %
-					  NEIGH_VAR(p, PROXY_DELAY));
+	unsigned long sched_next = jiffies +
+			prandom_u32_max(NEIGH_VAR(p, PROXY_DELAY));
 
 	if (tbl->proxy_queue.qlen > NEIGH_VAR(p, PROXY_QLEN)) {
 		kfree_skb(skb);
@@ -3140,7 +3142,7 @@ static struct pneigh_entry *pneigh_get_first(struct seq_file *seq)
 	struct net *net = seq_file_net(seq);
 	struct neigh_table *tbl = state->tbl;
 	struct pneigh_entry *pn = NULL;
-	int bucket = state->bucket;
+	int bucket;
 
 	state->flags |= NEIGH_SEQ_IS_PNEIGH;
 	for (bucket = 0; bucket <= PNEIGH_HASHMASK; bucket++) {

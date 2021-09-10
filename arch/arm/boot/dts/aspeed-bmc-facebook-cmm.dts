@@ -280,7 +280,7 @@
 
 	chosen {
 		stdout-path = &uart1;
-		bootargs = "console=ttyS1,9600n8 root=/dev/ram rw earlyprintk";
+		bootargs = "console=ttyS1,9600n8 root=/dev/ram rw earlycon";
 	};
 
 	ast-adc-hwmon {
@@ -1280,7 +1280,6 @@
  */
 &i2c8 {
 	status = "okay";
-	base-clock-divisor = <4>;
 
 	i2c-switch@77 {
 		compatible = "nxp,pca9548";

@@ -544,8 +544,8 @@ static int twl4030_usb_ldo_init(struct twl4030_usb *twl)
 	return 0;
 }
 
-static ssize_t twl4030_usb_vbus_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t vbus_show(struct device *dev,
+			 struct device_attribute *attr, char *buf)
 {
 	struct twl4030_usb *twl = dev_get_drvdata(dev);
 	int ret = -EINVAL;
@@ -557,7 +557,7 @@ static ssize_t twl4030_usb_vbus_show(struct device *dev,
 
 	return ret;
 }
-static DEVICE_ATTR(vbus, 0444, twl4030_usb_vbus_show, NULL);
+static DEVICE_ATTR_RO(vbus);
 
 static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
 {
@@ -779,7 +779,7 @@ static int twl4030_usb_remove(struct platform_device *pdev)
 
 	usb_remove_phy(&twl->phy);
 	pm_runtime_get_sync(twl->dev);
-	cancel_delayed_work(&twl->id_workaround_work);
+	cancel_delayed_work_sync(&twl->id_workaround_work);
 	device_remove_file(twl->dev, &dev_attr_vbus);
 
 	/* set transceiver mode to power on defaults */

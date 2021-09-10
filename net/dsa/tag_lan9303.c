@@ -58,15 +58,6 @@ static struct sk_buff *lan9303_xmit(struct sk_buff *skb, struct net_device *dev)
 	__be16 *lan9303_tag;
 	u16 tag;
 
-	/* insert a special VLAN tag between the MAC addresses
-	 * and the current ethertype field.
-	 */
-	if (skb_cow_head(skb, LAN9303_TAG_LEN) < 0) {
-		dev_dbg(&dev->dev,
-			"Cannot make room for the special tag. Dropping packet\n");
-		return NULL;
-	}
-
 	/* provide 'LAN9303_TAG_LEN' bytes additional space */
 	skb_push(skb, LAN9303_TAG_LEN);
 
@@ -134,7 +125,7 @@ static const struct dsa_device_ops lan9303_netdev_ops = {
 	.proto	= DSA_TAG_PROTO_LAN9303,
 	.xmit = lan9303_xmit,
 	.rcv = lan9303_rcv,
-	.overhead = LAN9303_TAG_LEN,
+	.needed_headroom = LAN9303_TAG_LEN,
 };
 
 MODULE_LICENSE("GPL");

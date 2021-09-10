@@ -286,6 +286,9 @@ static int ehci_platform_probe(struct platform_device *dev)
 		if (of_property_read_bool(dev->dev.of_node, "big-endian"))
 			ehci->big_endian_mmio = ehci->big_endian_desc = 1;
 
+		if (of_property_read_bool(dev->dev.of_node, "spurious-oc"))
+			ehci->spurious_oc = 1;
+
 		if (of_property_read_bool(dev->dev.of_node,
 					  "needs-reset-on-resume"))
 			priv->reset_on_resume = true;
@@ -327,6 +330,8 @@ static int ehci_platform_probe(struct platform_device *dev)
 		hcd->has_tt = 1;
 	if (pdata->reset_on_resume)
 		priv->reset_on_resume = true;
+	if (pdata->spurious_oc)
+		ehci->spurious_oc = 1;
 
 #ifndef CONFIG_USB_EHCI_BIG_ENDIAN_MMIO
 	if (ehci->big_endian_mmio) {
@@ -363,12 +368,6 @@ static int ehci_platform_probe(struct platform_device *dev)
 	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
 	if (err)
 		goto err_power;
-
-	// The default threshold is 256 bytes,
-	// to avoid BMC mishandle the transmit from EHCI driver,
-	// increase transmit bandwidth to 512 bytes to reduce the transmit frequency.
-	if (of_device_is_compatible(dev->dev.of_node, "aspeed,ast2600-ehci"))
-		writel(((readl(hcd->regs + 0x84) & ~0xC0) | 0x80), hcd->regs + 0x84);
 
 	device_wakeup_enable(hcd->self.controller);
 	device_enable_async_suspend(hcd->self.controller);

@@ -78,6 +78,7 @@ static enum power_supply_property max17042_battery_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CHARGE_NOW,
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
+	POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT,
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_TEMP_ALERT_MIN,
 	POWER_SUPPLY_PROP_TEMP_ALERT_MAX,
@@ -130,7 +131,7 @@ static int max17042_get_status(struct max17042_chip *chip, int *status)
 	 *
 	 * When this cycle the battery gets charged to a higher (calculated)
 	 * capacity then the previous cycle then FullCAP will get updated
-	 * contineously once end-of-charge detection kicks in, so allow the
+	 * continuously once end-of-charge detection kicks in, so allow the
 	 * 2 to differ a bit.
 	 */
 
@@ -354,7 +355,8 @@ static int max17042_get_property(struct power_supply *psy,
 		if (ret < 0)
 			return ret;
 
-		val->intval = data * 1000 / 2;
+		data64 = sign_extend64(data, 15) * 5000000ll;
+		val->intval = div_s64(data64, chip->pdata->r_sns);
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
 		ret = max17042_get_temperature(chip, &val->intval);
@@ -395,8 +397,8 @@ static int max17042_get_property(struct power_supply *psy,
 			if (ret < 0)
 				return ret;
 
-			val->intval = sign_extend32(data, 15);
-			val->intval *= 1562500 / chip->pdata->r_sns;
+			data64 = sign_extend64(data, 15) * 1562500ll;
+			val->intval = div_s64(data64, chip->pdata->r_sns);
 		} else {
 			return -EINVAL;
 		}
@@ -407,11 +409,19 @@ static int max17042_get_property(struct power_supply *psy,
 			if (ret < 0)
 				return ret;
 
-			val->intval = sign_extend32(data, 15);
-			val->intval *= 1562500 / chip->pdata->r_sns;
+			data64 = sign_extend64(data, 15) * 1562500ll;
+			val->intval = div_s64(data64, chip->pdata->r_sns);
 		} else {
 			return -EINVAL;
 		}
+		break;
+	case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
+		ret = regmap_read(map, MAX17042_ICHGTerm, &data);
+		if (ret < 0)
+			return ret;
+
+		data64 = data * 1562500ll;
+		val->intval = div_s64(data64, chip->pdata->r_sns);
 		break;
 	case POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW:
 		ret = regmap_read(map, MAX17042_TTE, &data);
@@ -729,7 +739,7 @@ static void max17042_load_new_capacity_params(struct max17042_chip *chip)
 
 /*
  * Block write all the override values coming from platform data.
- * This function MUST be called before the POR initialization proceedure
+ * This function MUST be called before the POR initialization procedure
  * specified by maxim.
  */
 static inline void max17042_override_por_values(struct max17042_chip *chip)
@@ -801,7 +811,7 @@ static int max17042_init_chip(struct max17042_chip *chip)
 	 */
 	msleep(500);
 
-	/* Initialize configaration */
+	/* Initialize configuration */
 	max17042_write_config_regs(chip);
 
 	/* write cell characterization data */
@@ -845,7 +855,7 @@ static void max17042_set_soc_threshold(struct max17042_chip *chip, u16 off)
 	struct regmap *map = chip->regmap;
 	u32 soc, soc_tr;
 
-	/* program interrupt thesholds such that we should
+	/* program interrupt thresholds such that we should
 	 * get interrupt for every 'off' perc change in the soc
 	 */
 	regmap_read(map, MAX17042_RepSOC, &soc);
@@ -1094,7 +1104,7 @@ static int max17042_probe(struct i2c_client *client,
 	}
 
 	if (client->irq) {
-		unsigned int flags = IRQF_TRIGGER_FALLING | IRQF_ONESHOT;
+		unsigned int flags = IRQF_ONESHOT;
 
 		/*
 		 * On ACPI systems the IRQ may be handled by ACPI-event code,

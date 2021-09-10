@@ -7,7 +7,6 @@
  *  Copyright 2017 Google, Inc.
  */
 
-#include <linux/bitfield.h>
 #include <linux/clk.h>
 #include <linux/completion.h>
 #include <linux/err.h>
@@ -44,7 +43,6 @@
 
 /* Device Register Definition */
 /* 0x00 : I2CD Function Control Register  */
-#define ASPEED_I2CD_BUS_AUTO_RECOVERY_EN		BIT(17)
 #define ASPEED_I2CD_MULTI_MASTER_DIS			BIT(15)
 #define ASPEED_I2CD_SDA_DRIVE_1T_EN			BIT(8)
 #define ASPEED_I2CD_M_SDA_DRIVE_1T_EN			BIT(7)
@@ -60,14 +58,10 @@
 #define ASPEED_I2CD_TIME_SCL_HIGH_MASK			GENMASK(19, 16)
 #define ASPEED_I2CD_TIME_SCL_LOW_SHIFT			12
 #define ASPEED_I2CD_TIME_SCL_LOW_MASK			GENMASK(15, 12)
-#define ASPEED_I2CD_TIME_TIMEOUT_BASE_DIVISOR_SHIFT	8
-#define ASPEED_I2CD_TIME_TIMEOUT_BASE_DIVISOR_MASK	GENMASK(9, 8)
 #define ASPEED_I2CD_TIME_BASE_DIVISOR_MASK		GENMASK(3, 0)
 #define ASPEED_I2CD_TIME_SCL_REG_MAX			GENMASK(3, 0)
-
 /* 0x08 : I2CD Clock and AC Timing Control Register #2 */
-#define ASPEED_I2CD_TIMEOUT_CYCLES_SHIFT		0
-#define ASPEED_I2CD_TIMEOUT_CYCLES_MASK			GENMASK(4, 0)
+#define ASPEED_NO_TIMEOUT_CTRL				0
 
 /* 0x0c : I2CD Interrupt Control Register &
  * 0x10 : I2CD Interrupt Status Register
@@ -76,7 +70,6 @@
  * status bits.
  */
 #define ASPEED_I2CD_INTR_RECV_MASK			0xf000ffff
-#define ASPEED_I2CD_INTR_SLAVE_INACTIVE_TIMEOUT		BIT(15)
 #define ASPEED_I2CD_INTR_SDA_DL_TIMEOUT			BIT(14)
 #define ASPEED_I2CD_INTR_BUS_RECOVER_DONE		BIT(13)
 #define ASPEED_I2CD_INTR_SLAVE_MATCH			BIT(7)
@@ -92,11 +85,8 @@
 		 ASPEED_I2CD_INTR_SCL_TIMEOUT |				       \
 		 ASPEED_I2CD_INTR_ABNORMAL |				       \
 		 ASPEED_I2CD_INTR_ARBIT_LOSS)
-#define ASPEED_I2CD_INTR_SLAVE_ERRORS					       \
-		ASPEED_I2CD_INTR_SLAVE_INACTIVE_TIMEOUT
 #define ASPEED_I2CD_INTR_ALL						       \
-		(ASPEED_I2CD_INTR_SLAVE_INACTIVE_TIMEOUT |		       \
-		 ASPEED_I2CD_INTR_SDA_DL_TIMEOUT |			       \
+		(ASPEED_I2CD_INTR_SDA_DL_TIMEOUT |			       \
 		 ASPEED_I2CD_INTR_BUS_RECOVER_DONE |			       \
 		 ASPEED_I2CD_INTR_SCL_TIMEOUT |				       \
 		 ASPEED_I2CD_INTR_ABNORMAL |				       \
@@ -159,11 +149,9 @@ struct aspeed_i2c_bus {
 	spinlock_t			lock;
 	struct completion		cmd_complete;
 	u32				(*get_clk_reg_val)(struct device *dev,
-							   u32 divisor,
-							   u32 base_clk_div);
+							   u32 divisor);
 	unsigned long			parent_clk_frequency;
 	u32				bus_frequency;
-	u32				hw_timeout_ms;
 	/* Transaction state. */
 	enum aspeed_i2c_master_state	master_state;
 	struct i2c_msg			*msgs;
@@ -253,14 +241,6 @@ reset_out:
 }
 
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
-static int aspeed_i2c_check_slave_error(u32 irq_status)
-{
-	if (irq_status & ASPEED_I2CD_INTR_SLAVE_INACTIVE_TIMEOUT)
-		return -EIO;
-
-	return 0;
-}
-
 static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 {
 	u32 command, irq_handled = 0;
@@ -269,14 +249,6 @@ static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 
 	if (!slave)
 		return 0;
-
-	if (aspeed_i2c_check_slave_error(irq_status)) {
-		dev_dbg(bus->dev, "received slave error interrupt: 0x%08x\n",
-			irq_status);
-		irq_handled |= (irq_status & ASPEED_I2CD_INTR_SLAVE_ERRORS);
-		bus->slave_state = ASPEED_I2C_SLAVE_INACTIVE;
-		return irq_handled;
-	}
 
 	command = readl(bus->base + ASPEED_I2C_CMD_REG);
 
@@ -415,7 +387,7 @@ static void aspeed_i2c_next_msg_or_stop(struct aspeed_i2c_bus *bus)
 	}
 }
 
-static int aspeed_i2c_check_master_error(u32 irq_status)
+static int aspeed_i2c_is_irq_error(u32 irq_status)
 {
 	if (irq_status & ASPEED_I2CD_INTR_ARBIT_LOSS)
 		return -EAGAIN;
@@ -446,9 +418,9 @@ static u32 aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 	 * should clear the command queue effectively taking us back to the
 	 * INACTIVE state.
 	 */
-	ret = aspeed_i2c_check_master_error(irq_status);
+	ret = aspeed_i2c_is_irq_error(irq_status);
 	if (ret) {
-		dev_dbg(bus->dev, "received master error interrupt: 0x%08x\n",
+		dev_dbg(bus->dev, "received error interrupt: 0x%08x\n",
 			irq_status);
 		irq_handled |= (irq_status & ASPEED_I2CD_INTR_MASTER_ERRORS);
 		if (bus->master_state != ASPEED_I2C_MASTER_INACTIVE) {
@@ -755,10 +727,14 @@ static void __aspeed_i2c_reg_slave(struct aspeed_i2c_bus *bus, u16 slave_addr)
 {
 	u32 addr_reg_val, func_ctrl_reg_val;
 
-	/* Set slave addr. */
-	addr_reg_val = readl(bus->base + ASPEED_I2C_DEV_ADDR_REG);
-	addr_reg_val &= ~ASPEED_I2CD_DEV_ADDR_MASK;
-	addr_reg_val |= slave_addr & ASPEED_I2CD_DEV_ADDR_MASK;
+	/*
+	 * Set slave addr.  Reserved bits can all safely be written with zeros
+	 * on all of ast2[456]00, so zero everything else to ensure we only
+	 * enable a single slave address (ast2500 has two, ast2600 has three,
+	 * the enable bits for which are also in this register) so that we don't
+	 * end up with additional phantom devices responding on the bus.
+	 */
+	addr_reg_val = slave_addr & ASPEED_I2CD_DEV_ADDR_MASK;
 	writel(addr_reg_val, bus->base + ASPEED_I2C_DEV_ADDR_REG);
 
 	/* Turn on slave mode. */
@@ -822,10 +798,9 @@ static const struct i2c_algorithm aspeed_i2c_algo = {
 
 static u32 aspeed_i2c_get_clk_reg_val(struct device *dev,
 				      u32 clk_high_low_mask,
-				      u32 divisor,
-				      u32 base_clk_divisor)
+				      u32 divisor)
 {
-	u32 clk_high_low_max, clk_high, clk_low, tmp;
+	u32 base_clk_divisor, clk_high_low_max, clk_high, clk_low, tmp;
 
 	/*
 	 * SCL_high and SCL_low represent a value 1 greater than what is stored
@@ -854,12 +829,10 @@ static u32 aspeed_i2c_get_clk_reg_val(struct device *dev,
 	 *		((1 << base_clk_divisor) * (clk_high + 1 + clk_low + 1))
 	 * The documentation recommends clk_high >= clk_high_max / 2 and
 	 * clk_low >= clk_low_max / 2 - 1 when possible; this last constraint
-	 * gives us the following solution (unless base_clk_divisor is manually
-	 * configured in device tree):
+	 * gives us the following solution:
 	 */
-	if (base_clk_divisor > ASPEED_I2CD_TIME_BASE_DIVISOR_MASK)
-		base_clk_divisor = divisor > clk_high_low_max ?
-				ilog2((divisor - 1) / clk_high_low_max) + 1 : 0;
+	base_clk_divisor = divisor > clk_high_low_max ?
+			ilog2((divisor - 1) / clk_high_low_max) + 1 : 0;
 
 	if (base_clk_divisor > ASPEED_I2CD_TIME_BASE_DIVISOR_MASK) {
 		base_clk_divisor = ASPEED_I2CD_TIME_BASE_DIVISOR_MASK;
@@ -890,103 +863,37 @@ static u32 aspeed_i2c_get_clk_reg_val(struct device *dev,
 			   & ASPEED_I2CD_TIME_BASE_DIVISOR_MASK);
 }
 
-static u32 aspeed_i2c_24xx_get_clk_reg_val(struct device *dev,
-					   u32 divisor,
-					   u32 base_clk_divisor)
+static u32 aspeed_i2c_24xx_get_clk_reg_val(struct device *dev, u32 divisor)
 {
-	u32 val;
-
 	/*
 	 * clk_high and clk_low are each 3 bits wide, so each can hold a max
 	 * value of 8 giving a clk_high_low_max of 16.
 	 */
-	val = aspeed_i2c_get_clk_reg_val(dev, GENMASK(2, 0), divisor,
-					 base_clk_divisor);
-
-	/*
-	 * We have seen consistent I2C transaction errors on wedge100 i2c-3
-	 * and i2c-4, and such transaction errors can be fixed by increasing
-	 * I2C setup/hold time as below. Please refer to AST2400 datasheet,
-	 * Chapter 40 for I2CD04 register definition.
-	 *
-	 * XXX "0x77700300" is copied from kernel 4.1, we may need a better
-	 * way to configure/customize these fields?
-	 */
-	return (val | 0x77700300);
+	return aspeed_i2c_get_clk_reg_val(dev, GENMASK(2, 0), divisor);
 }
 
-static u32 aspeed_i2c_25xx_get_clk_reg_val(struct device *dev,
-					   u32 divisor,
-					   u32 base_clk_divisor)
+static u32 aspeed_i2c_25xx_get_clk_reg_val(struct device *dev, u32 divisor)
 {
 	/*
 	 * clk_high and clk_low are each 4 bits wide, so each can hold a max
 	 * value of 16 giving a clk_high_low_max of 32.
 	 */
-	return aspeed_i2c_get_clk_reg_val(dev, GENMASK(3, 0), divisor,
-					  base_clk_divisor);
+	return aspeed_i2c_get_clk_reg_val(dev, GENMASK(3, 0), divisor);
 }
 
 /* precondition: bus.lock has been acquired. */
-static int aspeed_i2c_init_clk(struct aspeed_i2c_bus *bus,
-			       struct platform_device *pdev)
+static int aspeed_i2c_init_clk(struct aspeed_i2c_bus *bus)
 {
-	int ret;
-	u32 divisor, clk_reg_val, base_clk_divisor;
-	u32 timeout_base_divisor, timeout_tick_us, timeout_cycles;
-
-	ret = of_property_read_u32(pdev->dev.of_node, "base-clock-divisor",
-				   &base_clk_divisor);
-	if (ret < 0)
-		base_clk_divisor = (u32)-1;
+	u32 divisor, clk_reg_val;
 
 	divisor = DIV_ROUND_UP(bus->parent_clk_frequency, bus->bus_frequency);
 	clk_reg_val = readl(bus->base + ASPEED_I2C_AC_TIMING_REG1);
 	clk_reg_val &= (ASPEED_I2CD_TIME_TBUF_MASK |
 			ASPEED_I2CD_TIME_THDSTA_MASK |
 			ASPEED_I2CD_TIME_TACST_MASK);
-	clk_reg_val |= bus->get_clk_reg_val(bus->dev, divisor,
-					    base_clk_divisor);
-
-	if (bus->hw_timeout_ms) {
-		u8 div_max = ASPEED_I2CD_TIME_TIMEOUT_BASE_DIVISOR_MASK >>
-			     ASPEED_I2CD_TIME_TIMEOUT_BASE_DIVISOR_SHIFT;
-		u8 cycles_max = ASPEED_I2CD_TIMEOUT_CYCLES_MASK >>
-				ASPEED_I2CD_TIMEOUT_CYCLES_SHIFT;
-
-		timeout_base_divisor = 0;
-
-		do {
-			timeout_tick_us = 1000 * (16384 <<
-					  (timeout_base_divisor << 1)) /
-					  (bus->parent_clk_frequency / 1000);
-
-			if (timeout_base_divisor == div_max ||
-			    timeout_tick_us * ASPEED_I2CD_TIMEOUT_CYCLES_MASK >=
-			    bus->hw_timeout_ms * 1000)
-				break;
-		} while (timeout_base_divisor++ < div_max);
-
-		if (timeout_tick_us) {
-			timeout_cycles = DIV_ROUND_UP(bus->hw_timeout_ms * 1000,
-						      timeout_tick_us);
-			if (timeout_cycles == 0)
-				timeout_cycles = 1;
-			else if (timeout_cycles > cycles_max)
-				timeout_cycles = cycles_max;
-		} else {
-			timeout_cycles = 0;
-		}
-	} else {
-		timeout_base_divisor = 0;
-		timeout_cycles = 0;
-	}
-
-	clk_reg_val |= FIELD_PREP(ASPEED_I2CD_TIME_TIMEOUT_BASE_DIVISOR_MASK,
-				  timeout_base_divisor);
-
+	clk_reg_val |= bus->get_clk_reg_val(bus->dev, divisor);
 	writel(clk_reg_val, bus->base + ASPEED_I2C_AC_TIMING_REG1);
-	writel(timeout_cycles, bus->base + ASPEED_I2C_AC_TIMING_REG2);
+	writel(ASPEED_NO_TIMEOUT_CTRL, bus->base + ASPEED_I2C_AC_TIMING_REG2);
 
 	return 0;
 }
@@ -1001,12 +908,7 @@ static int aspeed_i2c_init(struct aspeed_i2c_bus *bus,
 	/* Disable everything. */
 	writel(0, bus->base + ASPEED_I2C_FUN_CTRL_REG);
 
-	device_property_read_u32(&pdev->dev, "aspeed,hw-timeout-ms",
-				 &bus->hw_timeout_ms);
-	if (bus->hw_timeout_ms)
-		fun_ctrl_reg |= ASPEED_I2CD_BUS_AUTO_RECOVERY_EN;
-
-	ret = aspeed_i2c_init_clk(bus, pdev);
+	ret = aspeed_i2c_init_clk(bus);
 	if (ret < 0)
 		return ret;
 
@@ -1111,7 +1013,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
 	if (!match)
 		bus->get_clk_reg_val = aspeed_i2c_24xx_get_clk_reg_val;
 	else
-		bus->get_clk_reg_val = (u32 (*)(struct device *, u32, u32))
+		bus->get_clk_reg_val = (u32 (*)(struct device *, u32))
 				match->data;
 
 	/* Initialize the I2C adapter */

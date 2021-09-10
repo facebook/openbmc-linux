@@ -403,7 +403,7 @@ static int ncsi_rsp_handler_ev(struct ncsi_request *nr)
 	/* Update to VLAN mode */
 	cmd = (struct ncsi_cmd_ev_pkt *)skb_network_header(nr->cmd);
 	ncm->enable = 1;
-	ncm->data[0] = ntohl(cmd->mode);
+	ncm->data[0] = ntohl((__force __be32)cmd->mode);
 
 	return 0;
 }
@@ -653,7 +653,7 @@ static int ncsi_rsp_handler_oem_mlx(struct ncsi_request *nr)
 	return 0;
 }
 
-/* Response handler for Broadcom legacy Get Mac Address command */
+/* Response handler for Broadcom command Get Mac Address */
 static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 {
 	struct ncsi_dev_priv *ndp = nr->ndp;
@@ -662,11 +662,6 @@ static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 	struct ncsi_rsp_oem_pkt *rsp;
 	struct sockaddr saddr;
 	int ret = 0;
-#ifdef CONFIG_NET_NCSI_MC_MAC_OFFSET
-	int mac_offset = CONFIG_NET_NCSI_MC_MAC_OFFSET;
-#else
-	int mac_offset = 1;
-#endif
 
 	/* Get the response header */
 	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
@@ -674,15 +669,10 @@ static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 	saddr.sa_family = ndev->type;
 	ndev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
 	memcpy(saddr.sa_data, &rsp->data[BCM_MAC_ADDR_OFFSET], ETH_ALEN);
-	/* Management Controller's MAC address is calculated by adding
-	 * the offset to Network Controller's (base) MAC address.
-	 */
-	while (mac_offset-- > 0)
-		eth_addr_inc((u8 *)saddr.sa_data);
-	if (!is_valid_ether_addr((const u8 *)saddr.sa_data)) {
-		netdev_warn(ndev, "NCSI: bcm_gma invalid mac addr %pM\n", (const u8 *)saddr.sa_data);
+	/* Increase mac address by 1 for BMC's address */
+	eth_addr_inc((u8 *)saddr.sa_data);
+	if (!is_valid_ether_addr((const u8 *)saddr.sa_data))
 		return -ENXIO;
-	}
 
 	/* Set the flag for GMA command which should only be called once */
 	ndp->gma_flag = 1;
@@ -690,42 +680,6 @@ static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
 	ret = ops->ndo_set_mac_address(ndev, &saddr);
 	if (ret < 0)
 		netdev_warn(ndev, "NCSI: 'Writing mac address to device failed\n");
-	netdev_info(ndev, "NCSI: bcm_gma MAC %pM\n", ndev->dev_addr);
-
-	return ret;
-}
-
-/* Response handler for Broadcom Get Mac Address command */
-static int ncsi_rsp_handler_oem_bcm_gmac16(struct ncsi_request *nr)
-{
-	struct ncsi_dev_priv *ndp = nr->ndp;
-	struct net_device *ndev = ndp->ndev.dev;
-	const struct net_device_ops *ops = ndev->netdev_ops;
-	struct ncsi_rsp_oem_pkt *rsp;
-	struct sockaddr saddr;
-	int ret = 0;
-	int i = 0;
-
-	/* Get the response header */
-	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
-
-	saddr.sa_family = ndev->type;
-	ndev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
-
-	/* Management Controller's MAC address is stored in reverse order,
-	 * e.g. byte5, byte4, byte3, byte2, byte1, byte0
-	 */
-	for (i = 0; i < ETH_ALEN; i++)
-		saddr.sa_data[i] = rsp->data[BCM_MACC16_ADDR_OFFSET + ETH_ALEN - 1 - i];
-	if (!is_valid_ether_addr((const u8 *)saddr.sa_data)) {
-		netdev_warn(ndev, "NCSI: bcm_gmac16 invalid mac addr %pM\n", (const u8 *)saddr.sa_data);
-		return -ENXIO;
-	}
-
-	ret = ops->ndo_set_mac_address(ndev, &saddr);
-	if (ret < 0)
-		netdev_warn(ndev, "NCSI: gmac16 Writing mac address to device failed\n");
-	netdev_info(ndev, "NCSI: bcm_gmac16 MAC %pM\n", ndev->dev_addr);
 
 	return ret;
 }
@@ -740,15 +694,14 @@ static int ncsi_rsp_handler_oem_bcm(struct ncsi_request *nr)
 	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
 	bcm = (struct ncsi_rsp_oem_bcm_pkt *)(rsp->data);
 
-	switch (bcm->type)
-	{
-		case NCSI_OEM_BCM_CMD_GMA:
-			return ncsi_rsp_handler_oem_bcm_gma(nr);
-		case NCSI_OEM_BCM_CMD_GMAC16:
-			return ncsi_rsp_handler_oem_bcm_gmac16(nr);
-		default:
-			return 0;
-	}
+	if (bcm->type == NCSI_OEM_BCM_CMD_GMA)
+		return ncsi_rsp_handler_oem_bcm_gma(nr);
+	return 0;
+}
+
+/* Response handler for Intel card */
+static int ncsi_rsp_handler_oem_intel(struct ncsi_request *nr)
+{
 	return 0;
 }
 
@@ -757,7 +710,8 @@ static struct ncsi_rsp_oem_handler {
 	int		(*handler)(struct ncsi_request *nr);
 } ncsi_rsp_oem_handlers[] = {
 	{ NCSI_OEM_MFR_MLX_ID, ncsi_rsp_handler_oem_mlx },
-	{ NCSI_OEM_MFR_BCM_ID, ncsi_rsp_handler_oem_bcm }
+	{ NCSI_OEM_MFR_BCM_ID, ncsi_rsp_handler_oem_bcm },
+	{ NCSI_OEM_MFR_INTEL_ID, ncsi_rsp_handler_oem_intel }
 };
 
 /* Response handler for OEM command */

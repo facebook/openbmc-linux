@@ -408,17 +408,17 @@ static void qh_lines(struct fotg210_hcd *fotg210, struct fotg210_qh *qh,
 		temp = snprintf(next, size,
 				"\n\t%p%c%s len=%d %08x urb %p",
 				td, mark, ({ char *tmp;
-				 switch ((scratch>>8)&0x03) {
-				 case 0:
+				switch ((scratch>>8)&0x03) {
+				case 0:
 					tmp = "out";
 					break;
-				 case 1:
+				case 1:
 					tmp = "in";
 					break;
-				 case 2:
+				case 2:
 					tmp = "setup";
 					break;
-				 default:
+				default:
 					tmp = "?";
 					break;
 				 } tmp; }),
@@ -850,7 +850,6 @@ static inline void create_debug_files(struct fotg210_hcd *fotg210)
 	struct dentry *root;
 
 	root = debugfs_create_dir(bus->bus_name, fotg210_debug_root);
-	fotg210->debug_dir = root;
 
 	debugfs_create_file("async", S_IRUGO, root, bus, &debug_async_fops);
 	debugfs_create_file("periodic", S_IRUGO, root, bus,
@@ -861,7 +860,9 @@ static inline void create_debug_files(struct fotg210_hcd *fotg210)
 
 static inline void remove_debug_files(struct fotg210_hcd *fotg210)
 {
-	debugfs_remove_recursive(fotg210->debug_dir);
+	struct usb_bus *bus = &fotg210_to_hcd(fotg210)->self;
+
+	debugfs_remove(debugfs_lookup(bus->bus_name, fotg210_debug_root));
 }
 
 /* handshake - spin reading hc until handshake completes or fails
@@ -1951,7 +1952,7 @@ static int fotg210_mem_init(struct fotg210_hcd *fotg210, gfp_t flags)
 		goto fail;
 
 	/* Hardware periodic table */
-	fotg210->periodic = (__le32 *)
+	fotg210->periodic =
 		dma_alloc_coherent(fotg210_to_hcd(fotg210)->self.controller,
 				fotg210->periodic_size * sizeof(__le32),
 				&fotg210->periodic_dma, 0);
@@ -2699,7 +2700,7 @@ cleanup:
  * any previous qh and cancel its urbs first; endpoints are
  * implicitly reset then (data toggle too).
  * That'd mean updating how usbcore talks to HCDs. (2.7?)
-*/
+ */
 
 
 /* Each QH holds a qtd list; a QH is used for everything except iso.
@@ -5276,7 +5277,7 @@ static int fotg210_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 		 */
 		if (urb->transfer_buffer_length > (16 * 1024))
 			return -EMSGSIZE;
-		/* FALLTHROUGH */
+		fallthrough;
 	/* case PIPE_BULK: */
 	default:
 		if (!qh_urb_transaction(fotg210, urb, &qtd_list, mem_flags))
@@ -5568,7 +5569,7 @@ static int fotg210_hcd_probe(struct platform_device *pdev)
 	struct usb_hcd *hcd;
 	struct resource *res;
 	int irq;
-	int retval = -ENODEV;
+	int retval;
 	struct fotg210_hcd *fotg210;
 
 	if (usb_disabled())
@@ -5588,7 +5589,7 @@ static int fotg210_hcd_probe(struct platform_device *pdev)
 	hcd = usb_create_hcd(&fotg210_fotg210_hc_driver, dev,
 			dev_name(dev));
 	if (!hcd) {
-		dev_err(dev, "failed to create hcd with err %d\n", retval);
+		dev_err(dev, "failed to create hcd\n");
 		retval = -ENOMEM;
 		goto fail_create_hcd;
 	}

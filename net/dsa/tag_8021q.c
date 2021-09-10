@@ -64,7 +64,7 @@
 #define DSA_8021Q_SUBVLAN_HI_SHIFT	9
 #define DSA_8021Q_SUBVLAN_HI_MASK	GENMASK(9, 9)
 #define DSA_8021Q_SUBVLAN_LO_SHIFT	4
-#define DSA_8021Q_SUBVLAN_LO_MASK	GENMASK(4, 3)
+#define DSA_8021Q_SUBVLAN_LO_MASK	GENMASK(5, 4)
 #define DSA_8021Q_SUBVLAN_HI(x)		(((x) & GENMASK(2, 2)) >> 2)
 #define DSA_8021Q_SUBVLAN_LO(x)		((x) & GENMASK(1, 0))
 #define DSA_8021Q_SUBVLAN(x)		\
@@ -133,10 +133,21 @@ u16 dsa_8021q_rx_subvlan(u16 vid)
 }
 EXPORT_SYMBOL_GPL(dsa_8021q_rx_subvlan);
 
+bool vid_is_dsa_8021q_rxvlan(u16 vid)
+{
+	return (vid & DSA_8021Q_DIR_MASK) == DSA_8021Q_DIR_RX;
+}
+EXPORT_SYMBOL_GPL(vid_is_dsa_8021q_rxvlan);
+
+bool vid_is_dsa_8021q_txvlan(u16 vid)
+{
+	return (vid & DSA_8021Q_DIR_MASK) == DSA_8021Q_DIR_TX;
+}
+EXPORT_SYMBOL_GPL(vid_is_dsa_8021q_txvlan);
+
 bool vid_is_dsa_8021q(u16 vid)
 {
-	return ((vid & DSA_8021Q_DIR_MASK) == DSA_8021Q_DIR_RX ||
-		(vid & DSA_8021Q_DIR_MASK) == DSA_8021Q_DIR_TX);
+	return vid_is_dsa_8021q_rxvlan(vid) || vid_is_dsa_8021q_txvlan(vid);
 }
 EXPORT_SYMBOL_GPL(vid_is_dsa_8021q);
 
@@ -459,5 +470,28 @@ struct sk_buff *dsa_8021q_xmit(struct sk_buff *skb, struct net_device *netdev,
 	return vlan_insert_tag(skb, htons(tpid), tci);
 }
 EXPORT_SYMBOL_GPL(dsa_8021q_xmit);
+
+void dsa_8021q_rcv(struct sk_buff *skb, int *source_port, int *switch_id,
+		   int *subvlan)
+{
+	u16 vid, tci;
+
+	skb_push_rcsum(skb, ETH_HLEN);
+	if (skb_vlan_tag_present(skb)) {
+		tci = skb_vlan_tag_get(skb);
+		__vlan_hwaccel_clear_tag(skb);
+	} else {
+		__skb_vlan_pop(skb, &tci);
+	}
+	skb_pull_rcsum(skb, ETH_HLEN);
+
+	vid = tci & VLAN_VID_MASK;
+
+	*source_port = dsa_8021q_rx_source_port(vid);
+	*switch_id = dsa_8021q_rx_switch_id(vid);
+	*subvlan = dsa_8021q_rx_subvlan(vid);
+	skb->priority = (tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
+}
+EXPORT_SYMBOL_GPL(dsa_8021q_rcv);
 
 MODULE_LICENSE("GPL v2");

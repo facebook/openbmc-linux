@@ -12,7 +12,6 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
-#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/reset.h>
 
@@ -193,28 +192,16 @@ int rpcif_sw_init(struct rpcif *rpc, struct device *dev)
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dirmap");
-	rpc->size = resource_size(res);
 	rpc->dirmap = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(rpc->dirmap))
 		rpc->dirmap = NULL;
+	rpc->size = resource_size(res);
 
 	rpc->rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
 
 	return PTR_ERR_OR_ZERO(rpc->rstc);
 }
 EXPORT_SYMBOL(rpcif_sw_init);
-
-void rpcif_enable_rpm(struct rpcif *rpc)
-{
-	pm_runtime_enable(rpc->dev);
-}
-EXPORT_SYMBOL(rpcif_enable_rpm);
-
-void rpcif_disable_rpm(struct rpcif *rpc)
-{
-	pm_runtime_disable(rpc->dev);
-}
-EXPORT_SYMBOL(rpcif_disable_rpm);
 
 void rpcif_hw_init(struct rpcif *rpc, bool hyperflash)
 {
