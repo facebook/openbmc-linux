@@ -44,5 +44,9 @@ config ASPEED_XDMA
 	  Enable support for the Aspeed XDMA Engine found on the Aspeed AST2XXX
 	  SOCs. The XDMA engine can perform automatic PCI DMA operations
 	  between the AST2XXX (acting as a BMC) and a host processor.
+	  
+config ASPEED_OTP
+	tristate "Aspeed OTP Driver"
+	depends on MACH_ASPEED_G6
 
 endmenu
