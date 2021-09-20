@@ -101,6 +101,7 @@ static const struct flash_info winbond_parts[] = {
 			    SECT_4K | SPI_NOR_QUAD_READ | SPI_NOR_DUAL_READ) },
 	{ "w25q01jvtb", INFO(0xef4021, 0, 64 * 1024, 2048, SECT_4K | SPI_NOR_DUAL_READ |
 			    SPI_NOR_QUAD_READ | SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB) },
+	{ "w25q01jv-im", INFO(0xef7021, 0, 64 * 1024, 2048, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
 };
 
 /**
