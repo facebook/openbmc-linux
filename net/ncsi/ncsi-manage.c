@@ -1339,12 +1339,12 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_probe_deselect;
 		fallthrough;
 	case ncsi_dev_state_probe_deselect:
-		ndp->pending_req_num = 8;
+		ndp->pending_req_num = ndp->max_package;
 
 		/* Deselect all possible packages */
 		nca.type = NCSI_PKT_CMD_DP;
 		nca.channel = NCSI_RESERVED_CHANNEL;
-		for (index = 0; index < 8; index++) {
+		for (index = 0; index < ndp->max_package; index++) {
 			nca.package = index;
 			ret = ncsi_xmit_cmd(&nca);
 			if (ret)
@@ -1408,12 +1408,12 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		break;
 #endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
 	case ncsi_dev_state_probe_cis:
-		ndp->pending_req_num = NCSI_RESERVED_CHANNEL;
+		ndp->pending_req_num = ndp->max_channel;
 
 		/* Clear initial state */
 		nca.type = NCSI_PKT_CMD_CIS;
 		nca.package = ndp->active_package->id;
-		for (index = 0; index < NCSI_RESERVED_CHANNEL; index++) {
+		for (index = 0; index < ndp->max_channel; index++) {
 			nca.channel = index;
 			ret = ncsi_xmit_cmd(&nca);
 			if (ret)
@@ -1465,7 +1465,7 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 
 		/* Probe next package */
 		ndp->package_probe_id++;
-		if (ndp->package_probe_id >= 8) {
+		if (ndp->package_probe_id >= ndp->max_package) {
 			/* Probe finished */
 			ndp->flags |= NCSI_DEV_PROBED;
 			break;
@@ -1752,6 +1752,8 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 		ndp->requests[i].ndp = ndp;
 		timer_setup(&ndp->requests[i].timer, ncsi_request_timeout, 0);
 	}
+	ndp->max_package = NCSI_MAX_PACKAGE;
+	ndp->max_channel = NCSI_RESERVED_CHANNEL;
 
 	spin_lock_irqsave(&ncsi_dev_lock, flags);
 	list_add_tail_rcu(&ndp->node, &ncsi_dev_list);
@@ -1766,11 +1768,21 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 	pdev = to_platform_device(dev->dev.parent);
 	if (pdev) {
 		np = pdev->dev.of_node;
-		if (np && of_get_property(np, "mlx,multi-host", NULL))
-			ndp->mlx_multi_host = true;
+		if (np) {
+			if (of_get_property(np, "mlx,multi-host", NULL))
+				ndp->mlx_multi_host = true;
+			if (!of_property_read_u32(np, "ncsi-package", &property) &&
+				(property < NCSI_MAX_PACKAGE)) {
+				ndp->max_package = (u8)property;
+			}
 
-		if (!of_property_read_u32(np, "ncsi-rexmit", &property)) {
-			ndp->rexmit = (u8)property;
+			if (!of_property_read_u32(np, "ncsi-channel", &property) &&
+				(property < NCSI_RESERVED_CHANNEL)) {
+				ndp->max_channel = (u8)property;
+			}
+			if (!of_property_read_u32(np, "ncsi-rexmit", &property)) {
+				ndp->rexmit = (u8)property;
+			}
 		}
 	}
 
