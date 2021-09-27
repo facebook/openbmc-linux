@@ -414,6 +414,10 @@ config SENSORS_ATXP1
 	  This driver can also be built as a module. If so, the module
 	  will be called atxp1.
 
+config SENSORS_ASPEED_PWM_TECHOMETER 
+	tristate "ASPEED AST2600 PWM and Fan Tachometer"
+	depends on THERMAL || THERMAL=n
+
 config SENSORS_BT1_PVT
 	tristate "Baikal-T1 Process, Voltage, Temperature sensor driver"
 	depends on MIPS_BAIKAL_T1 || COMPILE_TEST
