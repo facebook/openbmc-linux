@@ -34,6 +34,7 @@
 #include <linux/sysfs.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/iopoll.h>
 
 #include <mach/hardware.h>
 #include <asm/irq.h>
@@ -41,6 +42,9 @@
 
 #include <plat/regs-adc.h>
 #include <plat/ast-scu.h>
+
+#define ASPEED_ADC_INIT_POLLING_TIME_NS 500
+#define ASPEED_ADC_INIT_TIMEOUT_NS      500000
 
 struct adc_ch_vcc_data {
 	int v2;			/* in mV */
@@ -88,9 +92,11 @@ ast_adc_read(struct ast_adc_data *ast_adc, u32 reg)
 	return val;
 }
 
-static void ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
+static int ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
 {
+	int err;
 	u32 pclk;
+	u32 adc_engine_control_reg_val;
 #ifdef AST_SOC_G5
 	u8 trim;
 #endif
@@ -155,12 +161,24 @@ static void ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
 
 	ast_adc_write(ast_adc, AST_ADC_CTRL_NORMAL | AST_ADC_CTRL_EN, AST_ADC_CTRL);
 
-	while(!(ast_adc_read(ast_adc, AST_ADC_CTRL) & AST_ADC_CTRL_INIT_RDY));
+	if ((err = readl_poll_timeout(ast_adc->reg_base + AST_ADC_CTRL,
+				      adc_engine_control_reg_val,
+				      adc_engine_control_reg_val & AST_ADC_CTRL_INIT_RDY,
+				      ASPEED_ADC_INIT_POLLING_TIME_NS,
+				      ASPEED_ADC_INIT_TIMEOUT_NS))) {
+		return err;
+	}
 
 	ast_adc_write(ast_adc, AST_ADC_CTRL_COMPEN  | AST_ADC_CTRL_NORMAL | 
 							AST_ADC_CTRL_EN, AST_ADC_CTRL);
 
-	while(ast_adc_read(ast_adc, AST_ADC_CTRL) & AST_ADC_CTRL_COMPEN);
+	if ((err = readl_poll_timeout(ast_adc->reg_base + AST_ADC_CTRL,
+				      adc_engine_control_reg_val,
+				      !(adc_engine_control_reg_val & AST_ADC_CTRL_COMPEN),
+				      ASPEED_ADC_INIT_POLLING_TIME_NS,
+				      ASPEED_ADC_INIT_TIMEOUT_NS))) {
+		return err;
+	}
 	
 	//compensating value = 0x200 - ADC10[9:0]
 	ast_adc->compen_value = 0x200 - ((ast_adc_read(ast_adc, AST_ADC_COMP_TRIM) >> 16) & 0x3ff);
@@ -170,6 +188,7 @@ static void ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
 #err "No define for ADC "
 #endif
 	
+	return 0;
 }
 
 static u16
@@ -839,15 +858,23 @@ ast_adc_probe(struct platform_device *pdev)
 	}
 #endif
 
-	ast_adc_ctrl_init(ast_adc);
-	
+	if ((ret = ast_adc_ctrl_init(ast_adc))) {
+		goto remove_temperature_attribute_groups;
+	}
+
 	printk(KERN_INFO "ast_adc: driver successfully loaded.\n");
 
 	return 0;
 
 
-//out_irq:
-//	free_irq(ast_adc->irq, NULL);
+remove_temperature_attribute_groups:
+#if defined(AST_SOC_G5)
+	for (i = 0; i < TEMPER_CH_NO; i++)
+		sysfs_remove_group(&pdev->dev.kobj, &temper_attribute_groups[i]);
+#endif
+remove_adc_attribute_groups:
+	for (i = 0; i < MAX_CH_NO; i++)
+		sysfs_remove_group(&pdev->dev.kobj, &adc_attribute_groups[i]);
 out_sysfs00:
 	sysfs_remove_group(&pdev->dev.kobj, &name_attribute_groups);
 out_region:
@@ -855,7 +882,7 @@ out_region:
 out_mem:
 	kfree(ast_adc);
 out:
-	printk(KERN_WARNING "applesmc: driver init failed (ret=%d)!\n", ret);
+	printk(KERN_WARNING "ast_adc: driver init failed (ret=%d)!\n", ret);
 	return ret;
 }
 
@@ -901,8 +928,7 @@ ast_adc_resume(struct platform_device *pdev)
 {
 	struct ast_adc_data *ast_adc = platform_get_drvdata(pdev);
 
-	ast_adc_ctrl_init(ast_adc);
-	return 0;
+	return ast_adc_ctrl_init(ast_adc);
 }
 
 #else
