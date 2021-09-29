@@ -1071,9 +1071,6 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 		ret = -1;
 
 #if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
-		if (nc->version.mf_id == NCSI_OEM_MFR_MLX_ID)
-			nd->state = ncsi_dev_state_config_sma;
-
 		nca.type = NCSI_PKT_CMD_OEM;
 		nca.package = np->id;
 		nca.channel = nc->id;
