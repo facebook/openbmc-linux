@@ -43,8 +43,8 @@
 #include <plat/regs-adc.h>
 #include <plat/ast-scu.h>
 
-#define ASPEED_ADC_INIT_POLLING_TIME_NS 500
-#define ASPEED_ADC_INIT_TIMEOUT_NS      500000
+#define ASPEED_ADC_INIT_POLLING_TIME    500
+#define ASPEED_ADC_INIT_TIMEOUT         500000
 
 struct adc_ch_vcc_data {
 	int v2;			/* in mV */
@@ -164,8 +164,8 @@ static int ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
 	if ((err = readl_poll_timeout(ast_adc->reg_base + AST_ADC_CTRL,
 				      adc_engine_control_reg_val,
 				      adc_engine_control_reg_val & AST_ADC_CTRL_INIT_RDY,
-				      ASPEED_ADC_INIT_POLLING_TIME_NS,
-				      ASPEED_ADC_INIT_TIMEOUT_NS))) {
+				      ASPEED_ADC_INIT_POLLING_TIME,
+				      ASPEED_ADC_INIT_TIMEOUT))) {
 		return err;
 	}
 
@@ -175,8 +175,8 @@ static int ast_adc_ctrl_init(struct ast_adc_data *ast_adc)
 	if ((err = readl_poll_timeout(ast_adc->reg_base + AST_ADC_CTRL,
 				      adc_engine_control_reg_val,
 				      !(adc_engine_control_reg_val & AST_ADC_CTRL_COMPEN),
-				      ASPEED_ADC_INIT_POLLING_TIME_NS,
-				      ASPEED_ADC_INIT_TIMEOUT_NS))) {
+				      ASPEED_ADC_INIT_POLLING_TIME,
+				      ASPEED_ADC_INIT_TIMEOUT))) {
 		return err;
 	}
 	
