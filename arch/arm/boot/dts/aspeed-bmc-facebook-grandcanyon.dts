@@ -41,6 +41,15 @@
 			<&adc1 0>, <&adc1 1>;
 	};
 
+	fan0: pwm-fan0 {
+		compatible = "pwm-fan";
+		pwms = <&pwm 0 40000 0>;	/* Target freq:25 kHz */
+		cooling-min-state = <0>;
+		cooling-max-state = <3>;
+		#cooling-cells = <2>;
+		cooling-levels = <0 25 128 255>;
+	};
+
 	spi_gpio: spi-gpio {
 		status = "okay";
 		compatible = "spi-gpio";
@@ -149,18 +158,36 @@
     };
 };
 
-&pwm_tacho {
+&pwm {
+	status = "okay";
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_pwm0_default>;
+};
+
+&tach {
         status = "okay";
         pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_pwm0_default  &pinctrl_tach0_default
-                     &pinctrl_tach2_default &pinctrl_tach3_default
+        pinctrl-0 = <&pinctrl_tach0_default
+                     &pinctrl_tach2_default
+                     &pinctrl_tach3_default
                      &pinctrl_tach4_default>;
         fan@0 {
-                reg = <0x00>;
-                aspeed,target_pwm = <25000>;
-                aspeed,fan-tach-ch = /bits/ 8 <0x00 0x02 0x03 0x04>;
-                aspeed,min_rpm = <30>;
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x00>;
         };
+        fan@2 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x02>;
+        };
+        fan@3 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x03>;
+        };
+        fan@4 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x04>;
+        };
+
 };
 
 &i2c0 {
