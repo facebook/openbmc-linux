@@ -193,9 +193,9 @@ static int aspeed_get_fan_tach_ch_rpm(struct aspeed_tach_data *priv,
 		(val & TACHO_FULL_MEASUREMENT) && (val & TACHO_VALUE_UPDATE),
 		RPM_POLLING_PERIOD_US, usec);
 
-	/* return -ETIMEDOUT if we didn't get an answer. */
+	/* return 0 rpm if we didn't get an answer. */
 	if (ret)
-		return ret;
+		return 0;
 
 	raw_data = val & TACHO_VALUE_MASK;
 	/*
