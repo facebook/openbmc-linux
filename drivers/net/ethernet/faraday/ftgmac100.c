@@ -1421,7 +1421,9 @@ static void send_ncsi_cmd(struct net_device * dev, unsigned char channel_id,
 		dev_queue_xmit(skb);
 
 		//RX
-		tmo = wait_for_completion_timeout(&lp->ncsi_complete, HZ/10);
+		// Use 1s timeout to allow for longer running operations
+		// like crashdump to complete.
+		tmo = wait_for_completion_timeout(&lp->ncsi_complete, HZ);
 		if ((!tmo ||
 			(lp->NCSI_Respond.IID != lp->InstanceID) ||
 			(lp->NCSI_Respond.Command != (cmd | 0x80)) ||
