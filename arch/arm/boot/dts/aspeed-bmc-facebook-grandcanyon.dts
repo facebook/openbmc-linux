@@ -269,6 +269,14 @@
 		ti,mode = /bits/ 8 <1>;
 	};
 
+	// Voltage sensor(2nd source) for E1.S
+	ltc2991@48 {
+		compatible = "lltc,ltc2991";
+		reg = <0x48>;
+		lltc,meas-mode = <0x1f 0x00 0x00 0x04 0x00>;
+		// LTC2991_ENABLE, LTC2991_CONTROL_A, LTC2991_CONTROL_B, LTC2991_CONTROL_C, LTC2991_PWM_THRESH
+	};
+
 	// I/O expender for E1.S/MISC
 	pca9555@21 {
 		compatible = "nxp,pca9555";
@@ -504,6 +512,18 @@
 			ti,gain = <3>; // FSR: 1024 (mV)
 		};
 	};
+
+	// Voltage sensor(2nd source) for IOCM
+	ltc2990@4c {
+		compatible = "ltc2990";
+		reg = <0x4c>;
+		lltc,meas-mode = <7 3>; /* V1, V2, V3, V4 */
+	};
+
+	tmp75@4A {
+                compatible = "ti,tmp75";
+                reg = <0x4A>;
+        };
 
 	// IOCM FRU
 	eeprom@50 {
