@@ -184,75 +184,75 @@ static int ltc2991_get_value(struct ltc2991_data *data, int index, int *result)
 	case LTC2991_CURR3:
 	case LTC2991_CURR4:
 		 /* Vx-Vy, 19.075uV/LSB */
-		*result = sign_extend32(val, 13) * 19075 / 1000;
+		*result = sign_extend32(val, 14) * 19075 / 1000;
 		break;
 	case LTC2991_IN0:
 		/* Vcc, 305.18uV/LSB, 2.5V offset */
-		*result = sign_extend32(val, 13) * 30518 / (100 * 1000) + 2500;
+		*result = sign_extend32(val, 14) * 30518 / (100 * 1000) + 2500;
 		break;
 	case LTC2991_IN1:
 		if ((data->mode[1] & LTC2991_V1_V2_DIFF) > 0)
 		{
 			/* Vx, 19.075uV/LSB */
-			*result = sign_extend32(val, 13) * 19075 / (1000 * 1000);
+			*result = sign_extend32(val, 14) * 19075 / (1000 * 1000);
 		}
 		else
 		{
 			/* Vx, 305.18uV/LSB */
-			*result = sign_extend32(val, 13) * 30518 / (100 * 1000);
+			*result = sign_extend32(val, 14) * 30518 / (100 * 1000);
 		}
 		break;
 	case LTC2991_IN2:
 		/* Vx, 305.18uV/LSB */
-		*result = sign_extend32(val, 13) * 30518 / (100 * 1000);
+		*result = sign_extend32(val, 14) * 30518 / (100 * 1000);
 		break;
 	case LTC2991_IN3:
 		if ((data->mode[1] & LTC2991_V3_V4_DIFF) > 0)
 		{
 			/* Vx, 19.075uV/LSB */
-			*result = sign_extend32(val, 13) * 19075 / (1000 * 1000);
+			*result = sign_extend32(val, 14) * 19075 / (1000 * 1000);
 		}
 		else
 		{
 			/* Vx, 305.18uV/LSB */
-			*result = sign_extend32(val, 13) * 30518 / (100 * 1000);
+			*result = sign_extend32(val, 14) * 30518 / (100 * 1000);
 		}
 		break;
 	case LTC2991_IN4:
 		/* Vx, 305.18uV/LSB */
-		*result = sign_extend32(val, 13) * 30518 / (100 * 1000);
+		*result = sign_extend32(val, 14) * 30518 / (100 * 1000);
 		break;	
 	case LTC2991_IN5:
 		if ((data->mode[2] & LTC2991_V5_V6_DIFF) > 0)
 		{
 			/* Vx, 19.075uV/LSB */
-			*result = sign_extend32(val, 13) * 19075 / (1000 * 1000);
+			*result = sign_extend32(val, 14) * 19075 / (1000 * 1000);
 		}
 		else
 		{
 			/* Vx, 305.18uV/LSB */
-			*result = sign_extend32(val, 13) * 30518 / (100 * 1000);
+			*result = sign_extend32(val, 14) * 30518 / (100 * 1000);
 		}
 		break;
 	case LTC2991_IN6:
 		/* Vx, 305.18uV/LSB */
-		*result = sign_extend32(val, 13) * 30518 / (100 * 1000);
+		*result = sign_extend32(val, 14) * 30518 / (100 * 1000);
 		break;	
 	case LTC2991_IN7:
 		if ((data->mode[2] & LTC2991_V7_V8_DIFF) > 0)
 		{
 			/* Vx, 19.075uV/LSB */
-			*result = sign_extend32(val, 13) * 19075 / (1000 * 1000);
+			*result = sign_extend32(val, 14) * 19075 / (1000 * 1000);
 		}
 		else
 		{
 			/* Vx, 305.18uV/LSB */
-			*result = sign_extend32(val, 13) * 30518 / (100 * 1000);
+			*result = sign_extend32(val, 14) * 30518 / (100 * 1000);
 		}
 		break;
 	case LTC2991_IN8:
 		/* Vx, 305.18uV/LSB */
-		*result = sign_extend32(val, 13) * 30518 / (100 * 1000);
+		*result = sign_extend32(val, 14) * 30518 / (100 * 1000);
 		break;	
 
 	default:
