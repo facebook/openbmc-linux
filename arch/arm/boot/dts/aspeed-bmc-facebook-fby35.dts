@@ -35,7 +35,7 @@
 		io-channels = <&adc0 0>, <&adc0 1>, <&adc0 2>, <&adc0 3>,
 			<&adc0 4>, <&adc0 5>, <&adc0 6>, <&adc0 7>,
 			<&adc1 0>, <&adc1 1>, <&adc1 2>, <&adc1 3>,
-            <&adc1 4>, <&adc1 5>, <&adc1 6>;
+			<&adc1 4>, <&adc1 5>, <&adc1 6>;
 	};
 
 	fan0: pwm-fan0 {
@@ -134,9 +134,9 @@
 	pinctrl-0 = <&pinctrl_rmii4_default>;
 	no-hw-checksum;
 	use-ncsi;
+	mlx,multi-host;
 	ncsi-ctrl,start-redo-probe;
 	ncsi-ctrl,no-channel-monitor;
-        mlx,multi-host;
 	ncsi-package = <1>;
 	ncsi-channel = <1>;
 	ncsi-rexmit = <1>;
@@ -326,10 +326,6 @@
        status = "okay";
        pinctrl-names = "default";
        pinctrl-0 = <&pinctrl_jtagm_default>;
-};
-
-&vhub {
-      status = "okay";
 };
 
 &ehci0 {
