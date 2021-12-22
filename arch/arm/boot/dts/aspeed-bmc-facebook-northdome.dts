@@ -227,6 +227,11 @@
 		compatible = "ti,tmp75";
 		reg = <0x49>;
 	};
+
+	tmp75@4a {
+		compatible = "ti,tmp75";
+		reg = <0x4a>;
+	};
 };
 
 &i2c10 {
