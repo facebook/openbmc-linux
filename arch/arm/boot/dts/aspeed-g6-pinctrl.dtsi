@@ -2,6 +2,11 @@
 // Copyright 2019 IBM Corp.
 
 &pinctrl {
+	pinctrl_pcie1rc_default: pcie1rc_default {
+		function = "PCIERC1";
+		groups = "PCIERC1";
+	};
+
 	pinctrl_adc0_default: adc0_default {
 		function = "ADC0";
 		groups = "ADC0";
@@ -112,14 +117,9 @@
 		groups = "FWSPIABR";
 	};
 
-	pinctrl_fwspid_default: fwspid_default {
-		function = "FWSPID";
-		groups = "FWSPID";
-	};
-
-	pinctrl_fwqspid_default: fwqspid_default {
-		function = "FWQSPID";
-		groups = "FWQSPID";
+	pinctrl_fwqspi_default: fwqspid_default {
+		function = "FWQSPI";
+		groups = "FWQSPI";
 	};
 
 	pinctrl_fwspiwp_default: fwspiwp_default {
@@ -208,12 +208,12 @@
 	};
 
 	pinctrl_hvi3c3_default: hvi3c3_default {
-		function = "HVI3C3";
+		function = "I3C3";
 		groups = "HVI3C3";
 	};
 
 	pinctrl_hvi3c4_default: hvi3c4_default {
-		function = "HVI3C4";
+		function = "I3C4";
 		groups = "HVI3C4";
 	};
 
@@ -295,6 +295,16 @@
 	pinctrl_i2c9_default: i2c9_default {
 		function = "I2C9";
 		groups = "I2C9";
+	};
+
+	pinctrl_i3c1_default: i3c1_default {
+		function = "I3C1";
+		groups = "I3C1";
+	};
+
+	pinctrl_i3c2_default: i3c2_default {
+		function = "I3C2";
+		groups = "I3C2";
 	};
 
 	pinctrl_i3c3_default: i3c3_default {
@@ -653,12 +663,12 @@
 	};
 
 	pinctrl_qspi1_default: qspi1_default {
-		function = "QSPI1";
+		function = "SPI1";
 		groups = "QSPI1";
 	};
 
 	pinctrl_qspi2_default: qspi2_default {
-		function = "QSPI2";
+		function = "SPI2";
 		groups = "QSPI2";
 	};
 
@@ -857,9 +867,19 @@
 		groups = "EMMCG4";
 	};
 
+	pinctrl_emmcg8_default: emmcg8_default {
+		function = "EMMC";
+		groups = "EMMCG8";
+	};
+
 	pinctrl_sgpm1_default: sgpm1_default {
 		function = "SGPM1";
 		groups = "SGPM1";
+	};
+
+	pinctrl_sgpm2_default: sgpm2_default {
+		function = "SGPM2";
+		groups = "SGPM2";
 	};
 
 	pinctrl_sgps1_default: sgps1_default {
@@ -940,6 +960,11 @@
 	pinctrl_spi2cs2_default: spi2cs2_default {
 		function = "SPI2CS2";
 		groups = "SPI2CS2";
+	};
+
+	pinctrl_ssprstroot_default: ssprstroot_default {
+		function = "SSPRSTROOT";
+		groups = "SSPRSTROOT";
 	};
 
 	pinctrl_tach0_default: tach0_default {
@@ -1132,6 +1157,11 @@
 		groups = "USBB";
 	};
 
+	pinctrl_usb2adp_default: usb2adp_default {
+		function = "USB2ADP";
+		groups = "USBA";
+	};
+
 	pinctrl_usb11bhid_default: usb11bhid_default {
 		function = "USB11BHID";
 		groups = "USBB";
@@ -1171,4 +1201,10 @@
 		function = "WDTRST4";
 		groups = "WDTRST4";
 	};
+
+	pinctrl_fwspi18_default: fwspi18_default {
+		function = "FWSPI18";
+		groups = "FWSPI18";
+	};
+
 };
