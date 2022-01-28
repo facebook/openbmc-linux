@@ -4,3 +4,5 @@ obj-$(CONFIG_ASPEED_LPC_SNOOP)	+= aspeed-lpc-snoop.o
 obj-$(CONFIG_ASPEED_P2A_CTRL)	+= aspeed-p2a-ctrl.o
 obj-$(CONFIG_ASPEED_XDMA)	+= aspeed-xdma.o
 obj-$(CONFIG_ASPEED_OTP)	+= aspeed-otp.o
+obj-$(CONFIG_ASPEED_ESPI)	+= aspeed-espi-ctrl.o
+obj-$(CONFIG_ASPEED_ESPI_MMBI)	+= aspeed-espi-mmbi.o
