@@ -13,13 +13,28 @@
 	aliases {
 		serial0 = &uart5;
 		serial1 = &uart1;
-		serial2 = &uart2;
-		serial3 = &uart3;
-		serial4 = &uart4;
-		serial5 = &uart6;
-		serial6 = &uart7;
-		serial7 = &uart8;
-		serial8 = &uart9;
+
+		i2c20 = &imux20;
+		i2c21 = &imux21;
+		i2c22 = &imux22;
+		i2c23 = &imux23;
+		i2c24 = &imux24;
+		i2c25 = &imux25;
+		i2c26 = &imux26;
+		i2c27 = &imux27;
+		i2c28 = &imux28;
+		i2c29 = &imux29;
+		i2c30 = &imux30;
+		i2c31 = &imux31;
+		i2c32 = &imux32;
+		i2c33 = &imux33;
+		i2c34 = &imux34;
+		i2c35 = &imux35;
+		i2c36 = &imux36;
+		i2c37 = &imux37;
+		i2c38 = &imux38;
+		i2c39 = &imux39;
+	
 	};
 
 	chosen {
@@ -38,30 +53,9 @@
 			<&adc1 0>, <&adc1 1>;
 	};
 
-	fan0: pwm-fan0 {
-		compatible = "pwm-fan";
-		pwms = <&pwm 0 40000 0>;	/* Target freq:25 kHz */
-		cooling-min-state = <0>;
-		cooling-max-state = <3>;
-		#cooling-cells = <2>;
-		cooling-levels = <0 25 128 255>;
-	};
-
 };
 
 &uart1 {
-	status = "okay";
-};
-
-&uart2 {
-	status = "okay";
-};
-
-&uart3 {
-	status = "okay";
-};
-
-&uart4 {
 	status = "okay";
 };
 
@@ -91,6 +85,7 @@
 	use-ncsi;
 	ncsi-ctrl,start-redo-probe;
 	ncsi-ctrl,no-channel-monitor;
+	mlx,multi-host;
 	ncsi-package = <1>;
 	ncsi-channel = <1>;
 	ncsi-rexmit = <1>;
@@ -121,25 +116,328 @@
     };
 };
 
-&pwm {
+&spi2 {
 	status = "okay";
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_pwm0_default>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi2_default>;
+
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		label = "pnor";
+		spi-max-frequency = <12000000>;
+		spi-tx-bus-width = <2>;
+		spi-rx-bus-width = <2>;
+	};
 };
 
-&tach {
-        status = "okay";
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_tach0_default
-                     &pinctrl_tach2_default>;
-        fan@0 {
-                aspeed,min-rpm = <30>;
-                aspeed,tach-ch = <0x00>;
-        };
-        fan@2 {
-                aspeed,min-rpm = <30>;
-                aspeed,tach-ch = <0x02>;
-        };
+&kcs2 {
+	kcs_addr = <0xca8>;
+	status = "okay";
+};
+
+&kcs3 {
+	kcs_addr = <0xca2>;
+	status = "okay";
+};
+
+&lpc_snoop {
+	status = "okay";
+	snoop-ports = <0x80>;
+};
+
+//eSPI
+&espi_ctrl {
+	status = "okay";
+
+	perif,memcyc-src-addr = <0x98000000>;
+	perif,memcyc-size = <0x10000>;
+	perif,dma-mode;
+
+	oob,dma-mode;
+	oob,dma-tx-desc-num = <0x2>;
+	oob,dma-rx-desc-num = <0x8>;
+
+	flash,dma-mode;
+	flash,safs-mode = <0x2>;
+};
+
+&peci0 {
+	status = "okay";
+};
+
+&sgpiom0 {
+	status = "okay";
+	gpio-ranges = <&pinctrl 0 244 128>;
+	ngpios = <128>;
+	base = <244>;				
+	bus-frequency = <2000000>;	
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+	i2c-switch@70 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x70>;
+		imux20: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+
+		imux21: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+			lm75@48 {
+				compatible = "st,stlm75";
+				reg = <0x48>;
+			};
+		};
+
+		imux22: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+			lm75@48 {
+				compatible = "st,stlm75";
+				reg = <0x48>;
+			};
+		
+		};
+
+		imux23: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+			lm75@48 {
+				compatible = "st,stlm75";
+				reg = <0x48>;
+			};	
+		};
+
+		imux24: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+			lm75@48 {
+				compatible = "st,stlm75";
+				reg = <0x48>;
+			};		
+		};
+
+		imux25: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+		};
+
+		imux26: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+		};
+
+		imux27: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+
+		};
+	};
+	tmp75@4E {
+		compatible = "ti,tmp75";
+		reg = <0x4A>;
+	};
+
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+//To BIC
+&i2c3 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <1000000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+&i2c4 {
+	status = "okay";
+	// UIC FRU
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+	};
+	// UIC temperature
+	tmp75@4A {
+		compatible = "ti,tmp75";
+		reg = <0x4A>;
+	};
+};
+
+&i2c5 {
+	status = "okay";
+	i2c-switch@70 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x70>;
+		imux28: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+
+		imux29: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+
+		imux30: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+
+		imux31: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+
+		imux32: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+		};
+
+		imux33: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+		};
+
+		imux34: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+		};
+
+		imux35: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+		};
+	};
+};
+
+&i2c6 {
+	status = "okay";
+};
+
+// To FPGA
+&i2c7 {
+	status = "okay";
+};
+
+// To PDB
+&i2c8 {
+	status = "okay";
+	i2c-switch@72 {
+		compatible = "nxp,pca9543";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x72>;
+		imux36: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+
+		imux37: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+
+	};
+	i2c-switch@73 {
+		compatible = "nxp,pca9543";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x73>;
+		imux38: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+			//PDB-H
+			eeprom@51 {
+				compatible = "atmel,24c64";
+				reg = <0x51>;
+			};
+
+		};
+
+		imux39: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+			//PDB-V
+			eeprom@52 {
+				compatible = "atmel,24c64";
+				reg = <0x52>;
+			};
+		
+		};
+
+	};
+};
+
+//To GPU
+&i2c9 {
+	status = "okay";
+};
+
+// To GPU
+&i2c11 {
+	status = "okay";
+	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+&i2c12 {
+	status = "okay";
+};
+
+// TO OCP NIC
+&i2c13 {
+	status = "okay";
+};
+
+// To Debug card
+&i2c14 {
+	status = "okay";
+	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+&i2c15 {
+	status = "okay";
+	// BSM FRU
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+	};
 };
 
 &adc0 {
