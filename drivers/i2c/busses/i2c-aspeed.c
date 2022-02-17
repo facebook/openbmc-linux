@@ -92,8 +92,17 @@
 		 ASPEED_I2CD_INTR_SCL_TIMEOUT |				       \
 		 ASPEED_I2CD_INTR_ABNORMAL |				       \
 		 ASPEED_I2CD_INTR_ARBIT_LOSS)
+
+/*
+ * The SDA/SCL timeout or abnormal START/STOP may occur during
+ * a slave operation
+ */
 #define ASPEED_I2CD_INTR_SLAVE_ERRORS					       \
-		ASPEED_I2CD_INTR_SLAVE_INACTIVE_TIMEOUT
+		(ASPEED_I2CD_INTR_SLAVE_INACTIVE_TIMEOUT |		       \
+		 ASPEED_I2CD_INTR_SDA_DL_TIMEOUT |			       \
+		 ASPEED_I2CD_INTR_SCL_TIMEOUT |				       \
+		 ASPEED_I2CD_INTR_ABNORMAL)
+
 #define ASPEED_I2CD_INTR_ALL						       \
 		(ASPEED_I2CD_INTR_SLAVE_INACTIVE_TIMEOUT |		       \
 		 ASPEED_I2CD_INTR_SDA_DL_TIMEOUT |			       \
@@ -255,7 +264,7 @@ reset_out:
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 static int aspeed_i2c_check_slave_error(u32 irq_status)
 {
-	if (irq_status & ASPEED_I2CD_INTR_SLAVE_INACTIVE_TIMEOUT)
+	if (irq_status & ASPEED_I2CD_INTR_SLAVE_ERRORS)
 		return -EIO;
 
 	return 0;
