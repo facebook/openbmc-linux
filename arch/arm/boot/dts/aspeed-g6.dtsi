@@ -424,7 +424,7 @@
 					reg = <0x0 0x800>;
 					interrupts-extended = <&gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
 					clocks = <&syscon ASPEED_CLK_GATE_ESPICLK>;
-					//resets = <&syscon ASPEED_RESET_ESPI>;
+					resets = <&syscon ASPEED_RESET_ESPI>;
 					aspeed,scu = <&syscon>;
 					status = "disabled";
 				};
