@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 config SPI_ASPEED_SMC_MTD_SPI_NOR
 	tristate "Aspeed flash controllers in SPI mode"
-	depends on ARCH_ASPEED || COMPILE_TEST
+	depends on (ARCH_ASPEED && !SPI_ASPEED_SMC) || COMPILE_TEST
 	depends on HAS_IOMEM && OF
 	help
 	  This enables support for the Firmware Memory controller (FMC)
