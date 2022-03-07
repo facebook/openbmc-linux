@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 OR Linux-OpenIB */
 /* Copyright (c) 2018 Mellanox Technologies. */
 
+#include <net/inet_ecn.h>
 #include <net/vxlan.h>
 #include <net/gre.h>
 #include <net/geneve.h>
@@ -10,6 +11,8 @@
 #include "en_tc.h"
 #include "rep/tc.h"
 #include "rep/neigh.h"
+#include "lag.h"
+#include "lag_mp.h"
 
 struct mlx5e_tc_tun_route_attr {
 	struct net_device *out_dev;
@@ -227,7 +230,7 @@ int mlx5e_tc_tun_create_header_ipv4(struct mlx5e_priv *priv,
 	int err;
 
 	/* add the IP fields */
-	attr.fl.fl4.flowi4_tos = tun_key->tos;
+	attr.fl.fl4.flowi4_tos = tun_key->tos & ~INET_ECN_MASK;
 	attr.fl.fl4.daddr = tun_key->u.ipv4.dst;
 	attr.fl.fl4.saddr = tun_key->u.ipv4.src;
 	attr.ttl = tun_key->ttl;
@@ -342,7 +345,7 @@ int mlx5e_tc_tun_update_header_ipv4(struct mlx5e_priv *priv,
 	int err;
 
 	/* add the IP fields */
-	attr.fl.fl4.flowi4_tos = tun_key->tos;
+	attr.fl.fl4.flowi4_tos = tun_key->tos & ~INET_ECN_MASK;
 	attr.fl.fl4.daddr = tun_key->u.ipv4.dst;
 	attr.fl.fl4.saddr = tun_key->u.ipv4.src;
 	attr.ttl = tun_key->ttl;
@@ -525,7 +528,7 @@ int mlx5e_tc_tun_create_header_ipv6(struct mlx5e_priv *priv,
 	e->out_dev = attr.out_dev;
 	e->route_dev_ifindex = attr.route_dev->ifindex;
 
-	/* It's importent to add the neigh to the hash table before checking
+	/* It's important to add the neigh to the hash table before checking
 	 * the neigh validity state. So if we'll get a notification, in case the
 	 * neigh changes it's validity state, we would find the relevant neigh
 	 * in the hash.

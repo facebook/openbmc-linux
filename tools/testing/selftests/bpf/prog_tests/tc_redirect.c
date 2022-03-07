@@ -13,15 +13,16 @@
 #define _GNU_SOURCE
 
 #include <arpa/inet.h>
+#include <linux/if.h>
+#include <linux/if_tun.h>
 #include <linux/limits.h>
 #include <linux/sysctl.h>
-#include <linux/if_tun.h>
-#include <linux/if.h>
 #include <sched.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <sys/stat.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "test_progs.h"
 #include "network_helpers.h"
@@ -102,6 +103,13 @@ static int setns_by_fd(int nsfd)
 	 */
 	err = unshare(CLONE_NEWNS);
 	if (!ASSERT_OK(err, "unshare"))
+		return err;
+
+	/* Make our /sys mount private, so the following umount won't
+	 * trigger the global umount in case it's shared.
+	 */
+	err = mount("none", "/sys", NULL, MS_PRIVATE, NULL);
+	if (!ASSERT_OK(err, "remount private /sys"))
 		return err;
 
 	err = umount2("/sys", MNT_DETACH);
@@ -391,9 +399,7 @@ done:
 
 static int test_ping(int family, const char *addr)
 {
-	const char *ping = family == AF_INET6 ? "ping6" : "ping";
-
-	SYS("ip netns exec " NS_SRC " %s " PING_ARGS " %s > /dev/null", ping, addr);
+	SYS("ip netns exec " NS_SRC " %s " PING_ARGS " %s > /dev/null", ping_command(family), addr);
 	return 0;
 fail:
 	return -1;

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 OR MIT */
 /**************************************************************************
  *
- * Copyright 2009-2015 VMware, Inc., Palo Alto, CA., USA
+ * Copyright 2009-2021 VMware, Inc., Palo Alto, CA., USA
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
@@ -54,16 +54,13 @@
 
 
 #define VMWGFX_DRIVER_NAME "vmwgfx"
-#define VMWGFX_DRIVER_DATE "20210218"
+#define VMWGFX_DRIVER_DATE "20210722"
 #define VMWGFX_DRIVER_MAJOR 2
-#define VMWGFX_DRIVER_MINOR 18
-#define VMWGFX_DRIVER_PATCHLEVEL 1
+#define VMWGFX_DRIVER_MINOR 19
+#define VMWGFX_DRIVER_PATCHLEVEL 0
 #define VMWGFX_FIFO_STATIC_SIZE (1024*1024)
-#define VMWGFX_MAX_RELOCATIONS 2048
-#define VMWGFX_MAX_VALIDATIONS 2048
 #define VMWGFX_MAX_DISPLAYS 16
 #define VMWGFX_CMD_BOUNCE_INIT_SIZE 32768
-#define VMWGFX_ENABLE_SCREEN_TARGET_OTABLE 1
 
 #define VMWGFX_PCI_ID_SVGA2              0x0405
 #define VMWGFX_PCI_ID_SVGA3              0x0406
@@ -82,14 +79,18 @@
 			VMWGFX_NUM_GB_SURFACE +\
 			VMWGFX_NUM_GB_SCREEN_TARGET)
 
-#define VMW_PL_GMR (TTM_PL_PRIV + 0)
-#define VMW_PL_MOB (TTM_PL_PRIV + 1)
+#define VMW_PL_GMR      (TTM_PL_PRIV + 0)
+#define VMW_PL_MOB      (TTM_PL_PRIV + 1)
+#define VMW_PL_SYSTEM   (TTM_PL_PRIV + 2)
 
 #define VMW_RES_CONTEXT ttm_driver_type0
 #define VMW_RES_SURFACE ttm_driver_type1
 #define VMW_RES_STREAM ttm_driver_type2
 #define VMW_RES_FENCE ttm_driver_type3
 #define VMW_RES_SHADER ttm_driver_type4
+
+#define MKSSTAT_CAPACITY_LOG2 5U
+#define MKSSTAT_CAPACITY (1U << MKSSTAT_CAPACITY_LOG2)
 
 struct vmw_fpriv {
 	struct ttm_object_file *tfile;
@@ -311,7 +312,6 @@ struct vmw_res_cache_entry {
  * enum vmw_dma_map_mode - indicate how to perform TTM page dma mappings.
  */
 enum vmw_dma_map_mode {
-	vmw_dma_phys,           /* Use physical page addresses */
 	vmw_dma_alloc_coherent, /* Use TTM coherent pages */
 	vmw_dma_map_populate,   /* Unmap from DMA just after unpopulate */
 	vmw_dma_map_bind,       /* Unmap from DMA just before unbind */
@@ -356,7 +356,6 @@ struct vmw_piter {
 	unsigned long num_pages;
 	bool (*next)(struct vmw_piter *);
 	dma_addr_t (*dma_address)(struct vmw_piter *);
-	struct page *(*page)(struct vmw_piter *);
 };
 
 /*
@@ -366,7 +365,8 @@ enum vmw_display_unit_type {
 	vmw_du_invalid = 0,
 	vmw_du_legacy,
 	vmw_du_screen_object,
-	vmw_du_screen_target
+	vmw_du_screen_target,
+	vmw_du_max
 };
 
 struct vmw_validation_context;
@@ -486,12 +486,11 @@ struct vmw_private {
 	struct ttm_device bdev;
 
 	struct drm_vma_offset_manager vma_manager;
-	unsigned long pci_id;
-	u32 vmw_chipset;
+	u32 pci_id;
 	resource_size_t io_start;
 	resource_size_t vram_start;
 	resource_size_t vram_size;
-	resource_size_t prim_bb_mem;
+	resource_size_t max_primary_mem;
 	u32 __iomem *rmmio;
 	u32 *fifo_mem;
 	resource_size_t fifo_mem_size;
@@ -513,7 +512,6 @@ struct vmw_private {
 	bool has_gmr;
 	bool has_mob;
 	spinlock_t hw_lock;
-	spinlock_t cap_lock;
 	bool assume_16bpp;
 
 	enum vmw_sm_type sm_type;
@@ -629,6 +627,20 @@ struct vmw_private {
 
 	/* Validation memory reservation */
 	struct vmw_validation_mem vvm;
+
+	uint32 *devcaps;
+
+	/*
+	 * mksGuestStat instance-descriptor and pid arrays
+	 */
+	struct page *mksstat_user_pages[MKSSTAT_CAPACITY];
+	atomic_t mksstat_user_pids[MKSSTAT_CAPACITY];
+
+#if IS_ENABLED(CONFIG_DRM_VMWGFX_MKSSTATS)
+	struct page *mksstat_kern_pages[MKSSTAT_CAPACITY];
+	u8 mksstat_kern_top_timer[MKSSTAT_CAPACITY];
+	atomic_t mksstat_kern_pids[MKSSTAT_CAPACITY];
+#endif
 };
 
 static inline struct vmw_surface *vmw_res_to_srf(struct vmw_resource *res)
@@ -1025,7 +1037,6 @@ extern struct ttm_placement vmw_vram_placement;
 extern struct ttm_placement vmw_vram_sys_placement;
 extern struct ttm_placement vmw_vram_gmr_placement;
 extern struct ttm_placement vmw_sys_placement;
-extern struct ttm_placement vmw_evictable_placement;
 extern struct ttm_placement vmw_srf_placement;
 extern struct ttm_placement vmw_mob_placement;
 extern struct ttm_placement vmw_nonfixed_placement;
@@ -1073,7 +1084,7 @@ static inline dma_addr_t vmw_piter_dma_addr(struct vmw_piter *viter)
  */
 static inline struct page *vmw_piter_page(struct vmw_piter *viter)
 {
-	return viter->page(viter);
+	return viter->pages[viter->i];
 }
 
 /**
@@ -1101,15 +1112,14 @@ extern int vmw_execbuf_fence_commands(struct drm_file *file_priv,
 				      struct vmw_private *dev_priv,
 				      struct vmw_fence_obj **p_fence,
 				      uint32_t *p_handle);
-extern void vmw_execbuf_copy_fence_user(struct vmw_private *dev_priv,
+extern int vmw_execbuf_copy_fence_user(struct vmw_private *dev_priv,
 					struct vmw_fpriv *vmw_fp,
 					int ret,
 					struct drm_vmw_fence_rep __user
 					*user_fence_rep,
 					struct vmw_fence_obj *fence,
 					uint32_t fence_handle,
-					int32_t out_fence_fd,
-					struct sync_file *sync_file);
+					int32_t out_fence_fd);
 bool vmw_cmd_describe(const void *buf, u32 *size, char const **cmd);
 
 /**
@@ -1238,6 +1248,12 @@ int vmw_gmrid_man_init(struct vmw_private *dev_priv, int type);
 void vmw_gmrid_man_fini(struct vmw_private *dev_priv, int type);
 
 /**
+ * System memory manager
+ */
+int vmw_sys_man_init(struct vmw_private *dev_priv);
+void vmw_sys_man_fini(struct vmw_private *dev_priv);
+
+/**
  * Prime - vmwgfx_prime.c
  */
 
@@ -1281,7 +1297,6 @@ extern struct vmw_cmdbuf_res_manager *
 vmw_context_res_man(struct vmw_resource *ctx);
 extern struct vmw_resource *vmw_context_cotable(struct vmw_resource *ctx,
 						SVGACOTableType cotable_type);
-extern struct list_head *vmw_context_binding_list(struct vmw_resource *ctx);
 struct vmw_ctx_binding_state;
 extern struct vmw_ctx_binding_state *
 vmw_context_binding_state(struct vmw_resource *ctx);
@@ -1502,6 +1517,17 @@ __printf(1, 2) int vmw_host_printf(const char *fmt, ...);
 int vmw_msg_ioctl(struct drm_device *dev, void *data,
 		  struct drm_file *file_priv);
 
+/* Host mksGuestStats -vmwgfx_msg.c: */
+int vmw_mksstat_get_kern_slot(pid_t pid, struct vmw_private *dev_priv);
+
+int vmw_mksstat_reset_ioctl(struct drm_device *dev, void *data,
+		      struct drm_file *file_priv);
+int vmw_mksstat_add_ioctl(struct drm_device *dev, void *data,
+		      struct drm_file *file_priv);
+int vmw_mksstat_remove_ioctl(struct drm_device *dev, void *data,
+		      struct drm_file *file_priv);
+int vmw_mksstat_remove_all(struct vmw_private *dev_priv);
+
 /* VMW logging */
 
 /**
@@ -1526,16 +1552,7 @@ void vmw_bo_dirty_unmap(struct vmw_buffer_object *vbo,
 			pgoff_t start, pgoff_t end);
 vm_fault_t vmw_bo_vm_fault(struct vm_fault *vmf);
 vm_fault_t vmw_bo_vm_mkwrite(struct vm_fault *vmf);
-#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-vm_fault_t vmw_bo_vm_huge_fault(struct vm_fault *vmf,
-				enum page_entry_size pe_size);
-#endif
 
-/* Transparent hugepage support - vmwgfx_thp.c */
-#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-extern int vmw_thp_init(struct vmw_private *dev_priv);
-void vmw_thp_fini(struct vmw_private *dev_priv);
-#endif
 
 /**
  * VMW_DEBUG_KMS - Debug output for kernel mode-setting

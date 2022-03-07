@@ -27,7 +27,8 @@ static void *xattr_alloc(struct f2fs_sb_info *sbi, int size, bool *is_inline)
 {
 	if (likely(size == sbi->inline_xattr_slab_size)) {
 		*is_inline = true;
-		return kmem_cache_zalloc(sbi->inline_xattr_slab, GFP_NOFS);
+		return f2fs_kmem_cache_alloc(sbi->inline_xattr_slab,
+					GFP_F2FS_ZERO, false, sbi);
 	}
 	*is_inline = false;
 	return f2fs_kzalloc(sbi, size, GFP_NOFS);
@@ -683,8 +684,17 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 	}
 
 	last = here;
-	while (!IS_XATTR_LAST_ENTRY(last))
+	while (!IS_XATTR_LAST_ENTRY(last)) {
+		if ((void *)(last) + sizeof(__u32) > last_base_addr ||
+			(void *)XATTR_NEXT_ENTRY(last) > last_base_addr) {
+			f2fs_err(F2FS_I_SB(inode), "inode (%lu) has invalid last xattr entry, entry_size: %zu",
+					inode->i_ino, ENTRY_SIZE(last));
+			set_sbi_flag(F2FS_I_SB(inode), SBI_NEED_FSCK);
+			error = -EFSCORRUPTED;
+			goto exit;
+		}
 		last = XATTR_NEXT_ENTRY(last);
+	}
 
 	newsize = XATTR_ALIGN(sizeof(struct f2fs_xattr_entry) + len + size);
 

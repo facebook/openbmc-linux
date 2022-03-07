@@ -119,6 +119,16 @@ int dcn31_smu_send_msg_with_param(
 
 	result = dcn31_smu_wait_for_response(clk_mgr, 10, 200000);
 
+	if (result == VBIOSSMC_Result_Failed) {
+		if (msg_id == VBIOSSMC_MSG_TransferTableDram2Smu &&
+		    param == TABLE_WATERMARKS)
+			DC_LOG_WARNING("Watermarks table not configured properly by SMU");
+		else
+			ASSERT(0);
+		REG_WRITE(MP1_SMN_C2PMSG_91, VBIOSSMC_Result_OK);
+		return -1;
+	}
+
 	if (IS_SMU_TIMEOUT(result)) {
 		ASSERT(0);
 		dm_helpers_smu_timeout(CTX, msg_id, param, 10 * 200000);
@@ -147,7 +157,7 @@ int dcn31_smu_set_dispclk(struct clk_mgr_internal *clk_mgr, int requested_dispcl
 	actual_dispclk_set_mhz = dcn31_smu_send_msg_with_param(
 			clk_mgr,
 			VBIOSSMC_MSG_SetDispclkFreq,
-			(requested_dispclk_khz + 999) / 1000);
+			khz_to_mhz_ceil(requested_dispclk_khz));
 
 	return actual_dispclk_set_mhz * 1000;
 }
@@ -162,7 +172,7 @@ int dcn31_smu_set_dprefclk(struct clk_mgr_internal *clk_mgr)
 	actual_dprefclk_set_mhz = dcn31_smu_send_msg_with_param(
 			clk_mgr,
 			VBIOSSMC_MSG_SetDprefclkFreq,
-			(clk_mgr->base.dprefclk_khz + 999) / 1000);
+			khz_to_mhz_ceil(clk_mgr->base.dprefclk_khz));
 
 	/* TODO: add code for programing DP DTO, currently this is down by command table */
 
@@ -182,7 +192,7 @@ int dcn31_smu_set_hard_min_dcfclk(struct clk_mgr_internal *clk_mgr, int requeste
 	actual_dcfclk_set_mhz = dcn31_smu_send_msg_with_param(
 			clk_mgr,
 			VBIOSSMC_MSG_SetHardMinDcfclkByFreq,
-			(requested_dcfclk_khz + 999) / 1000);
+			khz_to_mhz_ceil(requested_dcfclk_khz));
 
 	return actual_dcfclk_set_mhz * 1000;
 }
@@ -200,7 +210,7 @@ int dcn31_smu_set_min_deep_sleep_dcfclk(struct clk_mgr_internal *clk_mgr, int re
 	actual_min_ds_dcfclk_mhz = dcn31_smu_send_msg_with_param(
 			clk_mgr,
 			VBIOSSMC_MSG_SetMinDeepSleepDcfclk,
-			(requested_min_ds_dcfclk_khz + 999) / 1000);
+			khz_to_mhz_ceil(requested_min_ds_dcfclk_khz));
 
 	return actual_min_ds_dcfclk_mhz * 1000;
 }
@@ -215,7 +225,7 @@ int dcn31_smu_set_dppclk(struct clk_mgr_internal *clk_mgr, int requested_dpp_khz
 	actual_dppclk_set_mhz = dcn31_smu_send_msg_with_param(
 			clk_mgr,
 			VBIOSSMC_MSG_SetDppclkFreq,
-			(requested_dpp_khz + 999) / 1000);
+			khz_to_mhz_ceil(requested_dpp_khz));
 
 	return actual_dppclk_set_mhz * 1000;
 }

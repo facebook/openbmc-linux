@@ -11,6 +11,11 @@
 
 #define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
 
+#define SOC_HAS_HDMI1
+#define SOC_HAS_SATA
+#define SOC_HAS_USB2_CH2
+#define SOC_HAS_USB2_CH3
+
 / {
 	compatible = "renesas,r8a7795";
 	#address-cells = <2>;
@@ -3370,7 +3375,7 @@
 	};
 
 	thermal-zones {
-		sensor_thermal1: sensor-thermal1 {
+		sensor1_thermal: sensor1-thermal {
 			polling-delay-passive = <250>;
 			polling-delay = <1000>;
 			thermal-sensors = <&tsc 0>;
@@ -3385,7 +3390,7 @@
 			};
 		};
 
-		sensor_thermal2: sensor-thermal2 {
+		sensor2_thermal: sensor2-thermal {
 			polling-delay-passive = <250>;
 			polling-delay = <1000>;
 			thermal-sensors = <&tsc 1>;
@@ -3400,7 +3405,7 @@
 			};
 		};
 
-		sensor_thermal3: sensor-thermal3 {
+		sensor3_thermal: sensor3-thermal {
 			polling-delay-passive = <250>;
 			polling-delay = <1000>;
 			thermal-sensors = <&tsc 2>;

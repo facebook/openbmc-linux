@@ -653,11 +653,6 @@ static bool ftgmac100_tx_complete_packet(struct ftgmac100 *priv)
 	ftgmac100_free_tx_packet(priv, pointer, skb, txdes, ctl_stat);
 	txdes->txdes0 = cpu_to_le32(ctl_stat & priv->txdes0_edotr_mask);
 
-	/* Ensure the descriptor config is visible before setting the tx
-	 * pointer.
-	 */
-	smp_wmb();
-
 	priv->tx_clean_pointer = ftgmac100_next_tx_pointer(priv, pointer);
 
 	return true;
@@ -810,11 +805,6 @@ static netdev_tx_t ftgmac100_hard_start_xmit(struct sk_buff *skb,
 	 */
 	dma_wmb();
 	first->txdes0 = cpu_to_le32(f_ctl_stat);
-
-	/* Ensure the descriptor config is visible before setting the tx
-	 * pointer.
-	 */
-	smp_wmb();
 
 	/* Update next TX pointer */
 	priv->tx_pointer = pointer;
@@ -1626,7 +1616,7 @@ static const struct net_device_ops ftgmac100_netdev_ops = {
 	.ndo_start_xmit		= ftgmac100_hard_start_xmit,
 	.ndo_set_mac_address	= ftgmac100_set_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_do_ioctl		= phy_do_ioctl,
+	.ndo_eth_ioctl		= phy_do_ioctl,
 	.ndo_tx_timeout		= ftgmac100_tx_timeout,
 	.ndo_set_rx_mode	= ftgmac100_set_rx_mode,
 	.ndo_set_features	= ftgmac100_set_features,

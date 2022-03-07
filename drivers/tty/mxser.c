@@ -261,7 +261,6 @@ struct mxser_port {
 	unsigned int xmit_head;
 	unsigned int xmit_tail;
 	unsigned int xmit_cnt;
-	int closing;
 
 	spinlock_t slock;
 };
@@ -923,7 +922,6 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 		return;
 	if (tty_port_close_start(port, tty, filp) == 0)
 		return;
-	info->closing = 1;
 	mutex_lock(&port->mutex);
 	mxser_close_port(port);
 	mxser_flush_buffer(tty);
@@ -932,7 +930,6 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 	mxser_shutdown_port(port);
 	tty_port_set_initialized(port, 0);
 	mutex_unlock(&port->mutex);
-	info->closing = 0;
 	/* Right now the tty_port set is done outside of the close_end helper
 	   as we don't yet have everyone using refcounts */	
 	tty_port_close_end(port, tty);
@@ -1039,12 +1036,12 @@ static int mxser_get_serial_info(struct tty_struct *tty,
 	if (closing_wait != ASYNC_CLOSING_WAIT_NONE)
 		closing_wait = jiffies_to_msecs(closing_wait) / 10;
 
-	ss->type = info->type,
-	ss->line = tty->index,
-	ss->port = info->ioaddr,
-	ss->irq = info->board->irq,
-	ss->flags = info->port.flags,
-	ss->baud_base = MXSER_BAUD_BASE,
+	ss->type = info->type;
+	ss->line = tty->index;
+	ss->port = info->ioaddr;
+	ss->irq = info->board->irq;
+	ss->flags = info->port.flags;
+	ss->baud_base = MXSER_BAUD_BASE;
 	ss->close_delay = close_delay;
 	ss->closing_wait = closing_wait;
 	ss->custom_divisor = MXSER_CUSTOM_DIVISOR,
@@ -1693,7 +1690,7 @@ static bool mxser_port_isr(struct mxser_port *port)
 
 	iir &= MOXA_MUST_IIR_MASK;
 	tty = tty_port_tty_get(&port->port);
-	if (!tty || port->closing || !tty_port_initialized(&port->port)) {
+	if (!tty) {
 		status = inb(port->ioaddr + UART_LSR);
 		outb(MOXA_MUST_FCR_GDA_MODE_ENABLE | UART_FCR_ENABLE_FIFO |
 				UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT,
@@ -1976,9 +1973,10 @@ static int __init mxser_module_init(void)
 {
 	int retval;
 
-	mxvar_sdriver = alloc_tty_driver(MXSER_PORTS);
-	if (!mxvar_sdriver)
-		return -ENOMEM;
+	mxvar_sdriver = tty_alloc_driver(MXSER_PORTS, TTY_DRIVER_REAL_RAW |
+			TTY_DRIVER_DYNAMIC_DEV);
+	if (IS_ERR(mxvar_sdriver))
+		return PTR_ERR(mxvar_sdriver);
 
 	/* Initialize the tty_driver structure */
 	mxvar_sdriver->name = "ttyMI";
@@ -1988,7 +1986,6 @@ static int __init mxser_module_init(void)
 	mxvar_sdriver->subtype = SERIAL_TYPE_NORMAL;
 	mxvar_sdriver->init_termios = tty_std_termios;
 	mxvar_sdriver->init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
-	mxvar_sdriver->flags = TTY_DRIVER_REAL_RAW|TTY_DRIVER_DYNAMIC_DEV;
 	tty_set_operations(mxvar_sdriver, &mxser_ops);
 
 	retval = tty_register_driver(mxvar_sdriver);
@@ -2008,7 +2005,7 @@ static int __init mxser_module_init(void)
 err_unr:
 	tty_unregister_driver(mxvar_sdriver);
 err_put:
-	put_tty_driver(mxvar_sdriver);
+	tty_driver_kref_put(mxvar_sdriver);
 	return retval;
 }
 
@@ -2016,7 +2013,7 @@ static void __exit mxser_module_exit(void)
 {
 	pci_unregister_driver(&mxser_driver);
 	tty_unregister_driver(mxvar_sdriver);
-	put_tty_driver(mxvar_sdriver);
+	tty_driver_kref_put(mxvar_sdriver);
 }
 
 module_init(mxser_module_init);

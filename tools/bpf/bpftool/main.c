@@ -64,7 +64,8 @@ static int do_help(int argc, char **argv)
 		"       %s version\n"
 		"\n"
 		"       OBJECT := { prog | map | link | cgroup | perf | net | feature | btf | gen | struct_ops | iter }\n"
-		"       " HELP_SPEC_OPTIONS "\n"
+		"       " HELP_SPEC_OPTIONS " |\n"
+		"                    {-V|--version} }\n"
 		"",
 		bin_name, bin_name, bin_name);
 
@@ -400,6 +401,8 @@ int main(int argc, char **argv)
 		{ 0 }
 	};
 	int opt, ret;
+
+	setlinebuf(stdout);
 
 	last_do_help = do_help;
 	pretty_output = false;

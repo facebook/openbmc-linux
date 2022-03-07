@@ -36,6 +36,7 @@
 #include "vangogh_ppt.h"
 #include "aldebaran_ppt.h"
 #include "yellow_carp_ppt.h"
+#include "cyan_skillfish_ppt.h"
 #include "amd_pcie.h"
 
 /*
@@ -57,7 +58,7 @@ static int smu_handle_task(struct smu_context *smu,
 			   enum amd_pp_task task_id,
 			   bool lock_needed);
 static int smu_reset(struct smu_context *smu);
-static int smu_set_fan_speed_percent(void *handle, u32 speed);
+static int smu_set_fan_speed_pwm(void *handle, u32 speed);
 static int smu_set_fan_control_mode(struct smu_context *smu, int value);
 static int smu_set_power_limit(void *handle, uint32_t limit);
 static int smu_set_fan_speed_rpm(void *handle, uint32_t speed);
@@ -402,17 +403,35 @@ static void smu_restore_dpm_user_profile(struct smu_context *smu)
 	}
 
 	/* set the user dpm fan configurations */
-	if (smu->user_dpm_profile.fan_mode == AMD_FAN_CTRL_MANUAL) {
+	if (smu->user_dpm_profile.fan_mode == AMD_FAN_CTRL_MANUAL ||
+	    smu->user_dpm_profile.fan_mode == AMD_FAN_CTRL_NONE) {
 		ret = smu_set_fan_control_mode(smu, smu->user_dpm_profile.fan_mode);
 		if (ret) {
+			smu->user_dpm_profile.fan_speed_pwm = 0;
+			smu->user_dpm_profile.fan_speed_rpm = 0;
+			smu->user_dpm_profile.fan_mode = AMD_FAN_CTRL_AUTO;
 			dev_err(smu->adev->dev, "Failed to set manual fan control mode\n");
-			return;
 		}
 
-		if (!ret && smu->user_dpm_profile.fan_speed_percent) {
-			ret = smu_set_fan_speed_percent(smu, smu->user_dpm_profile.fan_speed_percent);
+		if (smu->user_dpm_profile.fan_speed_pwm) {
+			ret = smu_set_fan_speed_pwm(smu, smu->user_dpm_profile.fan_speed_pwm);
 			if (ret)
-				dev_err(smu->adev->dev, "Failed to set manual fan speed\n");
+				dev_err(smu->adev->dev, "Failed to set manual fan speed in pwm\n");
+		}
+
+		if (smu->user_dpm_profile.fan_speed_rpm) {
+			ret = smu_set_fan_speed_rpm(smu, smu->user_dpm_profile.fan_speed_rpm);
+			if (ret)
+				dev_err(smu->adev->dev, "Failed to set manual fan speed in rpm\n");
+		}
+	}
+
+	/* Restore user customized OD settings */
+	if (smu->user_dpm_profile.user_od) {
+		if (smu->ppt_funcs->restore_user_od_settings) {
+			ret = smu->ppt_funcs->restore_user_od_settings(smu);
+			if (ret)
+				dev_err(smu->adev->dev, "Failed to upload customized OD settings\n");
 		}
 	}
 
@@ -588,6 +607,9 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 	case CHIP_YELLOW_CARP:
 		yellow_carp_set_ppt_funcs(smu);
 		break;
+	case CHIP_CYAN_SKILLFISH:
+		cyan_skillfish_set_ppt_funcs(smu);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -607,6 +629,7 @@ static int smu_early_init(void *handle)
 	mutex_init(&smu->smu_baco.mutex);
 	smu->smu_baco.state = SMU_BACO_STATE_EXIT;
 	smu->smu_baco.platform_support = false;
+	smu->user_dpm_profile.fan_mode = -1;
 
 	adev->powerplay.pp_handle = smu;
 	adev->powerplay.pp_funcs = &swsmu_pm_funcs;
@@ -1363,8 +1386,14 @@ static int smu_disable_dpms(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
 	int ret = 0;
+	/*
+	 * TODO: (adev->in_suspend && !adev->in_s0ix) is added to pair
+	 * the workaround which always reset the asic in suspend.
+	 * It's likely that workaround will be dropped in the future.
+	 * Then the change here should be dropped together.
+	 */
 	bool use_baco = !smu->is_apu &&
-		((amdgpu_in_reset(adev) &&
+		(((amdgpu_in_reset(adev) || (adev->in_suspend && !adev->in_s0ix)) &&
 		  (amdgpu_asic_reset_method(adev) == AMD_RESET_METHOD_BACO)) ||
 		 ((adev->in_runpm || adev->in_s4) && amdgpu_asic_supports_baco(adev)));
 
@@ -1381,7 +1410,7 @@ static int smu_disable_dpms(struct smu_context *smu)
 	 */
 	if (smu->uploading_custom_pp_table &&
 	    (adev->asic_type >= CHIP_NAVI10) &&
-	    (adev->asic_type <= CHIP_DIMGREY_CAVEFISH))
+	    (adev->asic_type <= CHIP_BEIGE_GOBY))
 		return smu_disable_all_features_with_exception(smu,
 							       true,
 							       SMU_FEATURE_COUNT);
@@ -1513,9 +1542,7 @@ static int smu_suspend(void *handle)
 
 	smu->watermarks_bitmap &= ~(WATERMARKS_LOADED);
 
-	/* skip CGPG when in S0ix */
-	if (smu->is_apu && !adev->in_s0ix)
-		smu_set_gfx_cgpg(&adev->smu, false);
+	smu_set_gfx_cgpg(&adev->smu, false);
 
 	return 0;
 }
@@ -1546,8 +1573,7 @@ static int smu_resume(void *handle)
 		return ret;
 	}
 
-	if (smu->is_apu)
-		smu_set_gfx_cgpg(&adev->smu, true);
+	smu_set_gfx_cgpg(&adev->smu, true);
 
 	smu->disable_uclk_switch = 0;
 
@@ -2166,7 +2192,6 @@ static int smu_set_gfx_cgpg(struct smu_context *smu, bool enabled)
 static int smu_set_fan_speed_rpm(void *handle, uint32_t speed)
 {
 	struct smu_context *smu = handle;
-	u32 percent;
 	int ret = 0;
 
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
@@ -2174,11 +2199,16 @@ static int smu_set_fan_speed_rpm(void *handle, uint32_t speed)
 
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->set_fan_speed_percent) {
-		percent = speed * 100 / smu->fan_max_rpm;
-		ret = smu->ppt_funcs->set_fan_speed_percent(smu, percent);
-		if (!ret && !(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE))
-			smu->user_dpm_profile.fan_speed_percent = percent;
+	if (smu->ppt_funcs->set_fan_speed_rpm) {
+		ret = smu->ppt_funcs->set_fan_speed_rpm(smu, speed);
+		if (!ret && !(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE)) {
+			smu->user_dpm_profile.flags |= SMU_CUSTOM_FAN_SPEED_RPM;
+			smu->user_dpm_profile.fan_speed_rpm = speed;
+
+			/* Override custom PWM setting as they cannot co-exist */
+			smu->user_dpm_profile.flags &= ~SMU_CUSTOM_FAN_SPEED_PWM;
+			smu->user_dpm_profile.fan_speed_pwm = 0;
+		}
 	}
 
 	mutex_unlock(&smu->mutex);
@@ -2538,8 +2568,11 @@ static int smu_set_fan_control_mode(struct smu_context *smu, int value)
 
 	/* reset user dpm fan speed */
 	if (!ret && value != AMD_FAN_CTRL_MANUAL &&
-			!(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE))
-		smu->user_dpm_profile.fan_speed_percent = 0;
+			!(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE)) {
+		smu->user_dpm_profile.fan_speed_pwm = 0;
+		smu->user_dpm_profile.fan_speed_rpm = 0;
+		smu->user_dpm_profile.flags &= ~(SMU_CUSTOM_FAN_SPEED_RPM | SMU_CUSTOM_FAN_SPEED_PWM);
+	}
 
 	return ret;
 }
@@ -2552,31 +2585,25 @@ static void smu_pp_set_fan_control_mode(void *handle, u32 value)
 }
 
 
-static int smu_get_fan_speed_percent(void *handle, u32 *speed)
+static int smu_get_fan_speed_pwm(void *handle, u32 *speed)
 {
 	struct smu_context *smu = handle;
 	int ret = 0;
-	uint32_t percent;
 
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
 		return -EOPNOTSUPP;
 
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->get_fan_speed_percent) {
-		ret = smu->ppt_funcs->get_fan_speed_percent(smu, &percent);
-		if (!ret) {
-			*speed = percent > 100 ? 100 : percent;
-		}
-	}
+	if (smu->ppt_funcs->get_fan_speed_pwm)
+		ret = smu->ppt_funcs->get_fan_speed_pwm(smu, speed);
 
 	mutex_unlock(&smu->mutex);
-
 
 	return ret;
 }
 
-static int smu_set_fan_speed_percent(void *handle, u32 speed)
+static int smu_set_fan_speed_pwm(void *handle, u32 speed)
 {
 	struct smu_context *smu = handle;
 	int ret = 0;
@@ -2586,12 +2613,16 @@ static int smu_set_fan_speed_percent(void *handle, u32 speed)
 
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->set_fan_speed_percent) {
-		if (speed > 100)
-			speed = 100;
-		ret = smu->ppt_funcs->set_fan_speed_percent(smu, speed);
-		if (!ret && !(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE))
-			smu->user_dpm_profile.fan_speed_percent = speed;
+	if (smu->ppt_funcs->set_fan_speed_pwm) {
+		ret = smu->ppt_funcs->set_fan_speed_pwm(smu, speed);
+		if (!ret && !(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE)) {
+			smu->user_dpm_profile.flags |= SMU_CUSTOM_FAN_SPEED_PWM;
+			smu->user_dpm_profile.fan_speed_pwm = speed;
+
+			/* Override custom RPM setting as they cannot co-exist */
+			smu->user_dpm_profile.flags &= ~SMU_CUSTOM_FAN_SPEED_RPM;
+			smu->user_dpm_profile.fan_speed_rpm = 0;
+		}
 	}
 
 	mutex_unlock(&smu->mutex);
@@ -2603,17 +2634,14 @@ static int smu_get_fan_speed_rpm(void *handle, uint32_t *speed)
 {
 	struct smu_context *smu = handle;
 	int ret = 0;
-	u32 percent;
 
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
 		return -EOPNOTSUPP;
 
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->get_fan_speed_percent) {
-		ret = smu->ppt_funcs->get_fan_speed_percent(smu, &percent);
-		*speed = percent * smu->fan_max_rpm / 100;
-	}
+	if (smu->ppt_funcs->get_fan_speed_rpm)
+		ret = smu->ppt_funcs->get_fan_speed_rpm(smu, speed);
 
 	mutex_unlock(&smu->mutex);
 
@@ -3030,8 +3058,8 @@ static const struct amd_pm_funcs swsmu_pm_funcs = {
 	/* export for sysfs */
 	.set_fan_control_mode    = smu_pp_set_fan_control_mode,
 	.get_fan_control_mode    = smu_get_fan_control_mode,
-	.set_fan_speed_percent   = smu_set_fan_speed_percent,
-	.get_fan_speed_percent   = smu_get_fan_speed_percent,
+	.set_fan_speed_pwm   = smu_set_fan_speed_pwm,
+	.get_fan_speed_pwm   = smu_get_fan_speed_pwm,
 	.force_clock_level       = smu_force_ppclk_levels,
 	.print_clock_levels      = smu_print_ppclk_levels,
 	.force_performance_level = smu_force_performance_level,

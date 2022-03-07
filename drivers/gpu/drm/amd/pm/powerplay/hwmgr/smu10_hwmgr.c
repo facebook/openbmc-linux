@@ -1065,7 +1065,7 @@ static int smu10_print_clock_levels(struct pp_hwmgr *hwmgr,
 			if (ret)
 				return ret;
 
-			size = sprintf(buf, "%s:\n", "OD_SCLK");
+			size += sprintf(buf + size, "%s:\n", "OD_SCLK");
 			size += sprintf(buf + size, "0: %10uMhz\n",
 			(data->gfx_actual_soft_min_freq > 0) ? data->gfx_actual_soft_min_freq : min_freq);
 			size += sprintf(buf + size, "1: %10uMhz\n",
@@ -1081,7 +1081,7 @@ static int smu10_print_clock_levels(struct pp_hwmgr *hwmgr,
 			if (ret)
 				return ret;
 
-			size = sprintf(buf, "%s:\n", "OD_RANGE");
+			size += sprintf(buf + size, "%s:\n", "OD_RANGE");
 			size += sprintf(buf + size, "SCLK: %7uMHz %10uMHz\n",
 				min_freq, max_freq);
 		}
@@ -1456,11 +1456,13 @@ static int smu10_get_power_profile_mode(struct pp_hwmgr *hwmgr, char *buf)
 	if (!buf)
 		return -EINVAL;
 
-	size += sprintf(buf + size, "%s %16s %s %s %s %s\n",title[0],
+	phm_get_sysfs_buf(&buf, &size);
+
+	size += sysfs_emit_at(buf, size, "%s %16s %s %s %s %s\n",title[0],
 			title[1], title[2], title[3], title[4], title[5]);
 
 	for (i = 0; i <= PP_SMC_POWER_PROFILE_COMPUTE; i++)
-		size += sprintf(buf + size, "%3d %14s%s: %14d %3d %10d %14d\n",
+		size += sysfs_emit_at(buf, size, "%3d %14s%s: %14d %3d %10d %14d\n",
 			i, profile_name[i], (i == hwmgr->power_profile_mode) ? "*" : " ",
 			profile_mode_setting[i][0], profile_mode_setting[i][1],
 			profile_mode_setting[i][2], profile_mode_setting[i][3]);
@@ -1580,7 +1582,7 @@ static int smu10_set_fine_grain_clk_vol(struct pp_hwmgr *hwmgr,
 		}
 
 		if (smu10_data->gfx_actual_soft_min_freq > smu10_data->gfx_actual_soft_max_freq) {
-			pr_err("The setting minimun sclk (%d) MHz is greater than the setting maximum sclk (%d) MHz\n",
+			pr_err("The setting minimum sclk (%d) MHz is greater than the setting maximum sclk (%d) MHz\n",
 					smu10_data->gfx_actual_soft_min_freq, smu10_data->gfx_actual_soft_max_freq);
 			return -EINVAL;
 		}

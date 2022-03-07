@@ -19,6 +19,7 @@
 
 #include <net/sch_generic.h>
 #include <net/pkt_cls.h>
+#include <net/pkt_sched.h>
 #include <net/ip.h>
 #include <net/flow_dissector.h>
 #include <net/geneve.h>
@@ -309,7 +310,8 @@ static int fl_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 		       struct tcf_result *res)
 {
 	struct cls_fl_head *head = rcu_dereference_bh(tp->root);
-	bool post_ct = qdisc_skb_cb(skb)->post_ct;
+	bool post_ct = tc_skb_cb(skb)->post_ct;
+	u16 zone = tc_skb_cb(skb)->zone;
 	struct fl_flow_key skb_key;
 	struct fl_flow_mask *mask;
 	struct cls_fl_filter *f;
@@ -327,7 +329,7 @@ static int fl_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 		skb_flow_dissect_ct(skb, &mask->dissector, &skb_key,
 				    fl_ct_info_to_flower_map,
 				    ARRAY_SIZE(fl_ct_info_to_flower_map),
-				    post_ct);
+				    post_ct, zone);
 		skb_flow_dissect_hash(skb, &mask->dissector, &skb_key);
 		skb_flow_dissect(skb, &mask->dissector, &skb_key, 0);
 
@@ -1915,23 +1917,22 @@ errout_cleanup:
 static int fl_set_parms(struct net *net, struct tcf_proto *tp,
 			struct cls_fl_filter *f, struct fl_flow_mask *mask,
 			unsigned long base, struct nlattr **tb,
-			struct nlattr *est, bool ovr,
-			struct fl_flow_tmplt *tmplt, bool rtnl_held,
+			struct nlattr *est,
+			struct fl_flow_tmplt *tmplt, u32 flags,
 			struct netlink_ext_ack *extack)
 {
 	int err;
 
-	err = tcf_exts_validate(net, tp, tb, est, &f->exts, ovr, rtnl_held,
-				extack);
+	err = tcf_exts_validate(net, tp, tb, est, &f->exts, flags, extack);
 	if (err < 0)
 		return err;
 
 	if (tb[TCA_FLOWER_CLASSID]) {
 		f->res.classid = nla_get_u32(tb[TCA_FLOWER_CLASSID]);
-		if (!rtnl_held)
+		if (flags & TCA_ACT_FLAGS_NO_RTNL)
 			rtnl_lock();
 		tcf_bind_filter(tp, &f->res, base);
-		if (!rtnl_held)
+		if (flags & TCA_ACT_FLAGS_NO_RTNL)
 			rtnl_unlock();
 	}
 
@@ -1975,10 +1976,11 @@ static int fl_ht_insert_unique(struct cls_fl_filter *fnew,
 static int fl_change(struct net *net, struct sk_buff *in_skb,
 		     struct tcf_proto *tp, unsigned long base,
 		     u32 handle, struct nlattr **tca,
-		     void **arg, bool ovr, bool rtnl_held,
+		     void **arg, u32 flags,
 		     struct netlink_ext_ack *extack)
 {
 	struct cls_fl_head *head = fl_head_dereference(tp);
+	bool rtnl_held = !(flags & TCA_ACT_FLAGS_NO_RTNL);
 	struct cls_fl_filter *fold = *arg;
 	struct cls_fl_filter *fnew;
 	struct fl_flow_mask *mask;
@@ -2034,8 +2036,8 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 		}
 	}
 
-	err = fl_set_parms(net, tp, fnew, mask, base, tb, tca[TCA_RATE], ovr,
-			   tp->chain->tmplt_priv, rtnl_held, extack);
+	err = fl_set_parms(net, tp, fnew, mask, base, tb, tca[TCA_RATE],
+			   tp->chain->tmplt_priv, flags, extack);
 	if (err)
 		goto errout;
 
@@ -2188,18 +2190,24 @@ static void fl_walk(struct tcf_proto *tp, struct tcf_walker *arg,
 
 	arg->count = arg->skip;
 
+	rcu_read_lock();
 	idr_for_each_entry_continue_ul(&head->handle_idr, f, tmp, id) {
 		/* don't return filters that are being deleted */
 		if (!refcount_inc_not_zero(&f->refcnt))
 			continue;
+		rcu_read_unlock();
+
 		if (arg->fn(tp, f, arg) < 0) {
 			__fl_put(f);
 			arg->stop = 1;
+			rcu_read_lock();
 			break;
 		}
 		__fl_put(f);
 		arg->count++;
+		rcu_read_lock();
 	}
+	rcu_read_unlock();
 	arg->cookie = id;
 }
 

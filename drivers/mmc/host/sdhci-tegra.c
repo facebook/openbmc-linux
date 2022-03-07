@@ -116,6 +116,8 @@
  */
 #define NVQUIRK_HAS_TMCLK				BIT(10)
 
+#define NVQUIRK_HAS_ANDROID_GPT_SECTOR			BIT(11)
+
 /* SDMMC CQE Base Address for Tegra Host Ver 4.1 and Higher */
 #define SDHCI_TEGRA_CQE_BASE_ADDR			0xF000
 
@@ -352,23 +354,6 @@ static void tegra_sdhci_set_tap(struct sdhci_host *host, unsigned int tap)
 		sdhci_reset(host, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
 		tegra_sdhci_configure_card_clk(host, card_clk_enabled);
 	}
-}
-
-static void tegra_sdhci_hs400_enhanced_strobe(struct mmc_host *mmc,
-					      struct mmc_ios *ios)
-{
-	struct sdhci_host *host = mmc_priv(mmc);
-	u32 val;
-
-	val = sdhci_readl(host, SDHCI_TEGRA_VENDOR_SYS_SW_CTRL);
-
-	if (ios->enhanced_strobe)
-		val |= SDHCI_TEGRA_SYS_SW_CTRL_ENHANCED_STROBE;
-	else
-		val &= ~SDHCI_TEGRA_SYS_SW_CTRL_ENHANCED_STROBE;
-
-	sdhci_writel(host, val, SDHCI_TEGRA_VENDOR_SYS_SW_CTRL);
-
 }
 
 static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
@@ -789,6 +774,32 @@ static void tegra_sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 		tegra_sdhci_pad_autocalib(host);
 		tegra_host->pad_calib_required = false;
 	}
+}
+
+static void tegra_sdhci_hs400_enhanced_strobe(struct mmc_host *mmc,
+					      struct mmc_ios *ios)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	u32 val;
+
+	val = sdhci_readl(host, SDHCI_TEGRA_VENDOR_SYS_SW_CTRL);
+
+	if (ios->enhanced_strobe) {
+		val |= SDHCI_TEGRA_SYS_SW_CTRL_ENHANCED_STROBE;
+		/*
+		 * When CMD13 is sent from mmc_select_hs400es() after
+		 * switching to HS400ES mode, the bus is operating at
+		 * either MMC_HIGH_26_MAX_DTR or MMC_HIGH_52_MAX_DTR.
+		 * To meet Tegra SDHCI requirement at HS400ES mode, force SDHCI
+		 * interface clock to MMC_HS200_MAX_DTR (200 MHz) so that host
+		 * controller CAR clock and the interface clock are rate matched.
+		 */
+		tegra_sdhci_set_clock(host, MMC_HS200_MAX_DTR);
+	} else {
+		val &= ~SDHCI_TEGRA_SYS_SW_CTRL_ENHANCED_STROBE;
+	}
+
+	sdhci_writel(host, val, SDHCI_TEGRA_VENDOR_SYS_SW_CTRL);
 }
 
 static unsigned int tegra_sdhci_get_max_clock(struct sdhci_host *host)
@@ -1361,6 +1372,7 @@ static const struct sdhci_tegra_soc_data soc_data_tegra20 = {
 	.pdata = &sdhci_tegra20_pdata,
 	.dma_mask = DMA_BIT_MASK(32),
 	.nvquirks = NVQUIRK_FORCE_SDHCI_SPEC_200 |
+		    NVQUIRK_HAS_ANDROID_GPT_SECTOR |
 		    NVQUIRK_ENABLE_BLOCK_GAP_DET,
 };
 
@@ -1390,6 +1402,7 @@ static const struct sdhci_tegra_soc_data soc_data_tegra30 = {
 	.nvquirks = NVQUIRK_ENABLE_SDHCI_SPEC_300 |
 		    NVQUIRK_ENABLE_SDR50 |
 		    NVQUIRK_ENABLE_SDR104 |
+		    NVQUIRK_HAS_ANDROID_GPT_SECTOR |
 		    NVQUIRK_HAS_PADCALIB,
 };
 
@@ -1422,6 +1435,7 @@ static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
 static const struct sdhci_tegra_soc_data soc_data_tegra114 = {
 	.pdata = &sdhci_tegra114_pdata,
 	.dma_mask = DMA_BIT_MASK(32),
+	.nvquirks = NVQUIRK_HAS_ANDROID_GPT_SECTOR,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra124_pdata = {
@@ -1438,6 +1452,7 @@ static const struct sdhci_pltfm_data sdhci_tegra124_pdata = {
 static const struct sdhci_tegra_soc_data soc_data_tegra124 = {
 	.pdata = &sdhci_tegra124_pdata,
 	.dma_mask = DMA_BIT_MASK(34),
+	.nvquirks = NVQUIRK_HAS_ANDROID_GPT_SECTOR,
 };
 
 static const struct sdhci_ops tegra210_sdhci_ops = {
@@ -1615,6 +1630,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	tegra_host->pad_calib_required = false;
 	tegra_host->pad_control_available = false;
 	tegra_host->soc_data = soc_data;
+
+	if (soc_data->nvquirks & NVQUIRK_HAS_ANDROID_GPT_SECTOR)
+		host->mmc->caps2 |= MMC_CAP2_ALT_GPT_TEGRA;
 
 	if (soc_data->nvquirks & NVQUIRK_NEEDS_PAD_CONTROL) {
 		rc = tegra_sdhci_init_pinctrl_info(&pdev->dev, tegra_host);

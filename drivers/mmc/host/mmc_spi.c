@@ -180,7 +180,7 @@ static int mmc_spi_skip(struct mmc_spi_host *host, unsigned long timeout,
 	u8 *cp = host->data->status;
 	unsigned long start = jiffies;
 
-	while (1) {
+	do {
 		int		status;
 		unsigned	i;
 
@@ -193,16 +193,9 @@ static int mmc_spi_skip(struct mmc_spi_host *host, unsigned long timeout,
 				return cp[i];
 		}
 
-		if (time_is_before_jiffies(start + timeout))
-			break;
-
-		/* If we need long timeouts, we may release the CPU.
-		 * We use jiffies here because we want to have a relation
-		 * between elapsed time and the blocking of the scheduler.
-		 */
-		if (time_is_before_jiffies(start + 1))
-			schedule();
-	}
+		/* If we need long timeouts, we may release the CPU */
+		cond_resched();
+	} while (time_is_after_jiffies(start + timeout));
 	return -ETIMEDOUT;
 }
 
@@ -948,7 +941,7 @@ mmc_spi_data_do(struct mmc_spi_host *host, struct mmc_command *cmd,
 
 		/* discard mappings */
 		if (direction == DMA_FROM_DEVICE)
-			flush_kernel_dcache_page(sg_page(sg));
+			flush_dcache_page(sg_page(sg));
 		kunmap(sg_page(sg));
 		if (dma_dev)
 			dma_unmap_page(dma_dev, dma_addr, PAGE_SIZE, dir);
@@ -1521,6 +1514,12 @@ static int mmc_spi_remove(struct spi_device *spi)
 	return 0;
 }
 
+static const struct spi_device_id mmc_spi_dev_ids[] = {
+	{ "mmc-spi-slot"},
+	{ },
+};
+MODULE_DEVICE_TABLE(spi, mmc_spi_dev_ids);
+
 static const struct of_device_id mmc_spi_of_match_table[] = {
 	{ .compatible = "mmc-spi-slot", },
 	{},
@@ -1532,6 +1531,7 @@ static struct spi_driver mmc_spi_driver = {
 		.name =		"mmc_spi",
 		.of_match_table = mmc_spi_of_match_table,
 	},
+	.id_table =	mmc_spi_dev_ids,
 	.probe =	mmc_spi_probe,
 	.remove =	mmc_spi_remove,
 };

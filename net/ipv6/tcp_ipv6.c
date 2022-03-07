@@ -107,9 +107,9 @@ static void inet6_sk_rx_dst_set(struct sock *sk, const struct sk_buff *skb)
 	if (dst && dst_hold_safe(dst)) {
 		const struct rt6_info *rt = (const struct rt6_info *)dst;
 
-		sk->sk_rx_dst = dst;
-		inet_sk(sk)->rx_dst_ifindex = skb->skb_iif;
-		tcp_inet6_sk(sk)->rx_dst_cookie = rt6_get_cookie(rt);
+		rcu_assign_pointer(sk->sk_rx_dst, dst);
+		sk->sk_rx_dst_ifindex = skb->skb_iif;
+		sk->sk_rx_dst_cookie = rt6_get_cookie(rt);
 	}
 }
 
@@ -599,6 +599,7 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&cmd.tcpm_addr;
 	int l3index = 0;
 	u8 prefixlen;
+	u8 flags;
 
 	if (optlen < sizeof(cmd))
 		return -EINVAL;
@@ -608,6 +609,8 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 
 	if (sin6->sin6_family != AF_INET6)
 		return -EINVAL;
+
+	flags = cmd.tcpm_flags & TCP_MD5SIG_FLAG_IFINDEX;
 
 	if (optname == TCP_MD5SIG_EXT &&
 	    cmd.tcpm_flags & TCP_MD5SIG_FLAG_PREFIX) {
@@ -619,7 +622,7 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 		prefixlen = ipv6_addr_v4mapped(&sin6->sin6_addr) ? 32 : 128;
 	}
 
-	if (optname == TCP_MD5SIG_EXT &&
+	if (optname == TCP_MD5SIG_EXT && cmd.tcpm_ifindex &&
 	    cmd.tcpm_flags & TCP_MD5SIG_FLAG_IFINDEX) {
 		struct net_device *dev;
 
@@ -640,9 +643,9 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 		if (ipv6_addr_v4mapped(&sin6->sin6_addr))
 			return tcp_md5_do_del(sk, (union tcp_md5_addr *)&sin6->sin6_addr.s6_addr32[3],
 					      AF_INET, prefixlen,
-					      l3index);
+					      l3index, flags);
 		return tcp_md5_do_del(sk, (union tcp_md5_addr *)&sin6->sin6_addr,
-				      AF_INET6, prefixlen, l3index);
+				      AF_INET6, prefixlen, l3index, flags);
 	}
 
 	if (cmd.tcpm_keylen > TCP_MD5SIG_MAXKEYLEN)
@@ -650,12 +653,12 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 
 	if (ipv6_addr_v4mapped(&sin6->sin6_addr))
 		return tcp_md5_do_add(sk, (union tcp_md5_addr *)&sin6->sin6_addr.s6_addr32[3],
-				      AF_INET, prefixlen, l3index,
+				      AF_INET, prefixlen, l3index, flags,
 				      cmd.tcpm_key, cmd.tcpm_keylen,
 				      GFP_KERNEL);
 
 	return tcp_md5_do_add(sk, (union tcp_md5_addr *)&sin6->sin6_addr,
-			      AF_INET6, prefixlen, l3index,
+			      AF_INET6, prefixlen, l3index, flags,
 			      cmd.tcpm_key, cmd.tcpm_keylen, GFP_KERNEL);
 }
 
@@ -1404,7 +1407,7 @@ static struct sock *tcp_v6_syn_recv_sock(const struct sock *sk, struct sk_buff *
 		 * across. Shucks.
 		 */
 		tcp_md5_do_add(newsk, (union tcp_md5_addr *)&newsk->sk_v6_daddr,
-			       AF_INET6, 128, l3index, key->key, key->keylen,
+			       AF_INET6, 128, l3index, key->flags, key->key, key->keylen,
 			       sk_gfp_mask(sk, GFP_ATOMIC));
 	}
 #endif
@@ -1501,16 +1504,19 @@ static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 		opt_skb = skb_clone(skb, sk_gfp_mask(sk, GFP_ATOMIC));
 
 	if (sk->sk_state == TCP_ESTABLISHED) { /* Fast path */
-		struct dst_entry *dst = sk->sk_rx_dst;
+		struct dst_entry *dst;
+
+		dst = rcu_dereference_protected(sk->sk_rx_dst,
+						lockdep_sock_is_held(sk));
 
 		sock_rps_save_rxhash(sk, skb);
 		sk_mark_napi_id(sk, skb);
 		if (dst) {
-			if (inet_sk(sk)->rx_dst_ifindex != skb->skb_iif ||
+			if (sk->sk_rx_dst_ifindex != skb->skb_iif ||
 			    INDIRECT_CALL_1(dst->ops->check, ip6_dst_check,
-					    dst, np->rx_dst_cookie) == NULL) {
+					    dst, sk->sk_rx_dst_cookie) == NULL) {
+				RCU_INIT_POINTER(sk->sk_rx_dst, NULL);
 				dst_release(dst);
-				sk->sk_rx_dst = NULL;
 			}
 		}
 
@@ -1872,12 +1878,12 @@ INDIRECT_CALLABLE_SCOPE void tcp_v6_early_demux(struct sk_buff *skb)
 		skb->sk = sk;
 		skb->destructor = sock_edemux;
 		if (sk_fullsock(sk)) {
-			struct dst_entry *dst = READ_ONCE(sk->sk_rx_dst);
+			struct dst_entry *dst = rcu_dereference(sk->sk_rx_dst);
 
 			if (dst)
-				dst = dst_check(dst, tcp_inet6_sk(sk)->rx_dst_cookie);
+				dst = dst_check(dst, sk->sk_rx_dst_cookie);
 			if (dst &&
-			    inet_sk(sk)->rx_dst_ifindex == skb->skb_iif)
+			    sk->sk_rx_dst_ifindex == skb->skb_iif)
 				skb_dst_set_noref(skb, dst);
 		}
 	}

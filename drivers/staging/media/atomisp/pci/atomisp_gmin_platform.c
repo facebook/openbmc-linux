@@ -481,7 +481,7 @@ fail:
 
 static u8 gmin_get_pmic_id_and_addr(struct device *dev)
 {
-	struct i2c_client *power;
+	struct i2c_client *power = NULL;
 	static u8 pmic_i2c_addr;
 
 	if (pmic_id)
@@ -1040,10 +1040,10 @@ static struct camera_sensor_platform_data acpi_gmin_plat = {
 	.get_vcm_ctrl = gmin_get_vcm_ctrl,
 };
 
-struct camera_sensor_platform_data *gmin_camera_platform_data(
-    struct v4l2_subdev *subdev,
-    enum atomisp_input_format csi_format,
-    enum atomisp_bayer_order csi_bayer)
+struct camera_sensor_platform_data *
+gmin_camera_platform_data(struct v4l2_subdev *subdev,
+			  enum atomisp_input_format csi_format,
+			  enum atomisp_bayer_order csi_bayer)
 {
 	u8 pmic_i2c_addr = gmin_detect_pmic(subdev);
 	struct gmin_subdev *gs;

@@ -361,6 +361,21 @@ int intel_opregion_notify_encoder(struct intel_encoder *intel_encoder,
 		port++;
 	}
 
+	/*
+	 * The port numbering and mapping here is bizarre. The now-obsolete
+	 * swsci spec supports ports numbered [0..4]. Port E is handled as a
+	 * special case, but port F and beyond are not. The functionality is
+	 * supposed to be obsolete for new platforms. Just bail out if the port
+	 * number is out of bounds after mapping.
+	 */
+	if (port > 4) {
+		drm_dbg_kms(&dev_priv->drm,
+			    "[ENCODER:%d:%s] port %c (index %u) out of bounds for display power state notification\n",
+			    intel_encoder->base.base.id, intel_encoder->base.name,
+			    port_name(intel_encoder->port), port);
+		return -EINVAL;
+	}
+
 	if (!enable)
 		parm |= 4 << 8;
 
@@ -1077,6 +1092,9 @@ void intel_opregion_resume(struct drm_i915_private *i915)
 		opregion->asle->tche = ASLE_TCHE_BLC_EN;
 		opregion->asle->ardy = ASLE_ARDY_READY;
 	}
+
+	/* Some platforms abuse the _DSM to enable MUX */
+	intel_dsm_get_bios_data_funcs_supported(i915);
 
 	intel_opregion_notify_adapter(i915, PCI_D0);
 }

@@ -32,6 +32,7 @@
 #include <drm/ttm/ttm_placement.h>
 #include "vmwgfx_so.h"
 #include "vmwgfx_binding.h"
+#include "vmwgfx_mksstat.h"
 
 #define VMW_RES_HT_ORDER 12
 
@@ -2364,7 +2365,7 @@ static int vmw_cmd_dx_set_rendertargets(struct vmw_private *dev_priv,
 		sizeof(SVGA3dRenderTargetViewId);
 	int ret;
 
-	if (num_rt_view > SVGA3D_MAX_SIMULTANEOUS_RENDER_TARGETS) {
+	if (num_rt_view > SVGA3D_DX_MAX_RENDER_TARGETS) {
 		VMW_DEBUG_USER("Invalid DX Rendertarget binding.\n");
 		return -EINVAL;
 	}
@@ -2546,6 +2547,8 @@ static int vmw_cmd_dx_so_define(struct vmw_private *dev_priv,
 
 	so_type = vmw_so_cmd_to_type(header->id);
 	res = vmw_context_cotable(ctx_node->ctx, vmw_so_cotables[so_type]);
+	if (IS_ERR(res))
+		return PTR_ERR(res);
 	cmd = container_of(header, typeof(*cmd), header);
 	ret = vmw_cotable_notify(res, cmd->defined_id);
 
@@ -3820,17 +3823,17 @@ int vmw_execbuf_fence_commands(struct drm_file *file_priv,
  * Also if copying fails, user-space will be unable to signal the fence object
  * so we wait for it immediately, and then unreference the user-space reference.
  */
-void
+int
 vmw_execbuf_copy_fence_user(struct vmw_private *dev_priv,
 			    struct vmw_fpriv *vmw_fp, int ret,
 			    struct drm_vmw_fence_rep __user *user_fence_rep,
 			    struct vmw_fence_obj *fence, uint32_t fence_handle,
-			    int32_t out_fence_fd, struct sync_file *sync_file)
+			    int32_t out_fence_fd)
 {
 	struct drm_vmw_fence_rep fence_rep;
 
 	if (user_fence_rep == NULL)
-		return;
+		return 0;
 
 	memset(&fence_rep, 0, sizeof(fence_rep));
 
@@ -3858,20 +3861,14 @@ vmw_execbuf_copy_fence_user(struct vmw_private *dev_priv,
 	 * handle.
 	 */
 	if (unlikely(ret != 0) && (fence_rep.error == 0)) {
-		if (sync_file)
-			fput(sync_file->file);
-
-		if (fence_rep.fd != -1) {
-			put_unused_fd(fence_rep.fd);
-			fence_rep.fd = -1;
-		}
-
 		ttm_ref_object_base_unref(vmw_fp->tfile, fence_handle,
 					  TTM_REF_USAGE);
 		VMW_DEBUG_USER("Fence copy error. Syncing.\n");
 		(void) vmw_fence_obj_wait(fence, false, false,
 					  VMW_FENCE_WAIT_TIMEOUT);
 	}
+
+	return ret ? -EFAULT : 0;
 }
 
 /**
@@ -4209,15 +4206,22 @@ int vmw_execbuf_process(struct drm_file *file_priv,
 
 			(void) vmw_fence_obj_wait(fence, false, false,
 						  VMW_FENCE_WAIT_TIMEOUT);
+		}
+	}
+
+	ret = vmw_execbuf_copy_fence_user(dev_priv, vmw_fpriv(file_priv), ret,
+				    user_fence_rep, fence, handle, out_fence_fd);
+
+	if (sync_file) {
+		if (ret) {
+			/* usercopy of fence failed, put the file object */
+			fput(sync_file->file);
+			put_unused_fd(out_fence_fd);
 		} else {
 			/* Link the fence with the FD created earlier */
 			fd_install(out_fence_fd, sync_file->file);
 		}
 	}
-
-	vmw_execbuf_copy_fence_user(dev_priv, vmw_fpriv(file_priv), ret,
-				    user_fence_rep, fence, handle, out_fence_fd,
-				    sync_file);
 
 	/* Don't unreference when handing fence out */
 	if (unlikely(out_fence != NULL)) {
@@ -4236,7 +4240,7 @@ int vmw_execbuf_process(struct drm_file *file_priv,
 	 */
 	vmw_validation_unref_lists(&val_ctx);
 
-	return 0;
+	return ret;
 
 out_unlock_binding:
 	mutex_unlock(&dev_priv->binding_mutex);
@@ -4406,6 +4410,9 @@ int vmw_execbuf_ioctl(struct drm_device *dev, void *data,
 	int ret;
 	struct dma_fence *in_fence = NULL;
 
+	MKS_STAT_TIME_DECL(MKSSTAT_KERN_EXECBUF);
+	MKS_STAT_TIME_PUSH(MKSSTAT_KERN_EXECBUF);
+
 	/*
 	 * Extend the ioctl argument while maintaining backwards compatibility:
 	 * We take different code paths depending on the value of arg->version.
@@ -4415,7 +4422,8 @@ int vmw_execbuf_ioctl(struct drm_device *dev, void *data,
 	if (unlikely(arg->version > DRM_VMW_EXECBUF_VERSION ||
 		     arg->version == 0)) {
 		VMW_DEBUG_USER("Incorrect execbuf version.\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto mksstats_out;
 	}
 
 	switch (arg->version) {
@@ -4435,7 +4443,8 @@ int vmw_execbuf_ioctl(struct drm_device *dev, void *data,
 
 		if (!in_fence) {
 			VMW_DEBUG_USER("Cannot get imported fence\n");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto mksstats_out;
 		}
 
 		ret = vmw_wait_dma_fence(dev_priv->fman, in_fence);
@@ -4458,5 +4467,8 @@ int vmw_execbuf_ioctl(struct drm_device *dev, void *data,
 out:
 	if (in_fence)
 		dma_fence_put(in_fence);
+
+mksstats_out:
+	MKS_STAT_TIME_POP(MKSSTAT_KERN_EXECBUF);
 	return ret;
 }

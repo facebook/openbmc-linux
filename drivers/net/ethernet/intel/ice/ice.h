@@ -139,13 +139,10 @@
 #define ice_for_each_q_vector(vsi, i) \
 	for ((i) = 0; (i) < (vsi)->num_q_vectors; (i)++)
 
-#define ICE_UCAST_PROMISC_BITS (ICE_PROMISC_UCAST_TX | ICE_PROMISC_MCAST_TX | \
-				ICE_PROMISC_UCAST_RX | ICE_PROMISC_MCAST_RX)
+#define ICE_UCAST_PROMISC_BITS (ICE_PROMISC_UCAST_TX | ICE_PROMISC_UCAST_RX)
 
 #define ICE_UCAST_VLAN_PROMISC_BITS (ICE_PROMISC_UCAST_TX | \
-				     ICE_PROMISC_MCAST_TX | \
 				     ICE_PROMISC_UCAST_RX | \
-				     ICE_PROMISC_MCAST_RX | \
 				     ICE_PROMISC_VLAN_TX  | \
 				     ICE_PROMISC_VLAN_RX)
 
@@ -306,10 +303,6 @@ struct ice_vsi {
 	spinlock_t arfs_lock;	/* protects aRFS hash table and filter state */
 	atomic_t *arfs_last_fltr_id;
 
-	/* devlink port data */
-	struct devlink_port devlink_port;
-	bool devlink_port_registered;
-
 	u16 max_frame;
 	u16 rx_buf_len;
 
@@ -405,6 +398,7 @@ enum ice_pf_flags {
 	ICE_FLAG_VF_TRUE_PROMISC_ENA,
 	ICE_FLAG_MDD_AUTO_RESET_VF,
 	ICE_FLAG_LINK_LENIENT_MODE_ENA,
+	ICE_FLAG_PLUG_AUX_DEV,
 	ICE_PF_FLAGS_NBITS		/* must be last */
 };
 
@@ -420,6 +414,9 @@ struct ice_pf {
 
 	struct devlink_region *nvm_region;
 	struct devlink_region *devcaps_region;
+
+	/* devlink port data */
+	struct devlink_port devlink_port;
 
 	/* OS reserved IRQ details */
 	struct msix_entry *msix_entries;
@@ -695,7 +692,8 @@ static inline void ice_set_rdma_cap(struct ice_pf *pf)
 {
 	if (pf->hw.func_caps.common_cap.rdma && pf->num_rdma_msix) {
 		set_bit(ICE_FLAG_RDMA_ENA, pf->flags);
-		ice_plug_aux_dev(pf);
+		set_bit(ICE_FLAG_AUX_ENA, pf->flags);
+		set_bit(ICE_FLAG_PLUG_AUX_DEV, pf->flags);
 	}
 }
 
@@ -707,5 +705,6 @@ static inline void ice_clear_rdma_cap(struct ice_pf *pf)
 {
 	ice_unplug_aux_dev(pf);
 	clear_bit(ICE_FLAG_RDMA_ENA, pf->flags);
+	clear_bit(ICE_FLAG_AUX_ENA, pf->flags);
 }
 #endif /* _ICE_H_ */

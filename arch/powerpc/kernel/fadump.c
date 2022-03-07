@@ -24,8 +24,8 @@
 #include <linux/slab.h>
 #include <linux/cma.h>
 #include <linux/hugetlb.h>
+#include <linux/debugfs.h>
 
-#include <asm/debugfs.h>
 #include <asm/page.h>
 #include <asm/prom.h>
 #include <asm/fadump.h>
@@ -1557,7 +1557,7 @@ static void fadump_init_files(void)
 		return;
 	}
 
-	debugfs_create_file("fadump_region", 0444, powerpc_debugfs_root, NULL,
+	debugfs_create_file("fadump_region", 0444, arch_debugfs_dir, NULL,
 			    &fadump_region_fops);
 
 	if (fw_dump.dump_active) {
@@ -1640,6 +1640,14 @@ int __init setup_fadump(void)
 	/* Initialize the kernel dump memory structure for FAD registration. */
 	else if (fw_dump.reserve_dump_area_size)
 		fw_dump.ops->fadump_init_mem_struct(&fw_dump);
+
+	/*
+	 * In case of panic, fadump is triggered via ppc_panic_event()
+	 * panic notifier. Setting crash_kexec_post_notifiers to 'true'
+	 * lets panic() function take crash friendly path before panic
+	 * notifiers are invoked.
+	 */
+	crash_kexec_post_notifiers = true;
 
 	return 1;
 }

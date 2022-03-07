@@ -711,10 +711,11 @@ static int gfs2_release(struct inode *inode, struct file *file)
 	kfree(file->private_data);
 	file->private_data = NULL;
 
-	if (gfs2_rs_active(&ip->i_res))
-		gfs2_rs_delete(ip, &inode->i_writecount);
-	if (file->f_mode & FMODE_WRITE)
+	if (file->f_mode & FMODE_WRITE) {
+		if (gfs2_rs_active(&ip->i_res))
+			gfs2_rs_delete(ip, &inode->i_writecount);
 		gfs2_qa_put(ip);
+	}
 	return 0;
 }
 
@@ -1237,9 +1238,6 @@ static int gfs2_lock(struct file *file, int cmd, struct file_lock *fl)
 
 	if (!(fl->fl_flags & FL_POSIX))
 		return -ENOLCK;
-	if (__mandatory_lock(&ip->i_inode) && fl->fl_type != F_UNLCK)
-		return -ENOLCK;
-
 	if (cmd == F_CANCELLK) {
 		/* Hack: */
 		cmd = F_SETLK;

@@ -124,7 +124,7 @@ static void rpcrdma_xprt_drain(struct rpcrdma_xprt *r_xprt)
  * connection is closed or lost. (The important thing is it needs
  * to be invoked "at least" once).
  */
-static void rpcrdma_force_disconnect(struct rpcrdma_ep *ep)
+void rpcrdma_force_disconnect(struct rpcrdma_ep *ep)
 {
 	if (atomic_add_unless(&ep->re_force_disconnect, 1, 1))
 		xprt_force_disconnect(ep->re_xprt);
@@ -438,6 +438,7 @@ static int rpcrdma_ep_create(struct rpcrdma_xprt *r_xprt)
 					      IB_POLL_WORKQUEUE);
 	if (IS_ERR(ep->re_attr.send_cq)) {
 		rc = PTR_ERR(ep->re_attr.send_cq);
+		ep->re_attr.send_cq = NULL;
 		goto out_destroy;
 	}
 
@@ -446,6 +447,7 @@ static int rpcrdma_ep_create(struct rpcrdma_xprt *r_xprt)
 					      IB_POLL_WORKQUEUE);
 	if (IS_ERR(ep->re_attr.recv_cq)) {
 		rc = PTR_ERR(ep->re_attr.recv_cq);
+		ep->re_attr.recv_cq = NULL;
 		goto out_destroy;
 	}
 	ep->re_receive_count = 0;
@@ -484,6 +486,7 @@ static int rpcrdma_ep_create(struct rpcrdma_xprt *r_xprt)
 	ep->re_pd = ib_alloc_pd(device, 0);
 	if (IS_ERR(ep->re_pd)) {
 		rc = PTR_ERR(ep->re_pd);
+		ep->re_pd = NULL;
 		goto out_destroy;
 	}
 
@@ -1350,21 +1353,6 @@ static void rpcrdma_regbuf_free(struct rpcrdma_regbuf *rb)
 }
 
 /**
- * rpcrdma_post_sends - Post WRs to a transport's Send Queue
- * @r_xprt: controlling transport instance
- * @req: rpcrdma_req containing the Send WR to post
- *
- * Returns 0 if the post was successful, otherwise -ENOTCONN
- * is returned.
- */
-int rpcrdma_post_sends(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req)
-{
-	if (frwr_send(r_xprt, req))
-		return -ENOTCONN;
-	return 0;
-}
-
-/**
  * rpcrdma_post_recvs - Refill the Receive Queue
  * @r_xprt: controlling transport instance
  * @needed: current credit grant
@@ -1416,12 +1404,8 @@ void rpcrdma_post_recvs(struct rpcrdma_xprt *r_xprt, int needed, bool temp)
 
 	rc = ib_post_recv(ep->re_id->qp, wr,
 			  (const struct ib_recv_wr **)&bad_wr);
-	if (atomic_dec_return(&ep->re_receiving) > 0)
-		complete(&ep->re_done);
-
-out:
-	trace_xprtrdma_post_recvs(r_xprt, count, rc);
 	if (rc) {
+		trace_xprtrdma_post_recvs_err(r_xprt, rc);
 		for (wr = bad_wr; wr;) {
 			struct rpcrdma_rep *rep;
 
@@ -1431,6 +1415,11 @@ out:
 			--count;
 		}
 	}
+	if (atomic_dec_return(&ep->re_receiving) > 0)
+		complete(&ep->re_done);
+
+out:
+	trace_xprtrdma_post_recvs(r_xprt, count);
 	ep->re_receive_count += count;
 	return;
 }

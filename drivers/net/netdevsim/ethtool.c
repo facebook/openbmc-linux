@@ -43,7 +43,9 @@ nsim_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam *pause)
 }
 
 static int nsim_get_coalesce(struct net_device *dev,
-			     struct ethtool_coalesce *coal)
+			     struct ethtool_coalesce *coal,
+			     struct kernel_ethtool_coalesce *kernel_coal,
+			     struct netlink_ext_ack *extack)
 {
 	struct netdevsim *ns = netdev_priv(dev);
 
@@ -52,7 +54,9 @@ static int nsim_get_coalesce(struct net_device *dev,
 }
 
 static int nsim_set_coalesce(struct net_device *dev,
-			     struct ethtool_coalesce *coal)
+			     struct ethtool_coalesce *coal,
+			     struct kernel_ethtool_coalesce *kernel_coal,
+			     struct netlink_ext_ack *extack)
 {
 	struct netdevsim *ns = netdev_priv(dev);
 
@@ -73,7 +77,10 @@ static int nsim_set_ringparam(struct net_device *dev,
 {
 	struct netdevsim *ns = netdev_priv(dev);
 
-	memcpy(&ns->ethtool.ring, ring, sizeof(ns->ethtool.ring));
+	ns->ethtool.ring.rx_pending = ring->rx_pending;
+	ns->ethtool.ring.rx_jumbo_pending = ring->rx_jumbo_pending;
+	ns->ethtool.ring.rx_mini_pending = ring->rx_mini_pending;
+	ns->ethtool.ring.tx_pending = ring->tx_pending;
 	return 0;
 }
 

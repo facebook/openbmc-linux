@@ -775,28 +775,27 @@ static bool ext4_fc_add_tlv(struct super_block *sb, u16 tag, u16 len, u8 *val,
 }
 
 /* Same as above, but adds dentry tlv. */
-static  bool ext4_fc_add_dentry_tlv(struct super_block *sb, u16 tag,
-					int parent_ino, int ino, int dlen,
-					const unsigned char *dname,
-					u32 *crc)
+static bool ext4_fc_add_dentry_tlv(struct super_block *sb, u32 *crc,
+				   struct ext4_fc_dentry_update *fc_dentry)
 {
 	struct ext4_fc_dentry_info fcd;
 	struct ext4_fc_tl tl;
+	int dlen = fc_dentry->fcd_name.len;
 	u8 *dst = ext4_fc_reserve_space(sb, sizeof(tl) + sizeof(fcd) + dlen,
 					crc);
 
 	if (!dst)
 		return false;
 
-	fcd.fc_parent_ino = cpu_to_le32(parent_ino);
-	fcd.fc_ino = cpu_to_le32(ino);
-	tl.fc_tag = cpu_to_le16(tag);
+	fcd.fc_parent_ino = cpu_to_le32(fc_dentry->fcd_parent);
+	fcd.fc_ino = cpu_to_le32(fc_dentry->fcd_ino);
+	tl.fc_tag = cpu_to_le16(fc_dentry->fcd_op);
 	tl.fc_len = cpu_to_le16(sizeof(fcd) + dlen);
 	ext4_fc_memcpy(sb, dst, &tl, sizeof(tl), crc);
 	dst += sizeof(tl);
 	ext4_fc_memcpy(sb, dst, &fcd, sizeof(fcd), crc);
 	dst += sizeof(fcd);
-	ext4_fc_memcpy(sb, dst, dname, dlen, crc);
+	ext4_fc_memcpy(sb, dst, fc_dentry->fcd_name.name, dlen, crc);
 	dst += dlen;
 
 	return true;
@@ -893,6 +892,12 @@ static int ext4_fc_write_inode_data(struct inode *inode, u32 *crc)
 					    sizeof(lrange), (u8 *)&lrange, crc))
 				return -ENOSPC;
 		} else {
+			unsigned int max = (map.m_flags & EXT4_MAP_UNWRITTEN) ?
+				EXT_UNWRITTEN_MAX_LEN : EXT_INIT_MAX_LEN;
+
+			/* Limit the number of blocks in one extent */
+			map.m_len = min(max, map.m_len);
+
 			fc_ext.fc_ino = cpu_to_le32(inode->i_ino);
 			ex = (struct ext4_extent *)&fc_ext.fc_ex;
 			ex->ee_block = cpu_to_le32(map.m_lblk);
@@ -992,11 +997,7 @@ __releases(&sbi->s_fc_lock)
 				 &sbi->s_fc_dentry_q[FC_Q_MAIN], fcd_list) {
 		if (fc_dentry->fcd_op != EXT4_FC_TAG_CREAT) {
 			spin_unlock(&sbi->s_fc_lock);
-			if (!ext4_fc_add_dentry_tlv(
-				sb, fc_dentry->fcd_op,
-				fc_dentry->fcd_parent, fc_dentry->fcd_ino,
-				fc_dentry->fcd_name.len,
-				fc_dentry->fcd_name.name, crc)) {
+			if (!ext4_fc_add_dentry_tlv(sb, crc, fc_dentry)) {
 				ret = -ENOSPC;
 				goto lock_and_exit;
 			}
@@ -1035,11 +1036,7 @@ __releases(&sbi->s_fc_lock)
 		if (ret)
 			goto lock_and_exit;
 
-		if (!ext4_fc_add_dentry_tlv(
-			sb, fc_dentry->fcd_op,
-			fc_dentry->fcd_parent, fc_dentry->fcd_ino,
-			fc_dentry->fcd_name.len,
-			fc_dentry->fcd_name.name, crc)) {
+		if (!ext4_fc_add_dentry_tlv(sb, crc, fc_dentry)) {
 			ret = -ENOSPC;
 			goto lock_and_exit;
 		}
@@ -1436,14 +1433,15 @@ static int ext4_fc_record_modified_inode(struct super_block *sb, int ino)
 		if (state->fc_modified_inodes[i] == ino)
 			return 0;
 	if (state->fc_modified_inodes_used == state->fc_modified_inodes_size) {
-		state->fc_modified_inodes_size +=
-			EXT4_FC_REPLAY_REALLOC_INCREMENT;
 		state->fc_modified_inodes = krealloc(
-					state->fc_modified_inodes, sizeof(int) *
-					state->fc_modified_inodes_size,
-					GFP_KERNEL);
+				state->fc_modified_inodes,
+				sizeof(int) * (state->fc_modified_inodes_size +
+				EXT4_FC_REPLAY_REALLOC_INCREMENT),
+				GFP_KERNEL);
 		if (!state->fc_modified_inodes)
 			return -ENOMEM;
+		state->fc_modified_inodes_size +=
+			EXT4_FC_REPLAY_REALLOC_INCREMENT;
 	}
 	state->fc_modified_inodes[state->fc_modified_inodes_used++] = ino;
 	return 0;
@@ -1475,7 +1473,9 @@ static int ext4_fc_replay_inode(struct super_block *sb, struct ext4_fc_tl *tl,
 	}
 	inode = NULL;
 
-	ext4_fc_record_modified_inode(sb, ino);
+	ret = ext4_fc_record_modified_inode(sb, ino);
+	if (ret)
+		goto out;
 
 	raw_fc_inode = (struct ext4_inode *)
 		(val + offsetof(struct ext4_fc_inode, fc_raw_inode));
@@ -1606,16 +1606,23 @@ out:
 }
 
 /*
- * Record physical disk regions which are in use as per fast commit area. Our
- * simple replay phase allocator excludes these regions from allocation.
+ * Record physical disk regions which are in use as per fast commit area,
+ * and used by inodes during replay phase. Our simple replay phase
+ * allocator excludes these regions from allocation.
  */
-static int ext4_fc_record_regions(struct super_block *sb, int ino,
-		ext4_lblk_t lblk, ext4_fsblk_t pblk, int len)
+int ext4_fc_record_regions(struct super_block *sb, int ino,
+		ext4_lblk_t lblk, ext4_fsblk_t pblk, int len, int replay)
 {
 	struct ext4_fc_replay_state *state;
 	struct ext4_fc_alloc_region *region;
 
 	state = &EXT4_SB(sb)->s_fc_replay_state;
+	/*
+	 * during replay phase, the fc_regions_valid may not same as
+	 * fc_regions_used, update it when do new additions.
+	 */
+	if (replay && state->fc_regions_used != state->fc_regions_valid)
+		state->fc_regions_used = state->fc_regions_valid;
 	if (state->fc_regions_used == state->fc_regions_size) {
 		state->fc_regions_size +=
 			EXT4_FC_REPLAY_REALLOC_INCREMENT;
@@ -1632,6 +1639,9 @@ static int ext4_fc_record_regions(struct super_block *sb, int ino,
 	region->lblk = lblk;
 	region->pblk = pblk;
 	region->len = len;
+
+	if (replay)
+		state->fc_regions_valid++;
 
 	return 0;
 }
@@ -1664,6 +1674,8 @@ static int ext4_fc_replay_add_range(struct super_block *sb,
 	}
 
 	ret = ext4_fc_record_modified_inode(sb, inode->i_ino);
+	if (ret)
+		goto out;
 
 	start = le32_to_cpu(ex->ee_block);
 	start_pblk = ext4_ext_pblock(ex);
@@ -1681,18 +1693,14 @@ static int ext4_fc_replay_add_range(struct super_block *sb,
 		map.m_pblk = 0;
 		ret = ext4_map_blocks(NULL, inode, &map, 0);
 
-		if (ret < 0) {
-			iput(inode);
-			return 0;
-		}
+		if (ret < 0)
+			goto out;
 
 		if (ret == 0) {
 			/* Range is not mapped */
 			path = ext4_find_extent(inode, cur, NULL, 0);
-			if (IS_ERR(path)) {
-				iput(inode);
-				return 0;
-			}
+			if (IS_ERR(path))
+				goto out;
 			memset(&newex, 0, sizeof(newex));
 			newex.ee_block = cpu_to_le32(cur);
 			ext4_ext_store_pblock(
@@ -1706,10 +1714,8 @@ static int ext4_fc_replay_add_range(struct super_block *sb,
 			up_write((&EXT4_I(inode)->i_data_sem));
 			ext4_ext_drop_refs(path);
 			kfree(path);
-			if (ret) {
-				iput(inode);
-				return 0;
-			}
+			if (ret)
+				goto out;
 			goto next;
 		}
 
@@ -1722,10 +1728,8 @@ static int ext4_fc_replay_add_range(struct super_block *sb,
 			ret = ext4_ext_replay_update_ex(inode, cur, map.m_len,
 					ext4_ext_is_unwritten(ex),
 					start_pblk + cur - start);
-			if (ret) {
-				iput(inode);
-				return 0;
-			}
+			if (ret)
+				goto out;
 			/*
 			 * Mark the old blocks as free since they aren't used
 			 * anymore. We maintain an array of all the modified
@@ -1745,10 +1749,8 @@ static int ext4_fc_replay_add_range(struct super_block *sb,
 			ext4_ext_is_unwritten(ex), map.m_pblk);
 		ret = ext4_ext_replay_update_ex(inode, cur, map.m_len,
 					ext4_ext_is_unwritten(ex), map.m_pblk);
-		if (ret) {
-			iput(inode);
-			return 0;
-		}
+		if (ret)
+			goto out;
 		/*
 		 * We may have split the extent tree while toggling the state.
 		 * Try to shrink the extent tree now.
@@ -1760,6 +1762,7 @@ next:
 	}
 	ext4_ext_replay_shrink_inode(inode, i_size_read(inode) >>
 					sb->s_blocksize_bits);
+out:
 	iput(inode);
 	return 0;
 }
@@ -1789,6 +1792,8 @@ ext4_fc_replay_del_range(struct super_block *sb, struct ext4_fc_tl *tl,
 	}
 
 	ret = ext4_fc_record_modified_inode(sb, inode->i_ino);
+	if (ret)
+		goto out;
 
 	jbd_debug(1, "DEL_RANGE, inode %ld, lblk %d, len %d\n",
 			inode->i_ino, le32_to_cpu(lrange.fc_lblk),
@@ -1798,10 +1803,8 @@ ext4_fc_replay_del_range(struct super_block *sb, struct ext4_fc_tl *tl,
 		map.m_len = remaining;
 
 		ret = ext4_map_blocks(NULL, inode, &map, 0);
-		if (ret < 0) {
-			iput(inode);
-			return 0;
-		}
+		if (ret < 0)
+			goto out;
 		if (ret > 0) {
 			remaining -= ret;
 			cur += ret;
@@ -1812,16 +1815,18 @@ ext4_fc_replay_del_range(struct super_block *sb, struct ext4_fc_tl *tl,
 		}
 	}
 
-	ret = ext4_punch_hole(inode,
-		le32_to_cpu(lrange.fc_lblk) << sb->s_blocksize_bits,
-		le32_to_cpu(lrange.fc_len) <<  sb->s_blocksize_bits);
+	down_write(&EXT4_I(inode)->i_data_sem);
+	ret = ext4_ext_remove_space(inode, le32_to_cpu(lrange.fc_lblk),
+				le32_to_cpu(lrange.fc_lblk) +
+				le32_to_cpu(lrange.fc_len) - 1);
+	up_write(&EXT4_I(inode)->i_data_sem);
 	if (ret)
-		jbd_debug(1, "ext4_punch_hole returned %d", ret);
+		goto out;
 	ext4_ext_replay_shrink_inode(inode,
 		i_size_read(inode) >> sb->s_blocksize_bits);
 	ext4_mark_inode_dirty(NULL, inode);
+out:
 	iput(inode);
-
 	return 0;
 }
 
@@ -1973,7 +1978,7 @@ static int ext4_fc_replay_scan(journal_t *journal,
 			ret = ext4_fc_record_regions(sb,
 				le32_to_cpu(ext.fc_ino),
 				le32_to_cpu(ex->ee_block), ext4_ext_pblock(ex),
-				ext4_ext_get_actual_len(ex));
+				ext4_ext_get_actual_len(ex), 0);
 			if (ret < 0)
 				break;
 			ret = JBD2_FC_REPLAY_CONTINUE;
@@ -2187,4 +2192,9 @@ int __init ext4_fc_init_dentry_cache(void)
 		return -ENOMEM;
 
 	return 0;
+}
+
+void ext4_fc_destroy_dentry_cache(void)
+{
+	kmem_cache_destroy(ext4_fc_dentry_cachep);
 }

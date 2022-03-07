@@ -327,6 +327,19 @@
 			#power-domain-cells = <1>;
 		};
 
+		tsc: thermal@e6190000 {
+			compatible = "renesas,r8a779a0-thermal";
+			reg = <0 0xe6190000 0 0x200>,
+			      <0 0xe6198000 0 0x200>,
+			      <0 0xe61a0000 0 0x200>,
+			      <0 0xe61a8000 0 0x200>,
+			      <0 0xe61b0000 0 0x200>;
+			clocks = <&cpg CPG_MOD 919>;
+			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
+			resets = <&cpg 919>;
+			#thermal-sensor-cells = <1>;
+		};
+
 		tmu0: timer@e61e0000 {
 			compatible = "renesas,tmu-r8a779a0", "renesas,tmu";
 			reg = <0 0xe61e0000 0 0x30>;
@@ -390,19 +403,6 @@
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			resets = <&cpg 717>;
 			status = "disabled";
-		};
-
-		tsc: thermal@e6190000 {
-			compatible = "renesas,r8a779a0-thermal";
-			reg = <0 0xe6190000 0 0x200>,
-			      <0 0xe6198000 0 0x200>,
-			      <0 0xe61a0000 0 0x200>,
-			      <0 0xe61a8000 0 0x200>,
-			      <0 0xe61b0000 0 0x200>;
-			clocks = <&cpg CPG_MOD 919>;
-			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
-			resets = <&cpg 919>;
-			#thermal-sensor-cells = <1>;
 		};
 
 		i2c0: i2c@e6500000 {
@@ -1149,7 +1149,7 @@
 	};
 
 	thermal-zones {
-		sensor_thermal1: sensor-thermal1 {
+		sensor1_thermal: sensor1-thermal {
 			polling-delay-passive = <250>;
 			polling-delay = <1000>;
 			thermal-sensors = <&tsc 0>;
@@ -1163,7 +1163,7 @@
 			};
 		};
 
-		sensor_thermal2: sensor-thermal2 {
+		sensor2_thermal: sensor2-thermal {
 			polling-delay-passive = <250>;
 			polling-delay = <1000>;
 			thermal-sensors = <&tsc 1>;
@@ -1177,7 +1177,7 @@
 			};
 		};
 
-		sensor_thermal3: sensor-thermal3 {
+		sensor3_thermal: sensor3-thermal {
 			polling-delay-passive = <250>;
 			polling-delay = <1000>;
 			thermal-sensors = <&tsc 2>;
@@ -1191,7 +1191,7 @@
 			};
 		};
 
-		sensor_thermal4: sensor-thermal4 {
+		sensor4_thermal: sensor4-thermal {
 			polling-delay-passive = <250>;
 			polling-delay = <1000>;
 			thermal-sensors = <&tsc 3>;
@@ -1205,7 +1205,7 @@
 			};
 		};
 
-		sensor_thermal5: sensor-thermal5 {
+		sensor5_thermal: sensor5-thermal {
 			polling-delay-passive = <250>;
 			polling-delay = <1000>;
 			thermal-sensors = <&tsc 4>;

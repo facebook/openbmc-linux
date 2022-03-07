@@ -23,7 +23,6 @@
 #include "rtl_pm.h"
 
 int hwwep = 1;
-static int channels = 0x3fff;
 static char *ifname = "wlan%d";
 
 
@@ -2550,15 +2549,14 @@ static void _rtl92e_pci_disconnect(struct pci_dev *pdev)
 			free_irq(dev->irq, dev);
 			priv->irq = 0;
 		}
-		free_rtllib(dev);
 
 		if (dev->mem_start != 0) {
 			iounmap((void __iomem *)dev->mem_start);
 			release_mem_region(pci_resource_start(pdev, 1),
 					pci_resource_len(pdev, 1));
 		}
-	} else {
-		priv = rtllib_priv(dev);
+
+		free_rtllib(dev);
 	}
 
 	pci_disable_device(pdev);
@@ -2642,8 +2640,6 @@ MODULE_FIRMWARE(RTL8192E_DATA_IMG_FW);
 
 module_param(ifname, charp, 0644);
 module_param(hwwep, int, 0644);
-module_param(channels, int, 0644);
 
 MODULE_PARM_DESC(ifname, " Net interface name, wlan%d=default");
 MODULE_PARM_DESC(hwwep, " Try to use hardware WEP support(default use hw. set 0 to use software security)");
-MODULE_PARM_DESC(channels, " Channel bitmask for specific locales. NYI");

@@ -2,6 +2,7 @@
 /* Copyright (c) 2019 Mellanox Technologies. */
 
 #include <linux/mlx5/eswitch.h>
+#include <linux/err.h>
 #include "dr_types.h"
 
 #define DR_DOMAIN_SW_STEERING_SUPPORTED(dmn, dmn_type)	\
@@ -75,9 +76,9 @@ static int dr_domain_init_resources(struct mlx5dr_domain *dmn)
 	}
 
 	dmn->uar = mlx5_get_uars_page(dmn->mdev);
-	if (!dmn->uar) {
+	if (IS_ERR(dmn->uar)) {
 		mlx5dr_err(dmn, "Couldn't allocate UAR\n");
-		ret = -ENOMEM;
+		ret = PTR_ERR(dmn->uar);
 		goto clean_pd;
 	}
 
@@ -245,7 +246,7 @@ static int dr_domain_caps_init(struct mlx5_core_dev *mdev,
 			return -ENOTSUPP;
 
 		dmn->info.supp_sw_steering = true;
-		dmn->info.rx.ste_type = MLX5DR_STE_TYPE_RX;
+		dmn->info.rx.type = DR_DOMAIN_NIC_TYPE_RX;
 		dmn->info.rx.default_icm_addr = dmn->info.caps.nic_rx_drop_address;
 		dmn->info.rx.drop_icm_addr = dmn->info.caps.nic_rx_drop_address;
 		break;
@@ -254,7 +255,7 @@ static int dr_domain_caps_init(struct mlx5_core_dev *mdev,
 			return -ENOTSUPP;
 
 		dmn->info.supp_sw_steering = true;
-		dmn->info.tx.ste_type = MLX5DR_STE_TYPE_TX;
+		dmn->info.tx.type = DR_DOMAIN_NIC_TYPE_TX;
 		dmn->info.tx.default_icm_addr = dmn->info.caps.nic_tx_allow_address;
 		dmn->info.tx.drop_icm_addr = dmn->info.caps.nic_tx_drop_address;
 		break;
@@ -265,8 +266,8 @@ static int dr_domain_caps_init(struct mlx5_core_dev *mdev,
 		if (!DR_DOMAIN_SW_STEERING_SUPPORTED(dmn, fdb))
 			return -ENOTSUPP;
 
-		dmn->info.rx.ste_type = MLX5DR_STE_TYPE_RX;
-		dmn->info.tx.ste_type = MLX5DR_STE_TYPE_TX;
+		dmn->info.rx.type = DR_DOMAIN_NIC_TYPE_RX;
+		dmn->info.tx.type = DR_DOMAIN_NIC_TYPE_TX;
 		vport_cap = mlx5dr_get_vport_cap(&dmn->info.caps, 0);
 		if (!vport_cap) {
 			mlx5dr_err(dmn, "Failed to get esw manager vport\n");

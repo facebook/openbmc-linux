@@ -294,6 +294,9 @@ struct hda_gen_spec {
 				   struct hda_jack_callback *cb);
 	void (*mic_autoswitch_hook)(struct hda_codec *codec,
 				    struct hda_jack_callback *cb);
+
+	/* leds */
+	struct led_classdev *led_cdevs[NUM_AUDIO_LEDS];
 };
 
 /* values for add_stereo_mix_input flag */
@@ -324,7 +327,6 @@ int snd_hda_gen_parse_auto_config(struct hda_codec *codec,
 				  struct auto_pin_cfg *cfg);
 int snd_hda_gen_build_controls(struct hda_codec *codec);
 int snd_hda_gen_build_pcms(struct hda_codec *codec);
-void snd_hda_gen_reboot_notify(struct hda_codec *codec);
 
 /* standard jack event callbacks */
 void snd_hda_gen_hp_automute(struct hda_codec *codec,

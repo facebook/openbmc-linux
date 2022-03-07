@@ -80,9 +80,18 @@ static void mmc_host_classdev_release(struct device *dev)
 	kfree(host);
 }
 
+static int mmc_host_classdev_shutdown(struct device *dev)
+{
+	struct mmc_host *host = cls_dev_to_mmc_host(dev);
+
+	__mmc_stop_host(host);
+	return 0;
+}
+
 static struct class mmc_host_class = {
 	.name		= "mmc_host",
 	.dev_release	= mmc_host_classdev_release,
+	.shutdown_pre	= mmc_host_classdev_shutdown,
 	.pm		= MMC_HOST_CLASS_DEV_PM_OPS,
 };
 
@@ -96,6 +105,10 @@ void mmc_unregister_host_class(void)
 	class_unregister(&mmc_host_class);
 }
 
+/**
+ * mmc_retune_enable() - enter a transfer mode that requires retuning
+ * @host: host which should retune now
+ */
 void mmc_retune_enable(struct mmc_host *host)
 {
 	host->can_retune = 1;
@@ -127,13 +140,18 @@ void mmc_retune_unpause(struct mmc_host *host)
 }
 EXPORT_SYMBOL(mmc_retune_unpause);
 
+/**
+ * mmc_retune_disable() - exit a transfer mode that requires retuning
+ * @host: host which should not retune anymore
+ *
+ * It is not meant for temporarily preventing retuning!
+ */
 void mmc_retune_disable(struct mmc_host *host)
 {
 	mmc_retune_unpause(host);
 	host->can_retune = 0;
 	del_timer_sync(&host->retune_timer);
-	host->retune_now = 0;
-	host->need_retune = 0;
+	mmc_retune_clear(host);
 }
 
 void mmc_retune_timer_stop(struct mmc_host *host)

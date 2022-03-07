@@ -28,10 +28,7 @@ bool mlx5_sf_dev_allocated(const struct mlx5_core_dev *dev)
 {
 	struct mlx5_sf_dev_table *table = dev->priv.sf_dev_table;
 
-	if (!mlx5_sf_dev_supported(dev))
-		return false;
-
-	return !xa_empty(&table->devices);
+	return table && !xa_empty(&table->devices);
 }
 
 static ssize_t sfnum_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -39,7 +36,7 @@ static ssize_t sfnum_show(struct device *dev, struct device_attribute *attr, cha
 	struct auxiliary_device *adev = container_of(dev, struct auxiliary_device, dev);
 	struct mlx5_sf_dev *sf_dev = container_of(adev, struct mlx5_sf_dev, adev);
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", sf_dev->sfnum);
+	return sysfs_emit(buf, "%u\n", sf_dev->sfnum);
 }
 static DEVICE_ATTR_RO(sfnum);
 

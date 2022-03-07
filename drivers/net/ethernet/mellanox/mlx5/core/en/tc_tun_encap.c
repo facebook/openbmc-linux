@@ -147,7 +147,7 @@ void mlx5e_tc_encap_flows_add(struct mlx5e_priv *priv,
 	mlx5e_rep_queue_neigh_stats_work(priv);
 
 	list_for_each_entry(flow, flow_list, tmp_list) {
-		if (!mlx5e_is_offloaded_flow(flow))
+		if (!mlx5e_is_offloaded_flow(flow) || !flow_flag_test(flow, SLOW))
 			continue;
 		attr = flow->attr;
 		esw_attr = attr->esw_attr;
@@ -188,7 +188,7 @@ void mlx5e_tc_encap_flows_del(struct mlx5e_priv *priv,
 	int err;
 
 	list_for_each_entry(flow, flow_list, tmp_list) {
-		if (!mlx5e_is_offloaded_flow(flow))
+		if (!mlx5e_is_offloaded_flow(flow) || flow_flag_test(flow, SLOW))
 			continue;
 		attr = flow->attr;
 		esw_attr = attr->esw_attr;
@@ -221,8 +221,14 @@ static void mlx5e_take_tmp_flow(struct mlx5e_tc_flow *flow,
 				struct list_head *flow_list,
 				int index)
 {
-	if (IS_ERR(mlx5e_flow_get(flow)))
+	if (IS_ERR(mlx5e_flow_get(flow))) {
+		/* Flow is being deleted concurrently. Wait for it to be
+		 * unoffloaded from hardware, otherwise deleting encap will
+		 * fail.
+		 */
+		wait_for_completion(&flow->del_hw_done);
 		return;
+	}
 	wait_for_completion(&flow->init_done);
 
 	flow->tmp_entry_index = index;
@@ -1538,6 +1544,8 @@ mlx5e_init_fib_work_ipv4(struct mlx5e_priv *priv,
 	struct net_device *fib_dev;
 
 	fen_info = container_of(info, struct fib_entry_notifier_info, info);
+	if (fen_info->fi->nh)
+		return NULL;
 	fib_dev = fib_info_nh(fen_info->fi, 0)->fib_nh_dev;
 	if (!fib_dev || fib_dev->netdev_ops != &mlx5e_netdev_ops ||
 	    fen_info->dst_len != 32)

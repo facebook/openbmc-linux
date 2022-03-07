@@ -17,7 +17,12 @@
 # Mike Shaver, Helge Deller and Martin K. Petersen
 #
 
+ifdef CONFIG_PARISC_SELF_EXTRACT
+boot := arch/parisc/boot
+KBUILD_IMAGE := $(boot)/bzImage
+else
 KBUILD_IMAGE := vmlinuz
+endif
 
 NM		= sh $(srctree)/arch/parisc/nm
 CHECKFLAGS	+= -D__hppa__=1
@@ -25,18 +30,18 @@ CHECKFLAGS	+= -D__hppa__=1
 ifdef CONFIG_64BIT
 UTS_MACHINE	:= parisc64
 CHECKFLAGS	+= -D__LP64__=1
-CC_ARCHES	= hppa64
 LD_BFD		:= elf64-hppa-linux
 else # 32-bit
-CC_ARCHES	= hppa hppa2.0 hppa1.1
 LD_BFD		:= elf32-hppa-linux
 endif
 
 # select defconfig based on actual architecture
-ifeq ($(shell uname -m),parisc64)
+ifeq ($(ARCH),parisc64)
 	KBUILD_DEFCONFIG := generic-64bit_defconfig
+	CC_ARCHES := hppa64
 else
 	KBUILD_DEFCONFIG := generic-32bit_defconfig
+	CC_ARCHES := hppa hppa2.0 hppa1.1
 endif
 
 export LD_BFD
@@ -111,9 +116,6 @@ KBUILD_CFLAGS	+= $(cflags-y)
 LIBGCC		:= $(shell $(CC) -print-libgcc-file-name)
 export LIBGCC
 
-kernel-y			:= mm/ kernel/ math-emu/
-
-core-y	+= $(addprefix arch/parisc/, $(kernel-y))
 libs-y	+= arch/parisc/lib/ $(LIBGCC)
 
 boot	:= arch/parisc/boot

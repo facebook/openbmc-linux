@@ -900,7 +900,7 @@ static void atl1c_clean_tx_ring(struct atl1c_adapter *adapter,
 		atl1c_clean_buffer(pdev, buffer_info);
 	}
 
-	netdev_reset_queue(adapter->netdev);
+	netdev_tx_reset_queue(netdev_get_tx_queue(adapter->netdev, queue));
 
 	/* Zero out Tx-buffers */
 	memset(tpd_ring->desc, 0, sizeof(struct atl1c_tpd_desc) *
@@ -2609,7 +2609,7 @@ static const struct net_device_ops atl1c_netdev_ops = {
 	.ndo_change_mtu		= atl1c_change_mtu,
 	.ndo_fix_features	= atl1c_fix_features,
 	.ndo_set_features	= atl1c_set_features,
-	.ndo_do_ioctl		= atl1c_ioctl,
+	.ndo_eth_ioctl		= atl1c_ioctl,
 	.ndo_tx_timeout		= atl1c_tx_timeout,
 	.ndo_get_stats		= atl1c_get_stats,
 #ifdef CONFIG_NET_POLL_CONTROLLER

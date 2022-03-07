@@ -38,9 +38,8 @@ static struct hns3_dbg_dentry_info hns3_dbg_dentry[] = {
 	},
 };
 
-static int hns3_dbg_bd_file_init(struct hnae3_handle *handle, unsigned int cmd);
-static int hns3_dbg_common_file_init(struct hnae3_handle *handle,
-				     unsigned int cmd);
+static int hns3_dbg_bd_file_init(struct hnae3_handle *handle, u32 cmd);
+static int hns3_dbg_common_file_init(struct hnae3_handle *handle, u32 cmd);
 
 static struct hns3_dbg_cmd_info hns3_dbg_cmd[] = {
 	{
@@ -138,7 +137,7 @@ static struct hns3_dbg_cmd_info hns3_dbg_cmd[] = {
 		.name = "uc",
 		.cmd = HNAE3_DBG_CMD_MAC_UC,
 		.dentry = HNS3_DBG_DENTRY_MAC,
-		.buf_len = HNS3_DBG_READ_LEN,
+		.buf_len = HNS3_DBG_READ_LEN_128KB,
 		.init = hns3_dbg_common_file_init,
 	},
 	{
@@ -257,7 +256,7 @@ static struct hns3_dbg_cmd_info hns3_dbg_cmd[] = {
 		.name = "tqp",
 		.cmd = HNAE3_DBG_CMD_REG_TQP,
 		.dentry = HNS3_DBG_DENTRY_REG,
-		.buf_len = HNS3_DBG_READ_LEN,
+		.buf_len = HNS3_DBG_READ_LEN_128KB,
 		.init = hns3_dbg_common_file_init,
 	},
 	{
@@ -299,7 +298,7 @@ static struct hns3_dbg_cmd_info hns3_dbg_cmd[] = {
 		.name = "fd_tcam",
 		.cmd = HNAE3_DBG_CMD_FD_TCAM,
 		.dentry = HNS3_DBG_DENTRY_FD,
-		.buf_len = HNS3_DBG_READ_LEN,
+		.buf_len = HNS3_DBG_READ_LEN_1MB,
 		.init = hns3_dbg_common_file_init,
 	},
 	{
@@ -463,7 +462,7 @@ static const struct hns3_dbg_item rx_queue_info_items[] = {
 	{ "TAIL", 2 },
 	{ "HEAD", 2 },
 	{ "FBDNUM", 2 },
-	{ "PKTNUM", 2 },
+	{ "PKTNUM", 5 },
 	{ "COPYBREAK", 2 },
 	{ "RING_EN", 2 },
 	{ "RX_RING_EN", 2 },
@@ -566,7 +565,7 @@ static const struct hns3_dbg_item tx_queue_info_items[] = {
 	{ "HEAD", 2 },
 	{ "FBDNUM", 2 },
 	{ "OFFSET", 2 },
-	{ "PKTNUM", 2 },
+	{ "PKTNUM", 5 },
 	{ "RING_EN", 2 },
 	{ "TX_RING_EN", 2 },
 	{ "BASE_ADDR", 10 },
@@ -696,7 +695,7 @@ static int hns3_dbg_queue_map(struct hnae3_handle *h, char *buf, int len)
 		sprintf(result[j++], "%u", i);
 		sprintf(result[j++], "%u",
 			h->ae_algo->ops->get_global_queue_id(h, i));
-		sprintf(result[j++], "%u",
+		sprintf(result[j++], "%d",
 			priv->ring[i].tqp_vector->vector_irq);
 		hns3_dbg_fill_content(content, sizeof(content), queue_map_items,
 				      (const char **)result,
@@ -791,17 +790,17 @@ static int hns3_dbg_rx_bd_info(struct hns3_dbg_data *d, char *buf, int len)
 }
 
 static const struct hns3_dbg_item tx_bd_info_items[] = {
-	{ "BD_IDX", 5 },
-	{ "ADDRESS", 2 },
+	{ "BD_IDX", 2 },
+	{ "ADDRESS", 13 },
 	{ "VLAN_TAG", 2 },
 	{ "SIZE", 2 },
 	{ "T_CS_VLAN_TSO", 2 },
 	{ "OT_VLAN_TAG", 3 },
-	{ "TV", 2 },
-	{ "OLT_VLAN_LEN", 2},
-	{ "PAYLEN_OL4CS", 2},
-	{ "BD_FE_SC_VLD", 2},
-	{ "MSS_HW_CSUM", 0},
+	{ "TV", 5 },
+	{ "OLT_VLAN_LEN", 2 },
+	{ "PAYLEN_OL4CS", 2 },
+	{ "BD_FE_SC_VLD", 2 },
+	{ "MSS_HW_CSUM", 0 },
 };
 
 static void hns3_dump_tx_bd_info(struct hns3_nic_priv *priv,
@@ -868,7 +867,7 @@ static void
 hns3_dbg_dev_caps(struct hnae3_handle *h, char *buf, int len, int *pos)
 {
 	struct hnae3_ae_dev *ae_dev = pci_get_drvdata(h->pdev);
-	static const char * const str[] = {"no", "yes"};
+	const char * const str[] = {"no", "yes"};
 	unsigned long *caps = ae_dev->caps;
 	u32 i, state;
 
@@ -1022,6 +1021,7 @@ static ssize_t hns3_dbg_read(struct file *filp, char __user *buffer,
 	if (ret)
 		return ret;
 
+	mutex_lock(&handle->dbgfs_lock);
 	save_buf = &hns3_dbg_cmd[index].buf;
 
 	if (!test_bit(HNS3_NIC_STATE_INITED, &priv->state) ||
@@ -1034,15 +1034,15 @@ static ssize_t hns3_dbg_read(struct file *filp, char __user *buffer,
 		read_buf = *save_buf;
 	} else {
 		read_buf = kvzalloc(hns3_dbg_cmd[index].buf_len, GFP_KERNEL);
-		if (!read_buf)
-			return -ENOMEM;
+		if (!read_buf) {
+			ret = -ENOMEM;
+			goto out;
+		}
 
 		/* save the buffer addr until the last read operation */
 		*save_buf = read_buf;
-	}
 
-	/* get data ready for the first time to read */
-	if (!*ppos) {
+		/* get data ready for the first time to read */
 		ret = hns3_dbg_read_cmd(dbg_data, hns3_dbg_cmd[index].cmd,
 					read_buf, hns3_dbg_cmd[index].buf_len);
 		if (ret)
@@ -1051,8 +1051,10 @@ static ssize_t hns3_dbg_read(struct file *filp, char __user *buffer,
 
 	size = simple_read_from_buffer(buffer, count, ppos, read_buf,
 				       strlen(read_buf));
-	if (size > 0)
+	if (size > 0) {
+		mutex_unlock(&handle->dbgfs_lock);
 		return size;
+	}
 
 out:
 	/* free the buffer for the last read operation */
@@ -1061,6 +1063,7 @@ out:
 		*save_buf = NULL;
 	}
 
+	mutex_unlock(&handle->dbgfs_lock);
 	return ret;
 }
 
@@ -1133,6 +1136,8 @@ int hns3_dbg_init(struct hnae3_handle *handle)
 			debugfs_create_dir(hns3_dbg_dentry[i].name,
 					   handle->hnae3_dbgfs);
 
+	mutex_init(&handle->dbgfs_lock);
+
 	for (i = 0; i < ARRAY_SIZE(hns3_dbg_cmd); i++) {
 		if ((hns3_dbg_cmd[i].cmd == HNAE3_DBG_CMD_TM_NODES &&
 		     ae_dev->dev_version <= HNAE3_DEVICE_VERSION_V2) ||
@@ -1159,6 +1164,7 @@ int hns3_dbg_init(struct hnae3_handle *handle)
 	return 0;
 
 out:
+	mutex_destroy(&handle->dbgfs_lock);
 	debugfs_remove_recursive(handle->hnae3_dbgfs);
 	handle->hnae3_dbgfs = NULL;
 	return ret;
@@ -1174,6 +1180,7 @@ void hns3_dbg_uninit(struct hnae3_handle *handle)
 			hns3_dbg_cmd[i].buf = NULL;
 		}
 
+	mutex_destroy(&handle->dbgfs_lock);
 	debugfs_remove_recursive(handle->hnae3_dbgfs);
 	handle->hnae3_dbgfs = NULL;
 }

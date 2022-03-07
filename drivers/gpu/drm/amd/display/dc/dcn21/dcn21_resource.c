@@ -35,6 +35,8 @@
 #include "include/irq_service_interface.h"
 #include "dcn20/dcn20_resource.h"
 
+#include "dml/dcn2x/dcn2x.h"
+
 #include "clk_mgr.h"
 #include "dcn10/dcn10_hubp.h"
 #include "dcn10/dcn10_ipp.h"
@@ -872,7 +874,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 		.clock_trace = true,
 		.disable_pplib_clock_request = true,
 		.min_disp_clk_khz = 100000,
-		.pipe_split_policy = MPC_SPLIT_AVOID_MULT_DISP,
+		.pipe_split_policy = MPC_SPLIT_DYNAMIC,
 		.force_single_disp_pipe_split = false,
 		.disable_dcc = DCC_ENABLE,
 		.vsr_support = true,
@@ -884,7 +886,8 @@ static const struct dc_debug_options debug_defaults_drv = {
 		.disable_48mhz_pwrdwn = false,
 		.usbc_combo_phy_reset_wa = true,
 		.dmub_command_table = true,
-		.use_max_lb = true
+		.use_max_lb = true,
+		.optimize_edp_link_rate = true
 };
 
 static const struct dc_debug_options debug_defaults_diags = {

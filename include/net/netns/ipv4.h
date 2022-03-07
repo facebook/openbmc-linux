@@ -65,7 +65,7 @@ struct netns_ipv4 {
 	bool			fib_has_custom_local_routes;
 	bool			fib_offload_disabled;
 #ifdef CONFIG_IP_ROUTE_CLASSID
-	int			fib_num_tclassid_users;
+	atomic_t		fib_num_tclassid_users;
 #endif
 	struct hlist_head	*fib_table_hash;
 	struct sock		*fibnl;
@@ -174,7 +174,6 @@ struct netns_ipv4 {
 	int sysctl_tcp_fastopen;
 	const struct tcp_congestion_ops __rcu  *tcp_congestion_control;
 	struct tcp_fastopen_context __rcu *tcp_fastopen_ctx;
-	spinlock_t tcp_fastopen_ctx_lock;
 	unsigned int sysctl_tcp_fastopen_blackhole_timeout;
 	atomic_t tfo_active_disable_times;
 	unsigned long tfo_active_disable_stamp;

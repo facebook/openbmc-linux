@@ -597,11 +597,9 @@ call_fpe:
 	tstne	r0, #0x04000000			@ bit 26 set on both ARM and Thumb-2
 	reteq	lr
 	and	r8, r0, #0x00000f00		@ mask out CP number
- THUMB(	lsr	r8, r8, #8		)
 	mov	r7, #1
-	add	r6, r10, #TI_USED_CP
- ARM(	strb	r7, [r6, r8, lsr #8]	)	@ set appropriate used_cp[]
- THUMB(	strb	r7, [r6, r8]		)	@ set appropriate used_cp[]
+	add	r6, r10, r8, lsr #8		@ add used_cp[] array offset first
+	strb	r7, [r6, #TI_USED_CP]		@ set appropriate used_cp[]
 #ifdef CONFIG_IWMMXT
 	@ Test if we need to give access to iWMMXt coprocessors
 	ldr	r5, [r10, #TI_FLAGS]
@@ -610,7 +608,7 @@ call_fpe:
 	bcs	iwmmxt_task_enable
 #endif
  ARM(	add	pc, pc, r8, lsr #6	)
- THUMB(	lsl	r8, r8, #2		)
+ THUMB(	lsr	r8, r8, #6		)
  THUMB(	add	pc, r8			)
 	nop
 
@@ -618,15 +616,9 @@ call_fpe:
 	W(b)	do_fpe				@ CP#1 (FPE)
 	W(b)	do_fpe				@ CP#2 (FPE)
 	ret.w	lr				@ CP#3
-#ifdef CONFIG_CRUNCH
-	b	crunch_task_enable		@ CP#4 (MaverickCrunch)
-	b	crunch_task_enable		@ CP#5 (MaverickCrunch)
-	b	crunch_task_enable		@ CP#6 (MaverickCrunch)
-#else
 	ret.w	lr				@ CP#4
 	ret.w	lr				@ CP#5
 	ret.w	lr				@ CP#6
-#endif
 	ret.w	lr				@ CP#7
 	ret.w	lr				@ CP#8
 	ret.w	lr				@ CP#9

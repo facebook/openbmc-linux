@@ -48,7 +48,7 @@
  * in all its forms: The monster ATOMIC IOCTL itself, code for GET_PROPERTY and
  * SET_PROPERTY IOCTLs. Plus interface functions for compatibility helpers and
  * drivers which have special needs to construct their own atomic updates, e.g.
- * for load detect or similiar.
+ * for load detect or similar.
  */
 
 /**
@@ -76,15 +76,17 @@ int drm_atomic_set_mode_for_crtc(struct drm_crtc_state *state,
 	state->mode_blob = NULL;
 
 	if (mode) {
+		struct drm_property_blob *blob;
+
 		drm_mode_convert_to_umode(&umode, mode);
-		state->mode_blob =
-			drm_property_create_blob(state->crtc->dev,
-						 sizeof(umode),
-						 &umode);
-		if (IS_ERR(state->mode_blob))
-			return PTR_ERR(state->mode_blob);
+		blob = drm_property_create_blob(crtc->dev,
+						sizeof(umode), &umode);
+		if (IS_ERR(blob))
+			return PTR_ERR(blob);
 
 		drm_mode_copy(&state->mode, mode);
+
+		state->mode_blob = blob;
 		state->enable = true;
 		drm_dbg_atomic(crtc->dev,
 			       "Set [MODE:%s] for [CRTC:%d:%s] state %p\n",
@@ -753,7 +755,7 @@ static int drm_atomic_connector_set_property(struct drm_connector *connector,
 		 * restore the state it wants on VT switch. So if the userspace
 		 * tries to change the link_status from GOOD to BAD, driver
 		 * silently rejects it and returns a 0. This prevents userspace
-		 * from accidently breaking  the display when it restores the
+		 * from accidentally breaking  the display when it restores the
 		 * state.
 		 */
 		if (state->link_status != DRM_LINK_STATUS_GOOD)
@@ -1064,7 +1066,7 @@ int drm_atomic_set_property(struct drm_atomic_state *state,
  * DOC: explicit fencing properties
  *
  * Explicit fencing allows userspace to control the buffer synchronization
- * between devices. A Fence or a group of fences are transfered to/from
+ * between devices. A Fence or a group of fences are transferred to/from
  * userspace using Sync File fds and there are two DRM properties for that.
  * IN_FENCE_FD on each DRM Plane to send fences to the kernel and
  * OUT_FENCE_PTR on each DRM CRTC to receive fences from the kernel.
