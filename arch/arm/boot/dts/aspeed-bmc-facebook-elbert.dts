@@ -73,13 +73,13 @@
 };
 
 &kcs2 {
+	kcs_addr = <0xca8>;
 	status = "okay";
-	aspeed,lpc-io-reg = <0xca8>;
 };
 
 &kcs3 {
+	kcs_addr = <0xca2>;
 	status = "okay";
-	aspeed,lpc-io-reg = <0xca2>;
 };
 
 &mac3 {
