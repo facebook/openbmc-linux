@@ -96,6 +96,7 @@ struct ftgmac100 {
 	int cur_speed;
 	int cur_duplex;
 	bool use_ncsi;
+	bool use_fixed_link;
 
 	/* Multicast filter settings */
 	u32 maht0;
@@ -1487,6 +1488,9 @@ static int ftgmac100_open(struct net_device *netdev)
 	if (priv->use_ncsi) {
 		priv->cur_duplex = DUPLEX_FULL;
 		priv->cur_speed = SPEED_100;
+	} else if (priv->use_fixed_link) {
+		priv->cur_duplex = netdev->phydev->duplex;
+		priv->cur_speed = netdev->phydev->speed;
 	} else {
 		priv->cur_duplex = 0;
 		priv->cur_speed = 0;
@@ -1880,6 +1884,17 @@ static int ftgmac100_probe(struct platform_device *pdev)
 
 		/* Display what we found */
 		phy_attached_info(phy);
+	} else if (np && of_phy_is_fixed_link(np)) {
+		struct phy_device *phy;
+
+		priv->use_fixed_link = true;
+		phy = of_phy_get_and_connect(priv->netdev, np,
+					     &ftgmac100_adjust_link);
+		if (!phy) {
+			dev_err(&pdev->dev, "Failed to connect to fixed-link\n");
+			err = -EINVAL;
+			goto err_phy_connect;
+		}
 	} else if (np && !of_get_child_by_name(np, "mdio")) {
 		/* Support legacy ASPEED devicetree descriptions that decribe a
 		 * MAC with an embedded MDIO controller but have no "mdio"
