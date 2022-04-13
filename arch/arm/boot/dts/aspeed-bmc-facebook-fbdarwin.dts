@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2021 Facebook Inc.
+
+/dts-v1/;
+
+#include "ast2600-facebook-netbmc-common.dtsi"
+
+/ {
+	model = "Facebook FBDARWIN BMC";
+	compatible = "facebook,fbdarwin-bmc", "aspeed,ast2600";
+
+	aliases {
+		serial0 = &uart5;
+		serial1 = &uart1;
+		serial2 = &uart2;
+		serial3 = &uart3;
+		spi1 = &spi1;
+		spi2 = &spi2;
+	};
+
+
+	chosen {
+		stdout-path = &uart5;
+	};
+};
+
+&spi1 {
+	status = "okay";
+	compatible = "spi-gpio";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	num-chipselects = <2>;
+
+	gpio-sck = <&gpio0 ASPEED_GPIO(Z, 3) GPIO_ACTIVE_HIGH>;
+	gpio-mosi = <&gpio0 ASPEED_GPIO(Z, 4) GPIO_ACTIVE_HIGH>;
+	gpio-miso = <&gpio0 ASPEED_GPIO(Z, 5) GPIO_ACTIVE_HIGH>;
+	cs-gpios = <0>,
+		   <&gpio0 ASPEED_GPIO(Z, 0) GPIO_ACTIVE_HIGH>;
+
+	eeprom@1 {
+		compatible = "atmel,at93c86";
+		spi-max-frequency = <250000>;
+		data-size = <16>;
+		spi-cs-high;
+		reg = <1>;
+	};
+};
+
+&spi2 {
+	status = "okay";
+	compatible = "spi-gpio";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	num-chipselects = <1>;
+
+	gpio-miso = <&gpio0 ASPEED_GPIO(X, 5) GPIO_ACTIVE_HIGH>;
+	gpio-mosi = <&gpio0 ASPEED_GPIO(X, 4) GPIO_ACTIVE_HIGH>;
+	gpio-sck = <&gpio0 ASPEED_GPIO(X, 3) GPIO_ACTIVE_HIGH>;
+	cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>;
+
+	tpmdev@0 {
+		compatible = "tcg,tpm_tis-spi";
+		spi-max-frequency = <33000000>;
+		reg = <0>;
+	};
+};
+
+&mac3 {
+	status = "okay";
+	phy-mode = "rgmii";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_rgmii4_default>;
+	fixed-link {
+		speed = <1000>;
+		full-duplex;
+	};
+};
