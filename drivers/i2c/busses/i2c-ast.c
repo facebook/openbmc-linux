@@ -484,7 +484,7 @@ static int ast_i2c_slave_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs)
 #endif
 static u8 ast_i2c_bus_error_recover(struct ast_i2c_dev *i2c_dev);
 
-static void ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
+static void ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev, bool in_atomic)
 {
 	u32 ctrl_reg1, cmd_reg1;
 
@@ -492,6 +492,16 @@ static void ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
 	cmd_reg1 = ast_i2c_read(i2c_dev, I2C_CMD_REG);
 
 	i2c_dev->bus_master_reset_cnt++;
+
+	// ast_i2c_bus_error_recover may wait for the Bus Recover Done
+	// interrupt, and we can't receive a new interrupt or sleep within an
+	// atomic context (holding a spinlock, handling an interrupt, etc).
+	if (in_atomic) {
+		dev_err(i2c_dev->dev,
+			"I2C(%d) skipping recover while in atomic context\n",
+			i2c_dev->bus_id);
+		goto skip_bus_error_recovery;
+	}
 
 	// MASTER mode only - bus recover + reset
 	// MASTER & SLAVE mode - only reset
@@ -512,6 +522,7 @@ static void ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev)
 			ast_i2c_read(i2c_dev, I2C_CMD_REG));
 	}
 
+skip_bus_error_recovery:
 	// Reset i2c controller
 	ast_i2c_write(i2c_dev,
 		      i2c_dev->func_ctrl_reg &
@@ -539,7 +550,9 @@ static void ast_i2c_bus_recovery(struct ast_i2c_dev *i2c_dev, u32 reg)
 		       __func__, __LINE__, i2c_dev->bus_id,
 		       i2c_dev->slave_xfer_cnt,
 		       ast_i2c_read(i2c_dev, I2C_CMD_REG));
-		ast_i2c_bus_reset(i2c_dev);
+		// ast_i2c_bus_recovery is only called within the interrupt
+		// handler i2c_ast_handler, so we always specify in_atomic=true.
+		ast_i2c_bus_reset(i2c_dev, true);
 	} else
 		return;
 }
@@ -722,7 +735,7 @@ static int ast_i2c_wait_bus_not_busy(struct ast_i2c_dev *i2c_dev)
 			ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
 			ast_i2c_read(i2c_dev, I2C_CMD_REG));
 
-		ast_i2c_bus_reset(i2c_dev);
+		ast_i2c_bus_reset(i2c_dev, false);
 		return 0;
 	}
 
@@ -1975,7 +1988,7 @@ static void ast_i2c_slave_xfer_done(struct ast_i2c_dev *i2c_dev)
 		// Reset i2c controller
 		dev_err(i2c_dev->dev,
 			"slave_xfer_cnt exceed to I2C_S_BUF_SIZE(4096)\n");
-		ast_i2c_bus_reset(i2c_dev);
+		ast_i2c_bus_reset(i2c_dev, true);
 	}
 #endif
 }
@@ -2157,7 +2170,7 @@ next_xfer:
 		       i2c_dev->bus_id, i2c_dev->master_msgs->addr, xfer_len,
 		       i2c_dev->master_xfer_len);
 		//HACK: for BMC I2C timeout
-		ast_i2c_bus_reset(i2c_dev);
+		ast_i2c_bus_reset(i2c_dev, true);
 		//should goto stop....
 		i2c_dev->cmd_err = 1;
 		goto done_out;
@@ -2340,7 +2353,7 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 		complete(&i2c_dev->cmd_complete);
 		// Reset i2c controller
 
-		ast_i2c_bus_reset(i2c_dev);
+		ast_i2c_bus_reset(i2c_dev, true);
 		return IRQ_HANDLED;
 	}
 
@@ -2734,7 +2747,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev,
 				(ast_i2c_read(i2c_dev, I2C_CMD_REG) >> 19) &
 				0xf;
 			//			printk("sts [%x], isr sts [%x] \n",i2c_dev->state, ast_i2c_read(i2c_dev,I2C_INTR_STS_REG));
-			ast_i2c_bus_reset(i2c_dev);
+			ast_i2c_bus_reset(i2c_dev, false);
 			ret = -ETIMEDOUT;
 			i2c_dev->master_xfer_first = 0;
 			spin_unlock_irqrestore(&i2c_dev->master_lock, flags);
@@ -2747,7 +2760,7 @@ static int ast_i2c_do_msgs_xfer(struct ast_i2c_dev *i2c_dev,
 				printk("ast-i2c:  error got unexpected STOP\n");
 				// reset the bus
 				//ast_i2c_bus_error_recover(i2c_dev);
-				ast_i2c_bus_reset(i2c_dev);
+				ast_i2c_bus_reset(i2c_dev, false);
 			}
 			ret = -EAGAIN;
 			i2c_dev->master_xfer_first = 0;
@@ -2844,7 +2857,7 @@ static ssize_t perform_bus_master_reset(struct device *dev,
 {
 	struct ast_i2c_dev *i2c_dev = dev_get_drvdata(dev);
 
-	ast_i2c_bus_reset(i2c_dev);
+	ast_i2c_bus_reset(i2c_dev, false);
 	return count;
 }
 
