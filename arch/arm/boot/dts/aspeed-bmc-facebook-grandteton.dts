@@ -14,27 +14,8 @@
 		serial0 = &uart5;
 		serial1 = &uart1;
 
-		i2c20 = &imux20;
-		i2c21 = &imux21;
-		i2c22 = &imux22;
-		i2c23 = &imux23;
-		i2c24 = &imux24;
-		i2c25 = &imux25;
-		i2c26 = &imux26;
-		i2c27 = &imux27;
-		i2c28 = &imux28;
-		i2c29 = &imux29;
-		i2c30 = &imux30;
-		i2c31 = &imux31;
-		i2c32 = &imux32;
-		i2c33 = &imux33;
-		i2c34 = &imux34;
-		i2c35 = &imux35;
-		i2c36 = &imux36;
-		i2c37 = &imux37;
-		i2c38 = &imux38;
-		i2c39 = &imux39;
-	
+		spi1 = &spi_gpio;
+
 	};
 
 	chosen {
@@ -46,12 +27,33 @@
 		device_type = "memory";
 		reg = <0x80000000 0x80000000>;
 	};
+
 	iio-hwmon {
 		compatible = "iio-hwmon";
 		io-channels = <&adc0 0>, <&adc0 1>, <&adc0 2>, <&adc0 3>,
 			<&adc0 4>, <&adc0 5>, <&adc0 6>, <&adc0 7>,
-			<&adc1 0>, <&adc1 1>;
+			<&adc1 2>;
 	};
+
+	spi_gpio: spi-gpio {
+		status = "okay";
+		compatible = "spi-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gpio-sck = <&gpio0 ASPEED_GPIO(Z, 3) GPIO_ACTIVE_HIGH>;
+		gpio-mosi = <&gpio0 ASPEED_GPIO(Z, 4) GPIO_ACTIVE_HIGH>;
+		gpio-miso = <&gpio0 ASPEED_GPIO(Z, 5) GPIO_ACTIVE_HIGH>;
+		num-chipselects = <1>;
+		cs-gpios = <&gpio0 ASPEED_GPIO(Z, 0) GPIO_ACTIVE_LOW>;
+
+		tpmdev@0 {
+			compatible = "tcg,tpm_tis-spi";
+			spi-max-frequency = <33000000>;
+			reg = <0>;
+		};
+	};
+
 
 };
 
@@ -59,10 +61,28 @@
 	status = "okay";
 };
 
+&uart2 {
+	// SOL Host Console
+	status = "okay";
+	pinctrl-0 = <>;
+
+};
+
+&uart3 {
+	// SOL BMC Console
+	status = "okay";
+	pinctrl-0 = <>;
+};
+
 &uart5 {
 	status = "okay";
 	/* Workaround for AST2600 A0 */
 	compatible = "snps,dw-apb-uart";
+};
+
+&uart6 {
+	// SWB Console
+	status = "okay";
 };
 
 &wdt1 {
@@ -97,23 +117,23 @@
 };
 
 &fmc {
-    status = "okay";
-    flash@0 {
-        reg = < 1 >;
-        status = "okay";
-        m25p,fast-read;
-        label = "spi0.1";
-        spi-max-frequency = <50000000>;
+	status = "okay";
+	flash@0 {
+		reg = < 1 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.1";
+		spi-max-frequency = <50000000>;
 #include "facebook-bmc-vboot2-flash1-32MBdata0-layout.dtsi"
-    };
-    flash@1 {
-        reg = < 0 >;
-        status = "okay";
-        m25p,fast-read;
-        label = "spi0.0";
-        spi-max-frequency = <50000000>;
+	};
+	flash@1 {
+		reg = < 0 >;
+		status = "okay";
+		m25p,fast-read;
+		label = "spi0.0";
+		spi-max-frequency = <50000000>;
 #include "facebook-bmc-vboot2-flash0-layout.dtsi"
-    };
+	};
 };
 
 &spi2 {
@@ -180,82 +200,6 @@
 
 &i2c1 {
 	status = "okay";
-	i2c-switch@70 {
-		compatible = "nxp,pca9548";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0x70>;
-		imux20: i2c@0 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0>;
-		};
-
-		imux21: i2c@1 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <1>;
-			lm75@48 {
-				compatible = "st,stlm75";
-				reg = <0x48>;
-			};
-		};
-
-		imux22: i2c@2 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <2>;
-			lm75@48 {
-				compatible = "st,stlm75";
-				reg = <0x48>;
-			};
-		
-		};
-
-		imux23: i2c@3 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <3>;
-			lm75@48 {
-				compatible = "st,stlm75";
-				reg = <0x48>;
-			};	
-		};
-
-		imux24: i2c@4 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <4>;
-			lm75@48 {
-				compatible = "st,stlm75";
-				reg = <0x48>;
-			};		
-		};
-
-		imux25: i2c@5 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <5>;
-		};
-
-		imux26: i2c@6 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <6>;
-		};
-
-		imux27: i2c@7 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <7>;
-
-		};
-	};
-	tmp75@4E {
-		compatible = "ti,tmp75";
-		reg = <0x4A>;
-	};
-
 };
 
 &i2c2 {
@@ -272,77 +216,23 @@
 
 &i2c4 {
 	status = "okay";
-	// UIC FRU
-	eeprom@50 {
+	// NIC FRU
+	eeprom@52 {
 		compatible = "atmel,24c64";
-		reg = <0x50>;
-	};
-	// UIC temperature
-	tmp75@4A {
-		compatible = "ti,tmp75";
-		reg = <0x4A>;
+		reg = <0x52>;
 	};
 };
 
 &i2c5 {
 	status = "okay";
-	i2c-switch@70 {
-		compatible = "nxp,pca9548";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0x70>;
-		imux28: i2c@0 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0>;
-		};
-
-		imux29: i2c@1 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <1>;
-		};
-
-		imux30: i2c@2 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <2>;
-		};
-
-		imux31: i2c@3 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <3>;
-		};
-
-		imux32: i2c@4 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <4>;
-		};
-
-		imux33: i2c@5 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <5>;
-		};
-
-		imux34: i2c@6 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <6>;
-		};
-
-		imux35: i2c@7 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <7>;
-		};
-	};
 };
 
+//To Me
 &i2c6 {
 	status = "okay";
+	multi-master;
+	bus-frequency = <400000>;
+	aspeed,hw-timeout-ms = <1000>;
 };
 
 // To FPGA
@@ -353,54 +243,6 @@
 // To PDB
 &i2c8 {
 	status = "okay";
-	i2c-switch@72 {
-		compatible = "nxp,pca9543";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0x72>;
-		imux36: i2c@0 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0>;
-		};
-
-		imux37: i2c@1 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <1>;
-		};
-
-	};
-	i2c-switch@73 {
-		compatible = "nxp,pca9543";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0x73>;
-		imux38: i2c@0 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0>;
-			//PDB-H
-			eeprom@51 {
-				compatible = "atmel,24c64";
-				reg = <0x51>;
-			};
-
-		};
-
-		imux39: i2c@1 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <1>;
-			//PDB-V
-			eeprom@52 {
-				compatible = "atmel,24c64";
-				reg = <0x52>;
-			};
-		
-		};
-
-	};
 };
 
 //To GPU
@@ -422,6 +264,11 @@
 // TO OCP NIC
 &i2c13 {
 	status = "okay";
+	// NIC FRU
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+	};
 };
 
 // To Debug card
@@ -433,11 +280,17 @@
 
 &i2c15 {
 	status = "okay";
-	// BSM FRU
+	// SCM FRU
 	eeprom@50 {
 		compatible = "atmel,24c64";
 		reg = <0x50>;
 	};
+	// BSM FRU
+	eeprom@56 {
+		compatible = "atmel,24c64";
+		reg = <0x56>;
+	};
+
 };
 
 &adc0 {
@@ -454,13 +307,24 @@
 	ref_voltage = <2500>;
 	status = "okay";
 
-	pinctrl-0 = <&pinctrl_adc8_default &pinctrl_adc9_default>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_adc10_default>;
+};
+
+&jtag1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_jtagm_default>;
 };
 
 &ehci1 {
-      status = "okay";
+	status = "okay";
 };
 
 &uhci {
+	status = "okay";
+};
+
+&pcie {
 	status = "okay";
 };
