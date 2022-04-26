@@ -22,6 +22,7 @@
 #include <linux/interrupt.h>
 #include <linux/completion.h>
 #include <linux/slab.h>
+#include <linux/ratelimit.h>
 
 #include <linux/platform_device.h>
 #include <linux/err.h>
@@ -99,6 +100,7 @@ struct ast_i2c_dev {
 	u8 master_xfer_first;
 	u16 bus_master_reset_cnt;
 	u16 bus_slave_recovery_cnt;
+	struct ratelimit_state scl_low_limiter;
 };
 
 enum { BUS_LOCK_RECOVER_ERROR = 0,
@@ -497,9 +499,10 @@ static void ast_i2c_bus_reset(struct ast_i2c_dev *i2c_dev, bool in_atomic)
 	// interrupt, and we can't receive a new interrupt or sleep within an
 	// atomic context (holding a spinlock, handling an interrupt, etc).
 	if (in_atomic) {
-		dev_err(i2c_dev->dev,
-			"I2C(%d) skipping recover while in atomic context\n",
-			i2c_dev->bus_id);
+		if (__ratelimit(&i2c_dev->scl_low_limiter))
+			dev_err(i2c_dev->dev,
+				"I2C(%d) skipping recover while in atomic context\n",
+				i2c_dev->bus_id);
 		goto skip_bus_error_recovery;
 	}
 
@@ -531,11 +534,12 @@ skip_bus_error_recovery:
 
 	ast_i2c_write(i2c_dev, i2c_dev->func_ctrl_reg, I2C_FUN_CTRL_REG);
 
-	dev_err(i2c_dev->dev,
-		"I2C(%d) reset completed (ctrl,cmd): before(%x,%x) after(%x,%x)\n",
-		i2c_dev->bus_id, ctrl_reg1, cmd_reg1,
-		ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
-		ast_i2c_read(i2c_dev, I2C_CMD_REG));
+	if (__ratelimit(&i2c_dev->scl_low_limiter))
+		dev_err(i2c_dev->dev,
+			"I2C(%d) reset completed (ctrl,cmd): before(%x,%x) after(%x,%x)\n",
+			i2c_dev->bus_id, ctrl_reg1, cmd_reg1,
+			ast_i2c_read(i2c_dev, I2C_FUN_CTRL_REG),
+			ast_i2c_read(i2c_dev, I2C_CMD_REG));
 }
 
 // TODO: This is a hack for I2C 1MHz BMC Kernel panic workaround
@@ -2344,9 +2348,10 @@ static irqreturn_t i2c_ast_handler(int this_irq, void *dev_id)
 	}
 
 	if (AST_I2CD_INTR_STS_SCL_TO & sts) {
-		dev_err(i2c_dev->dev,
-			"SCL LOW detected with sts = %x, slave mode: %x\n", sts,
-			i2c_dev->slave_operation);
+		if (__ratelimit(&i2c_dev->scl_low_limiter))
+			dev_err(i2c_dev->dev,
+				"SCL LOW detected with sts = %x, slave mode: %x\n", sts,
+				i2c_dev->slave_operation);
 		ast_i2c_write(i2c_dev, AST_I2CD_INTR_STS_SCL_TO,
 			      I2C_INTR_STS_REG);
 		i2c_dev->cmd_err |= AST_I2CD_INTR_STS_SCL_TO;
@@ -3005,6 +3010,7 @@ static int ast_i2c_probe(struct platform_device *pdev)
 	ast_i2c_dev_init(i2c_dev);
 	i2c_dev->bus_master_reset_cnt = 0;
 	i2c_dev->bus_slave_recovery_cnt = 0;
+	ratelimit_state_init(&i2c_dev->scl_low_limiter, 60 * HZ, 10);
 
 	ret = request_irq(i2c_dev->irq, i2c_ast_handler, IRQF_SHARED,
 			  i2c_dev->adap.name, i2c_dev);
