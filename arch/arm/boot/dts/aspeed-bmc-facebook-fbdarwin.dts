@@ -75,3 +75,10 @@
 		full-duplex;
 	};
 };
+
+&i2c0 {
+	eeprom@50 {
+		compatible = "atmel,24c512";
+		reg = <0x50>;
+	};
+};
