@@ -44,6 +44,11 @@ static const struct eeprom_93xx46_devtype_data at93c66_data = {
 	.flags = EE_SIZE4K,
 };
 
+static const struct eeprom_93xx46_devtype_data at93c86_data = {
+	.flags = EE_SIZE16K,
+	.quirks = EEPROM_93XX46_QUIRK_ADDRESS_BYTE_SHIFT,
+};
+
 static const struct eeprom_93xx46_devtype_data atmel_at93c46d_data = {
 	.flags = EE_SIZE1K,
 	.quirks = EEPROM_93XX46_QUIRK_SINGLE_WORD_READ |
@@ -78,6 +83,11 @@ static inline bool has_quirk_instruction_length(struct eeprom_93xx46_dev *edev)
 static inline bool has_quirk_extra_read_cycle(struct eeprom_93xx46_dev *edev)
 {
 	return edev->pdata->quirks & EEPROM_93XX46_QUIRK_EXTRA_READ_CYCLE;
+}
+
+static inline bool has_quirk_address_byte_shift(struct eeprom_93xx46_dev *edev)
+{
+	return edev->pdata->quirks & EEPROM_93XX46_QUIRK_ADDRESS_BYTE_SHIFT;
 }
 
 static int eeprom_93xx46_read(void *priv, unsigned int off,
@@ -167,16 +177,23 @@ static int eeprom_93xx46_ew(struct eeprom_93xx46_dev *edev, int is_on)
 	struct spi_message m;
 	struct spi_transfer t;
 	int bits, ret;
+	u16 instruction_addr = 0;
 	u16 cmd_addr;
 
 	/* The opcode in front of the address is three bits. */
 	bits = edev->addrlen + 3;
 
 	cmd_addr = OP_START << edev->addrlen;
-	if (edev->pdata->flags & EE_ADDR8)
-		cmd_addr |= (is_on ? ADDR_EWEN : ADDR_EWDS) << 1;
+	/* Some devices like 93C76/93C86 have EW EN/DS address shifted */
+	if (has_quirk_address_byte_shift(edev))
+		instruction_addr |= (is_on ? ADDR_EWEN : ADDR_EWDS) << 4;
 	else
-		cmd_addr |= (is_on ? ADDR_EWEN : ADDR_EWDS);
+		instruction_addr |= (is_on ? ADDR_EWEN : ADDR_EWDS);
+
+	if (edev->pdata->flags & EE_ADDR8)
+		cmd_addr |= instruction_addr << 1;
+	else
+		cmd_addr |= instruction_addr;
 
 	if (has_quirk_instruction_length(edev)) {
 		cmd_addr <<= 2;
@@ -185,6 +202,7 @@ static int eeprom_93xx46_ew(struct eeprom_93xx46_dev *edev, int is_on)
 
 	dev_dbg(&edev->spi->dev, "ew%s cmd 0x%04x, %d bits\n",
 			is_on ? "en" : "ds", cmd_addr, bits);
+
 
 	spi_message_init(&m);
 	memset(&t, 0, sizeof(t));
@@ -314,16 +332,23 @@ static int eeprom_93xx46_eral(struct eeprom_93xx46_dev *edev)
 	struct spi_message m;
 	struct spi_transfer t;
 	int bits, ret;
+	u16 instruction_addr = 0;
 	u16 cmd_addr;
 
 	/* The opcode in front of the address is three bits. */
 	bits = edev->addrlen + 3;
 
 	cmd_addr = OP_START << edev->addrlen;
-	if (edev->pdata->flags & EE_ADDR8)
-		cmd_addr |= ADDR_ERAL << 1;
+	/* Some devices like 93C76/93C86 have EW EN/DS address shifted */
+	if (has_quirk_address_byte_shift(edev))
+		instruction_addr |= ADDR_ERAL << 4;
 	else
-		cmd_addr |= ADDR_ERAL;
+		instruction_addr |= ADDR_ERAL;
+
+	if (edev->pdata->flags & EE_ADDR8)
+		cmd_addr |= instruction_addr << 1;
+	else
+		cmd_addr |= instruction_addr;
 
 	if (has_quirk_instruction_length(edev)) {
 		cmd_addr <<= 2;
@@ -401,6 +426,7 @@ static const struct of_device_id eeprom_93xx46_of_table[] = {
 	{ .compatible = "atmel,at93c46d", .data = &atmel_at93c46d_data, },
 	{ .compatible = "atmel,at93c56", .data = &at93c56_data, },
 	{ .compatible = "atmel,at93c66", .data = &at93c66_data, },
+	{ .compatible = "atmel,at93c86", .data = &at93c86_data, },
 	{ .compatible = "microchip,93lc46b", .data = &microchip_93lc46b_data, },
 	{}
 };
@@ -503,6 +529,8 @@ static int eeprom_93xx46_probe(struct spi_device *spi)
 		edev->size = 256;
 	else if (pd->flags & EE_SIZE4K)
 		edev->size = 512;
+	else if (pd->flags & EE_SIZE16K)
+		edev->size = 2048;
 	else {
 		dev_err(&spi->dev, "unspecified size\n");
 		return -EINVAL;

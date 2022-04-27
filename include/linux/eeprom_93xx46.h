@@ -13,6 +13,7 @@ struct eeprom_93xx46_platform_data {
 #define EE_SIZE1K	0x10		/* 1 kb of data, that is a 93xx46 */
 #define EE_SIZE2K	0x20		/* 2 kb of data, that is a 93xx56 */
 #define EE_SIZE4K	0x40		/* 4 kb of data, that is a 93xx66 */
+#define EE_SIZE16K	0x80		/* 16 kb of data, that is a 93xx86 */
 
 	unsigned int	quirks;
 /* Single word read transfers only; no sequential read. */
@@ -21,6 +22,8 @@ struct eeprom_93xx46_platform_data {
 #define EEPROM_93XX46_QUIRK_INSTRUCTION_LENGTH		(1 << 1)
 /* Add extra cycle after address during a read */
 #define EEPROM_93XX46_QUIRK_EXTRA_READ_CYCLE		BIT(2)
+/* Instructions addresses are shifted by 4 bits to the left */
+#define EEPROM_93XX46_QUIRK_ADDRESS_BYTE_SHIFT		BIT(3)
 
 	/*
 	 * optional hooks to control additional logic
