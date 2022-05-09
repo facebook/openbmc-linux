@@ -767,7 +767,7 @@ static int aspeed_g6_clk_probe(struct platform_device *pdev)
 
 	/* uartx parent assign*/
 	for (i = 0; i < 13; i++) {
-		if ((i < 6) & (i != 4)) {
+		if ((i < 6) && (i != 4)) {
 			regmap_read(map, 0x310, &val);
 			if (val & BIT(i))
 				aspeed_g6_gates[ASPEED_CLK_GATE_UART1CLK + i].parent_name = "huxclk";
@@ -776,7 +776,7 @@ static int aspeed_g6_clk_probe(struct platform_device *pdev)
 		}
 		if (i == 4)
 			aspeed_g6_gates[ASPEED_CLK_GATE_UART1CLK + i].parent_name = "uart5";
-		if ((i > 5) & (i != 4)) {
+		if (i > 5) {
 			regmap_read(map, 0x314, &val);
 			if (val & BIT(i))
 				aspeed_g6_gates[ASPEED_CLK_GATE_UART1CLK + i].parent_name = "huxclk";
@@ -1056,7 +1056,7 @@ static void __init aspeed_g6_cc_init(struct device_node *np)
 		     ASPEED_G6_DEF_MAC34_DELAY_10M);
 
 	/* MAC3/4 default pad driving strength */
-	regmap_write(map, ASPEED_G6_MAC34_DRIVING_CTRL, 0x0000000a);
+	regmap_write(map, ASPEED_G6_MAC34_DRIVING_CTRL, 0x0000000f);
 
 	regmap_read(map, ASPEED_MAC12_CLK_DLY, &reg_1g.w);
 	regmap_read(map, ASPEED_MAC12_CLK_DLY_100M, &reg_100.w);
