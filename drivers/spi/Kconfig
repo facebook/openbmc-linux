@@ -112,6 +112,13 @@ config SPI_ASPEED_SMC
 	  controller (SPI) for the host firmware. The implementation
 	  only supports SPI NOR.
 
+config SPI_ASPEED_USER
+	tristate "ASPEED SPI Controller (User Mode)"
+	depends on ARCH_ASPEED
+	help
+	  This enables support for the SPI Controller User Mode in
+	  AST24XX, AST25XX and AST26XX SoCs.
+
 config SPI_ATMEL
 	tristate "Atmel SPI Controller"
 	depends on ARCH_AT91 || COMPILE_TEST
