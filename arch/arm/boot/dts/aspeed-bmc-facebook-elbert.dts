@@ -50,6 +50,24 @@
 	};
 };
 
+&spi1 {
+	status = "okay";
+	compatible = "aspeed,ast2600-spi-user";
+
+	/* GPIOV0 controls another mux beyond this Chip select on SCM2 */
+	spidev@0 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <5000000>;
+		reg = <0>;
+	};
+
+	spidev@1 {
+		compatible = "rohm,dh2228fv";
+		spi-max-frequency = <5000000>;
+		reg = <1>;
+	};
+};
+
 &lpc_ctrl {
 	status = "okay";
 };
