@@ -200,6 +200,10 @@
 
 &i2c1 {
 	status = "okay";
+	tmp75@4B {
+		compatible = "ti,tmp75";
+		reg = <0x4B>;
+	};
 };
 
 &i2c2 {
