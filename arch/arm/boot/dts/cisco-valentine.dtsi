@@ -1,0 +1,121 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2022 Cisco Systems Inc.
+
+info@0 {
+	reg = < 0 >;
+	compatible = "cisco-fpga-info";
+	fpd-name = "valentine";
+	fpd-description = "VALENTINE";
+};
+msd@1000 {
+	reg = < 0x1000 >;
+	compatible = "cisco-fpga-msd";
+	reboot-notifier-enable = <0>;
+};
+soc@3000 {
+	reg = < 0x3000 >;
+	ignore-cell = <1>;
+};
+wd@5000 {
+	reg = < 0x5000 >;
+	compatible = "cisco-fpga-wdt";
+};
+i2c0@7000 {
+	reg = < 0x7000 >;
+	nickname = "X86";
+	ignore-cell = <1>;
+	compatible = "cisco-fpga-i2c";
+};
+spi0@10000 {
+	reg = < 0x10000 >;
+	ignore-cell = <1>;
+	compatible = "cisco-fpga-spi";
+};
+p2pm@12000 {
+	reg = < 0x12000 >;
+	ignore-cell = <1>;
+};
+pseq@14000 {
+	reg = < 0x14000 >;
+	compatible = "cisco-fpga-pseq";
+	standby = <1>;
+	reboot-notifier-enable = <0>;
+	rail-names =
+		"P3V3",
+		"PVCCSCFUSESUS",
+		"PVCCKRHV",
+		"P1V05_COMBINED",
+		"P1V05_VCCSCSUS",
+		"P2V5_VPP",
+		"P1V2_VDDQ",
+		"P0V6_VTT_DIMM",
+		"P1V5_PCH",
+		"P3V3_PCH",
+		"PVCCIN",
+		"ZONE2_ON",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		""
+	;
+};
+akd@17000 {
+	reg = < 0x17000 >;
+	ignore-cell = <1>;
+};
+i2c1@18000 {
+	reg = < 0x18000 >;
+	ignore-cell = <1>;
+	compatible = "cisco-fpga-i2c-pex";
+};
+lpc@20000 {
+	reg = < 0x20000 >;
+	ignore-cell = <1>;
+};
+gpio@30000 {
+	reg = < 0x30000 >;
+	compatible = "cisco-fpga-gpio";
+	gpio-chip-label = "X86";
+};
+pwm@3a000 {
+	reg = < 0x3a000 >;
+	compatible = "cisco-bmc-pwm";
+};
+uart@3a800 {
+	reg = < 0x3a800 >;
+	ignore-cell = <1>;
+};
+led@3b000 {
+	reg = < 0x3b000 >;
+	compatible = "cisco-bmc-led";
+};
+lrstr@3b800 {
+	reg = < 0x3b800 >;
+	compatible = "cisco-fpga-lrstr";
+};
+rptime@3c800 {
+	reg = < 0x3c800 >;
+	compatible = "cisco-fpga-rptime";
+};
+sbus@40000 {
+	reg = < 0x40000 >;
+	ignore-cell = <1>;
+};
+

@@ -23,15 +23,26 @@
 	pinctrl-0 = <&pinctrl_rgmii4_default>;
 	phy-mode = "rgmii";
 	fixed-link {
-            speed = <1000>;
-            full-duplex;
-    };
+		speed = <1000>;
+		full-duplex;
+	};
 };
 
 &emmc {
-       clk-phase-legacy = <180 180>;
-       clk-phase-mmc-hs = <180 180>;
-       clk-phase-mmc-hs200 = <180 180>;
-       clk-phase-mmc-hs400 = <180 180>;
+	clk-phase-legacy = <180 180>;
+	clk-phase-mmc-hs = <180 180>;
+	clk-phase-mmc-hs200 = <180 180>;
+	clk-phase-mmc-hs400 = <180 180>;
+};
+
+&i2c2 {
+	bus-frequency = <1000000>;
+
+	valentine@20 {
+		compatible = "cisco-fpga-bmc";
+		reg = <0x20>;
+		devid-none = <1>;
+#include "cisco-valentine.dtsi"
+	};
 };
 
