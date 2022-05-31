@@ -220,10 +220,16 @@
 
 &i2c4 {
 	status = "okay";
-	// NIC FRU
+	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
+	// NIC1 FRU
 	eeprom@52 {
 		compatible = "atmel,24c64";
 		reg = <0x52>;
+	};
+	tmp421@1F {
+		compatible = "ti,tmp421";
+		reg = <0x1F>;
 	};
 };
 
@@ -272,6 +278,10 @@
 	eeprom@50 {
 		compatible = "atmel,24c64";
 		reg = <0x50>;
+	};
+	tmp421@1F {
+		compatible = "ti,tmp421";
+		reg = <0x1F>;
 	};
 };
 
