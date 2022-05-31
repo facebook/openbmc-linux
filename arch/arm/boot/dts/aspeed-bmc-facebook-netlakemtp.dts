@@ -1,0 +1,383 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2020 Facebook Inc.
+
+/dts-v1/;
+
+#include "aspeed-g6.dtsi"
+#include <dt-bindings/gpio/aspeed-gpio.h>
+#include <dt-bindings/leds/leds-pca955x.h>
+#include <dt-bindings/i2c/i2c.h>
+
+/ {
+    model = "Facebook NetLake MTP";
+    compatible = "facebook,netlakemtp", "aspeed,ast2600";
+
+    aliases {
+        serial0 = &uart5;
+        serial1 = &uart1;
+        serial2 = &uart2;
+        serial3 = &uart3;
+        serial4 = &uart4;
+    };
+
+    chosen {
+        stdout-path = &uart5;
+        bootargs = "console=ttyS4,57600 earlyprintk";
+    };
+
+    memory@80000000 {
+        device_type = "memory";
+        reg = <0x80000000 0x80000000>;
+    };
+
+    reserved-memory {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+
+        ramoops@f10000000 {
+            compatible = "ramoops";
+            reg = <0 0x9c000000 0 0x180000>;
+            record-size = <0x4000>;
+            console-size = <0x4000>;
+            pmsg-size = <0x4000>;
+            max-reason = <3>;
+        };
+    };
+
+    iio-hwmon {
+        compatible = "iio-hwmon";
+        io-channels = <&adc0 0>, <&adc0 1>, <&adc0 2>, <&adc0 3>,
+                      <&adc0 4>, <&adc0 5>, <&adc0 6>, <&adc0 7>,
+                      <&adc1 0>;
+    };
+
+    fan0: pwm-fan0 {
+        compatible = "pwm-fan";
+        pwms = <&pwm 0 40000 0>;
+        cooling-min-state = <0>;
+        cooling-max-state = <3>;
+        #cooling-cells = <2>;
+        cooling-levels = <0 25 128 255>;
+    };
+
+    spi_gpio: spi-gpio {
+        status = "okay";
+        compatible = "spi-gpio";
+        #address-cells = <1>;
+        #size-cells = <0>;
+    
+        gpio-sck = <&gpio0 ASPEED_GPIO(X, 3) GPIO_ACTIVE_HIGH>;
+        gpio-mosi = <&gpio0 ASPEED_GPIO(X, 4) GPIO_ACTIVE_HIGH>;
+        gpio-miso = <&gpio0 ASPEED_GPIO(X, 5) GPIO_ACTIVE_HIGH>;
+        num-chipselects = <1>;
+        cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>;
+    
+        tpmdev@0 {
+            compatible = "tcg,tpm_tis-spi";
+            spi-max-frequency = <33000000>;
+            reg = <0>;
+        };
+    };
+};
+
+&uart2 {
+    status = "okay";
+};
+
+&uart3 {
+    status = "okay";
+};
+
+&uart5 {
+    status = "okay";
+    /* Workaround for AST2600 A0 */
+    compatible = "snps,dw-apb-uart";
+};
+
+&wdt1 {
+    status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_wdtrst1_default>;
+    aspeed,reset-type = "soc";
+    aspeed,external-signal;
+    aspeed,ext-push-pull;
+    aspeed,ext-active-high;
+    aspeed,ext-pulse-duration = <256>;
+};
+
+&wdt2 {
+    status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_wdtrst2_default>;
+};
+
+&mdio1 {
+    status = "okay";
+    ethphy0: ethernet-phy@0 {
+        compatible = "ethernet-phy-id001c.c916";
+        reg = <0>;
+    };
+};
+
+&adc0 {
+    status = "okay";
+    ref_voltage = <2500>;
+    clock-divisor = <0x510>;
+    pinctrl-0 = <&pinctrl_adc0_default &pinctrl_adc1_default
+                 &pinctrl_adc2_default &pinctrl_adc3_default
+                 &pinctrl_adc4_default &pinctrl_adc5_default
+                 &pinctrl_adc6_default &pinctrl_adc7_default>;
+};
+
+&adc1 {
+    status = "okay";
+    ref_voltage = <2500>;
+    clock-divisor = <0x510>;
+
+    pinctrl-0 = <&pinctrl_adc8_default>;
+};
+
+
+&mac2 {
+    status = "okay";
+
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_rmii3_default>;
+    no-hw-checksum;
+    use-ncsi;
+    mlx,multi-host;
+    ncsi-ctrl,start-redo-probe;
+    ncsi-ctrl,no-channel-monitor;
+    ncsi-package = <1>;
+    ncsi-channel = <1>;
+    ncsi-rexmit = <1>;
+    ncsi-timeout = <2>;
+};
+
+&mac3 {
+    status = "okay";
+
+    phy-mode = "rgmii";
+    phy-handle = <&ethphy0>;
+
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_rgmii4_default>;
+};
+
+&rtc {
+    status = "okay";
+};
+
+&fmc {
+    status = "okay";
+
+    flash@0 {
+        reg = < 1 >;
+        status = "okay";
+        m25p,fast-read;
+        label = "spi0.1";
+        spi-max-frequency = <50000000>;
+#include "facebook-bmc-vboot2-flash1-32MBdata0-layout.dtsi"
+    };
+    flash@1 {
+        reg = < 0 >;
+        status = "okay";
+        m25p,fast-read;
+        label = "spi0.0";
+        spi-max-frequency = <50000000>;
+#include "facebook-bmc-vboot2-flash0-layout.dtsi"
+    };
+};
+
+&spi1 {
+    status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_spi1_default>;
+    flash@0 {
+        status = "okay";
+        m25p,fast-read;
+        label = "pnor";
+    };
+};
+
+&pwm {
+    status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_pwm0_default>;
+};
+
+&i2c0 {
+    status = "okay";
+};
+
+&i2c1 {
+    status = "okay";
+    ipmb0@10 {
+        compatible = "ipmb-dev";
+        reg = <(0x10 | I2C_OWN_SLAVE_ADDRESS)>;
+        i2c-protocol;
+    };
+};
+
+&i2c2 {
+    status = "okay";
+};
+
+&i2c3 {
+    status = "okay";
+};
+
+&i2c4 {
+    status = "okay";
+
+    tmp75@48 {
+        compatible = "ti,tmp75";
+        reg = <0x48>;
+    };
+
+    tmp75@4a {
+        compatible = "ti,tmp75";
+        reg = <0x4A>;
+    };
+
+    mtp_eeprom@56 {
+        compatible = "atmel,24c128";
+        reg = <0x56>;
+        pagesize = <32>;
+    };
+
+};
+
+&i2c5 {
+    status = "okay";
+};
+
+&i2c6 {
+    status = "okay";
+};
+
+&i2c7 {
+    status = "okay";
+    i2cswitch@71 {
+        compatible = "nxp,pca9846";
+        idle-state = <0>;
+        i2c-mux-idle-disconnect;
+        reg = <0x71>;
+    };
+};
+
+&i2c8 {
+    status = "okay";
+};
+
+&i2c9 {
+    status = "okay";
+    pca9641@70 {
+        compatible = "nxp,pca9641";
+        reg = <0x70>;
+        i2c-arb {
+            pca9641@71 {
+                compatible = "nxp,pca9641";
+                reg = <0x71>;
+                i2c-arb {
+                    max31790@21 {
+                        compatible = "max31790";
+                        reg = <0x21>;
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        fan-mode = "pwm";
+                        fanconfig = /bits/ 8 <0x19 0x19 0x19 0x19 0x19 0x19>;
+                    };
+                };
+            };
+        };
+    };
+
+    netlake_eeprom@56 {
+        compatible = "atmel,24c128";
+        reg = <0x56>;
+        pagesize = <32>;
+    };
+};
+
+&i2c10 {
+    status = "okay";
+    tmp75@48 {
+        compatible = "ti,tmp75";
+        reg = <0x48>;
+    };
+};
+
+&i2c11 {
+    status = "okay";
+};
+
+&i2c12 {
+    status = "okay";
+};
+
+&i2c13 {
+    status = "okay";
+};
+
+&i2c14 {
+    status = "okay";
+};
+
+&i2c15 {
+    status = "okay";
+};
+
+&gpio0 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_gpiu1_default &pinctrl_gpiu3_default
+                 &pinctrl_gpiu4_default &pinctrl_gpiu5_default
+                 &pinctrl_gpiu6_default &pinctrl_gpiu7_default>;
+};
+
+&peci0 {
+    status = "okay";
+
+    peci-client@30 {
+        compatible = "intel,peci-client";
+        reg = <0x30>;
+        cpu-id= <0x606C2>;
+    };
+};
+
+&jtag1 {
+    status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_jtagm_default>;
+};
+
+&lpc_snoop {
+    status = "okay";
+    snoop-ports = <0x80>;
+};
+
+&lpc_ctrl {
+    status = "okay";
+    flash = <&spi1>;
+};
+
+&kcs1 {
+    kcs_addr = <0xCA0>;
+    status = "okay";
+};
+
+&kcs2 {
+    kcs_addr = <0xCA8>;
+    status = "okay";
+};
+
+&kcs3 {
+    status = "okay";
+    kcs_addr = <0xCA2>;
+};
+
+&emmc_controller {
+    status = "okay";
+};
+
