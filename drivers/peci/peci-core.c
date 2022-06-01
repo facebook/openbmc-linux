@@ -3,6 +3,7 @@
 
 #include <linux/bitfield.h>
 #include <linux/crc8.h>
+#include <linux/delay.h>
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -192,7 +193,8 @@ static int peci_aw_fcs(struct peci_xfer_msg *msg, int len, u8 *aw_fcs)
 static int __peci_xfer(struct peci_adapter *adapter, struct peci_xfer_msg *msg,
 		       bool do_retry, bool has_aw_fcs)
 {
-	uint interval_ms = PECI_DEV_RETRY_INTERVAL_MIN_MSEC;
+	uint interval_us = PECI_DEV_RETRY_INTERVAL_MIN_USEC;
+	char task_name[TASK_COMM_LEN];
 	ulong timeout = jiffies;
 	u8 aw_fcs;
 	int ret;
@@ -212,6 +214,10 @@ static int __peci_xfer(struct peci_adapter *adapter, struct peci_xfer_msg *msg,
 			return -EAGAIN;
 		}
 	}
+
+	get_task_comm(task_name, current);
+	dev_dbg(&adapter->dev, "%s is called by %s(%d) through %s\n",
+		__func__, task_name, current->pid, adapter->name);
 
 	/*
 	 * For some commands, the PECI originator may need to retry a command if
@@ -256,15 +262,11 @@ static int __peci_xfer(struct peci_adapter *adapter, struct peci_xfer_msg *msg,
 			break;
 		}
 
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (schedule_timeout(msecs_to_jiffies(interval_ms))) {
-			ret = -EINTR;
-			break;
-		}
+		usleep_range(interval_us, interval_us * 2);
 
-		interval_ms *= 2;
-		if (interval_ms > PECI_DEV_RETRY_INTERVAL_MAX_MSEC)
-			interval_ms = PECI_DEV_RETRY_INTERVAL_MAX_MSEC;
+		interval_us *= 2;
+		if (interval_us > PECI_DEV_RETRY_INTERVAL_MAX_USEC)
+			interval_us = PECI_DEV_RETRY_INTERVAL_MAX_USEC;
 	}
 
 	if (ret)
@@ -304,23 +306,33 @@ static int peci_scan_cmd_mask(struct peci_adapter *adapter)
 	msg->tx_buf[0] = PECI_GET_DIB_CMD;
 
 	ret = peci_xfer(adapter, msg);
-	if (ret)
-		return ret;
-
-	dib = le64_to_cpup((__le64 *)msg->rx_buf);
-
-	/* Check special case for Get DIB command */
-	if (dib == 0) {
-		dev_dbg(&adapter->dev, "DIB read as 0\n");
-		ret = -EIO;
+	if (ret) {
+		ret = -EAGAIN;
 		goto out;
 	}
+	if (msg->rx_buf[0] == PECI_DEV_CC_INVALID_REQ) {
+		/*
+		 * if GetDIB() is not supported, use a revision property of
+		 * hardware adapter
+		 */
+		revision = adapter->peci_revision;
+	} else {
+		dib = le64_to_cpup((__le64 *)msg->rx_buf);
 
-	/*
-	 * Setting up the supporting commands based on revision number.
-	 * See PECI Spec Table 3-1.
-	 */
-	revision = FIELD_GET(REVISION_NUM_MASK, dib);
+		/* Check special case for Get DIB command */
+		if (dib == 0) {
+			dev_dbg(&adapter->dev, "DIB read as 0\n");
+			ret = -EIO;
+			goto out;
+		}
+
+		/*
+		 * Setting up the supporting commands based on revision number.
+		 * See PECI Spec Table 3-1.
+		 */
+		revision = FIELD_GET(REVISION_NUM_MASK, dib);
+	}
+
 	if (revision >= 0x40) { /* Rev. 4.0 */
 		adapter->cmd_mask |= BIT(PECI_CMD_RD_IA_MSREX);
 		adapter->cmd_mask |= BIT(PECI_CMD_RD_END_PT_CFG);
@@ -383,46 +395,30 @@ static int peci_cmd_xfer(struct peci_adapter *adapter, void *vmsg)
 		ret = peci_xfer(adapter, msg);
 	} else {
 		switch (msg->tx_buf[0]) {
-		case PECI_RDPKGCFG_CMD:
-		case PECI_RDIAMSR_CMD:
-		case PECI_RDIAMSREX_CMD:
-		case PECI_RDPCICFG_CMD:
-		case PECI_RDPCICFGLOCAL_CMD:
-		case PECI_RDENDPTCFG_CMD:
-		case PECI_CRASHDUMP_CMD:
-			ret = peci_xfer_with_retries(adapter, msg, false);
+		case PECI_GET_DIB_CMD:
+		case PECI_GET_TEMP_CMD:
+			ret = peci_xfer(adapter, msg);
 			break;
 		case PECI_WRPKGCFG_CMD:
 		case PECI_WRIAMSR_CMD:
 		case PECI_WRPCICFG_CMD:
 		case PECI_WRPCICFGLOCAL_CMD:
 		case PECI_WRENDPTCFG_CMD:
-			/* Check if the AW FCS byte is already provided */
+			/*
+			 * The sender may not have supplied the AW FCS byte.
+			 * Unconditionally add an Assured Write Frame Check
+			 * Sequence byte
+			 */
 			ret = peci_aw_fcs(msg, 2 + msg->tx_len, &aw_fcs);
 			if (ret)
 				break;
 
-			if (msg->tx_buf[msg->tx_len - 1] != (0x80 ^ aw_fcs)) {
-				/*
-				 * Add an Assured Write Frame Check Sequence
-				 * byte and increment the tx_len to include
-				 * the new byte.
-				 */
-				msg->tx_len++;
-				ret = peci_aw_fcs(msg, 2 + msg->tx_len,
-						  &aw_fcs);
-				if (ret)
-					break;
-
-				msg->tx_buf[msg->tx_len - 1] = 0x80 ^ aw_fcs;
-			}
+			msg->tx_buf[msg->tx_len - 1] = 0x80 ^ aw_fcs;
 
 			ret = peci_xfer_with_retries(adapter, msg, true);
 			break;
-		case PECI_GET_DIB_CMD:
-		case PECI_GET_TEMP_CMD:
 		default:
-			ret = peci_xfer(adapter, msg);
+			ret = peci_xfer_with_retries(adapter, msg, false);
 			break;
 		}
 	}
@@ -1040,7 +1036,6 @@ static int peci_cmd_wr_end_pt_cfg(struct peci_adapter *adapter, void *vmsg)
 				       >> 24); /* MSB - DWORD Register Offset */
 		if (umsg->params.mmio.addr_type ==
 		    PECI_ENDPTCFG_ADDR_TYPE_MMIO_Q) {
-			msg->tx_len = PECI_WRENDPTCFG_MMIO_Q_WRITE_LEN_BASE;
 			msg->tx_buf[14] = (u8)(umsg->params.mmio.offset
 					       >> 32); /* Register Offset */
 			msg->tx_buf[15] = (u8)(umsg->params.mmio.offset
@@ -1069,7 +1064,7 @@ static int peci_cmd_wr_end_pt_cfg(struct peci_adapter *adapter, void *vmsg)
 		return -EINVAL;
 	}
 
-	ret = peci_xfer_with_retries(adapter, msg, false);
+	ret = peci_xfer_with_retries(adapter, msg, true);
 
 out:
 	umsg->cc = msg->rx_buf[0];
