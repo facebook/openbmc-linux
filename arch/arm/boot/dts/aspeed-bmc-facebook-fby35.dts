@@ -251,7 +251,7 @@
 	ref_voltage = <2500>;
 	status = "okay";
 
-	pinctrl-0 = <&pinctrl_adc8_default &pinctrl_adc9_default
+	pinctrl-0 = <&pinctrl_adc8_default
 		&pinctrl_adc10_default &pinctrl_adc11_default
 		&pinctrl_adc12_default &pinctrl_adc13_default>;
 };
