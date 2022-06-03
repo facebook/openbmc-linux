@@ -213,11 +213,9 @@
 
 &i2c1 {
     status = "okay";
-    ipmb0@10 {
-        compatible = "ipmb-dev";
-        reg = <(0x10 | I2C_OWN_SLAVE_ADDRESS)>;
-        i2c-protocol;
-    };
+    multi-master;
+    bus-frequency = <100000>;
+    aspeed,hw-timeout-ms = <1000>;
 };
 
 &i2c2 {
@@ -342,7 +340,7 @@
     peci-client@30 {
         compatible = "intel,peci-client";
         reg = <0x30>;
-        cpu-id= <0x606C2>;
+        cpu-id= <0x606C1>;
     };
 };
 
