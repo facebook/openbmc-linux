@@ -21,6 +21,10 @@
 		i2c16 = &imux16;
 		i2c17 = &imux17;
 		i2c18 = &imux18;
+		i2c19 = &imux19;
+		i2c20 = &imux20;
+		i2c21 = &imux21;
+		i2c22 = &imux22;
 
 		spi3 = &spi2_gpio;
 	};
@@ -121,6 +125,7 @@
 
 	flash@0 {
 		status = "okay";
+		compatible = "m25p80", "jedec,spi-nor";
 		m25p,fast-read;
 		spi-max-frequency = <12000000>;
 		label = "switch0";
@@ -484,6 +489,32 @@
 
 &i2c12 {
 	status = "okay";
+	i2c-switch@70 {
+		compatible = "nxp,pca9546";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x70>;
+		imux19: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+		imux20: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+		imux21: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+		imux22: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+	};	
 };
 
 &i2c13 {
