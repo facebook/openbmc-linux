@@ -375,6 +375,13 @@ static int ehci_platform_probe(struct platform_device *dev)
 	if (err)
 		goto err_power;
 
+	// The default threshold is 256 bytes,
+	// to avoid BMC mishandle the transmit from EHCI driver,
+	// increase transmit bandwidth to 512 bytes to reduce the transmit frequency.
+	if (of_device_is_compatible(dev->dev.of_node, "aspeed,ast2600-ehci")) {
+		writel(((readl(hcd->regs + 0x84) & ~0xC0) | 0x80), hcd->regs + 0x84);
+	}
+
 	device_wakeup_enable(hcd->self.controller);
 	device_enable_async_suspend(hcd->self.controller);
 	platform_set_drvdata(dev, hcd);
