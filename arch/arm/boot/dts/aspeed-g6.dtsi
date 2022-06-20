@@ -735,6 +735,7 @@
 				lpc_snoop: lpc-snoop@80 {
 					compatible = "aspeed,ast2600-lpc-snoop";
 					reg = <0x80 0x80>;
+					clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
 					interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
 					status = "disabled";
 				};
