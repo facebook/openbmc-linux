@@ -779,6 +779,7 @@ static int ncsi_oem_smaf_mlx(struct ncsi_cmd_arg *nca)
 	u.data_u32[0] = ntohl((__force __be32)NCSI_OEM_MFR_MLX_ID);
 	u.data_u8[5] = NCSI_OEM_MLX_CMD_SMAF;
 	u.data_u8[6] = NCSI_OEM_MLX_CMD_SMAF_PARAM;
+	u.data_u8[7] = 0xFF;
 	memcpy(&u.data_u8[MLX_SMAF_MAC_ADDR_OFFSET],
 	       nca->ndp->ndev.dev->dev_addr,	ETH_ALEN);
 	u.data_u8[MLX_SMAF_MED_SUPPORT_OFFSET] =
@@ -791,6 +792,10 @@ static int ncsi_oem_smaf_mlx(struct ncsi_cmd_arg *nca)
 	if (ret)
 		netdev_err(nca->ndp->ndev.dev,
 			   "NCSI: Failed to transmit cmd 0x%x during probe\n",
+			   nca->type);
+	else
+		netdev_err(nca->ndp->ndev.dev,
+			   "NCSI: transmit cmd 0x%x ncsi_oem_sma_mlx success during probe\n",
 			   nca->type);
 	return ret;
 }
