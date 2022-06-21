@@ -223,6 +223,7 @@ static int ftgmac100_set_mac_addr(struct net_device *dev, void *p)
 
 	eth_commit_mac_addr_change(dev, p);
 	ftgmac100_write_mac_addr(netdev_priv(dev), dev->dev_addr);
+	dev->addr_assign_type = NET_ADDR_SET;
 
 	return 0;
 }
