@@ -48,12 +48,14 @@
 			compatible = "arm,cortex-a7";
 			device_type = "cpu";
 			reg = <0xf00>;
+			clock-frequency= <1200000000>;
 		};
 
 		cpu@f01 {
 			compatible = "arm,cortex-a7";
 			device_type = "cpu";
 			reg = <0xf01>;
+			clock-frequency= <1200000000>;
 		};
 	};
 
