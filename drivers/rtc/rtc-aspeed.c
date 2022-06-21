@@ -19,6 +19,10 @@ struct aspeed_rtc {
 #define RTC_UNLOCK	BIT(1)
 #define RTC_ENABLE	BIT(0)
 
+#define RTC_DAYCNT 24
+#define RTC_MONCNT 0
+#define RTC_CENTCNT 16
+
 static int aspeed_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct aspeed_rtc *rtc = dev_get_drvdata(dev);
@@ -98,6 +102,14 @@ static int aspeed_rtc_probe(struct platform_device *pdev)
 	if (IS_ERR(rtc->rtc_dev))
 		return PTR_ERR(rtc->rtc_dev);
 
+	if (!(readl(rtc->base + RTC_CTRL) & RTC_ENABLE)) {
+		// start RTC from 2000/1/1 00:00:00
+		writel(RTC_UNLOCK, rtc->base + RTC_CTRL);
+		writel(1 << RTC_DAYCNT, rtc->base + RTC_TIME);
+		writel((20 << RTC_CENTCNT) | (1 << RTC_MONCNT), rtc->base + RTC_YEAR);
+	}
+
+	writel(RTC_ENABLE, rtc->base + RTC_CTRL);
 	platform_set_drvdata(pdev, rtc);
 
 	rtc->rtc_dev->ops = &aspeed_rtc_ops;
