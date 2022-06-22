@@ -330,6 +330,11 @@ struct vlan_vid {
 	u16 vid;
 };
 
+enum {
+	NCSI_CTRL_FLAG_NO_CHANNEL_MONITOR	= 0x0001,
+	NCSI_CTRL_FLAG_START_REDO_PROBE		= 0x0002,
+};
+
 struct ncsi_dev_priv {
 	struct ncsi_dev     ndev;            /* Associated NCSI device     */
 	unsigned int        flags;           /* NCSI device flags          */
@@ -360,6 +365,7 @@ struct ncsi_dev_priv {
 	bool                mlx_multi_host;  /* Enable multi host Mellanox */
 	u32                 package_whitelist; /* Packages to configure    */
 	unsigned char       rexmit; /* Retransmit when timeout */
+	unsigned int        ctrl_flags;      /* NCSI control flags */
 };
 
 
