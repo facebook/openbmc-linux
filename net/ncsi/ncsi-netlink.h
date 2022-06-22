@@ -9,6 +9,7 @@
 #include <linux/netdevice.h>
 
 #include "internal.h"
+#include "ncsi-pkt.h"
 
 int ncsi_send_netlink_rsp(struct ncsi_request *nr,
 			  struct ncsi_package *np,
@@ -21,5 +22,7 @@ int ncsi_send_netlink_err(struct net_device *dev,
 			  u32 snd_portid,
 			  struct nlmsghdr *nlhdr,
 			  int err);
+int ncsi_generate_aen_netlink_event(struct ncsi_dev_priv *ndp,
+			  struct ncsi_aen_pkt_hdr *h);
 
 #endif /* __NCSI_NETLINK_H__ */
