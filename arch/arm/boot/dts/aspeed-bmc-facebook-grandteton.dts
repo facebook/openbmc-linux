@@ -5,6 +5,7 @@
 
 #include "aspeed-g6.dtsi"
 #include <dt-bindings/gpio/aspeed-gpio.h>
+#include <dt-bindings/leds/leds-pca955x.h>
 
 / {
 	model = "Facebook GrandTeton";
@@ -16,6 +17,44 @@
 
 		spi1 = &spi_gpio;
 
+		i2c20 = &imux20;
+		i2c21 = &imux21;
+		i2c22 = &imux22;
+		i2c23 = &imux23;
+		i2c24 = &imux24;
+		i2c25 = &imux25;
+		i2c26 = &imux26;
+		i2c27 = &imux27;
+		i2c28 = &imux28;
+		i2c29 = &imux29;
+		i2c30 = &imux30;
+		i2c31 = &imux31;
+		i2c32 = &imux32;
+		i2c33 = &imux33;
+		i2c34 = &imux34;
+		i2c35 = &imux35;
+		i2c36 = &imux36;
+		i2c37 = &imux37;
+		i2c38 = &imux38;
+		i2c39 = &imux39;
+		i2c40 = &imux40;
+		i2c41 = &imux41;
+		i2c42 = &imux42;
+		i2c43 = &imux43;
+		i2c44 = &imux44;
+		i2c45 = &imux45;
+		i2c46 = &imux46;
+		i2c47 = &imux47;
+		i2c48 = &imux48;
+		i2c49 = &imux49;
+		i2c50 = &imux50;
+		i2c51 = &imux51;
+		i2c52 = &imux52;
+		i2c53 = &imux53;
+		i2c54 = &imux54;
+		i2c55 = &imux55;
+		i2c56 = &imux56;
+		i2c57 = &imux57;
 	};
 
 	chosen {
@@ -184,6 +223,7 @@
 
 &peci0 {
 	status = "okay";
+	clock-frequency = <1000000>;
 };
 
 &sgpiom0 {
@@ -200,6 +240,52 @@
 
 &i2c1 {
 	status = "okay";
+	i2c-switch@70 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x70>;
+		imux20: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+		imux21: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+		imux22: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+		imux23: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+		imux24: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+		};
+		imux25: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+		};
+		imux26: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+		};
+		imux27: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+		};
+	};
 	tmp75@4B {
 		compatible = "ti,tmp75";
 		reg = <0x4B>;
@@ -235,6 +321,52 @@
 
 &i2c5 {
 	status = "okay";
+	i2c-switch@70 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x70>;
+		imux28: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+		imux29: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+		imux30: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+		imux31: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+		imux32: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+		};
+		imux33: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+		};
+		imux34: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+		};
+		imux35: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+		};
+	};
 };
 
 //To Me
@@ -253,6 +385,286 @@
 // To PDB
 &i2c8 {
 	status = "okay";
+	i2c-switch@72 {
+		compatible = "nxp,pca9545";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x72>;
+		imux36: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+
+		imux37: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+				status = "okay";
+			i2c-switch@71 {
+				compatible = "nxp,pca9543";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0x71>;
+				imux40: i2c@0 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <0>;
+					fan_bp0_led: pca9552@62 {
+						compatible = "nxp,pca9552";
+						reg = <0x62>;
+						#address-cells = <1>;
+						#size-cells = <0>;
+						gpio-controller;
+						#gpio-cells = <2>;
+						gpio@0 {
+							reg = <0>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@1 {
+							reg = <1>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@2 {
+							reg = <2>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@3 {
+							reg = <3>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@4 {
+							reg = <4>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@5 {
+							reg = <5>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@6 {
+							reg = <6>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@7 {
+							reg = <7>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@8 {
+							reg = <8>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@9 {
+							reg = <9>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@10 {
+							reg = <10>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@11 {
+							reg = <11>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@12 {
+							reg = <12>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@13 {
+							reg = <13>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@14 {
+							reg = <14>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@15 {
+							reg = <15>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+					};
+					i2c-switch@70 {
+						compatible = "nxp,pca9548";
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <0x70>;
+						imux42: i2c@0 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <0>;
+						};
+						imux43: i2c@1 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <1>;
+						};
+						imux44: i2c@2 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <2>;
+						};
+						imux45: i2c@3 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <3>;
+						};
+						imux46: i2c@4 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <4>;
+						};
+						imux47: i2c@5 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <5>;
+						};
+						imux48: i2c@6 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <6>;
+						};
+						imux49: i2c@7 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <7>;
+						};
+					};
+				};
+				imux41: i2c@1 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <1>;
+					fan_bp1_led: pca9552@62 {
+						compatible = "nxp,pca9552";
+						reg = <0x62>;
+						#address-cells = <1>;
+						#size-cells = <0>;
+						gpio-controller;
+						#gpio-cells = <2>;
+						gpio@0 {
+							reg = <0>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@1 {
+							reg = <1>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@2 {
+							reg = <2>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@3 {
+							reg = <3>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@4 {
+							reg = <4>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@5 {
+							reg = <5>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@6 {
+							reg = <6>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@7 {
+							reg = <7>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@8 {
+							reg = <8>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@9 {
+							reg = <9>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@10 {
+							reg = <10>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@11 {
+							reg = <11>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@12 {
+							reg = <12>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@13 {
+							reg = <13>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@14 {
+							reg = <14>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+						gpio@15 {
+							reg = <15>;
+							type = <PCA955X_TYPE_GPIO>;
+						};
+					};
+					i2c-switch@70 {
+						compatible = "nxp,pca9548";
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <0x70>;
+						imux50: i2c@0 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <0>;
+						};
+						imux51: i2c@1 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <1>;
+						};
+						imux52: i2c@2 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <2>;
+						};
+						imux53: i2c@3 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <3>;
+						};
+						imux54: i2c@4 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <4>;
+						};
+						imux55: i2c@5 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <5>;
+						};
+						imux56: i2c@6 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <6>;
+						};
+						imux57: i2c@7 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <7>;
+						};
+					};
+				};
+			};
+		};
+		imux38: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+		imux39: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+	};
 };
 
 //To GPU
