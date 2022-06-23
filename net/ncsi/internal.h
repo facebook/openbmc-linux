@@ -364,6 +364,8 @@ struct ncsi_dev_priv {
 	bool                multi_package;   /* Enable multiple packages   */
 	bool                mlx_multi_host;  /* Enable multi host Mellanox */
 	u32                 package_whitelist; /* Packages to configure    */
+	unsigned char       max_package;     /* Num of packages to probe   */
+	unsigned char       max_channel;     /* Num of channels to probe   */
 	unsigned char       rexmit; /* Retransmit when timeout */
 	unsigned int        ctrl_flags;      /* NCSI control flags */
 };
