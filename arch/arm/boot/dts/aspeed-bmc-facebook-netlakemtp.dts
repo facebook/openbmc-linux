@@ -89,6 +89,10 @@
     status = "okay";
 };
 
+&uart4 {
+    status = "okay";
+};
+
 &uart5 {
     status = "okay";
     /* Workaround for AST2600 A0 */
