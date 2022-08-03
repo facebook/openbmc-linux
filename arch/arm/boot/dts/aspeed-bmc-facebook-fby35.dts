@@ -167,7 +167,7 @@
         spi-max-frequency = <50000000>;
         spi-tx-bus-width = <2>;
         spi-rx-bus-width = <2>;
-#include "facebook-bmc-vboot2-flash0-layout.dtsi"
+#include "facebook-bmc-vboot2-flash0-128MB-layout.dtsi"
     };
 };
 
