@@ -366,6 +366,15 @@ static void pci_read_bridge_windows(struct pci_dev *bridge)
 	if (bridge->vendor == PCI_VENDOR_ID_DEC && bridge->device == 0x0001)
 		return;
 
+	if ((bridge->vendor == 0x1a03 && bridge->device == 0x1150) ||
+		(bridge->vendor == 0x15b3 && bridge->device == 0x1017)) {
+		u16 reg16;
+		dev_info(&bridge->dev, "ASPEED Bridge Gen2 re-training\n");
+		pcie_capability_read_word(bridge, PCI_EXP_LNKCTL, &reg16);
+		reg16 |= PCI_EXP_LNKCTL_RL;
+		pcie_capability_write_word(bridge, PCI_EXP_LNKCTL, reg16);
+	}
+
 	pci_read_config_dword(bridge, PCI_PREF_MEMORY_BASE, &pmem);
 	if (!pmem) {
 		pci_write_config_dword(bridge, PCI_PREF_MEMORY_BASE,
