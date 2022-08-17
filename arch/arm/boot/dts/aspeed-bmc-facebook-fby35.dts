@@ -23,7 +23,7 @@
 
 	chosen {
 		stdout-path = &uart5;
-		bootargs = "console=ttyS4,57600n8 root=/dev/ram rw vmalloc=384M";
+		bootargs = "console=ttyS0,57600n8 root=/dev/ram rw vmalloc=384M";
 	};
 
 	memory@80000000 {
