@@ -45,6 +45,7 @@
 		cooling-max-state = <3>;
 		#cooling-cells = <2>;
 		cooling-levels = <0 25 128 255>;
+		retain-state-shutdown;
 	};
 
 	fan1: pwm-fan1 {
@@ -54,6 +55,7 @@
 		cooling-max-state = <3>;
 		#cooling-cells = <2>;
 		cooling-levels = <0 15 128 255>;
+		retain-state-shutdown;
 	};
 
 	fan2: pwm-fan2 {
@@ -63,6 +65,7 @@
 		cooling-max-state = <3>;
 		#cooling-cells = <2>;
 		cooling-levels = <0 15 128 255>;
+		retain-state-shutdown;
 	};
 
 	fan3: pwm-fan3 {
@@ -72,6 +75,7 @@
 		cooling-max-state = <3>;
 		#cooling-cells = <2>;
 		cooling-levels = <0 15 128 255>;
+		retain-state-shutdown;
 	};
 
 	spi_gpio: spi-gpio {
