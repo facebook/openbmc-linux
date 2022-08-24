@@ -238,6 +238,15 @@ config SENSORS_MP2975
 	  This driver can also be built as a module. If so, the module will
 	  be called mp2975.
 
+config SENSORS_MP2971
+	tristate "MPS MP2971"
+	help
+	  If you say yes here you get hardware monitoring support for MPS
+	  MP2971 MP2973 Dual Loop Digital Multi-Phase Controller.
+
+	  This driver can also be built as a module. If so, the module will
+	  be called mp2971 mp2973.
+
 config SENSORS_MP5920
     tristate "Monolithic MP5920"
     help
@@ -246,6 +255,15 @@ config SENSORS_MP5920
 
       This driver can also be built as a module. If so, the module will
       be called mp5920.
+
+config SENSORS_MP5990
+	tristate "MPS MP5990"
+	help
+	  If you say yes here you get hardware monitoring support for Monolithic
+	  MP5990.
+
+	  This driver can also be built as a module. If so, the module will
+	  be called mp5990.
 
 config SENSORS_PXE1610
 	tristate "Infineon PXE1610"
@@ -294,6 +312,15 @@ config SENSORS_UCD9200
 	  This driver can also be built as a module. If so, the module will
 	  be called ucd9200.
 
+config SENSORS_XDPE152
+	tristate "Infineon XDPE152 family"
+	help
+	  If you say yes here you get hardware monitoring support for Infineon
+	  XDPE15284, XDPE152C4, device.
+
+	  This driver can also be built as a module. If so, the module will
+	  be called xdpe152c4.
+
 config SENSORS_XDPE122
 	tristate "Infineon XDPE122 family"
 	help
@@ -322,5 +349,12 @@ config SENSORS_ZL6100
 
 	  This driver can also be built as a module. If so, the module will
 	  be called zl6100.
+
+config SENSORS_BMR4XX
+	tristate "Intersil BMR4XX and compatibles"
+	help
+	  If you say yes here you get hardware monitoring support for Intersil
+	  Digital DC/DC Controllers, as well as for
+	  Ericsson BMR491.
 
 endif # PMBUS
