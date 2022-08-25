@@ -139,6 +139,7 @@
 	no-hw-checksum;
 	use-ncsi;
 	mlx,multi-host;
+	disable-ncsi-vlan-filter;
 	ncsi-ctrl,start-redo-probe;
 	ncsi-ctrl,no-channel-monitor;
 	ncsi-package = <1>;

@@ -1067,7 +1067,11 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_config_oem_gma;
 		break;
 	case ncsi_dev_state_config_oem_gma:
-		nd->state = ncsi_dev_state_config_clear_vids;
+		if (ndp->vlan_filter_flags) {
+			nd->state = ncsi_dev_state_config_clear_vids;
+		} else {
+			nd->state = ncsi_dev_state_config_ev;
+		}
 		ret = -1;
 
 #if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
@@ -1809,6 +1813,7 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 	INIT_WORK(&ndp->work, ncsi_dev_work);
 	ndp->package_whitelist = UINT_MAX;
 	ndp->ctrl_flags = 0;
+	ndp->vlan_filter_flags = true;
 
 	/* Initialize private NCSI device */
 	spin_lock_init(&ndp->lock);
@@ -1845,6 +1850,9 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 			if (of_get_property(np, "ncsi-ctrl,start-redo-probe", NULL))
 				ndp->ctrl_flags |= NCSI_CTRL_FLAG_START_REDO_PROBE;
 
+			if (of_get_property(np, "disable-ncsi-vlan-filter", NULL)) {
+				ndp->vlan_filter_flags = false;
+			}
 			if (!of_property_read_u32(np, "ncsi-package", &property) &&
 				(property < NCSI_MAX_PACKAGE)) {
 				ndp->max_package = (u8)property;
