@@ -305,7 +305,6 @@ static int sbrmi_probe(struct i2c_client *client,
 	struct sbrmi_data *data;
 	int ret;
 
-	printk("%s\n", __func__);
 	data = devm_kzalloc(dev, sizeof(struct sbrmi_data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;

@@ -240,4 +240,6 @@ source "drivers/jtag/Kconfig"
 
 source "drivers/peci/Kconfig"
 
+source "drivers/apml/Kconfig"
+
 endmenu

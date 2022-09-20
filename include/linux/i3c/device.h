@@ -74,6 +74,14 @@ struct i3c_priv_xfer {
  */
 enum i3c_dcr {
 	I3C_DCR_GENERIC_DEVICE = 0,
+	I3C_DCR_THERMAL_SENSOR_FIRST = 210,
+	I3C_DCR_THERMAL_SENSOR_SECOND = 214,
+	I3C_DCR_PMIC_SECOND = 216,
+	I3C_DCR_PMIC_FIRST = 217,
+	I3C_DCR_SPD_HUB = 218,
+	I3C_DCR_RCD = 219,
+	I3C_DCR_PMIC_THIRD = 220,
+	I3C_DCR_MAX = 228,
 };
 
 #define I3C_PID_MANUF_ID(pid)		(((pid) & GENMASK_ULL(47, 33)) >> 33)
@@ -92,6 +100,22 @@ enum i3c_dcr {
 #define I3C_BCR_IBI_PAYLOAD		BIT(2)
 #define I3C_BCR_IBI_REQ_CAP		BIT(1)
 #define I3C_BCR_MAX_DATA_SPEED_LIM	BIT(0)
+
+/*
+ * MIPI I3C MDB definition
+ * see https://www.mipi.org/MIPI_I3C_mandatory_data_byte_values_public
+ */
+#define IBI_MDB_ID(grp, id)                                                    \
+	((((grp) << 5) & GENMASK(7, 5)) | ((id)&GENMASK(4, 0)))
+#define IBI_MDB_GET_GRP(m) (((m)&GENMASK(7, 5)) >> 5)
+#define IBI_MDB_GET_ID(m) ((m)&GENMASK(4, 0))
+
+#define IBI_MDB_GRP_PENDING_READ_NOTIF 0x5
+#define IS_MDB_PENDING_READ_NOTIFY(m)                                          \
+	(IBI_MDB_GET_GRP(m) == IBI_MDB_GRP_PENDING_READ_NOTIF)
+#define IBI_MDB_MIPI_DBGDATAREADY                                              \
+	IBI_MDB_ID(IBI_MDB_GRP_PENDING_READ_NOTIF, 0xd)
+#define IBI_MDB_MCTP IBI_MDB_ID(IBI_MDB_GRP_PENDING_READ_NOTIF, 0xe)
 
 /**
  * struct i3c_device_info - I3C device information
@@ -287,7 +311,8 @@ static inline void i3c_i2c_driver_unregister(struct i3c_driver *i3cdrv,
 #define module_i3c_i2c_driver(__i3cdrv, __i2cdrv)	\
 	module_driver(__i3cdrv,				\
 		      i3c_i2c_driver_register,		\
-		      i3c_i2c_driver_unregister)
+		      i3c_i2c_driver_unregister,	\
+		      __i2cdrv)
 
 int i3c_device_do_priv_xfers(struct i3c_device *dev,
 			     struct i3c_priv_xfer *xfers,
