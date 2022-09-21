@@ -200,9 +200,12 @@
 	status = "okay";
 };
 
-&lpc_snoop {
+&lpc_pcc {
+	rec-mode = <0x1>;
+	port-addr = <0x80>;
+	port-addr-hbits-select = <0x1>;
+	port-addr-xbits = <0x3>;
 	status = "okay";
-	snoop-ports = <0x80>;
 };
 
 //eSPI
