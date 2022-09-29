@@ -49,6 +49,13 @@ properties:
     description:
       states that there is another master active on this bus
 
+  i2c-clk-high-min-percent:
+    minimum: 1
+    maximum: 100
+    default: 50
+    description:
+      a minimum percentage of clock high
+
 required:
   - reg
   - compatible
