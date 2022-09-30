@@ -4,6 +4,7 @@
 /dts-v1/;
 
 #include "ast2600-facebook-netbmc-common.dtsi"
+
 / {
         model = "Facebook Sandia BMC";
         compatible = "facebook,sandia-bmc", "aspeed,ast2600";
@@ -17,5 +18,18 @@
         fixed-link {
                 speed = <1000>;
                 full-duplex;
+        };
+};
+
+&i2c2 {
+        multi-master;
+        bus-frequency = <1000000>;
+
+        cyclonus@20 {
+                compatible = "cisco-fpga-bmc";
+                reg = <0x20>;
+                devid-none = <1>;
+
+#include "cisco-cyclonus.dtsi"
         };
 };

@@ -1,0 +1,78 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2022 Cisco Systems Inc.
+
+info@0 {
+    reg = < 0 >;
+    compatible = "cisco-fpga-info";
+    fpd-name = "cyclonus";
+    fpd-description = "CYCLONUS";
+};
+
+cyclonus_msd: msd@1000 {
+    reg = < 0x1000 >;
+    compatible = "cisco-fpga-msd";
+    reboot-notifier-enable = <0>;
+};
+
+pseq@14000 {
+    reg = < 0x14000 >;
+    compatible = "cisco-fpga-pseq";
+    standby = <1>;
+    reboot-notifier-enable = <0>;
+    rail-names =
+        "P3V3",
+        "PVCCSCFUSESUS",
+        "PVCCKRHV",
+        "P1V05_COMBINED",
+        "P1V05_VCCSCSUS",
+        "P2V5_VPP",
+        "P1V2_VDDQ",
+        "P0V6_VTT_DIMM",
+        "P1V5_PCH",
+        "P3V3_PCH",
+        "PVCCIN",
+        "ZONE2_ON",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+    ;
+};
+
+i2c2@18000 {
+    reg = < 0x18000 >;
+    compatible = "cisco-fpga-i2c-ext";
+    nickname = "SCM_IDPROM";
+    multi-master = <1>;
+    arbitration-request = <1>;
+    arbitration-index = <2>;
+    arbitration-timeout-msecs = <1000>;
+    arbitration-peer-grant-msecs = <100>;
+    arbitration-peer-retry-msecs = <10>;
+    arbitration-ip-block = <&cyclonus_msd>;
+    devid-auto = <1>;
+
+    eep0@0x50 {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        reg = <0x50>;
+        compatible= "24c64";
+    };
+};
