@@ -65,47 +65,47 @@
  * a set of reg & real values.
  * Values must be recalibration if schematic change
  */
-#define VSOURCE_SLOPE                   2523
-#define VSOURCE_INTERCEPT               578530
-#define VSENSE_SLOPE                    34902
-#define VSENSE_INTERCEPT                971700
-#define VGPIO3_SLOPE                    14412
-#define VGPIO3_INTERCEPT                (-15000000)
-#define TEMP_SLOPE                      VGPIO3_SLOPE
-#define TEMP_INTERCEPT                  VGPIO3_INTERCEPT
-#define UNIT_MV                         10000
-#define UNIT_MA                         10000
-#define UNIT_C                          10000
+#define VSOURCE_SLOPE                2523
+#define VSOURCE_INTERCEPT            578530
+#define VSENSE_SLOPE                 34902
+#define VSENSE_INTERCEPT             971700
+#define VGPIO3_SLOPE                 14412
+#define VGPIO3_INTERCEPT             (-15000000)
+#define TEMP_SLOPE                   VGPIO3_SLOPE
+#define TEMP_INTERCEPT               VGPIO3_INTERCEPT
+#define UNIT_MV                      10000
+#define UNIT_MA                      10000
+#define UNIT_C                       10000
 
-#define LTC4282_REBOOT                  (1 << 7)
-#define ON_FAULT_MASK                   (1 << 7)
-#define RESOLUTION_16_BIT               (1 << 0)
-#define VOLTAGE_SELECT                  (1 << 2)
-#define VGPIO_SELECT                    (1 << 1)
+#define LTC4282_REBOOT               (1 << 7)
+#define ON_FAULT_MASK                (1 << 7)
+#define RESOLUTION_16_BIT            (1 << 0)
+#define VOLTAGE_SELECT               (1 << 2)
+#define VGPIO_SELECT                 (1 << 1)
 
-#define OC_AUTORETRY                    (1 << 2)
+#define OC_AUTORETRY                 (1 << 2)
 
-#define FAULT_LOG_EN                    (1 << 2)
+#define FAULT_LOG_EN                 (1 << 2)
 /* Fault log register bits */
-#define FAULT_OV                    0
-#define FAULT_UV                    1
-#define FAULT_OC                    2
-#define FAULT_POWER                 3
-#define ON_FAULT                    4
-#define FAULT_FET_SHORT             5
-#define FAULT_FET_BAD               6
-#define EEPROM_DONE                 7
+#define FAULT_OV                     0
+#define FAULT_UV                     1
+#define FAULT_OC                     2
+#define FAULT_POWER                  3
+#define ON_FAULT                     4
+#define FAULT_FET_SHORT              5
+#define FAULT_FET_BAD                6
+#define EEPROM_DONE                  7
 
 /* ADC Alert log */
-#define POWER_ALARM_HIGH            7
-#define POWER_ALARM_LOW             6
-#define VSENSE_ALARM_HIGH           5
-#define VSENSE_ALARM_LOW            4
-#define VSOURCE_ALARM_HIGH          3
-#define VSOURCE_ALARM_LOW           2
-#define GPIO_ALARM_HIGH             1
-#define GPIO_ALARM_LOW              0
-#define TEMP_ALARM_HIGH             GPIO_ALARM_HIGH
+#define POWER_ALARM_HIGH             7
+#define POWER_ALARM_LOW              6
+#define VSENSE_ALARM_HIGH            5
+#define VSENSE_ALARM_LOW             4
+#define VSOURCE_ALARM_HIGH           3
+#define VSOURCE_ALARM_LOW            2
+#define GPIO_ALARM_HIGH              1
+#define GPIO_ALARM_LOW               0
+#define TEMP_ALARM_HIGH              GPIO_ALARM_HIGH
 
 /* Fault status register bits */
 #define ON_STATUS                    15
@@ -209,23 +209,27 @@ static struct ltc4282_data *ltc4282_update_adc(struct device *dev, int reg)
 	switch (reg) {
 	case ltc4282_reg_vin:
 		val = i2c_smbus_read_byte_data(client, LTC4282_ADJUST);
-		val &= (~VOLTAGE_SELECT);
-		i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
-		if (val | RESOLUTION_16_BIT)
-			msleep(1100);
-		else
-			msleep(100);
+		if ((val & VOLTAGE_SELECT) == VOLTAGE_SELECT) {
+			val &= (~VOLTAGE_SELECT);
+			i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
+			if (val | RESOLUTION_16_BIT)
+				msleep(1100);
+			else
+				msleep(100);
+		}
 		val = i2c_smbus_read_word_data(client, LTC4282_VSOURCE);
 		val = (u16)(val << 8) | (val >> 8);
 		break;
 	case ltc4282_reg_vout:
 		val = i2c_smbus_read_byte_data(client, LTC4282_ADJUST);
-		val |= VOLTAGE_SELECT;
-		i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
-		if (val | RESOLUTION_16_BIT)
-			msleep(1100);
-		else
-			msleep(100);
+		if ((val & VOLTAGE_SELECT) != VOLTAGE_SELECT) {
+			val |= VOLTAGE_SELECT;
+			i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
+			if (val | RESOLUTION_16_BIT)
+				msleep(1100);
+			else
+				msleep(100);
+		}
 		val = i2c_smbus_read_word_data(client, LTC4282_VSOURCE);
 		val = (u16)(val << 8) | (val >> 8);
 		break;
