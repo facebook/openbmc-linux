@@ -10,6 +10,35 @@
         compatible = "facebook,sandia-bmc", "aspeed,ast2600";
 };
 
+&spi1 {
+        reg = < 0x1e630000 0xc4
+                0x30000000 0x1000000 >;
+
+        flash@0 {
+                status = "okay";
+                m25p,fast-read;
+                compatible = "jedec,spi-nor";
+                label = "spi1.0";
+                spi-rx-bus-width = <1>;
+                spi-max-frequency = <10000000>;
+
+                partitions {
+                        compatible = "fixed-partitions";
+                        #address-cells = <1>;
+                        #size-cells = <1>;
+
+                        bios_full@0 {
+                               reg = <0x0 0x1000000>;
+                               label = "bios_full";
+                        };
+                        bios@0 {
+                               reg = <0x800000 0x800000>;
+                               label = "bios";
+                        };
+                };
+        };
+};
+
 &mac3 {
         status = "okay";
         pinctrl-names = "default";
@@ -31,5 +60,15 @@
                 devid-none = <1>;
 
 #include "cisco-cyclonus.dtsi"
+        };
+};
+
+&i2c4 {
+        bus-frequency = <1000000>;
+
+        cpucpld@40 {
+                compatible = "lattice_machx03";
+                reg = <0x40>;
+                devid-none = <1>;
         };
 };
