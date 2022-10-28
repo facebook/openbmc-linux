@@ -12,10 +12,7 @@
 
 	aliases {
 		serial0 = &uart5;
-		serial1 = &uart1;
-		serial2 = &uart2;
-		serial3 = &uart3;
-		serial4 = &uart4;
+		serial5 = &uart6;
 	};
 
 	chosen {
@@ -27,35 +24,43 @@
 		device_type = "memory";
 		reg = <0x80000000 0x80000000>;
 	};
+
 	iio-hwmon {
 		compatible = "iio-hwmon";
 		io-channels = <&adc0 0>, <&adc0 1>, <&adc0 2>, <&adc0 3>,
 			<&adc0 4>, <&adc0 5>, <&adc0 6>, <&adc0 7>,
-			<&adc1 0>, <&adc1 1>;
+			<&adc1 2>;
 	};
 
-};
+	spi_gpio: spi-gpio {
+		status = "okay";
+		compatible = "spi-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
 
-&uart1 {
-	status = "okay";
-};
+		gpio-sck = <&gpio0 ASPEED_GPIO(Z, 3) GPIO_ACTIVE_HIGH>;
+		gpio-mosi = <&gpio0 ASPEED_GPIO(Z, 4) GPIO_ACTIVE_HIGH>;
+		gpio-miso = <&gpio0 ASPEED_GPIO(Z, 5) GPIO_ACTIVE_HIGH>;
+		num-chipselects = <1>;
+		cs-gpios = <&gpio0 ASPEED_GPIO(Z, 0) GPIO_ACTIVE_LOW>;
 
-&uart2 {
-	status = "okay";
-};
+		tpmdev@0 {
+			compatible = "tcg,tpm_tis-spi";
+			spi-max-frequency = <33000000>;
+			reg = <0>;
+		};
+	};
 
-&uart3 {
-	status = "okay";
-};
-
-&uart4 {
-	status = "okay";
 };
 
 &uart5 {
 	status = "okay";
 	/* Workaround for AST2600 A0 */
 	compatible = "snps,dw-apb-uart";
+};
+
+&uart6 {
+	status = "okay";
 };
 
 &wdt1 {
@@ -76,6 +81,7 @@
 	pinctrl-0 = <&pinctrl_rmii4_default>;
 	no-hw-checksum;
 	use-ncsi;
+	mlx,multi-host;
 	ncsi-ctrl,start-redo-probe;
 	ncsi-ctrl,no-channel-monitor;
 	ncsi-package = <1>;
@@ -127,9 +133,141 @@
 };
 
 &ehci1 {
-      status = "okay";
+	status = "okay";
 };
 
 &uhci {
 	status = "okay";
+};
+
+// SAS IOC
+&i2c0 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <100000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// SAS EXP
+&i2c1 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <100000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// MB BIC
+&i2c2 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <400000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// peer MB BIC
+&i2c3 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <400000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// NIC card
+&i2c4 {
+	status = "okay";
+	multi-master;
+	aspeed,hw-timeout-ms = <1000>;
+	// NIC FRU
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+	};
+	// NIC TEMP
+	tmp421@1F {
+		compatible = "ti,tmp421";
+		reg = <0x1F>;
+	};
+};
+
+// E1S - SAS IOC
+&i2c5 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <100000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// E1S - SAS EXP
+&i2c6 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <100000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// SAS EXP
+&i2c7 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <100000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// SAS EXP
+&i2c8 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <100000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// SAS EXP
+&i2c9 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <100000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
+
+// SCM CPLD
+&i2c10 {
+	status = "okay";
+};
+
+// OCP debug card
+&i2c11 {
+	multi-master;
+	bus-frequency = <100000>;
+	aspeed,hw-timeout-ms = <1000>;
+	status = "okay";
+};
+
+// reserve
+&i2c12 {
+	status = "okay";
+};
+
+// reserve
+&i2c13 {
+	status = "okay";
+};
+
+// no used
+&i2c14 {
+	status = "okay";
+};
+
+// SCM local
+&i2c15 {
+	status = "okay";
+	// SCM FRU
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+	};
+	// BSM FRU
+	eeprom@56 {
+		compatible = "atmel,24c64";
+		reg = <0x56>;
+	};
 };
