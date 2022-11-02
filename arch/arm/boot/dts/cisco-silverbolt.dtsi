@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2022 Cisco Systems Inc.
+info@0 {
+    reg = < 0 >;
+    compatible = "cisco-fpga-info";
+    fpd-name = "silverbolt";
+    fpd-description = "SILVERBOLT";
+    devid = < 1 >;
+};
+silverbolt_xil: xil@1000 {
+    reg = < 0x1000 >;
+    compatible = "cisco-fpga-xil";
+    reboot-notifier-enable = <0>;
+};

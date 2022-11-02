@@ -72,3 +72,14 @@
                 devid-none = <1>;
         };
 };
+
+&i2c5 {
+        bus-frequency = <1000000>;
+
+        silverbolt@20 {
+                compatible = "cisco-fpga-bmc";
+                reg = <0x20>;
+                devid-none = <1>;
+#include "cisco-silverbolt.dtsi"
+        };
+};
