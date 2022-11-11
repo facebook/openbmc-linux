@@ -540,6 +540,8 @@
 				no-loopback-test;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_txd1_default &pinctrl_rxd1_default>;
+				dma-mode;
+				dma-channel = <0>;
 				status = "disabled";
 			};
 
@@ -726,6 +728,8 @@
 				no-loopback-test;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_txd2_default &pinctrl_rxd2_default>;
+				dma-mode;
+				dma-channel = <1>;
 				status = "disabled";
 			};
 
@@ -740,6 +744,8 @@
 				no-loopback-test;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_txd3_default &pinctrl_rxd3_default>;
+				dma-mode;
+				dma-channel = <2>;
 				status = "disabled";
 			};
 
@@ -754,6 +760,8 @@
 				no-loopback-test;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_txd4_default &pinctrl_rxd4_default>;
+				dma-mode;
+				dma-channel = <3>;
 				status = "disabled";
 			};
 
@@ -767,7 +775,8 @@
 				no-loopback-test;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart6_default>;
-
+				dma-mode;
+				dma-channel = <4>;
 				status = "disabled";
 			};
 
@@ -781,7 +790,8 @@
 				no-loopback-test;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart7_default>;
-
+				dma-mode;
+				dma-channel = <5>;
 				status = "disabled";
 			};
 
@@ -795,7 +805,8 @@
 				no-loopback-test;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart8_default>;
-
+				dma-mode;
+				dma-channel = <6>;
 				status = "disabled";
 			};
 
@@ -809,7 +820,8 @@
 				no-loopback-test;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart9_default>;
-
+				dma-mode;
+				dma-channel = <7>;
 				status = "disabled";
 			};
 
@@ -838,6 +850,12 @@
 				pinctrl-0 = <&pinctrl_fsi2_default>;
 				clocks = <&syscon ASPEED_CLK_GATE_FSICLK>;
 				status = "disabled";
+			};
+
+			udma: uart-dma@1e79e000 {
+				compatible = "aspeed,ast2600-udma";
+				reg = <0x1e79e000 0x400>;
+				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
 			};
 		};
 	};
