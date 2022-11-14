@@ -99,18 +99,22 @@
 };
 
 &uart1 {
+	compatible = "aspeed,ast2600-uart";
 	status = "okay";
 };
 
 &uart2 {
+	compatible = "aspeed,ast2600-uart";
 	status = "okay";
 };
 
 &uart3 {
+	compatible = "aspeed,ast2600-uart";
 	status = "okay";
 };
 
 &uart4 {
+	compatible = "aspeed,ast2600-uart";
 	status = "okay";
 };
 
