@@ -245,7 +245,6 @@
         multi-master;
         bus-frequency = <400000>;
         aspeed,hw-timeout-ms = <1000>;
-        i2c-clk-high-min-percent = <42>;
         status = "okay";
 };
 
@@ -253,7 +252,6 @@
         multi-master;
         bus-frequency = <400000>;
         aspeed,hw-timeout-ms = <1000>;
-        i2c-clk-high-min-percent = <42>;
         status = "okay";
 };
 
@@ -261,7 +259,6 @@
         multi-master;
         bus-frequency = <400000>;
         aspeed,hw-timeout-ms = <1000>;
-        i2c-clk-high-min-percent = <42>;
         status = "okay";
 };
 
@@ -269,7 +266,6 @@
         multi-master;
         bus-frequency = <400000>;
         aspeed,hw-timeout-ms = <1000>;
-        i2c-clk-high-min-percent = <42>;
         status = "okay";
 };
 
