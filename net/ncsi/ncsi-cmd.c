@@ -378,14 +378,7 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	eh->h_proto = htons(ETH_P_NCSI);
 	eth_broadcast_addr(eh->h_dest);
 
-	/* If mac address received from device then use it for
-	 * source address as unicast address else use broadcast
-	 * address as source address
-	 */
-	if (nca->ndp->gma_flag == 1)
-		memcpy(eh->h_source, nca->ndp->ndev.dev->dev_addr, ETH_ALEN);
-	else
-		eth_broadcast_addr(eh->h_source);
+	memcpy(eh->h_source, nca->ndp->ndev.dev->dev_addr, ETH_ALEN);
 
 	if ((nr->flags == NCSI_REQ_FLAG_EVENT_DRIVEN) && (nca->rexmit > 0)) {
 		memcpy(&nr->nca, nca, sizeof(*nca));
