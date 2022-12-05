@@ -1023,8 +1023,6 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 	struct net_device *dev = nd->dev;
 	struct ncsi_cmd_arg nca;
 	unsigned char index;
-	unsigned char major;
-	unsigned char minor;
 	unsigned long flags;
 	int ret;
 
@@ -1077,18 +1075,13 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 		}
 		ret = -1;
 
-		/* The version fields are binary-coded decimal encoded, and the
-		 * simplest way to handle this is to ignore the
-		 * most-significant nibble (4-bits).
-		 */
-		major = (nc->version.version >> 24) & 0xF;
-		minor = (nc->version.version >> 16) & 0xF;
-		if (major < 1 || minor < 2) {
+		if (nc->version.major < 1 || nc->version.minor < 2) {
 #if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
 			netdev_warn(dev, "NCSI: Network controller only "
 				    "supports NC-SI %d.%d, querying MAC address"
-				    " through OEM(0x%04x) command\n", major,
-				    minor, nc->version.mf_id);
+				    " through OEM(0x%04x) command\n",
+				    nc->version.major, nc->version.minor,
+				    nc->version.mf_id);
 			nca.type = NCSI_PKT_CMD_OEM;
 			nca.package = np->id;
 			nca.channel = nc->id;
