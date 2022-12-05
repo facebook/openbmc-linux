@@ -738,8 +738,6 @@ static int ncsi_oem_keep_phy_intel(struct ncsi_cmd_arg *nca)
 
 #endif
 
-#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
-
 /* NCSI OEM Command APIs */
 static int ncsi_oem_gma_handler_bcm(struct ncsi_cmd_arg *nca)
 {
@@ -880,8 +878,6 @@ static int ncsi_gma_handler(struct ncsi_cmd_arg *nca, unsigned int mf_id)
 	/* Get Mac address from NCSI device */
 	return nch->handler(nca);
 }
-
-#endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
 
 /* Determine if a given channel from the channel_queue should be used for Tx */
 static bool ncsi_channel_is_tx(struct ncsi_dev_priv *ndp,
@@ -1073,10 +1069,13 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 		} else {
 			nd->state = ncsi_dev_state_config_ev;
 		}
-		ret = -1;
+
+		if (!IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)) {
+			schedule_work(&ndp->work);
+			break;
+		}
 
 		if (nc->version.major < 1 || nc->version.minor < 2) {
-#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
 			netdev_warn(dev, "NCSI: Network controller only "
 				    "supports NC-SI %d.%d, querying MAC address"
 				    " through OEM(0x%04x) command\n",
@@ -1087,7 +1086,6 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 			nca.channel = nc->id;
 			ndp->pending_req_num = 1;
 			ret = ncsi_gma_handler(&nca, nc->version.mf_id);
-#endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
 			if (ret < 0)
 				schedule_work(&ndp->work);
 			break;
@@ -1451,7 +1449,6 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 
 		schedule_work(&ndp->work);
 		break;
-#if IS_ENABLED(CONFIG_NCSI_OEM_CMD_GET_MAC)
 	case ncsi_dev_state_probe_mlx_gma:
 		ndp->pending_req_num = 1;
 
@@ -1476,7 +1473,6 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 
 		nd->state = ncsi_dev_state_probe_cis;
 		break;
-#endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
 	case ncsi_dev_state_probe_cis:
 		ndp->pending_req_num = ndp->max_package;
 
