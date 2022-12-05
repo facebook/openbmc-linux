@@ -799,6 +799,7 @@ static int ncsi_oem_smaf_mlx(struct ncsi_cmd_arg *nca)
 	u.data_u32[0] = ntohl((__force __be32)NCSI_OEM_MFR_MLX_ID);
 	u.data_u8[5] = NCSI_OEM_MLX_CMD_SMAF;
 	u.data_u8[6] = NCSI_OEM_MLX_CMD_SMAF_PARAM;
+	u.data_u8[7] = 0xFF;
 	memcpy(&u.data_u8[MLX_SMAF_MAC_ADDR_OFFSET],
 	       nca->ndp->ndev.dev->dev_addr,	ETH_ALEN);
 	u.data_u8[MLX_SMAF_MED_SUPPORT_OFFSET] =
