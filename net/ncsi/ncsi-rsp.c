@@ -1149,6 +1149,7 @@ static int ncsi_rsp_handler_gmcma(struct ncsi_request *nr)
 	struct sockaddr saddr;
 	int ret = -1;
 	int i;
+	int j;
 
 	rsp = (struct ncsi_rsp_gmcma_pkt *)skb_network_header(nr->rsp);
 	saddr.sa_family = ndev->type;
@@ -1159,13 +1160,15 @@ static int ncsi_rsp_handler_gmcma(struct ncsi_request *nr)
 	for (i = 0; i < rsp->address_count; i++) {
 		netdev_warn(ndev, "NCSI: MAC address %d: "
 			    "%02x:%02x:%02x:%02x:%02x:%02x\n", i,
-			    rsp->addresses[i][0], rsp->addresses[i][1],
-			    rsp->addresses[i][2], rsp->addresses[i][3],
-			    rsp->addresses[i][4], rsp->addresses[i][5]);
+			    rsp->addresses[i][5], rsp->addresses[i][4],
+			    rsp->addresses[i][3], rsp->addresses[i][2],
+			    rsp->addresses[i][1], rsp->addresses[i][0]);
 	}
 
 	for (i = 0; i < rsp->address_count; i++) {
-		memcpy(saddr.sa_data, &rsp->addresses[i], ETH_ALEN);
+		for (j = 0; j < ETH_ALEN; j++) {
+			saddr.sa_data[j] = rsp->addresses[i][ETH_ALEN - j - 1];
+		}
 		ret = ops->ndo_set_mac_address(ndev, &saddr);
 		if (ret < 0) {
 			netdev_warn(ndev, "NCSI: Unable to assign mac address "
