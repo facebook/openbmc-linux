@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2020 Facebook Inc.
+
+/dts-v1/;
+
+#include "aspeed-bmc-facebook-inspirationpoint.dts"
+
+&fitro {
+	reg = <0x1A0000 0x3E60000>;
+};
+
+&flash0 {
+	reg = <0x0 0x8000000>;
+};
+
+&fit {
+	reg = <0x1A0000 0x3E60000>;
+};
+
+&data0 {
+	reg = <0x6000000 0x2000000>;
+};
