@@ -5,11 +5,11 @@ partitions {
 	compatible = "fixed-partitions";
 	#address-cells = <1>;
 	#size-cells = <1>;
-	rom@0 {
+	rom: rom@0 {
 		reg = <0x0 0x40000>;
 		label = "rom";
 	};
-	recovery@40000 {
+	recovery: recovery@40000 {
 		reg = <0x40000 0xA0000>;
 		label = "recovery";
 	};
@@ -19,22 +19,22 @@ partitions {
 		label = "envro";
 	};
 	*/
-	metaro@F0000 {
+	metaro: metaro@F0000 {
 		reg = <0xF0000 0x10000>;
 		label = "metaro";
 	};
 	/* Don't expose u-bootro as it is not used 
-	u-bootro@100000 {
+	u-bootro: u-bootro@100000 {
 		reg = <0x100000 0xA0000>;
 		label = "u-bootro";
 	};
 	*/
-	fitro@1A0000 {
+	fitro: fitro@1A0000 {
 		reg = <0x1A0000 0x1E60000>;
 		label = "fitro";
 	};
 
-	flash0@0 {
+	flash0: flash0@0 {
 		reg = <0x0 0x2000000>;
 		label = "flash0";
 	};

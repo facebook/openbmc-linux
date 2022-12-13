@@ -6,7 +6,7 @@ partitions {
 	#address-cells = <1>;
 	#size-cells = <1>;
 
-	romx@0 {
+	romx: romx@0 {
 		reg = <0x0 0x40000>;
 		label = "romx";
 	};
@@ -16,24 +16,24 @@ partitions {
 		label = "recovery";
 	};
 	*/
-	env@E0000 {
+	env: env@E0000 {
 		reg = <0xE0000 0x10000>;
 		label = "env";
 	};
-	meta@F0000 {
+	meta: meta@F0000 {
 		reg = <0xF0000 0x10000>;
 		label = "meta";
 	};
-	u-boot@100000 {
+	uboot: u-boot@100000 {
 		reg = <0x100000 0xA0000>;
 		label = "u-boot";
 	};
-	fit@1A0000 {
+	fit: fit: fit@1A0000 {
 		reg = <0x1A0000 0x1E60000>;
 		label = "fit";
 	};
 	/* 32MB persistent data0 */
-	data0@2000000 {
+	data0: data0@2000000 {
 		reg = <0x2000000 0x2000000>;
 		label = "data0";
 	};
@@ -42,11 +42,11 @@ partitions {
 	 * MTD_PARTITIONED_MASTER option, below "flash1" and "flash1rw" partition is
 	 * explicitly created to avoid breaking legacy applications.
 	 */
-	flash1@0 {
+	flash1: flash1@0 {
 		reg = <0x0 0x8000000>;
 		label = "flash1";
 	};
-	flash1rw@10000 {
+	flash1rw: flash1rw@10000 {
 		reg = <0x10000 0x7ff0000>;
 		label = "flash1rw";
 	};
