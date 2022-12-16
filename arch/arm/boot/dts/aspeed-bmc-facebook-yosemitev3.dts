@@ -17,7 +17,7 @@
 	};
 	chosen {
 		stdout-path = &uart5;
-		bootargs = "debug console=ttyS4,57600n8 root=/dev/ram rw";
+		bootargs = "debug console=ttyS0,57600n8 root=/dev/ram rw";
 	};
 
 	memory@80000000 {
