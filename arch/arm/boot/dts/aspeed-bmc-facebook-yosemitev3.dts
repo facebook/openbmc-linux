@@ -234,7 +234,7 @@
 		aspeed,fan-tach-ch = /bits/ 8 <0x00 0x01>;
 		aspeed,pwm-typem-tach-mode = /bits/ 8 <0x00>;       // 00b: falling
 		aspeed,pwm-typem-tach-unit = /bits/ 16 <0x1000>;    // 4096
-		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x00>;    // div 4
+		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x04>;    // div 1024
 	};
 
 	fan@1 {
@@ -242,7 +242,7 @@
 		aspeed,fan-tach-ch = /bits/ 8 <0x02 0x03>;
 		aspeed,pwm-typem-tach-mode = /bits/ 8 <0x00>;       // 00b: falling
 		aspeed,pwm-typem-tach-unit = /bits/ 16 <0x1000>;    // 4096
-		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x00>;    // div 4
+		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x04>;    // div 1024
 	};
 
 	fan@2 {
@@ -250,7 +250,7 @@
 		aspeed,fan-tach-ch = /bits/ 8 <0x04 0x05>;
 		aspeed,pwm-typem-tach-mode = /bits/ 8 <0x00>;       // 00b: falling
 		aspeed,pwm-typem-tach-unit = /bits/ 16 <0x1000>;    // 4096
-		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x00>;    // div 4
+		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x04>;    // div 1024
 	};
 
 	fan@3 {
@@ -258,6 +258,6 @@
 		aspeed,fan-tach-ch = /bits/ 8 <0x06 0x07>;
 		aspeed,pwm-typem-tach-mode = /bits/ 8 <0x00>;       // 00b: falling
 		aspeed,pwm-typem-tach-unit = /bits/ 16 <0x1000>;    // 4096
-		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x00>;    // div 4
+		aspeed,pwm-typem-tach-clk-div = /bits/ 8 <0x04>;    // div 1024
 	};
 };
