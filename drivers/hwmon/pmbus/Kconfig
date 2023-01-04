@@ -204,6 +204,15 @@ config SENSORS_LTC4282
       This driver can also be built as a module. If so, the module will
       be called ltc4282.
 
+config SENSORS_LTC4286
+    tristate "Linear Technologies LTC4286"
+    help
+      If you say yes here you get hardware monitoring support for Linear
+      Technology LTC4286/LTC4287.
+
+      This driver can also be built as a module. If so, the module will
+      be called ltc4286/LTC4287.
+
 config SENSORS_MAX15301
 	tristate "Maxim MAX15301"
 	help
