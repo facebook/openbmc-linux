@@ -263,9 +263,14 @@
     status = "okay";
     i2cswitch@71 {
         compatible = "nxp,pca9846";
-        idle-state = <0>;
         i2c-mux-idle-disconnect;
         reg = <0x71>;
+    };
+
+    i2cswitch@73 {
+        compatible = "nxp,pca9846";
+        i2c-mux-idle-disconnect;
+        reg = <0x73>;
     };
 };
 
