@@ -502,12 +502,10 @@ static void aspeed_set_pwm_port_fan_ctrl(struct aspeed_pwm_tacho_data *priv,
 	}
 }
 
-static u32 aspeed_get_fan_tach_ch_measure_period(struct aspeed_pwm_tacho_data
-						 *priv, u8 type)
+static u32 aspeed_get_pwm_clock(struct aspeed_pwm_tacho_data *priv, u8 type)
 {
-	u32 clk;
-	u16 tacho_unit;
-	u8 clk_unit, div_h, div_l, tacho_div;
+	u32 clk, result;
+	u8 clk_unit, div_h, div_l;
 
 	clk = priv->clk_freq;
 	clk_unit = priv->type_pwm_clock_unit[type];
@@ -518,18 +516,26 @@ static u32 aspeed_get_fan_tach_ch_measure_period(struct aspeed_pwm_tacho_data
 		div_l = 1;
 	else
 		div_l = div_l * 2;
+	result = clk / (clk_unit * div_h * div_l);
+	return result;
+}
+
+static u32 aspeed_get_fan_tach_ch_measure_period(struct aspeed_pwm_tacho_data
+						 *priv, u8 type)
+{
+	u32 pwm_clk;
+	u16 tacho_unit;
 
 	tacho_unit = priv->type_fan_tach_unit[type];
-	tacho_div = priv->type_fan_tach_clock_division[type];
+	pwm_clk = aspeed_get_pwm_clock(priv, type);
 
-	tacho_div = 0x4 << (tacho_div * 2);
-	return clk / (clk_unit * div_h * div_l * tacho_div * tacho_unit);
+	return (tacho_unit * 1000000) / pwm_clk;
 }
 
 static int aspeed_get_fan_tach_ch_rpm(struct aspeed_pwm_tacho_data *priv,
 				      u8 fan_tach_ch)
 {
-	u32 raw_data, tach_div, clk_source, msec, usec, val;
+	u32 raw_data, tach_div, clk_source, usec, val;
 	u8 fan_tach_ch_source, type, mode, both;
 	int ret;
 
@@ -545,8 +551,7 @@ static int aspeed_get_fan_tach_ch_rpm(struct aspeed_pwm_tacho_data *priv,
 	fan_tach_ch_source = priv->fan_tach_ch_source[fan_tach_ch];
 	type = priv->pwm_port_type[fan_tach_ch_source];
 
-	msec = (1000 / aspeed_get_fan_tach_ch_measure_period(priv, type));
-	usec = msec * 1000;
+	usec = aspeed_get_fan_tach_ch_measure_period(priv, type);
 
 	ret = regmap_read_poll_timeout(
 		priv->regmap,
