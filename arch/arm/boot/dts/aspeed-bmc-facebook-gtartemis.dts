@@ -20,3 +20,10 @@
 &data0 {
 	reg = <0x6000000 0x2000000>;
 };
+
+&i2c9 {
+	status = "okay";
+	multi-master;
+	bus-frequency = <400000>;
+	aspeed,hw-timeout-ms = <1000>;
+};
