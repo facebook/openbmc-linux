@@ -757,3 +757,20 @@
 &pcie {
 	status = "okay";
 };
+
+/* override setup mtd parttion layout */
+&fitro {
+	reg = <0x1A0000 0x3E60000>;
+};
+
+&flash0 {
+	reg = <0x0 0x8000000>;
+};
+
+&fit {
+	reg = <0x1A0000 0x3E60000>;
+};
+
+&data0 {
+	reg = <0x6000000 0x2000000>;
+};
