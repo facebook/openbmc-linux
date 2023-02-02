@@ -51,9 +51,11 @@ static int ncsi_validate_rsp_pkt(struct ncsi_request *nr,
 		return -EINVAL;
 	}
 	if (ntohs(h->common.length) != payload) {
-		netdev_dbg(nr->ndp->ndev.dev,
-			   "NCSI: payload length mismatched\n");
-		return -EINVAL;
+		if (!(nr->flags == NCSI_REQ_FLAG_NETLINK_DRIVEN && ntohs(h->common.length) == 4)) {
+			netdev_dbg(nr->ndp->ndev.dev,
+				"NCSI: payload length mismatched\n");
+			return -EINVAL;
+		}
 	}
 
 	/* Check on code and reason */
