@@ -1474,12 +1474,12 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_probe_cis;
 		break;
 	case ncsi_dev_state_probe_cis:
-		ndp->pending_req_num = ndp->max_package;
+		ndp->pending_req_num = ndp->max_channel;
 
 		/* Clear initial state */
 		nca.type = NCSI_PKT_CMD_CIS;
 		nca.package = ndp->active_package->id;
-		for (index = 0; index < ndp->max_package; index++) {
+		for (index = 0; index < ndp->max_channel; index++) {
 			nca.channel = index;
 			ret = ncsi_xmit_cmd(&nca);
 			if (ret)
