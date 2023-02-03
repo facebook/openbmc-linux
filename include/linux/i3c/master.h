@@ -22,10 +22,13 @@
 #define I3C_BROADCAST_ADDR		0x7e
 #define I3C_MAX_ADDR			GENMASK(6, 0)
 
+struct i3c_target_ops;
 struct i3c_master_controller;
 struct i3c_bus;
 struct i2c_device;
 struct i3c_device;
+struct i3c_slave_setup;
+struct i3c_slave_payload;
 
 /**
  * struct i3c_i2c_dev_desc - Common part of the I3C/I2C device descriptor
@@ -85,7 +88,6 @@ struct i2c_dev_boardinfo {
  */
 struct i2c_dev_desc {
 	struct i3c_i2c_dev_desc common;
-	const struct i2c_dev_boardinfo *boardinfo;
 	struct i2c_client *dev;
 	u16 addr;
 	u8 lvr;
@@ -181,7 +183,18 @@ struct i3c_dev_boardinfo {
 	u8 init_dyn_addr;
 	u8 static_addr;
 	u64 pid;
+	u8 bcr;
+	u8 dcr;
 	struct device_node *of_node;
+};
+
+/**
+ * struct i3c_target_info - target information attached to a specific device
+ * @read handler: handler specified at i3c_target_read_register() call time.
+ */
+
+struct i3c_target_info {
+	void (*read_handler)(struct i3c_device *dev, const u8 *data, size_t len);
 };
 
 /**
@@ -189,6 +202,7 @@ struct i3c_dev_boardinfo {
  * @common: common part of the I3C device descriptor
  * @info: I3C device information. Will be automatically filled when you create
  *	  your device with i3c_master_add_i3c_dev_locked()
+ * @target_info: I3C target information.
  * @ibi_lock: lock used to protect the &struct_i3c_device->ibi
  * @ibi: IBI info attached to a device. Should be NULL until
  *	 i3c_device_request_ibi() is called
@@ -207,6 +221,7 @@ struct i3c_dev_boardinfo {
 struct i3c_dev_desc {
 	struct i3c_i2c_dev_desc common;
 	struct i3c_device_info info;
+	struct i3c_target_info target_info;
 	struct mutex ibi_lock;
 	struct i3c_device_ibi_info *ibi;
 	struct i3c_device *dev;
@@ -430,6 +445,7 @@ struct i3c_bus {
 struct i3c_master_controller_ops {
 	int (*bus_init)(struct i3c_master_controller *master);
 	void (*bus_cleanup)(struct i3c_master_controller *master);
+	void (*bus_reset)(struct i3c_master_controller *master);
 	int (*attach_i3c_dev)(struct i3c_dev_desc *dev);
 	int (*reattach_i3c_dev)(struct i3c_dev_desc *dev, u8 old_dyn_addr);
 	void (*detach_i3c_dev)(struct i3c_dev_desc *dev);
@@ -452,6 +468,14 @@ struct i3c_master_controller_ops {
 	int (*disable_ibi)(struct i3c_dev_desc *dev);
 	void (*recycle_ibi_slot)(struct i3c_dev_desc *dev,
 				 struct i3c_ibi_slot *slot);
+	int (*register_slave)(struct i3c_master_controller *master,
+			      const struct i3c_slave_setup *req);
+	int (*unregister_slave)(struct i3c_master_controller *master);
+	int (*send_sir)(struct i3c_master_controller *master,
+			struct i3c_slave_payload *payload);
+	int (*put_read_data)(struct i3c_master_controller *master,
+			     struct i3c_slave_payload *data,
+			     struct i3c_slave_payload *ibi_notify);
 };
 
 /**
@@ -463,6 +487,8 @@ struct i3c_master_controller_ops {
  *	 registered to the I2C subsystem to be as transparent as possible to
  *	 existing I2C drivers
  * @ops: master operations. See &struct i3c_master_controller_ops
+ * @target_ops: target operations. See &struct i3c_target_ops
+ * @target: true if the underlying I3C device acts as a target on I3C bus
  * @secondary: true if the master is a secondary master
  * @init_done: true when the bus initialization is done
  * @boardinfo.i3c: list of I3C  boardinfo objects
@@ -485,8 +511,12 @@ struct i3c_master_controller {
 	struct i3c_dev_desc *this;
 	struct i2c_adapter i2c;
 	const struct i3c_master_controller_ops *ops;
+	const struct i3c_target_ops *target_ops;
+	unsigned int pec_supported : 1;
+	unsigned int target : 1;
 	unsigned int secondary : 1;
 	unsigned int init_done : 1;
+	unsigned int jdec_spd : 1;
 	struct {
 		struct list_head i3c;
 		struct list_head i2c;
@@ -525,15 +555,20 @@ int i3c_master_disec_locked(struct i3c_master_controller *master, u8 addr,
 			    u8 evts);
 int i3c_master_enec_locked(struct i3c_master_controller *master, u8 addr,
 			   u8 evts);
+int i3c_master_setmrl_locked(struct i3c_master_controller *master,
+			     struct i3c_device_info *info, u16 read_len,
+			     u8 ibi_len);
 int i3c_master_entdaa_locked(struct i3c_master_controller *master);
 int i3c_master_defslvs_locked(struct i3c_master_controller *master);
-
+int i3c_master_rstdaa_locked(struct i3c_master_controller *master,
+				    u8 addr);
 int i3c_master_get_free_addr(struct i3c_master_controller *master,
 			     u8 start_addr);
 
 int i3c_master_add_i3c_dev_locked(struct i3c_master_controller *master,
 				  u8 addr);
 int i3c_master_do_daa(struct i3c_master_controller *master);
+int i3c_master_enable_hj(struct i3c_master_controller *master);
 
 int i3c_master_set_info(struct i3c_master_controller *master,
 			const struct i3c_device_info *info);
@@ -543,6 +578,13 @@ int i3c_master_register(struct i3c_master_controller *master,
 			const struct i3c_master_controller_ops *ops,
 			bool secondary);
 int i3c_master_unregister(struct i3c_master_controller *master);
+
+int i3c_register(struct i3c_master_controller *master,
+		 struct device *parent,
+		 const struct i3c_master_controller_ops *master_ops,
+		 const struct i3c_target_ops *target_ops,
+		 bool secondary);
+int i3c_unregister(struct i3c_master_controller *master);
 
 /**
  * i3c_dev_get_master_data() - get master private data attached to an I3C
@@ -636,6 +678,18 @@ i3c_master_get_bus(struct i3c_master_controller *master)
 	return &master->bus;
 }
 
+struct i3c_slave_payload {
+	unsigned int len;
+	const void *data;
+};
+
+struct i3c_slave_setup {
+	unsigned int max_payload_len;
+	unsigned int num_slots;
+	void (*handler)(struct i3c_master_controller *m,
+			const struct i3c_slave_payload *payload);
+};
+
 struct i3c_generic_ibi_pool;
 
 struct i3c_generic_ibi_pool *
@@ -652,4 +706,30 @@ void i3c_master_queue_ibi(struct i3c_dev_desc *dev, struct i3c_ibi_slot *slot);
 
 struct i3c_ibi_slot *i3c_master_get_free_ibi_slot(struct i3c_dev_desc *dev);
 
+int i3c_master_register_slave(struct i3c_master_controller *master,
+			      const struct i3c_slave_setup *req);
+int i3c_master_unregister_slave(struct i3c_master_controller *master);
+int i3c_master_send_sir(struct i3c_master_controller *master,
+			struct i3c_slave_payload *payload);
+/**
+ * i3c_master_put_read_data() - put read data and optionally notify primary master
+ * @master: master object in slave mode
+ * @data: data structure to be read
+ * @ibi_notify: IBI data (including MDB) to notify primary master device
+ */
+int i3c_master_put_read_data(struct i3c_master_controller *master,
+			     struct i3c_slave_payload *data,
+			     struct i3c_slave_payload *ibi_notify);
+/*
+ * Slave message queue driver API
+ */
+#ifdef CONFIG_I3C_SLAVE_MQUEUE
+int i3c_slave_mqueue_probe(struct i3c_master_controller *master);
+int i3c_slave_mqueue_remove(struct i3c_master_controller *master);
+#endif
+
+#ifdef CONFIG_I3C_SLAVE_EEPROM
+int i3c_slave_eeprom_probe(struct i3c_master_controller *master);
+int i3c_slave_eeprom_remove(struct i3c_master_controller *master);
+#endif
 #endif /* I3C_MASTER_H */

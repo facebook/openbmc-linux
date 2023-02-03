@@ -241,34 +241,6 @@
 
 };
 
-&i2c0 {
-        multi-master;
-        bus-frequency = <400000>;
-        aspeed,hw-timeout-ms = <1000>;
-        status = "okay";
-};
-
-&i2c1 {
-        multi-master;
-        bus-frequency = <400000>;
-        aspeed,hw-timeout-ms = <1000>;
-        status = "okay";
-};
-
-&i2c2 {
-        multi-master;
-        bus-frequency = <400000>;
-        aspeed,hw-timeout-ms = <1000>;
-        status = "okay";
-};
-
-&i2c3 {
-        multi-master;
-        bus-frequency = <400000>;
-        aspeed,hw-timeout-ms = <1000>;
-        status = "okay";
-};
-
 &i2c4 {
         status = "okay";
 };
@@ -348,3 +320,69 @@
 &uhci {
 	status = "okay";
 };
+
+&i3c2 {
+        status = "okay";
+        i3c-pp-scl-hi-period-ns = <100>;
+        i3c-pp-scl-lo-period-ns = <100>;
+        i3c-od-scl-hi-period-ns = <380>;
+        i3c-od-scl-lo-period-ns = <620>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_hvi3c3_default>;
+        gpios = <&gpio0 ASPEED_GPIO(S, 4) GPIO_ACTIVE_HIGH>;
+        astbic1: astbic1@13,7ec73411002 {
+                reg = <0x13 0x7ec 0x73411002>;
+                assigned-address = <0x13>;
+                compatible = "i3c-ast-bridgeic";
+        };
+};
+
+&i3c3 {
+        status = "okay";
+        i3c-pp-scl-hi-period-ns = <100>;
+        i3c-pp-scl-lo-period-ns = <100>;
+        i3c-od-scl-hi-period-ns = <380>;
+        i3c-od-scl-lo-period-ns = <620>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_hvi3c4_default>;
+        gpios = <&gpio0 ASPEED_GPIO(S, 5) GPIO_ACTIVE_HIGH>;
+        astbic2: astbic2@13,7ec73411002 {
+                reg = <0x13 0x7ec 0x73411002>;
+                assigned-address = <0x13>;
+                compatible = "i3c-ast-bridgeic";
+        };
+};
+
+&i3c4 {
+        status = "okay";
+        i3c-pp-scl-hi-period-ns = <100>;
+        i3c-pp-scl-lo-period-ns = <100>;
+        i3c-od-scl-hi-period-ns = <380>;
+        i3c-od-scl-lo-period-ns = <620>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_i3c5_default>;
+        gpios = <&gpio0 ASPEED_GPIO(S, 6) GPIO_ACTIVE_HIGH>;
+        astbic3: astbic3@13,7ec73411002 {
+                reg = <0x13 0x7ec 0x73411002>;
+                assigned-address = <0x13>;
+                compatible = "i3c-ast-bridgeic";
+        };
+};
+
+&i3c5 {
+        status = "okay";
+        i3c-pp-scl-hi-period-ns = <100>;
+        i3c-pp-scl-lo-period-ns = <100>;
+        i3c-od-scl-hi-period-ns = <380>;
+        i3c-od-scl-lo-period-ns = <620>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_i3c6_default>;
+        gpios = <&gpio0 ASPEED_GPIO(S, 7) GPIO_ACTIVE_HIGH>;
+        astbic4: astbic4@13,7ec73411002 {
+                reg = <0x13 0x7ec 0x73411002>;
+                assigned-address = <0x13>;
+                compatible = "i3c-ast-bridgeic";
+        };
+};
+
+

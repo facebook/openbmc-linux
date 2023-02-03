@@ -20,5 +20,90 @@ menuconfig I3C
 	  will be called i3c.
 
 if I3C
+
+source "drivers/i3c/mctp/Kconfig"
+
+config I3CDEV
+	tristate "I3C device interface"
+	depends on I3C
+	help
+	  Say Y here to use i3c-* device files, usually found in the /dev
+	  directory on your system.  They make it possible to have user-space
+	  programs use the I3C devices.
+
+	  This support is also available as a module.  If so, the module
+	  will be called i3cdev.
+
+	  Note that this application programming interface is EXPERIMENTAL
+	  and hence SUBJECT TO CHANGE WITHOUT NOTICE while it stabilizes.
+
+config I3C_HUB
+	tristate "I3C HUB support"
+	depends on I3C
+	select REGMAP_I3C
+	help
+	  This enables support for I3C HUB. Say Y here to use I3C HUB driver to
+	  configure I3C HUB device.
+
+	  I3C HUB drivers will be loaded automatically when I3C device with BCR
+	  equals to 0xC2 (HUB device) is detected on the bus.
+
+
+if I3CDEV
+config I3CDEV_FORCE_CREATE
+	bool "force create I3C device interface"
+	default y
+	help
+	  Say 'y' to force create I3C devices under /dev/bus/i3c/ regardless of
+	  driver binding.  This option is to help development so it shall be
+	  turned off in production.
+endif # I3CDEV
+
+config I3C_IBI_MQUEUE
+	bool "I3C mqueue (message queue) master ibi driver"
+	default y
+	help
+	  Some protocols over I3C are designed for bi-directional transferring
+	  messages by using I3C IBI protocol. This driver is used to receive and
+	  queue messages from the remote I3C slave device.
+
+	  Userspace can get the messages by reading sysfs file that this driver
+	  exposes.
+
+config I3C_MUX_IMX3102
+	bool "IMX/IML3102 I3C multiplexer driver"
+	default y
+	select REGMAP_I3C
+	help
+	  Say y to enable Renesas IMX3102 I3C 2:1 multiplexer.
+
+choice
+	prompt "I3C secondary master / slave mode driver selection"
+	default I3C_SLAVE_MQUEUE
+
+config I3C_SLAVE_MQUEUE
+	bool "I3C mqueue (message queue) secondary master and slave driver"
+	help
+	  Some protocols over I3C are designed for bi-directional transferring
+	  messages by using I3C Master Write protocol. This driver is used to
+	  receive and queue messages from the remote I3C main master device.
+
+	  Userspace can get the messages by reading sysfs file that this driver
+	  exposes.
+
+config I3C_SLAVE_EEPROM
+	bool "I3C EEPROM secondary master and slave driver"
+	help
+	  This driver makes the slave mode I3C controller simulate the EEPROM.
+endchoice
+
+config I3C_AST_BRIDGE_IC
+	bool "Aspeed Bridge IC driver"
+	default y
+	select REGMAP_I3C
+	help
+	  Say y to enable Aspeed bridge IC device driver.
+
 source "drivers/i3c/master/Kconfig"
+
 endif # I3C
