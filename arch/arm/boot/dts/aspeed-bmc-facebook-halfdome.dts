@@ -1,0 +1,350 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2020 Facebook Inc.
+
+/dts-v1/;
+
+#include "aspeed-g6.dtsi"
+#include <dt-bindings/gpio/aspeed-gpio.h>
+#include <dt-bindings/leds/leds-pca955x.h>
+
+/ {
+	model = "Facebook fby35";
+	compatible = "facebook,fby35", "aspeed,ast2600";
+
+	aliases {
+		serial0 = &uart5;
+		serial1 = &uart1;
+		serial2 = &uart2;
+		serial3 = &uart3;
+		serial4 = &uart4;
+
+		spi2 = &spi_gpio;
+	};
+
+	chosen {
+		stdout-path = &uart5;
+		bootargs = "console=ttyS0,57600n8 root=/dev/ram rw vmalloc=384M";
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x80000000 0x80000000>;
+	};
+	iio-hwmon {
+		compatible = "iio-hwmon";
+		io-channels = <&adc0 0>, <&adc0 1>, <&adc0 2>, <&adc0 3>,
+			<&adc0 4>, <&adc0 5>, <&adc0 6>, <&adc0 7>,
+			<&adc1 0>, <&adc1 1>, <&adc1 2>, <&adc1 3>,
+			<&adc1 4>, <&adc1 5>, <&adc1 6>;
+	};
+
+	fan0: pwm-fan0 {
+		compatible = "pwm-fan";
+		pwms = <&pwm 0 40000 0>;	/* Target freq:25 kHz */
+		cooling-min-state = <0>;
+		cooling-max-state = <3>;
+		#cooling-cells = <2>;
+		cooling-levels = <0 25 128 255>;
+		retain-state-shutdown;
+	};
+
+	fan1: pwm-fan1 {
+		compatible = "pwm-fan";
+		pwms = <&pwm 1 40000 0>;	/* Target freq:25 kHz */
+		cooling-min-state = <0>;
+		cooling-max-state = <3>;
+		#cooling-cells = <2>;
+		cooling-levels = <0 15 128 255>;
+		retain-state-shutdown;
+	};
+
+	fan2: pwm-fan2 {
+		compatible = "pwm-fan";
+		pwms = <&pwm 2 40000 0>;	/* Target freq:25 kHz */
+		cooling-min-state = <0>;
+		cooling-max-state = <3>;
+		#cooling-cells = <2>;
+		cooling-levels = <0 15 128 255>;
+		retain-state-shutdown;
+	};
+
+	fan3: pwm-fan3 {
+		compatible = "pwm-fan";
+		pwms = <&pwm 3 40000 0>;	/* Target freq:25 kHz */
+		cooling-min-state = <0>;
+		cooling-max-state = <3>;
+		#cooling-cells = <2>;
+		cooling-levels = <0 15 128 255>;
+		retain-state-shutdown;
+	};
+
+	spi_gpio: spi-gpio {
+		status = "okay";
+		compatible = "spi-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gpio-sck = <&gpio0 ASPEED_GPIO(X, 3) GPIO_ACTIVE_HIGH>;
+		gpio-mosi = <&gpio0 ASPEED_GPIO(X, 4) GPIO_ACTIVE_HIGH>;
+		gpio-miso = <&gpio0 ASPEED_GPIO(X, 5) GPIO_ACTIVE_HIGH>;
+		num-chipselects = <1>;
+		cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>;
+
+		tpmdev@0 {
+			compatible = "tcg,tpm_tis-spi";
+			spi-max-frequency = <33000000>;
+			reg = <0>;
+		};
+	};
+};
+
+&uart1 {
+	compatible = "aspeed,ast2600-uart";
+	status = "okay";
+};
+
+&uart2 {
+	compatible = "aspeed,ast2600-uart";
+	status = "okay";
+};
+
+&uart3 {
+	compatible = "aspeed,ast2600-uart";
+	status = "okay";
+};
+
+&uart4 {
+	compatible = "aspeed,ast2600-uart";
+	status = "okay";
+};
+
+&uart5 {
+	status = "okay";
+	/* Workaround for AST2600 A0 */
+	compatible = "snps,dw-apb-uart";
+};
+
+&wdt1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_wdtrst1_default>;
+	aspeed,reset-type = "soc";
+	aspeed,external-signal;
+	aspeed,ext-push-pull;
+	aspeed,ext-active-high;
+	aspeed,ext-pulse-duration = <256>;
+};
+
+&mac3 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_rmii4_default>;
+	no-hw-checksum;
+	use-ncsi;
+	mlx,multi-host;
+	disable-ncsi-vlan-filter;
+	ncsi-ctrl,start-redo-probe;
+	ncsi-ctrl,no-channel-monitor;
+	ncsi-package = <1>;
+	ncsi-channel = <4>;
+	ncsi-rexmit = <1>;
+	ncsi-timeout = <2>;
+};
+
+&rtc {
+	status = "okay";
+};
+
+&fmc {
+    status = "okay";
+    flash@0 {
+        reg = < 1 >;
+        status = "okay";
+        m25p,fast-read;
+        label = "spi0.1";
+        spi-max-frequency = <50000000>;
+        spi-tx-bus-width = <2>;
+        spi-rx-bus-width = <2>;
+#include "facebook-bmc-vboot2-flash1-32MBdata0-layout.dtsi"
+    };
+    flash@1 {
+        reg = < 0 >;
+        status = "okay";
+        m25p,fast-read;
+        label = "spi0.0";
+        spi-max-frequency = <50000000>;
+        spi-tx-bus-width = <2>;
+        spi-rx-bus-width = <2>;
+#include "facebook-bmc-vboot2-flash0-128MB-layout.dtsi"
+    };
+};
+
+&pwm {
+        status = "okay";
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_pwm0_default
+		             &pinctrl_pwm1_default
+					 &pinctrl_pwm2_default
+					 &pinctrl_pwm3_default
+					 >;
+};
+
+&tach {
+        status = "okay";
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_tach0_default
+		             &pinctrl_tach1_default
+					 &pinctrl_tach2_default
+					 &pinctrl_tach3_default
+                     &pinctrl_tach4_default
+					 &pinctrl_tach5_default
+					 &pinctrl_tach6_default
+					 &pinctrl_tach7_default
+					 >;
+        fan@0 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x00>;
+        };
+
+        fan@1 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x01>;
+        };
+        fan@2 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x02>;
+        };
+
+        fan@3 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x03>;
+        };
+        fan@4 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x04>;
+        };
+
+        fan@5 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x05>;
+        };
+        fan@6 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x06>;
+        };
+
+        fan@7 {
+                aspeed,min-rpm = <30>;
+                aspeed,tach-ch = <0x07>;
+        };
+
+};
+
+&i2c0 {
+        multi-master;
+        bus-frequency = <400000>;
+        aspeed,hw-timeout-ms = <1000>;
+        status = "okay";
+};
+
+&i2c1 {
+        multi-master;
+        bus-frequency = <400000>;
+        aspeed,hw-timeout-ms = <1000>;
+        status = "okay";
+};
+
+&i2c2 {
+        multi-master;
+        bus-frequency = <400000>;
+        aspeed,hw-timeout-ms = <1000>;
+        status = "okay";
+};
+
+&i2c3 {
+        multi-master;
+        bus-frequency = <400000>;
+        aspeed,hw-timeout-ms = <1000>;
+        status = "okay";
+};
+
+&i2c4 {
+        status = "okay";
+};
+
+&i2c5 {
+        status = "okay";
+};
+
+&i2c6 {
+        status = "okay";
+};
+
+&i2c7 {
+        status = "okay";
+};
+
+&i2c8 {
+        status = "okay";
+};
+
+&i2c9 {
+        multi-master;
+        bus-frequency = <100000>;
+        aspeed,hw-timeout-ms = <1000>;
+        status = "okay";
+};
+
+&i2c10 {
+        status = "okay";
+};
+
+&i2c11 {
+        status = "okay";
+};
+
+&i2c12 {
+        status = "okay";
+};
+
+&i2c13 {
+        status = "okay";
+};
+
+&adc0 {
+	ref_voltage = <2500>;
+	status = "okay";
+
+	pinctrl-0 = <&pinctrl_adc0_default &pinctrl_adc1_default
+		&pinctrl_adc2_default &pinctrl_adc3_default
+		&pinctrl_adc4_default &pinctrl_adc5_default
+		&pinctrl_adc6_default &pinctrl_adc7_default>;
+};
+
+&adc1 {
+	ref_voltage = <2500>;
+	status = "okay";
+
+	pinctrl-0 = <&pinctrl_adc8_default &pinctrl_adc9_default
+		&pinctrl_adc10_default &pinctrl_adc11_default
+		&pinctrl_adc12_default &pinctrl_adc13_default>;
+};
+
+&jtag1 {
+       status = "okay";
+       pinctrl-names = "default";
+       pinctrl-0 = <&pinctrl_jtagm_default>;
+};
+
+&ehci0 {
+	status = "okay";
+};
+
+&ehci1 {
+	status = "okay";
+};
+
+&uhci {
+	status = "okay";
+};
