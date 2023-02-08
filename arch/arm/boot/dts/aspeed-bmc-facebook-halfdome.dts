@@ -147,7 +147,7 @@
 	ncsi-ctrl,start-redo-probe;
 	ncsi-ctrl,no-channel-monitor;
 	ncsi-package = <1>;
-	ncsi-channel = <4>;
+	ncsi-channel = <1>;
 	ncsi-rexmit = <1>;
 	ncsi-timeout = <2>;
 };
