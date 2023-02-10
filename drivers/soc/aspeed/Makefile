@@ -7,4 +7,5 @@ obj-$(CONFIG_ASPEED_XDMA)	+= aspeed-xdma.o
 obj-$(CONFIG_ASPEED_OTP)	+= aspeed-otp.o
 obj-$(CONFIG_ASPEED_ESPI)	+= aspeed-espi-ctrl.o
 obj-$(CONFIG_ASPEED_ESPI_MMBI)	+= aspeed-espi-mmbi.o
+obj-$(CONFIG_ASPEED_UDMA)	+= aspeed-udma.o
 obj-$(CONFIG_ASPEED_UART_ROUTING)	+= aspeed-uart-routing.o
