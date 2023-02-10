@@ -124,6 +124,10 @@
 	status = "okay";
 };
 
+&uart_routing {
+	status = "okay";
+};
+
 &wdt1 {
 	status = "okay";
 	pinctrl-names = "default";
