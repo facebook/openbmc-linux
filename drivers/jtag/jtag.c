@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// drivers/jtag/jtag.c
-//
 // Copyright (c) 2018 Mellanox Technologies. All rights reserved.
 // Copyright (c) 2018 Oleksandr Shamray <oleksandrs@mellanox.com>
+// Copyright (c) 2019 Intel Corporation
 
 #include <linux/cdev.h>
 #include <linux/device.h>
@@ -13,7 +12,6 @@
 #include <linux/module.h>
 #include <linux/rtnetlink.h>
 #include <linux/spinlock.h>
-#include <linux/types.h>
 #include <uapi/linux/jtag.h>
 
 struct jtag {
@@ -34,9 +32,10 @@ EXPORT_SYMBOL_GPL(jtag_priv);
 static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct jtag *jtag = file->private_data;
-	struct jtag_end_tap_state endstate;
+	struct jtag_tap_state tapstate;
 	struct jtag_xfer xfer;
-	struct tck_bitbang bitbang;
+	struct bitbang_packet bitbang;
+	struct tck_bitbang *bitbang_data;
 	struct jtag_mode mode;
 	u8 *xfer_data;
 	u32 data_size;
@@ -72,20 +71,27 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	case JTAG_SIOCSTATE:
-		if (copy_from_user(&endstate, (const void __user *)arg,
-				   sizeof(struct jtag_end_tap_state)))
+		if (copy_from_user(&tapstate, (const void __user *)arg,
+				   sizeof(struct jtag_tap_state)))
 			return -EFAULT;
 
-		if (endstate.endstate > JTAG_STATE_UPDATEIR)
+		if (tapstate.from > JTAG_STATE_CURRENT)
 			return -EINVAL;
 
-		if (endstate.reset > JTAG_FORCE_RESET)
+		if (tapstate.endstate > JTAG_STATE_CURRENT)
 			return -EINVAL;
 
-		err = jtag->ops->status_set(jtag, &endstate);
+		if (tapstate.reset > JTAG_FORCE_RESET)
+			return -EINVAL;
+
+		err = jtag->ops->status_set(jtag, &tapstate);
 		break;
 
 	case JTAG_IOCXFER:
+	{
+		u8 ubit_mask = GENMASK(7, 0);
+		u8 remaining_bits = 0x0;
+
 		if (copy_from_user(&xfer, (const void __user *)arg,
 				   sizeof(struct jtag_xfer)))
 			return -EFAULT;
@@ -99,11 +105,22 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (xfer.direction > JTAG_READ_WRITE_XFER)
 			return -EINVAL;
 
-		if (xfer.endstate > JTAG_STATE_UPDATEIR)
+		if (xfer.from > JTAG_STATE_CURRENT)
+			return -EINVAL;
+
+		if (xfer.endstate > JTAG_STATE_CURRENT)
 			return -EINVAL;
 
 		data_size = DIV_ROUND_UP(xfer.length, BITS_PER_BYTE);
 		xfer_data = memdup_user(u64_to_user_ptr(xfer.tdio), data_size);
+
+		/* Save unused remaining bits in this transfer */
+		if ((xfer.length % BITS_PER_BYTE)) {
+			ubit_mask = GENMASK((xfer.length % BITS_PER_BYTE) - 1,
+					    0);
+			remaining_bits = xfer_data[data_size - 1] & ~ubit_mask;
+		}
+
 		if (IS_ERR(xfer_data))
 			return -EFAULT;
 
@@ -112,6 +129,10 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			kfree(xfer_data);
 			return err;
 		}
+
+		/* Restore unused remaining bits in this transfer */
+		xfer_data[data_size - 1] = (xfer_data[data_size - 1]
+					    & ubit_mask) | remaining_bits;
 
 		err = copy_to_user(u64_to_user_ptr(xfer.tdio),
 				   (void *)xfer_data, data_size);
@@ -123,6 +144,7 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				 sizeof(struct jtag_xfer)))
 			return -EFAULT;
 		break;
+	}
 
 	case JTAG_GIOCSTATUS:
 		err = jtag->ops->status_get(jtag, &value);
@@ -133,14 +155,27 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case JTAG_IOCBITBANG:
 		if (copy_from_user(&bitbang, (const void __user *)arg,
-				   sizeof(struct tck_bitbang)))
+				   sizeof(struct bitbang_packet)))
 			return -EFAULT;
-		err = jtag->ops->bitbang(jtag, &bitbang);
-		if (err)
-			break;
 
-		if (copy_to_user((void __user *)arg, (void *)&bitbang,
-				 sizeof(struct tck_bitbang)))
+		if (bitbang.length >= JTAG_MAX_XFER_DATA_LEN)
+			return -EINVAL;
+
+		data_size = bitbang.length * sizeof(struct tck_bitbang);
+		bitbang_data = memdup_user((void __user *)bitbang.data,
+					   data_size);
+		if (IS_ERR(bitbang_data))
+			return -EFAULT;
+
+		err = jtag->ops->bitbang(jtag, &bitbang, bitbang_data);
+		if (err) {
+			kfree(bitbang_data);
+			return err;
+		}
+		err = copy_to_user((void __user *)bitbang.data,
+				   (void *)bitbang_data, data_size);
+		kfree(bitbang_data);
+		if (err)
 			return -EFAULT;
 		break;
 	case JTAG_SIOCMODE:
@@ -155,8 +190,6 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
-		if (jtag->ops->ioctl)
-			return jtag->ops->ioctl(jtag, cmd, arg);
 		return -EINVAL;
 	}
 	return err;
@@ -187,7 +220,7 @@ static const struct file_operations jtag_fops = {
 	.owner		= THIS_MODULE,
 	.open		= jtag_open,
 	.llseek		= noop_llseek,
-	.unlocked_ioctl = jtag_ioctl,
+	.unlocked_ioctl	= jtag_ioctl,
 	.release	= jtag_release,
 };
 
@@ -276,7 +309,8 @@ int devm_jtag_register(struct device *dev, struct jtag *jtag)
 	struct jtag **ptr;
 	int ret;
 
-	ptr = devres_alloc(devm_jtag_unregister, sizeof(*ptr), GFP_KERNEL);
+	ptr = devres_alloc(devm_jtag_unregister, sizeof(struct jtag *),
+			   GFP_KERNEL);
 	if (!ptr)
 		return -ENOMEM;
 
