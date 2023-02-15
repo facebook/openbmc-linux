@@ -107,7 +107,7 @@
 
 };
 
-&uart3 {
+&uart4 {
 	// SOL BMC Console
 	status = "okay";
 	pinctrl-0 = <>;
