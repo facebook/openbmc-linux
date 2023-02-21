@@ -115,7 +115,7 @@
 
 };
 
-&uart3 {
+&uart4 {
 	// SOL BMC Console
 	status = "okay";
 	pinctrl-0 = <>;
@@ -130,6 +130,20 @@
 &uart6 {
 	// SWB Console
 	status = "okay";
+};
+
+&uart_routing {
+	status = "okay";
+};
+
+&vuart1 {
+	status = "okay";
+	virtual;
+	port=<0x3e8>;
+	sirq = <7>;
+	sirq-polarity = <0>;
+	dma-mode;
+	dma-channel = <12>;
 };
 
 &wdt1 {
