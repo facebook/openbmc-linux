@@ -440,6 +440,11 @@ static int ncsi_send_cmd_nl(struct sk_buff *msg, struct genl_info *info)
 		goto out;
 	}
 
+	if (ndp->ndev.state != ncsi_dev_state_functional) {
+		ret = -EPERM;
+		goto out_netlink;
+	}
+
 	package_id = nla_get_u32(info->attrs[NCSI_ATTR_PACKAGE_ID]);
 	channel_id = nla_get_u32(info->attrs[NCSI_ATTR_CHANNEL_ID]);
 
