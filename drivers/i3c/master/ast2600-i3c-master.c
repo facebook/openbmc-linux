@@ -26,6 +26,8 @@
 #include <linux/mfd/syscon.h>
 #include <linux/regmap.h>
 
+#define I3C_CHANNEL_MAX 5
+
 #define DEVICE_CTRL			0x0
 #define DEV_CTRL_ENABLE			BIT(31)
 #define DEV_CTRL_RESUME			BIT(30)
@@ -63,6 +65,7 @@
 #define COMMAND_PORT_TRANSFER_ARG	0x01
 
 #define COMMAND_ATTR_SLAVE_DATA		0x0
+#define COMMAND_PORT_SLAVE_TID(x)      (((x) << 3) & GENMASK(5, 3))
 #define COMMAND_PORT_SLAVE_DATA_LEN	GENMASK(31, 16)
 
 #define COMMAND_PORT_SDA_DATA_BYTE_3(x)	(((x) << 24) & GENMASK(31, 24))
@@ -92,6 +95,8 @@
 #define IS_RESPONSE_ERROR_NACK(x)  (((x) == RESPONSE_ERROR_IBA_NACK) ||    \
 	((x) == RESPONSE_ERROR_ADDRESS_NACK))
 #define RESPONSE_PORT_TID(x)		(((x) & GENMASK(27, 24)) >> 24)
+#define   TID_SLAVE_IBI_DONE		0b0001
+#define   TID_MASTER_READ_DATA		0b0010
 #define   TID_MASTER_WRITE_DATA		0b1000
 #define   TID_CCC_WRITE_DATA		0b1111
 #define RESPONSE_PORT_DATA_LEN(x)	((x) & GENMASK(15, 0))
@@ -206,8 +211,13 @@
 #define DATA_BUFFER_STATUS_LEVEL_TX(x)	((x) & GENMASK(7, 0))
 
 #define PRESENT_STATE			0x54
-#define PRESENT_STATE_CM_ST_STS(x)	(((x) & GENMASK(13, 8)) >> 8)
-#define CM_ST_STS_HALT			0x6
+#define CM_TFR_ST_STS			GENMASK(21, 16)
+#define CM_TFR_ST_STS_HALT		0x13
+#define CM_TFR_STS			GENMASK(13, 8)
+#define CM_TFR_STS_MASTER_SERV_IBI	0xe
+#define CM_TFR_STS_MASTER_HALT	0xf
+#define CM_TFR_STS_SLAVE_HALT	0x6
+
 
 #define CCC_DEVICE_STATUS		0x58
 #define DEVICE_ADDR_TABLE_POINTER	0x5c
@@ -376,6 +386,7 @@ struct aspeed_i3c_dev_group {
 struct aspeed_i3c_master {
 	struct device *dev;
 	struct i3c_master_controller base;
+	struct regmap *i3cg;
 	u16 maxdevs;
 	u16 datstartaddr;
 	u32 free_pos;
@@ -387,6 +398,7 @@ struct aspeed_i3c_master {
 	} xferqueue;
 	struct {
 		struct i3c_dev_desc *slots[MAX_DEVS];
+		u32 received_ibi_len[MAX_DEVS];
 		spinlock_t lock;
 	} ibi;
 	struct aspeed_i3c_master_caps caps;
@@ -396,6 +408,7 @@ struct aspeed_i3c_master {
 	char version[5];
 	char type[5];
 	u8 addrs[MAX_DEVS];
+	u32 channel;
 	bool secondary;
 	struct {
 		u32 *buf;
@@ -403,6 +416,7 @@ struct aspeed_i3c_master {
 				 const struct i3c_slave_payload *payload);
 	} slave_data;
 	struct completion sir_complete;
+	struct completion data_read_complete;
 
 	struct {
 		unsigned long core_rate;
@@ -430,6 +444,53 @@ static u8 even_parity(u8 p)
 	p &= 0xf;
 
 	return (0x9669 >> p) & 1;
+}
+
+#define I3CG_REG1(x)			((x * 0x10) + 0x14)
+#define SDA_OUT_SW_MODE_EN		BIT(31)
+#define SCL_OUT_SW_MODE_EN		BIT(30)
+#define SDA_IN_SW_MODE_EN		BIT(29)
+#define SCL_IN_SW_MODE_EN		BIT(28)
+#define SDA_IN_SW_MODE_VAL		BIT(27)
+#define SDA_OUT_SW_MODE_VAL		BIT(25)
+#define SDA_SW_MODE_OE			BIT(24)
+#define SCL_IN_SW_MODE_VAL		BIT(23)
+#define SCL_OUT_SW_MODE_VAL		BIT(21)
+#define SCL_SW_MODE_OE			BIT(20)
+
+static void aspeed_i3c_toggle_scl_in(struct aspeed_i3c_master *master)
+{
+	regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+			  SCL_IN_SW_MODE_VAL, SCL_IN_SW_MODE_VAL);
+	regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+			  SCL_IN_SW_MODE_EN, SCL_IN_SW_MODE_EN);
+
+	regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+			  SCL_IN_SW_MODE_VAL, 0);
+	regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+			  SCL_IN_SW_MODE_VAL, SCL_IN_SW_MODE_VAL);
+
+	regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+			  SCL_IN_SW_MODE_EN, 0);
+}
+
+static void aspeed_i3c_gen_tbits_in(struct aspeed_i3c_master *master)
+{
+	regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+			  SDA_IN_SW_MODE_VAL, SDA_IN_SW_MODE_VAL);
+	regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+			  SDA_IN_SW_MODE_EN, SDA_IN_SW_MODE_EN);
+
+	regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+			  SDA_IN_SW_MODE_VAL, 0);
+	/*
+	 * Clear the IBI queue to enable the hardware to generate SCL and
+	 * begin detecting the T-bit to stop reading IBI data.
+	 */
+	while (FIELD_GET(CM_TFR_STS, readl(master->regs + PRESENT_STATE)))
+		readl(master->regs + IBI_QUEUE_DATA);
+	regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+			  SDA_IN_SW_MODE_EN, 0);
 }
 
 static bool aspeed_i3c_master_supports_ccc_cmd(struct i3c_master_controller *m,
@@ -787,6 +848,16 @@ static void aspeed_i3c_master_sir_handler(struct aspeed_i3c_master *master,
 		dev_err(master->dev, "no free ibi slot");
 		goto out_unlock;
 	}
+	master->ibi.received_ibi_len[addr] += length;
+	if (master->ibi.received_ibi_len[addr] > slot->dev->ibi->max_payload_len) {
+		pr_err("received ibi payload %d larger than device max payload %d",
+		       master->ibi.received_ibi_len[addr],
+		       slot->dev->ibi->max_payload_len);
+		goto out_unlock;
+	}
+	if (ibi_status & IBI_QUEUE_STATUS_LAST_FRAG)
+		master->ibi.received_ibi_len[addr] = 0;
+
 	buf = slot->data;
 	/* prepend ibi status */
 	memcpy(buf, &ibi_status, sizeof(ibi_status));
@@ -807,6 +878,11 @@ out:
 
 		for (i = 0; i < nwords; i++)
 			readl(master->regs + IBI_QUEUE_DATA);
+		if (FIELD_GET(CM_TFR_STS,
+			      readl(master->regs + PRESENT_STATE)) ==
+		    CM_TFR_STS_MASTER_SERV_IBI)
+			aspeed_i3c_gen_tbits_in(master);
+		master->ibi.received_ibi_len[addr] = 0;
 	}
 }
 
@@ -1266,11 +1342,49 @@ static void aspeed_i3c_master_bus_reset(struct i3c_master_controller *m)
 {
 	struct aspeed_i3c_master *master = to_aspeed_i3c_master(m);
 	u32 reset;
+	int i;
 
-	reset = RESET_CTRL_BUS |
-		FIELD_PREP(RESET_CTRL_BUS_RESET_TYPE, BUS_RESET_TYPE_SCL_LOW);
+	if (master->base.jdec_spd) {
+		reset = RESET_CTRL_BUS |
+			FIELD_PREP(RESET_CTRL_BUS_RESET_TYPE, BUS_RESET_TYPE_SCL_LOW);
 
-	writel(reset, master->regs + RESET_CTRL);
+		writel(reset, master->regs + RESET_CTRL);
+	} else {
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SDA_OUT_SW_MODE_VAL | SCL_OUT_SW_MODE_VAL,
+				  SDA_OUT_SW_MODE_VAL | SCL_OUT_SW_MODE_VAL);
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SDA_SW_MODE_OE | SCL_SW_MODE_OE,
+				  SDA_SW_MODE_OE | SCL_SW_MODE_OE);
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SDA_OUT_SW_MODE_EN | SCL_OUT_SW_MODE_EN,
+				  SDA_OUT_SW_MODE_EN | SCL_OUT_SW_MODE_EN);
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SDA_IN_SW_MODE_VAL | SCL_IN_SW_MODE_VAL,
+				  SDA_IN_SW_MODE_VAL | SCL_IN_SW_MODE_VAL);
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SDA_IN_SW_MODE_EN | SCL_IN_SW_MODE_EN,
+				  SDA_IN_SW_MODE_EN | SCL_IN_SW_MODE_EN);
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SCL_OUT_SW_MODE_VAL, 0);
+		for (i = 0; i < 7; i++) {
+			regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+					  SDA_OUT_SW_MODE_VAL, 0);
+			regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+					  SDA_OUT_SW_MODE_VAL,
+					  SDA_OUT_SW_MODE_VAL);
+		}
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SCL_OUT_SW_MODE_VAL, SCL_OUT_SW_MODE_VAL);
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SDA_OUT_SW_MODE_VAL, 0);
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SDA_OUT_SW_MODE_VAL, SDA_OUT_SW_MODE_VAL);
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SDA_OUT_SW_MODE_EN | SCL_OUT_SW_MODE_EN, 0);
+		regmap_write_bits(master->i3cg, I3CG_REG1(master->channel),
+				  SDA_IN_SW_MODE_EN | SCL_IN_SW_MODE_EN, 0);
+	}
 }
 
 static int aspeed_i3c_ccc_set(struct aspeed_i3c_master *master,
@@ -1447,6 +1561,10 @@ static int aspeed_i3c_master_daa(struct i3c_master_controller *m)
 		return -ENOMEM;
 
 	pos = aspeed_i3c_master_get_free_pos(master);
+	if (pos < 0) {
+		aspeed_i3c_master_free_xfer(xfer);
+		return pos;
+	}
 	cmd = &xfer->cmds[0];
 	cmd->cmd_hi = 0x1;
 	cmd->cmd_lo = COMMAND_PORT_DEV_COUNT(ndevs) |
@@ -1831,10 +1949,10 @@ static void aspeed_i3c_master_detach_i2c_dev(struct i2c_dev_desc *dev)
 static void aspeed_i3c_slave_event_handler(struct aspeed_i3c_master *master)
 {
 	u32 event = readl(master->regs + SLV_EVENT_CTRL);
-	u32 cm_state =
-		PRESENT_STATE_CM_ST_STS(readl(master->regs + PRESENT_STATE));
+	u32 reg = readl(master->regs + PRESENT_STATE);
+	u32 cm_state = FIELD_GET(CM_TFR_STS, reg);
 
-	if (cm_state == CM_ST_STS_HALT) {
+	if (cm_state == CM_TFR_STS_SLAVE_HALT) {
 		dev_dbg(master->dev, "slave in halt state\n");
 		aspeed_i3c_master_resume(master);
 	}
@@ -1886,10 +2004,15 @@ static void aspeed_i3c_slave_resp_handler(struct aspeed_i3c_master *master,
 			if (master->slave_data.callback && (tid == TID_MASTER_WRITE_DATA))
 				master->slave_data.callback(&master->base, &payload);
 		}
+		if (!error && !nbytes) {
+			if (status & INTR_IBI_UPDATED_STAT && tid == TID_SLAVE_IBI_DONE)
+				complete(&master->sir_complete);
+			else if (tid == TID_MASTER_READ_DATA)
+				complete(&master->data_read_complete);
+			else
+				dev_dbg(master->dev, "unexpected TID: %x\n", tid);
+		}
 	}
-
-	if (status & INTR_IBI_UPDATED_STAT)
-		complete(&master->sir_complete);
 
 	if (has_error) {
 		writel(RESET_CTRL_QUEUES, master->regs + RESET_CTRL);
@@ -1919,7 +2042,9 @@ static irqreturn_t aspeed_i3c_master_irq_handler(int irq, void *dev_id)
 		if (status & INTR_CCC_UPDATED_STAT)
 			aspeed_i3c_slave_event_handler(master);
 	} else {
-		if (status & INTR_RESP_READY_STAT) {
+		u32 reg, cm_state, xfr_state;
+		if (status & INTR_RESP_READY_STAT ||
+                   status & INTR_TRANSFER_ERR_STAT) {
 			spin_lock(&master->xferqueue.lock);
 			aspeed_i3c_master_end_xfer_locked(master, status);
 			if (status & INTR_TRANSFER_ERR_STAT)
@@ -1929,6 +2054,20 @@ static irqreturn_t aspeed_i3c_master_irq_handler(int irq, void *dev_id)
 
 		if (status & INTR_IBI_THLD_STAT)
 			aspeed_i3c_master_demux_ibis(master);
+		/*
+		 * check whether the controller is in halt state and resume the
+		 * controller if it is in halt state
+		 */
+		reg = readl(master->regs + PRESENT_STATE);
+		cm_state = FIELD_GET(CM_TFR_ST_STS, reg);
+		xfr_state = FIELD_GET(CM_TFR_STS, reg);
+
+		if (cm_state == CM_TFR_ST_STS_HALT ||
+		    xfr_state == CM_TFR_STS_MASTER_HALT) {
+			dev_dbg(master->dev, "master in halt state, resume\n");
+			writel(RESET_CTRL_QUEUES, master->regs + RESET_CTRL);
+			aspeed_i3c_master_resume(master);
+		}
 	}
 
 	writel(status, master->regs + INTR_STATUS);
@@ -2090,8 +2229,9 @@ static int aspeed_i3c_master_request_ibi(struct i3c_dev_desc *dev,
 
 	spin_lock_irqsave(&master->ibi.lock, flags);
 	master->ibi.slots[dev->info.dyn_addr & 0x7f] = dev;
-	data->ibi =
-		aspeed_i3c_master_get_group_hw_index(master, dev->info.dyn_addr);
+	master->ibi.received_ibi_len[dev->info.dyn_addr & 0x7f] = 0;
+	data->ibi = aspeed_i3c_master_get_group_hw_index(master,
+							 dev->info.dyn_addr);
 	spin_unlock_irqrestore(&master->ibi.lock, flags);
 
 	if (i < MAX_DEVS)
@@ -2219,7 +2359,7 @@ static int aspeed_i3c_master_put_read_data(struct i3c_master_controller *m,
 					   struct i3c_slave_payload *ibi_notify)
 {
 	struct aspeed_i3c_master *master = to_aspeed_i3c_master(m);
-	u32 reg, thld_ctrl;
+	u32 reg, thld_ctrl, wait_enable_us;
 	u8 *buf;
 
 	if (!data)
@@ -2237,7 +2377,8 @@ static int aspeed_i3c_master_put_read_data(struct i3c_master_controller *m,
 
 		aspeed_i3c_master_wr_tx_fifo(master, buf, ibi_notify->len);
 
-		reg = FIELD_PREP(COMMAND_PORT_SLAVE_DATA_LEN, ibi_notify->len);
+		reg = FIELD_PREP(COMMAND_PORT_SLAVE_DATA_LEN, ibi_notify->len) |
+			COMMAND_PORT_SLAVE_TID(TID_SLAVE_IBI_DONE);
 		writel(reg, master->regs + COMMAND_QUEUE_PORT);
 
 		thld_ctrl = readl(master->regs + QUEUE_THLD_CTRL);
@@ -2247,9 +2388,11 @@ static int aspeed_i3c_master_put_read_data(struct i3c_master_controller *m,
 	}
 
 	buf = (u8 *)data->data;
+	init_completion(&master->data_read_complete);
 	aspeed_i3c_master_wr_tx_fifo(master, buf, data->len);
 
-	reg = FIELD_PREP(COMMAND_PORT_SLAVE_DATA_LEN, data->len);
+	reg = FIELD_PREP(COMMAND_PORT_SLAVE_DATA_LEN, data->len) |
+	  COMMAND_PORT_SLAVE_TID(TID_MASTER_READ_DATA);
 	writel(reg, master->regs + COMMAND_QUEUE_PORT);
 
 	if (ibi_notify) {
@@ -2263,6 +2406,26 @@ static int aspeed_i3c_master_put_read_data(struct i3c_master_controller *m,
 		reg = readl(master->regs + DEVICE_CTRL);
 		reg &= ~DEV_CTRL_SLAVE_PEC_EN;
 		writel(reg, master->regs + DEVICE_CTRL);
+	}
+
+	/* Wait data to be read */
+	if (!wait_for_completion_timeout(&master->data_read_complete,
+						 XFER_TIMEOUT)) {
+		dev_err(master->dev, "wait master read timeout\n");
+		aspeed_i3c_master_disable(master);
+		while (readl(master->regs + DEVICE_CTRL) & DEV_CTRL_ENABLE)
+			aspeed_i3c_toggle_scl_in(master);
+		writel(RESET_CTRL_QUEUES, master->regs + RESET_CTRL);
+		aspeed_i3c_master_enable(master);
+		wait_enable_us =
+			DIV_ROUND_UP(master->timing.core_period *
+					     FIELD_GET(GENMASK(31, 16),
+						       readl(master->regs +
+							     BUS_FREE_TIMING)),
+				     NSEC_PER_USEC);
+		udelay(wait_enable_us);
+		while (!(readl(master->regs + DEVICE_CTRL) & DEV_CTRL_ENABLE))
+			aspeed_i3c_toggle_scl_in(master);
 	}
 
 	return 0;
@@ -2376,7 +2539,13 @@ static int aspeed_i3c_probe(struct platform_device *pdev)
 	master = devm_kzalloc(&pdev->dev, sizeof(*master), GFP_KERNEL);
 	if (!master)
 		return -ENOMEM;
-
+	master->i3cg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+						       "aspeed,i3cg");
+	if (IS_ERR(master->i3cg)) {
+		dev_err(master->dev,
+			"i3c controller missing 'aspeed,i3cg' property\n");
+		return PTR_ERR(master->i3cg);
+	}
 	master->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(master->regs))
 		return PTR_ERR(master->regs);
@@ -2420,6 +2589,11 @@ static int aspeed_i3c_probe(struct platform_device *pdev)
 	else
 		master->secondary = false;
 
+	ret = of_property_read_u32(np, "i3c_chan", &master->channel);
+	if ((ret != 0) || (master->channel > I3C_CHANNEL_MAX)) {
+		dev_err(&pdev->dev, "no valid 'i3c_chan' %d %d configured\n", ret, master->channel);
+		return -EINVAL;
+	}
 	ret = aspeed_i3c_master_timing_config(master, np);
 	if (ret)
 		goto err_assert_rst;
@@ -2451,9 +2625,11 @@ static int aspeed_i3c_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_assert_rst;
 
-	ret = aspeed_i3c_master_enable_hj(master);
-	if (ret)
-		goto err_master_register;
+	if (!master->secondary && !master->base.jdec_spd) {
+		ret = aspeed_i3c_master_enable_hj(master);
+		if (ret)
+			goto err_master_register;
+	}
 
 	return 0;
 
