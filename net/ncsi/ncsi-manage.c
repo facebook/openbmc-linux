@@ -1862,6 +1862,9 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 			if (of_get_property(np, "ncsi-ctrl,start-redo-probe", NULL))
 				ndp->ctrl_flags |= NCSI_CTRL_FLAG_START_REDO_PROBE;
 
+			if (of_get_property(np, "ncsi-ctrl,skip-aen-handler", NULL))
+				ndp->ctrl_flags |= NCSI_CTRL_FLAG_SKIP_AEN_HANDLER;
+
 			if (of_get_property(np, "disable-ncsi-vlan-filter", NULL)) {
 				ndp->vlan_filter_flags = false;
 			}

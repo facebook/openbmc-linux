@@ -253,11 +253,15 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb)
 		goto out;
 	}
 
-	ret = nah->handler(ndp, h);
-	if (ret)
-		netdev_err(ndp->ndev.dev,
-			   "NCSI: Handler for AEN type 0x%x returned %d\n",
-			   h->type, ret);
+	if ((ndp->ctrl_flags & NCSI_CTRL_FLAG_SKIP_AEN_HANDLER) == 0) {
+		ret = nah->handler(ndp, h);
+		if (ret)
+			netdev_err(
+				ndp->ndev.dev,
+				"NCSI: Handler for AEN type 0x%x returned %d\n",
+				h->type, ret);
+	}
+
 	ncsi_generate_aen_netlink_event(ndp, h);
 out:
 	consume_skb(skb);

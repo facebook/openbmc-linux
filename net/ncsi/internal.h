@@ -336,6 +336,7 @@ struct vlan_vid {
 enum {
 	NCSI_CTRL_FLAG_NO_CHANNEL_MONITOR	= 0x0001,
 	NCSI_CTRL_FLAG_START_REDO_PROBE		= 0x0002,
+	NCSI_CTRL_FLAG_SKIP_AEN_HANDLER		= 0x0004,
 };
 
 struct ncsi_dev_priv {
