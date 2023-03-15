@@ -1,11 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-// include/linux/jtag.h - JTAG class driver
-//
-// Copyright (c) 2018 Mellanox Technologies. All rights reserved.
-// Copyright (c) 2018 Oleksandr Shamray <oleksandrs@mellanox.com>
+/* Copyright (c) 2018 Mellanox Technologies. All rights reserved. */
+/* Copyright (c) 2018 Oleksandr Shamray <oleksandrs@mellanox.com> */
+/* Copyright (c) 2019 Intel Corporation */
 
-#ifndef __JTAG_H
-#define __JTAG_H
+#ifndef __LINUX_JTAG_H
+#define __LINUX_JTAG_H
 
 #include <linux/types.h>
 #include <uapi/linux/jtag.h>
@@ -22,19 +21,21 @@ struct jtag;
  * @status_set: set JTAG TAPC state function. Mandatory, Filled by dev driver
  * @xfer: send JTAG xfer function. Mandatory func. Filled by dev driver
  * @mode_set: set specific work mode for JTAG. Filled by dev driver
- * @ioctl: handle driver specific ioctl requests. Filled by dev driver
+ * @bitbang: set low level bitbang operations. Filled by dev driver
+ * @enable: enables JTAG interface in master mode. Filled by dev driver
+ * @disable: disables JTAG interface master mode. Filled by dev driver
  */
 struct jtag_ops {
 	int (*freq_get)(struct jtag *jtag, u32 *freq);
 	int (*freq_set)(struct jtag *jtag, u32 freq);
 	int (*status_get)(struct jtag *jtag, u32 *state);
-	int (*status_set)(struct jtag *jtag, struct jtag_end_tap_state *endst);
+	int (*status_set)(struct jtag *jtag, struct jtag_tap_state *endst);
 	int (*xfer)(struct jtag *jtag, struct jtag_xfer *xfer, u8 *xfer_data);
 	int (*mode_set)(struct jtag *jtag, struct jtag_mode *jtag_mode);
-	int (*bitbang)(struct jtag *jtag, struct tck_bitbang *tck_bitbang);
+	int (*bitbang)(struct jtag *jtag, struct bitbang_packet *bitbang,
+		       struct tck_bitbang *bitbang_data);
 	int (*enable)(struct jtag *jtag);
 	int (*disable)(struct jtag *jtag);
-	int (*ioctl)(struct jtag *jtag, unsigned int cmd, unsigned long arg);
 };
 
 void *jtag_priv(struct jtag *jtag);
@@ -43,4 +44,4 @@ struct jtag *jtag_alloc(struct device *host, size_t priv_size,
 			const struct jtag_ops *ops);
 void jtag_free(struct jtag *jtag);
 
-#endif /* __JTAG_H */
+#endif /* __LINUX_JTAG_H */
