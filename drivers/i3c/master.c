@@ -268,11 +268,11 @@ static ssize_t device_status_show(struct device *dev,
 {
 	struct i3c_device *i3c = dev_to_i3cdev(dev);
 	struct i3c_device_info devinfo;
-	ssize_t ret;
+	int ret;
 
 	ret = i3c_device_getstatus_ccc(i3c, &devinfo);
 
-	return sprintf(buf, "%x\n", ret);
+	return sprintf(buf, "%d\n", ret);
 }
 static DEVICE_ATTR_RO(device_status);
 
