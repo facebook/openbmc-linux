@@ -393,3 +393,7 @@
     status = "okay";
 };
 
+&vhub {
+      status = "okay";
+};
+
