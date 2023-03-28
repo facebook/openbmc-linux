@@ -107,6 +107,10 @@
 #define GPIO_ALARM_LOW              0
 #define TEMP_ALARM_HIGH             GPIO_ALARM_HIGH
 
+/* Delay for conversion after changing the source (2x conversion time) */
+#define CONV_12BIT_MS                140   // > (1000 / 14.5) * 2 = 138
+#define CONV_16BIT_MS                2210  // > (1000 / 0.906) * 2 = 2208
+
 /* Fault status register bits */
 #define ON_STATUS                    15
 #define FET_BAD                      14
@@ -209,23 +213,27 @@ static struct ltc4282_data *ltc4282_update_adc(struct device *dev, int reg)
 	switch (reg) {
 	case ltc4282_reg_vin:
 		val = i2c_smbus_read_byte_data(client, LTC4282_ADJUST);
-		val &= (~VOLTAGE_SELECT);
-		i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
-		if (val | RESOLUTION_16_BIT)
-			msleep(1100);
-		else
-			msleep(100);
+		if (val & VOLTAGE_SELECT) {
+			val &= (~VOLTAGE_SELECT);
+			i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
+			if (val & RESOLUTION_16_BIT)
+				msleep(CONV_16BIT_MS);
+			else
+				msleep(CONV_12BIT_MS);
+		}
 		val = i2c_smbus_read_word_data(client, LTC4282_VSOURCE);
 		val = (u16)(val << 8) | (val >> 8);
 		break;
 	case ltc4282_reg_vout:
 		val = i2c_smbus_read_byte_data(client, LTC4282_ADJUST);
-		val |= VOLTAGE_SELECT;
-		i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
-		if (val | RESOLUTION_16_BIT)
-			msleep(1100);
-		else
-			msleep(100);
+		if (!(val & VOLTAGE_SELECT)) {
+			val |= VOLTAGE_SELECT;
+			i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
+			if (val & RESOLUTION_16_BIT)
+				msleep(CONV_16BIT_MS);
+			else
+				msleep(CONV_12BIT_MS);
+		}
 		val = i2c_smbus_read_word_data(client, LTC4282_VSOURCE);
 		val = (u16)(val << 8) | (val >> 8);
 		break;
@@ -239,14 +247,14 @@ static struct ltc4282_data *ltc4282_update_adc(struct device *dev, int reg)
 		break;
 	case ltc4282_reg_temp:
 		val = i2c_smbus_read_byte_data(client, LTC4282_ADJUST);
-		if (val | VGPIO_SELECT) {
+		if (val & VGPIO_SELECT) {
 			val &= (~VGPIO_SELECT);
 			i2c_smbus_write_byte_data(client, LTC4282_ADJUST, val);
+			if (val & RESOLUTION_16_BIT)
+				msleep(CONV_16BIT_MS);
+			else
+				msleep(CONV_12BIT_MS);
 		}
-		if (val | RESOLUTION_16_BIT)
-			msleep(1100);
-		else
-			msleep(100);
 		val = i2c_smbus_read_word_data(client, LTC4282_TEMP);
 		val = (u16)(val << 8) | (val >> 8);
 		break;
