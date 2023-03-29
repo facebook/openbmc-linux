@@ -490,6 +490,7 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 	struct ncsi_channel *nc, *tmp;
 	struct ncsi_cmd_arg nca;
 	unsigned long flags;
+	static unsigned char channel_index = 0;
 	int ret;
 
 	np = ndp->active_package;
@@ -530,19 +531,20 @@ static void ncsi_suspend_channel(struct ncsi_dev_priv *ndp)
 
 		break;
 	case ncsi_dev_state_suspend_gls:
-		ndp->pending_req_num = np->channel_num;
+		ndp->pending_req_num = 1;
 
 		nca.type = NCSI_PKT_CMD_GLS;
 		nca.package = np->id;
+		nca.channel = channel_index;
+		ret = ncsi_xmit_cmd(&nca);
+		if (ret)
+			goto error;
+		channel_index++;
 
-		nd->state = ncsi_dev_state_suspend_dcnt;
-		NCSI_FOR_EACH_CHANNEL(np, nc) {
-			nca.channel = nc->id;
-			ret = ncsi_xmit_cmd(&nca);
-			if (ret)
-				goto error;
+		if (channel_index == ndp->max_channel) {
+			channel_index = 0;
+			nd->state = ncsi_dev_state_suspend_dcnt;
 		}
-
 		break;
 	case ncsi_dev_state_suspend_dcnt:
 		ndp->pending_req_num = 1;
@@ -1394,9 +1396,9 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 {
 	struct ncsi_dev *nd = &ndp->ndev;
 	struct ncsi_package *np;
-	struct ncsi_channel *nc;
 	struct ncsi_cmd_arg nca;
-	unsigned char index;
+	unsigned char package_index;
+	static unsigned char channel_index = 0;
 	int ret;
 
 	nca.ndp = ndp;
@@ -1412,8 +1414,8 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		/* Deselect all possible packages */
 		nca.type = NCSI_PKT_CMD_DP;
 		nca.channel = NCSI_RESERVED_CHANNEL;
-		for (index = 0; index < ndp->max_package; index++) {
-			nca.package = index;
+		for (package_index = 0; package_index < ndp->max_package; package_index++) {
+			nca.package = package_index;
 			ret = ncsi_xmit_cmd(&nca);
 			if (ret)
 				goto error;
@@ -1474,21 +1476,45 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		nd->state = ncsi_dev_state_probe_cis;
 		break;
 	case ncsi_dev_state_probe_cis:
-		ndp->pending_req_num = ndp->max_channel;
+	case ncsi_dev_state_probe_gvi:
+	case ncsi_dev_state_probe_gc:
+	case ncsi_dev_state_probe_gls:
+		np = ndp->active_package;
+		ndp->pending_req_num = 1;
 
 		/* Clear initial state */
-		nca.type = NCSI_PKT_CMD_CIS;
-		nca.package = ndp->active_package->id;
-		for (index = 0; index < ndp->max_channel; index++) {
-			nca.channel = index;
-			ret = ncsi_xmit_cmd(&nca);
-			if (ret)
-				goto error;
-		}
+		if (nd->state == ncsi_dev_state_probe_cis)
+			nca.type = NCSI_PKT_CMD_CIS;
+		/* Retrieve version, capability or link status */
+		else if (nd->state == ncsi_dev_state_probe_gvi)
+			nca.type = NCSI_PKT_CMD_GVI;
+		else if (nd->state == ncsi_dev_state_probe_gc)
+			nca.type = NCSI_PKT_CMD_GC;
+		else
+			nca.type = NCSI_PKT_CMD_GLS;
 
-		nd->state = ncsi_dev_state_probe_gvi;
-		if (IS_ENABLED(CONFIG_NCSI_OEM_CMD_KEEP_PHY))
-			nd->state = ncsi_dev_state_probe_keep_phy;
+		nca.package = np->id;
+		nca.channel = channel_index;
+		ret = ncsi_xmit_cmd(&nca);
+		if (ret)
+			goto error;
+
+		if (nd->state == ncsi_dev_state_probe_cis)
+			nd->state = ncsi_dev_state_probe_gvi;
+		else if (nd->state == ncsi_dev_state_probe_gvi)
+			nd->state = ncsi_dev_state_probe_gc;
+		else if (nd->state == ncsi_dev_state_probe_gc)
+			nd->state = ncsi_dev_state_probe_gls;
+		else if (nd->state == ncsi_dev_state_probe_gls) {
+			nd->state = ncsi_dev_state_probe_cis;
+			channel_index++;
+		}
+		if (channel_index == ndp->max_channel) {
+			channel_index = 0;
+			nd->state = ncsi_dev_state_probe_dp;
+			if (IS_ENABLED(CONFIG_NCSI_OEM_CMD_KEEP_PHY))
+				nd->state = ncsi_dev_state_probe_keep_phy;
+		}
 		break;
 #if IS_ENABLED(CONFIG_NCSI_OEM_CMD_KEEP_PHY)
 	case ncsi_dev_state_probe_keep_phy:
@@ -1501,38 +1527,9 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		if (ret)
 			goto error;
 
-		nd->state = ncsi_dev_state_probe_gvi;
+		nd->state = ncsi_dev_state_probe_dp;
 		break;
 #endif /* CONFIG_NCSI_OEM_CMD_KEEP_PHY */
-	case ncsi_dev_state_probe_gvi:
-	case ncsi_dev_state_probe_gc:
-	case ncsi_dev_state_probe_gls:
-		np = ndp->active_package;
-		ndp->pending_req_num = np->channel_num;
-
-		/* Retrieve version, capability or link status */
-		if (nd->state == ncsi_dev_state_probe_gvi)
-			nca.type = NCSI_PKT_CMD_GVI;
-		else if (nd->state == ncsi_dev_state_probe_gc)
-			nca.type = NCSI_PKT_CMD_GC;
-		else
-			nca.type = NCSI_PKT_CMD_GLS;
-
-		nca.package = np->id;
-		NCSI_FOR_EACH_CHANNEL(np, nc) {
-			nca.channel = nc->id;
-			ret = ncsi_xmit_cmd(&nca);
-			if (ret)
-				goto error;
-		}
-
-		if (nd->state == ncsi_dev_state_probe_gvi)
-			nd->state = ncsi_dev_state_probe_gc;
-		else if (nd->state == ncsi_dev_state_probe_gc)
-			nd->state = ncsi_dev_state_probe_gls;
-		else
-			nd->state = ncsi_dev_state_probe_dp;
-		break;
 	case ncsi_dev_state_probe_dp:
 		ndp->pending_req_num = 1;
 
