@@ -71,9 +71,12 @@ struct i3c_priv_xfer {
 /**
  * enum i3c_dcr - I3C DCR values
  * @I3C_DCR_GENERIC_DEVICE: generic I3C device
+ * @I3C_DCR_HUB: I3C HUB device
  */
 enum i3c_dcr {
 	I3C_DCR_GENERIC_DEVICE = 0,
+	I3C_DCR_HUB = 194,
+	I3C_DCR_JESD403_BEGIN = 208,
 	I3C_DCR_THERMAL_SENSOR_FIRST = 210,
 	I3C_DCR_THERMAL_SENSOR_SECOND = 214,
 	I3C_DCR_PMIC_SECOND = 216,
@@ -81,8 +84,12 @@ enum i3c_dcr {
 	I3C_DCR_SPD_HUB = 218,
 	I3C_DCR_RCD = 219,
 	I3C_DCR_PMIC_THIRD = 220,
+	I3C_DCR_JESD403_END = 223,
 	I3C_DCR_MAX = 228,
 };
+
+#define I3C_DCR_IS_JESD403_COMPLIANT(dcr)                                      \
+	(dcr >= I3C_DCR_JESD403_BEGIN && dcr <= I3C_DCR_JESD403_END)
 
 #define I3C_PID_MANUF_ID(pid)		(((pid) & GENMASK_ULL(47, 33)) >> 33)
 #define I3C_PID_RND_LOWER_32BITS(pid)	(!!((pid) & BIT_ULL(32)))
@@ -131,6 +138,8 @@ enum i3c_dcr {
  * @max_read_turnaround: max read turn-around time in micro-seconds
  * @max_read_len: max private SDR read length in bytes
  * @max_write_len: max private SDR write length in bytes
+ * @pec: flag telling whether PEC (Packet Error Check) generation and verification for read
+ *       and write transaction is enabled
  *
  * These are all basic information that should be advertised by an I3C device.
  * Some of them are optional depending on the device type and device
@@ -152,6 +161,8 @@ struct i3c_device_info {
 	u32 max_read_turnaround;
 	u16 max_read_len;
 	u16 max_write_len;
+	u8 pec;
+	__be16 status;
 };
 
 /*
@@ -202,6 +213,7 @@ struct i3c_driver {
 	int (*probe)(struct i3c_device *dev);
 	int (*remove)(struct i3c_device *dev);
 	const struct i3c_device_id *id_table;
+	bool target;
 };
 
 static inline struct i3c_driver *drv_to_i3cdrv(struct device_driver *drv)
@@ -318,6 +330,8 @@ int i3c_device_do_priv_xfers(struct i3c_device *dev,
 			     struct i3c_priv_xfer *xfers,
 			     int nxfers);
 
+int i3c_device_generate_ibi(struct i3c_device *dev, const u8 *data, int len);
+
 void i3c_device_get_info(struct i3c_device *dev, struct i3c_device_info *info);
 
 struct i3c_ibi_payload {
@@ -356,5 +370,22 @@ int i3c_device_request_ibi(struct i3c_device *dev,
 void i3c_device_free_ibi(struct i3c_device *dev);
 int i3c_device_enable_ibi(struct i3c_device *dev);
 int i3c_device_disable_ibi(struct i3c_device *dev);
+int i3c_device_send_ccc_cmd(struct i3c_device *dev, u8 ccc_id);
+
+int i3c_device_getstatus_ccc(struct i3c_device *dev, struct i3c_device_info *info);
+int i3c_device_setmrl_ccc(struct i3c_device *dev, struct i3c_device_info *info, u16 read_len,
+			  u8 ibi_len);
+int i3c_device_setmwl_ccc(struct i3c_device *dev, struct i3c_device_info *info, u16 write_len);
+int i3c_device_getmrl_ccc(struct i3c_device *dev, struct i3c_device_info *info);
+int i3c_device_getmwl_ccc(struct i3c_device *dev, struct i3c_device_info *info);
+
+struct i3c_target_read_setup {
+	void (*handler)(struct i3c_device *dev, const u8 *data, size_t len);
+};
+
+int i3c_target_read_register(struct i3c_device *dev, const struct i3c_target_read_setup *setup);
+
+int i3c_device_control_pec(struct i3c_device *dev, bool pec);
+int i3c_device_send_ccc_cmd(struct i3c_device *dev, u8 ccc_id);
 
 #endif /* I3C_DEV_H */
