@@ -325,7 +325,7 @@
 &i2c3 {
 	status = "okay";
 	multi-master;
-	bus-frequency = <1000000>;
+	bus-frequency = <400000>;
 	aspeed,hw-timeout-ms = <1000>;
 };
 
