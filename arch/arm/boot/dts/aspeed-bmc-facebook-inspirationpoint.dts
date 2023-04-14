@@ -327,6 +327,9 @@
 	multi-master;
 	bus-frequency = <400000>;
 	aspeed,hw-timeout-ms = <1000>;
+	base-clock-divisor = <4>;
+	tck-high = <5>;
+	tck-low = <10>;
 };
 
 &i2c4 {
