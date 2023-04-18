@@ -146,7 +146,6 @@
 	disable-ncsi-vlan-filter;
 	ncsi-ctrl,start-redo-probe;
 	ncsi-ctrl,no-channel-monitor;
-	ncsi-ctrl,skip-aen-handler;
 	ncsi-package = <1>;
 	ncsi-rexmit = <1>;
 	ncsi-timeout = <2>;
