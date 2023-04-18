@@ -164,6 +164,7 @@ static int ncsi_aen_handler_cr(struct ncsi_dev_priv *ndp,
 
 	spin_lock_irqsave(&ndp->lock, flags);
 	nc->state = NCSI_CHANNEL_INACTIVE;
+	nc->modes[NCSI_MODE_TX_ENABLE].enable = 0;
 	list_add_tail_rcu(&nc->link, &ndp->channel_queue);
 	spin_unlock_irqrestore(&ndp->lock, flags);
 
