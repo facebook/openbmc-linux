@@ -887,7 +887,8 @@ static int ncsi_rsp_handler_gc(struct ncsi_request *nr)
 	 */
 	nc->vlan_filter.bitmap = U64_MAX;
 	nc->vlan_filter.n_vids = rsp->vlan_cnt;
-	np->ndp->max_channel = rsp->channel_cnt;
+	if (np->ndp->max_channel == NCSI_RESERVED_CHANNEL)
+		np->ndp->max_channel = rsp->channel_cnt;
 
 	return 0;
 }
