@@ -63,6 +63,7 @@
 		i2c65 = &imux65;
 		i2c66 = &imux66;
 		i2c67 = &imux67;
+		// imux68 ~ imux78 used by GTA
 	};
 
 	chosen {

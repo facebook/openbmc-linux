@@ -5,6 +5,22 @@
 
 #include "aspeed-bmc-facebook-inspirationpoint.dts"
 
+/ {
+	aliases {
+		i2c68 = &imux68;
+		i2c69 = &imux69;
+		i2c70 = &imux70;
+		i2c71 = &imux71;
+		i2c72 = &imux72;
+		i2c73 = &imux73;
+		i2c74 = &imux74;
+		i2c75 = &imux75;
+		i2c76 = &imux76;
+		i2c77 = &imux77;
+		i2c78 = &imux78;
+	};
+};
+
 &fitro {
 	reg = <0x1A0000 0x3E60000>;
 };
@@ -19,6 +35,125 @@
 
 &data0 {
 	reg = <0x6000000 0x2000000>;
+};
+
+&i2c5 {
+	status = "okay";
+	i2c-switch@70 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x70>;
+		imux28: i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+		};
+		imux29: i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+		};
+		imux30: i2c@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <2>;
+		};
+		imux31: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+		};
+		imux32: i2c@4 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <4>;
+			status = "okay";
+			i2c-switch@71 {
+				compatible = "nxp,pca9546";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0x71>;
+				imux68: i2c@0 {
+					#addreses-cells = <1>;
+					#size-cells = <0>;
+					reg = <0>;
+					status = "okay";
+					i2c-switch@72 {
+						compatible = "nxp,pca9548";
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <0x72>;
+						imux71: i2c@0 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <0>;
+						};
+						imux72: i2c@1 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <1>;
+						};
+						imux73: i2c@2 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <2>;
+						};
+						imux74: i2c@3 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <3>;
+						};
+						imux75: i2c@4 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <4>;
+						};
+						imux76: i2c@5 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <5>;
+						};
+						imux77: i2c@6 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <6>;
+						};
+						imux78: i2c@7 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <7>;
+						};
+					};				
+				};
+				imux69: i2c@1 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <1>;	
+				};
+				imux70: i2c@2 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <2>;		
+				};
+			};
+		};
+		imux33: i2c@5 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <5>;
+		};
+		imux34: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+		};
+		imux35: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <7>;
+		};
+	};
 };
 
 &i2c9 {
