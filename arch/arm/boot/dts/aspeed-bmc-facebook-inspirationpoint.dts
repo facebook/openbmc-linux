@@ -794,9 +794,9 @@
 &i3c0 {
 	pinctrl-names = "default";
 	i3c-scl-hz = <2000000>;
-	sda-tx-hold-ns = <>;
-	i3c-pp-scl-hi-period-ns = <>;
-	i3c-pp-scl-lo-period-ns = <>;
+	sda-tx-hold-ns = <70>;
+	i3c-pp-scl-hi-period-ns = <190>;
+	i3c-pp-scl-lo-period-ns = <190>;
 	status = "okay";
 	jdec-spd;
 
@@ -875,14 +875,89 @@
 		dcr = <0xda>;
 		bcr = <0x6>;
 	};
+
+	ts0_0_0: ts0@10,00000010 {
+		reg = <0x10 0xe 0x00000010>;
+		assigned-address = <0x10>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_0_0: ts1@30,00000030 {
+		reg = <0x30 0xe 0x00000030>;
+		assigned-address = <0x30>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+
+	ts0_0_1: ts0@11,00000011 {
+		reg = <0x11 0xe 0x00000011>;
+		assigned-address = <0x11>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_0_1: ts1@31,00000031 {
+		reg = <0x31 0xe 0x00000031>;
+		assigned-address = <0x31>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+
+	ts0_0_2: ts0@12,00000012 {
+		reg = <0x12 0xe 0x00000012>;
+		assigned-address = <0x12>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_0_2: ts1@32,00000032 {
+		reg = <0x32 0xe 0x00000032>;
+		assigned-address = <0x32>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_0_3: ts0@13,00000013 {
+		reg = <0x13 0xe 0x00000013>;
+		assigned-address = <0x13>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_0_3: ts1@33,00000033 {
+		reg = <0x33 0xe 0x00000033>;
+		assigned-address = <0x33>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_0_4: ts0@14,00000014 {
+		reg = <0x14 0xe 0x00000014>;
+		assigned-address = <0x14>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_0_4: ts1@34,00000034 {
+		reg = <0x34 0xe 0x00000034>;
+		assigned-address = <0x34>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_0_5: ts0@15,00000015 {
+		reg = <0x15 0xe 0x00000015>;
+		assigned-address = <0x15>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_0_5: ts1@35,00000035 {
+		reg = <0x35 0xe 0x00000035>;
+		assigned-address = <0x35>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
 };
 
 &i3c1 {
 	pinctrl-names = "default";
 	i3c-scl-hz = <2000000>;
-	sda-tx-hold-ns = <>;
-	i3c-pp-scl-hi-period-ns = <>;
-	i3c-pp-scl-lo-period-ns = <>;
+	sda-tx-hold-ns = <70>;
+	i3c-pp-scl-hi-period-ns = <190>;
+	i3c-pp-scl-lo-period-ns = <190>;
 	status = "okay";
 	jdec-spd;
 
@@ -961,15 +1036,89 @@
 		dcr = <0xda>;
 		bcr = <0x6>;
 	};
+
+
+	ts0_1_0: ts0@10,00000010 {
+		reg = <0x10 0xe 0x00000010>;
+		assigned-address = <0x10>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_1_0: ts1@30,00000030 {
+		reg = <0x30 0xe 0x00000030>;
+		assigned-address = <0x30>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_1_1: ts0@11,00000011 {
+		reg = <0x11 0xe 0x00000011>;
+		assigned-address = <0x11>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_1_1: ts1@31,00000031 {
+		reg = <0x31 0xe 0x00000031>;
+		assigned-address = <0x31>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_1_2: ts0@12,00000012 {
+		reg = <0x12 0xe 0x00000012>;
+		assigned-address = <0x12>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_1_2: ts1@32,00000032 {
+		reg = <0x32 0xe 0x00000032>;
+		assigned-address = <0x32>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_1_3: ts0@13,00000013 {
+		reg = <0x13 0xe 0x00000013>;
+		assigned-address = <0x13>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_1_3: ts1@33,00000033 {
+		reg = <0x33 0xe 0x00000033>;
+		assigned-address = <0x33>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_1_4: ts0@14,00000014 {
+		reg = <0x14 0xe 0x00000014>;
+		assigned-address = <0x14>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_1_4: ts1@34,00000034 {
+		reg = <0x34 0xe 0x00000034>;
+		assigned-address = <0x34>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_1_5: ts0@15,00000015 {
+		reg = <0x15 0xe 0x00000015>;
+		assigned-address = <0x15>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_1_5: ts1@35,00000035 {
+		reg = <0x35 0xe 0x00000035>;
+		assigned-address = <0x35>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
 };
 
 &i3c2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i3c3_default>;
 	i3c-scl-hz = <2000000>;
-	sda-tx-hold-ns = <>;
-	i3c-pp-scl-hi-period-ns = <>;
-	i3c-pp-scl-lo-period-ns = <>;
+	sda-tx-hold-ns = <70>;
+	i3c-pp-scl-hi-period-ns = <190>;
+	i3c-pp-scl-lo-period-ns = <190>;
 	status = "okay";
 	jdec-spd;
 
@@ -1048,15 +1197,88 @@
 		dcr = <0xda>;
 		bcr = <0x6>;
 	};
+
+	ts0_2_0: ts0@10,00000010 {
+		reg = <0x10 0xe 0x00000010>;
+		assigned-address = <0x10>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_2_0: ts1@30,00000030 {
+		reg = <0x30 0xe 0x00000030>;
+		assigned-address = <0x30>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_2_1: ts0@11,00000011 {
+		reg = <0x11 0xe 0x00000011>;
+		assigned-address = <0x11>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_2_1: ts1@31,00000031 {
+		reg = <0x31 0xe 0x00000031>;
+		assigned-address = <0x31>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_2_2: ts0@12,00000012 {
+		reg = <0x12 0xe 0x00000012>;
+		assigned-address = <0x12>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_2_2: ts1@32,00000032 {
+		reg = <0x32 0xe 0x00000032>;
+		assigned-address = <0x32>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_2_3: ts0@13,00000013 {
+		reg = <0x13 0xe 0x00000013>;
+		assigned-address = <0x13>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_2_3: ts1@33,00000033 {
+		reg = <0x33 0xe 0x00000033>;
+		assigned-address = <0x33>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_2_4: ts0@14,00000014 {
+		reg = <0x14 0xe 0x00000014>;
+		assigned-address = <0x14>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_2_4: ts1@34,00000034 {
+		reg = <0x34 0xe 0x00000034>;
+		assigned-address = <0x34>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_2_5: ts0@15,00000015 {
+		reg = <0x15 0xe 0x00000015>;
+		assigned-address = <0x15>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_2_5: ts1@35,00000035 {
+		reg = <0x35 0xe 0x00000035>;
+		assigned-address = <0x35>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
 };
 
 &i3c3 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i3c4_default>;
 	i3c-scl-hz = <2000000>;
-	sda-tx-hold-ns = <>;
-	i3c-pp-scl-hi-period-ns = <>;
-	i3c-pp-scl-lo-period-ns = <>;
+	sda-tx-hold-ns = <70>;
+	i3c-pp-scl-hi-period-ns = <190>;
+	i3c-pp-scl-lo-period-ns = <190>;
 	status = "okay";
 	jdec-spd;
 
@@ -1132,6 +1354,79 @@
 	pmic_3_5: pmic@4d,50105000 {
 		reg = <0x4d 0xe 0x50105000>;
 		assigned-address = <0x4d>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+
+	ts0_3_0: ts0@10,00000010 {
+		reg = <0x10 0xe 0x00000010>;
+		assigned-address = <0x10>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_3_0: ts1@30,00000030 {
+		reg = <0x30 0xe 0x00000030>;
+		assigned-address = <0x30>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_3_1: ts0@11,00000011 {
+		reg = <0x11 0xe 0x00000011>;
+		assigned-address = <0x11>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_3_1: ts1@31,00000031 {
+		reg = <0x31 0xe 0x00000031>;
+		assigned-address = <0x31>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_3_2: ts0@12,00000012 {
+		reg = <0x12 0xe 0x00000012>;
+		assigned-address = <0x12>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_3_2: ts1@32,00000032 {
+		reg = <0x32 0xe 0x00000032>;
+		assigned-address = <0x32>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_3_3: ts0@13,00000013 {
+		reg = <0x13 0xe 0x00000013>;
+		assigned-address = <0x13>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_3_3: ts1@33,00000033 {
+		reg = <0x33 0xe 0x00000033>;
+		assigned-address = <0x33>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_3_4: ts0@14,00000014 {
+		reg = <0x14 0xe 0x00000014>;
+		assigned-address = <0x14>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_3_4: ts1@34,00000034 {
+		reg = <0x34 0xe 0x00000034>;
+		assigned-address = <0x34>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts0_3_5: ts0@15,00000015 {
+		reg = <0x15 0xe 0x00000015>;
+		assigned-address = <0x15>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	ts1_3_5: ts1@35,00000035 {
+		reg = <0x35 0xe 0x00000035>;
+		assigned-address = <0x35>;
 		dcr = <0xda>;
 		bcr = <0x6>;
 	};
