@@ -329,10 +329,8 @@
         i3c-od-scl-lo-period-ns = <620>;
         pinctrl-names = "default";
         pinctrl-0 = <&pinctrl_hvi3c3_default>;
-        gpios = <&gpio0 ASPEED_GPIO(S, 4) GPIO_ACTIVE_HIGH>;
-        astbic1: astbic1@13,7ec73411002 {
-                reg = <0x13 0x7ec 0x73411002>;
-                assigned-address = <0x13>;
+        astbic1: astbic1@0,7ec73411002 {
+                reg = <0x0 0x7ec 0x73411002>;
                 compatible = "i3c-ast-bridgeic";
         };
 };
@@ -345,10 +343,8 @@
         i3c-od-scl-lo-period-ns = <620>;
         pinctrl-names = "default";
         pinctrl-0 = <&pinctrl_hvi3c4_default>;
-        gpios = <&gpio0 ASPEED_GPIO(S, 5) GPIO_ACTIVE_HIGH>;
-        astbic2: astbic2@13,7ec73411002 {
-                reg = <0x13 0x7ec 0x73411002>;
-                assigned-address = <0x13>;
+        astbic2: astbic2@0,7ec73411002 {
+                reg = <0x0 0x7ec 0x73411002>;
                 compatible = "i3c-ast-bridgeic";
         };
 };
@@ -361,10 +357,8 @@
         i3c-od-scl-lo-period-ns = <620>;
         pinctrl-names = "default";
         pinctrl-0 = <&pinctrl_i3c5_default>;
-        gpios = <&gpio0 ASPEED_GPIO(S, 6) GPIO_ACTIVE_HIGH>;
-        astbic3: astbic3@13,7ec73411002 {
-                reg = <0x13 0x7ec 0x73411002>;
-                assigned-address = <0x13>;
+        astbic3: astbic3@0,7ec73411002 {
+                reg = <0x0 0x7ec 0x73411002>;
                 compatible = "i3c-ast-bridgeic";
         };
 };
@@ -377,10 +371,8 @@
         i3c-od-scl-lo-period-ns = <620>;
         pinctrl-names = "default";
         pinctrl-0 = <&pinctrl_i3c6_default>;
-        gpios = <&gpio0 ASPEED_GPIO(S, 7) GPIO_ACTIVE_HIGH>;
-        astbic4: astbic4@13,7ec73411002 {
-                reg = <0x13 0x7ec 0x73411002>;
-                assigned-address = <0x13>;
+        astbic4: astbic4@0,7ec73411002 {
+                reg = <0x0 0x7ec 0x73411002>;
                 compatible = "i3c-ast-bridgeic";
         };
 };
