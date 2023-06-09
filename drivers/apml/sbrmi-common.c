@@ -86,8 +86,6 @@ struct cpu_msr_outdata {
 	};
 } __packed;
 
-struct apml_spl_ops apml_ops;
-
 #define prepare_mca_msr_input_message(input, thread_id, data_in)	\
 	input.rd_len = MSR_RD_DATA_LEN,					\
 	input.wr_len = MSR_WR_DATA_LEN,					\
@@ -103,17 +101,21 @@ struct apml_spl_ops apml_ops;
 	input.value =  func,						\
 	input.ext =  ext_func
 
-/* Assigning the CPUID and MSR protocols as per revision */
-void rmi_set_apml_ops(int rev)
+static int sbrmi_get_rev(struct apml_sbrmi_device *rmi_dev)
 {
-	/* default definitions for CPUID and MCA-MSR protocols */
-	apml_ops.rmi_cpuid_read = rmi_cpuid_read_v10;
-	apml_ops.rmi_mca_msr_read = rmi_mca_msr_read_v10;
+	struct apml_message msg = { 0 };
+	int ret;
 
-	if (rev == 0x20) {
-		apml_ops.rmi_cpuid_read = rmi_cpuid_read_v20;
-		apml_ops.rmi_mca_msr_read = rmi_mca_msr_read_v20;
-	}
+	msg.data_in.reg_in[REG_OFF_INDEX] = SBRMI_REV;
+	msg.data_in.reg_in[RD_FLAG_INDEX] = 1;
+	ret = regmap_read(rmi_dev->regmap,
+			  msg.data_in.reg_in[REG_OFF_INDEX],
+			  &msg.data_out.mb_out[RD_WR_DATA_INDEX]);
+	if (ret < 0)
+		return ret;
+
+	rmi_dev->rev = msg.data_out.reg_out[RD_WR_DATA_INDEX];
+	return 0;
 }
 
 /*
@@ -149,15 +151,25 @@ static int sbrmi_wait_status(struct apml_sbrmi_device *rmi_dev,
 	return ret;
 }
 
-/* MCA MSR protocol for REV 0x20 */
-int rmi_mca_msr_read_v20(struct apml_sbrmi_device *rmi_dev,
-			 struct apml_message *msg)
+/* MCA MSR protocol */
+int rmi_mca_msr_read(struct apml_sbrmi_device *rmi_dev,
+		     struct apml_message *msg)
 {
 	struct cpu_msr_outdata output = {0};
 	struct cpu_msr_indata input = {0};
 	int ret, val = 0;
 	int hw_status;
 	u16 thread;
+
+	/* cache the rev value to identify if protocol is supported or not */
+	if (!rmi_dev->rev) {
+		ret = sbrmi_get_rev(rmi_dev);
+		if (ret < 0)
+			return ret;
+	}
+	/* MCA MSR protocol for REV 0x10 is not supported*/
+	if (rmi_dev->rev == 0x10)
+		return -EOPNOTSUPP;
 
 	thread = msg->data_in.reg_in[THREAD_LOW_INDEX] |
 		 msg->data_in.reg_in[THREAD_HI_INDEX] << 8;
@@ -167,16 +179,13 @@ int rmi_mca_msr_read_v20(struct apml_sbrmi_device *rmi_dev,
 		thread -= 128;
 		val = 1;
 	}
-	mutex_lock(&rmi_dev->lock);
 	ret = regmap_write(rmi_dev->regmap, SBRMI_THREAD128CS, val);
 	if (ret < 0)
 		goto exit_unlock;
-	mutex_unlock(&rmi_dev->lock);
 
 	prepare_mca_msr_input_message(input, thread,
 				      msg->data_in.mb_in[RD_WR_DATA_INDEX]);
 
-	mutex_lock(&rmi_dev->lock);
 	ret = regmap_bulk_write(rmi_dev->regmap, CPUID_MCA_CMD,
 				&input, MSR_WR_REG_LEN);
 	if (ret < 0)
@@ -192,7 +201,7 @@ int rmi_mca_msr_read_v20(struct apml_sbrmi_device *rmi_dev,
 		goto exit_unlock;
 
 	ret = regmap_write(rmi_dev->regmap, SBRMI_STATUS,
-			   hw_status | HW_ALERT_MASK);
+			   HW_ALERT_MASK);
 	if (ret < 0)
 		goto exit_unlock;
 
@@ -208,33 +217,28 @@ int rmi_mca_msr_read_v20(struct apml_sbrmi_device *rmi_dev,
 	msg->data_out.cpu_msr_out = output.value;
 
 exit_unlock:
-	mutex_unlock(&rmi_dev->lock);
 	return ret;
 }
 
-/* MCA MSR protocol for REV 0x10 */
-int rmi_mca_msr_read_v10(struct apml_sbrmi_device *rmi_dev,
-			 struct apml_message *msg)
-{
-	return -ENOTSUPP;
-}
-
-/* CPUID protocol for REV 0x10 */
-int rmi_cpuid_read_v10(struct apml_sbrmi_device *rmi_dev,
-		       struct apml_message *msg)
-{
-	return -ENOTSUPP;
-}
-
-/* CPUID protocol for REV 0x20 */
-int rmi_cpuid_read_v20(struct apml_sbrmi_device *rmi_dev,
-		       struct apml_message *msg)
+/* CPUID protocol */
+int rmi_cpuid_read(struct apml_sbrmi_device *rmi_dev,
+		   struct apml_message *msg)
 {
 	struct cpu_msr_indata input = {0};
 	struct cpu_msr_outdata output = {0};
 	int val = 0;
 	int ret, hw_status;
 	u16 thread;
+
+	/* cache the rev value to identify if protocol is supported or not */
+	if (!rmi_dev->rev) {
+		ret = sbrmi_get_rev(rmi_dev);
+		if (ret < 0)
+			return ret;
+	}
+	/* CPUID protocol for REV 0x10 is not supported*/
+	if (rmi_dev->rev == 0x10)
+		return -EOPNOTSUPP;
 
 	thread = msg->data_in.reg_in[THREAD_LOW_INDEX] |
 		 msg->data_in.reg_in[THREAD_HI_INDEX] << 8;
@@ -244,17 +248,14 @@ int rmi_cpuid_read_v20(struct apml_sbrmi_device *rmi_dev,
 		thread -= 128;
 		val = 1;
 	}
-	mutex_lock(&rmi_dev->lock);
 	ret = regmap_write(rmi_dev->regmap, SBRMI_THREAD128CS, val);
 	if (ret < 0)
 		goto exit_unlock;
-	mutex_unlock(&rmi_dev->lock);
 
 	prepare_cpuid_input_message(input, thread,
 				    msg->data_in.mb_in[RD_WR_DATA_INDEX],
 				    msg->data_in.reg_in[EXT_FUNC_INDEX]);
 
-	mutex_lock(&rmi_dev->lock);
 	ret = regmap_bulk_write(rmi_dev->regmap, CPUID_MCA_CMD,
 				&input, CPUID_WR_REG_LEN);
 	if (ret < 0)
@@ -270,7 +271,7 @@ int rmi_cpuid_read_v20(struct apml_sbrmi_device *rmi_dev,
 		goto exit_unlock;
 
 	ret = regmap_write(rmi_dev->regmap, SBRMI_STATUS,
-			   hw_status | HW_ALERT_MASK);
+			   HW_ALERT_MASK);
 	if (ret < 0)
 		goto exit_unlock;
 
@@ -285,7 +286,6 @@ int rmi_cpuid_read_v20(struct apml_sbrmi_device *rmi_dev,
 	}
 	msg->data_out.cpu_msr_out = output.value;
 exit_unlock:
-	mutex_unlock(&rmi_dev->lock);
 	return ret;
 }
 
@@ -302,7 +302,7 @@ static int esmi_oob_clear_status_alert(struct apml_sbrmi_device *rmi_dev)
 		return 0;
 
 	return regmap_write(rmi_dev->regmap, SBRMI_STATUS,
-			    sw_status | SW_ALERT_MASK);
+			    SW_ALERT_MASK);
 }
 
 int rmi_mailbox_xfer(struct apml_sbrmi_device *rmi_dev,
@@ -313,7 +313,6 @@ int rmi_mailbox_xfer(struct apml_sbrmi_device *rmi_dev,
 	int sw_status;
 	u8 byte = 0;
 
-	mutex_lock(&rmi_dev->lock);
 	msg->fw_ret_code = 0;
 
 	ret = esmi_oob_clear_status_alert(rmi_dev);
@@ -383,12 +382,11 @@ exit_clear_alert:
 	 * ALERT to initiator
 	 */
 	ret = regmap_write(rmi_dev->regmap, SBRMI_STATUS,
-			   sw_status | SW_ALERT_MASK);
+			   SW_ALERT_MASK);
 	if (ec) {
 		ret = -EPROTOTYPE;
 		msg->fw_ret_code = ec;
 	}
 exit_unlock:
-	mutex_unlock(&rmi_dev->lock);
 	return ret;
 }
