@@ -262,6 +262,24 @@
 
 &i2c0 {
 	status = "okay";
+	// CPU0
+	sbrmi@3C {
+		compatible = "amd,sbrmi";
+		reg = <0x3C>;
+	};
+	sbtsi@4C {
+		compatible = "amd,sbtsi";
+		reg = <0x4C>;
+	};
+	// CPU1
+	sbrmi@38 {
+		compatible = "amd,sbrmi";
+		reg = <0x38>;
+	};
+	sbtsi@48 {
+		compatible = "amd,sbtsi";
+		reg = <0x48>;
+	};
 };
 
 &i2c1 {
