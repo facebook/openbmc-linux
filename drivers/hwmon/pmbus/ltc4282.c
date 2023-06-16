@@ -461,6 +461,8 @@ static ssize_t ltc4282_show_value(struct device *dev,
 		value = ltc4282_reg_to_value(data, ltc4282_reg_temp_max);
 		break;
 	}
+	if (IS_ERR(data))
+		return PTR_ERR(data);
 
 	return snprintf(buf, PAGE_SIZE, "%d\n", value);
 }
