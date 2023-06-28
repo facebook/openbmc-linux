@@ -341,11 +341,8 @@
 	status = "okay";
 };
 
-&ehci1 {
-	status = "okay";
-};
-
 &uhci {
+	#ports = <1>;
 	status = "okay";
 };
 
