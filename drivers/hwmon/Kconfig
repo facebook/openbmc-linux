@@ -1879,6 +1879,19 @@ config SENSORS_INA3221
 	  This driver can also be built as a module. If so, the module
 	  will be called ina3221.
 
+config SENSORS_ISL28022
+	tristate "Renesas ISL28022"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  If you say yes here you get support for the ISL28022 power monitor
+	  chip. This driver supports voltage, current, power and temperature
+	  measurements as well as alarm configuration.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called ISL28022.
+
+
 config SENSORS_TC74
 	tristate "Microchip TC74"
 	depends on I2C
