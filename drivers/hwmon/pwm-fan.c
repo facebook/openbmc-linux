@@ -20,6 +20,7 @@
 #include <linux/timer.h>
 
 #define MAX_PWM 255
+#define INIT_PWM 178
 
 struct pwm_fan_tach {
 	int irq;
@@ -353,7 +354,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	}
 
 	/* Set duty cycle to maximum allowed and enable PWM output */
-	ret = __set_pwm(ctx, MAX_PWM);
+	ret = __set_pwm(ctx, INIT_PWM);
 	if (ret) {
 		dev_err(dev, "Failed to configure PWM: %d\n", ret);
 		return ret;
