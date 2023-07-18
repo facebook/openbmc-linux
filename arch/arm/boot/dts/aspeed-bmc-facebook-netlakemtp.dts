@@ -285,26 +285,14 @@
 
 &i2c9 {
     status = "okay";
-    pca9641@70 {
-        compatible = "nxp,pca9641";
-        reg = <0x70>;
-        i2c-arb {
-            pca9641@71 {
-                compatible = "nxp,pca9641";
-                reg = <0x71>;
-                i2c-arb {
-                    max31790@21 {
-                        compatible = "max31790";
-                        reg = <0x21>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                        fan-mode = "pwm";
-                        fanconfig = /bits/ 8 <0x19 0x19 0x19 0x19 0x19 0x19>;
-                    };
-                };
-            };
-        };
-    };
+    max31790@21 {
+        compatible = "max31790";
+        reg = <0x21>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+        fan-mode = "pwm";
+        fanconfig = /bits/ 8 <0x19 0x19 0x19 0x19 0x19 0x19>;
+     };
 
     netlake_eeprom@56 {
         compatible = "atmel,24c128";
