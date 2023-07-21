@@ -720,6 +720,50 @@ static ssize_t max1363_monitor_store_freq(struct device *dev,
 	return 0;
 }
 
+
+static ssize_t polar_resistor_show(struct device *dev,
+					  struct device_attribute *attr,
+					  char *buf)
+{
+	struct max1363_state *st = iio_priv(dev_to_iio_dev(dev));
+        u8 val=0;
+
+	val = (st->setupbyte & MAX1363_SETUP_BIPOLAR) >> 2;
+	return sprintf(buf, "%s\n", val ? "bipolar" : "unipolar");
+}
+
+static ssize_t polar_resistor_store(struct device *dev,
+					   struct device_attribute *attr,
+					   const char *buf, size_t len)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct max1363_state *st = iio_priv(indio_dev);
+	int val;
+
+	if (kstrtoint(buf, 10, &val) != 0)
+		return -EINVAL;
+
+		if (val != 0)
+			st->setupbyte |= MAX1363_SETUP_BIPOLAR;
+		else
+			st->setupbyte &= ~(MAX1363_SETUP_BIPOLAR);
+	return len;
+}
+
+static IIO_DEVICE_ATTR(polar_resistor, S_IRUGO | S_IWUSR,
+		       polar_resistor_show,
+		       polar_resistor_store, 0);
+
+static struct attribute *max1238_attributes[] = {
+	&iio_dev_attr_polar_resistor.dev_attr.attr,
+	NULL,
+};
+
+static const struct attribute_group max1238_attribute_group = {
+	.attrs = max1238_attributes,
+};
+
+
 static IIO_DEV_ATTR_SAMP_FREQ(S_IRUGO | S_IWUSR,
 			max1363_monitor_show_freq,
 			max1363_monitor_store_freq);
@@ -1040,6 +1084,7 @@ static int max1363_update_scan_mode(struct iio_dev *indio_dev,
 static const struct iio_info max1238_info = {
 	.read_raw = &max1363_read_raw,
 	.update_scan_mode = &max1363_update_scan_mode,
+	.attrs = &max1238_attribute_group,
 };
 
 static const struct iio_info max1363_info = {
