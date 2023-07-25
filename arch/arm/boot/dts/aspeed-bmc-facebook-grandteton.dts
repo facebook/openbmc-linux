@@ -74,6 +74,16 @@
 			<&adc1 2>;
 	};
 
+	iio_hwmon_max11617_adc0 {
+		compatible = "iio-hwmon";
+		io-channels = <&max11617_adc0 0>, <&max11617_adc0 1>, <&max11617_adc0 2>, <&max11617_adc0 3>,
+			<&max11617_adc0 4>, <&max11617_adc0 5>, <&max11617_adc0 6>, <&max11617_adc0 7>,
+			<&max11617_adc0 8>, <&max11617_adc0 9>, <&max11617_adc0 10>, <&max11617_adc0 11>,
+			<&max11617_adc0 12>, <&max11617_adc0 13>, <&max11617_adc0 14>, <&max11617_adc0 15>,
+			<&max11617_adc0 16>, <&max11617_adc0 17>, <&max11617_adc0 18>, <&max11617_adc0 19>,
+			<&max11617_adc0 20>, <&max11617_adc0 21>, <&max11617_adc0 22>, <&max11617_adc0 23>;
+	};
+
 	spi_gpio: spi-gpio {
 		status = "okay";
 		compatible = "spi-gpio";
@@ -263,6 +273,11 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0>;
+			max11617_adc0:adc@35 {
+				compatible = "maxim,max11617";
+				reg = <0x35>;
+				#io-channel-cells = <1>;
+			};
 		};
 		imux21: i2c@1 {
 			#address-cells = <1>;
