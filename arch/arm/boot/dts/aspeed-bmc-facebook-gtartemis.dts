@@ -162,3 +162,12 @@
 	bus-frequency = <400000>;
 	aspeed,hw-timeout-ms = <1000>;
 };
+
+&i2c11 {
+	status = "okay";
+	aspeed,hw-timeout-ms = <1000>;
+	base-clock-divisor = <6>;
+	tck-high = <8>;
+	tck-low = <6>;
+};
+
