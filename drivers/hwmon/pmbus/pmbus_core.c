@@ -19,6 +19,7 @@
 #include <linux/pmbus.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
+#include <linux/delay.h>
 #include "pmbus.h"
 
 /*
@@ -2147,9 +2148,24 @@ static int pmbus_identify_common(struct i2c_client *client,
 {
 	int vout_mode = -1;
 
-	if (pmbus_check_byte_register(client, page, PMBUS_VOUT_MODE))
-		vout_mode = _pmbus_read_byte_data(client, page,
-						  PMBUS_VOUT_MODE);
+	int retry_times = 0;
+	for (; retry_times < VOUT_MODE_RETRY_MAX; retry_times++) {
+		if (pmbus_check_byte_register(client, page, PMBUS_VOUT_MODE))
+			vout_mode = _pmbus_read_byte_data(client, page,
+							  PMBUS_VOUT_MODE);
+		if (vout_mode != 0xff)
+			break;
+		msleep(100);
+	}
+
+	if (vout_mode == 0xff) {
+		dev_err(data->dev,  "VOUT_MODE is incorrect(0xFF). Status_byte: 0x%02x status_word: 0x%04x\n",
+		       _pmbus_read_byte_data(client, page, PMBUS_STATUS_BYTE),
+		       _pmbus_read_word_data(client, page, 0xff,
+					     PMBUS_STATUS_WORD));
+		return -1;
+	}
+
 	if (vout_mode >= 0 && vout_mode != 0xff) {
 		/*
 		 * Not all chips support the VOUT_MODE command,

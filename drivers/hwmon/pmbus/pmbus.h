@@ -264,6 +264,8 @@ enum pmbus_regs {
 #define PB_VOUT_MODE_MODE_MASK		0xe0
 #define PB_VOUT_MODE_PARAM_MASK		0x1f
 
+#define VOUT_MODE_RETRY_MAX 3
+
 #define PB_VOUT_MODE_LINEAR		0x00
 #define PB_VOUT_MODE_VID		0x20
 #define PB_VOUT_MODE_DIRECT		0x40
