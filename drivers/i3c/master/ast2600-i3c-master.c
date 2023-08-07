@@ -981,12 +981,12 @@ static void aspeed_i3c_master_end_xfer_locked(struct aspeed_i3c_master *master, 
 	}
 
 	xfer->ret = ret;
-	complete(&xfer->comp);
 
 	if (ret < 0) {
 		aspeed_i3c_master_dequeue_xfer_locked(master, xfer);
 		aspeed_i3c_master_resume(master);
 	}
+	complete(&xfer->comp);
 
 	xfer = list_first_entry_or_null(&master->xferqueue.list,
 					struct aspeed_i3c_xfer,
