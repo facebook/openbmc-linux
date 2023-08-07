@@ -779,10 +779,6 @@
 	status = "okay";
 };
 
-&uhci {
-	status = "okay";
-};
-
 &pcie {
 	status = "okay";
 };
