@@ -22,8 +22,7 @@
         i2c22 = &imux22;
         i2c23 = &imux23;
         i2c24 = &imux24;
-        i2c26 = &imux26;
-        i2c27 = &imux27;
+        i2c25 = &imux25;
     };
 
     chosen {
@@ -289,23 +288,11 @@
             #size-cells = <0>;
             reg = <2>;
         };
-    };
 
-    i2cswitch@73 {
-        compatible = "nxp,pca9846";
-        i2c-mux-idle-disconnect;
-        reg = <0x73>;
-
-        imux26: i2c@0 {
+        imux25: i2c@3 {
             #address-cells = <1>;
             #size-cells = <0>;
-            reg = <0>;
-        };
-
-        imux27: i2c@1 {
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <1>;
+            reg = <3>;
         };
     };
 };
