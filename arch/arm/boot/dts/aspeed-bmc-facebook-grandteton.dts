@@ -84,6 +84,38 @@
 			<&max11617_adc0 20>, <&max11617_adc0 21>, <&max11617_adc0 22>, <&max11617_adc0 23>;
 	};
 
+	iio_hwmon_max11617_hpdb {
+		compatible = "iio-hwmon";
+		io-channels = <&max11617_hpdb 0>, <&max11617_hpdb 1>, <&max11617_hpdb 2>, <&max11617_hpdb 3>,
+			<&max11617_hpdb 4>, <&max11617_hpdb 5>, <&max11617_hpdb 6>, <&max11617_hpdb 7>,
+			<&max11617_hpdb 8>, <&max11617_hpdb 9>, <&max11617_hpdb 10>, <&max11617_hpdb 11>,
+			<&max11617_hpdb 12>, <&max11617_hpdb 13>, <&max11617_hpdb 14>, <&max11617_hpdb 15>,
+			<&max11617_hpdb 16>, <&max11617_hpdb 17>, <&max11617_hpdb 18>, <&max11617_hpdb 19>,
+			<&max11617_hpdb 20>, <&max11617_hpdb 21>, <&max11617_hpdb 22>, <&max11617_hpdb 23>;
+	};
+
+	iio_hwmon_max11617_vpdb {
+		compatible = "iio-hwmon";
+		io-channels = <&max11617_vpdb 0>, <&max11617_vpdb 1>, <&max11617_vpdb 2>, <&max11617_vpdb 3>,
+			<&max11617_vpdb 4>, <&max11617_vpdb 5>, <&max11617_vpdb 6>, <&max11617_vpdb 7>,
+			<&max11617_vpdb 8>, <&max11617_vpdb 9>, <&max11617_vpdb 10>, <&max11617_vpdb 11>,
+			<&max11617_vpdb 12>, <&max11617_vpdb 13>, <&max11617_vpdb 14>, <&max11617_vpdb 15>,
+			<&max11617_vpdb 16>, <&max11617_vpdb 17>, <&max11617_vpdb 18>, <&max11617_vpdb 19>,
+			<&max11617_vpdb 20>, <&max11617_vpdb 21>, <&max11617_vpdb 22>, <&max11617_vpdb 23>;
+	};
+
+	iio_hwmon_ads1015_vpdb {
+		compatible = "iio-hwmon";
+		io-channels = <&ads1015_vpdb 0>, <&ads1015_vpdb 1>, <&ads1015_vpdb 2>, <&ads1015_vpdb 3>,
+			<&ads1015_vpdb 4>, <&ads1015_vpdb 5>, <&ads1015_vpdb 6>, <&ads1015_vpdb 7>;
+	};
+
+	iio_hwmon_ads1015_hpdb {
+		compatible = "iio-hwmon";
+		io-channels = <&ads1015_hpdb 0>, <&ads1015_hpdb 1>, <&ads1015_hpdb 2>, <&ads1015_hpdb 3>,
+			<&ads1015_hpdb 4>, <&ads1015_hpdb 5>, <&ads1015_hpdb 6>, <&ads1015_hpdb 7>;
+	};
+
 	spi_gpio: spi-gpio {
 		status = "okay";
 		compatible = "spi-gpio";
@@ -254,8 +286,8 @@
 	status = "okay";
 	gpio-ranges = <&pinctrl 0 244 128>;
 	ngpios = <128>;
-	base = <244>;				
-	bus-frequency = <2000000>;	
+	base = <244>;
+	bus-frequency = <2000000>;
 };
 
 &i2c0 {
@@ -426,13 +458,22 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0>;
+			max11617_vpdb:adc@35 {
+				compatible = "maxim,max11617";
+				reg = <0x35>;
+				#io-channel-cells = <1>;
+			};
+			ads1015_vpdb:adc@48 {
+				compatible = "maxim,ads1015";
+				reg = <0x48>;
+				#io-channel-cells = <1>;
+			};
 		};
-
 		imux37: i2c@1 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <1>;
-				status = "okay";
+			status = "okay";
 			i2c-switch@71 {
 				compatible = "nxp,pca9543";
 				#address-cells = <1>;
@@ -684,6 +725,16 @@
 						};
 					};
 				};
+			};
+			max11617_hpdb:adc@35 {
+				compatible = "maxim,max11617";
+				reg = <0x35>;
+				#io-channel-cells = <1>;
+			};
+			ads1015_hpdb:adc@48 {
+				compatible = "maxim,ads1015";
+				reg = <0x48>;
+				#io-channel-cells = <1>;
 			};
 		};
 		imux38: i2c@2 {
