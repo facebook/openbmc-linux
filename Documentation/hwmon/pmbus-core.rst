@@ -270,6 +270,12 @@ obtain the chip status. Therefore, it must _not_ be called from that function.
 
 ::
 
+  int pmbus_query_register(struct i2c_client *client, int reg);
+Send pmbus QUERY command for specific register. Returns QUERY command
+response or negative value on fail.
+
+::
+
   int pmbus_do_probe(struct i2c_client *client, struct pmbus_driver_info *info);
 
 Execute probe function. Similar to standard probe function for other drivers,

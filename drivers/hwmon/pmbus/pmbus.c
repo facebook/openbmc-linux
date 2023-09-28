@@ -66,6 +66,12 @@ static void pmbus_find_sensor_groups(struct i2c_client *client,
 					 PMBUS_STATUS_TEMPERATURE))
 			info->func[0] |= PMBUS_HAVE_STATUS_TEMP;
 
+	if (pmbus_query_register(client, PMBUS_READ_EIN) > 0) {
+		info->func[0] |= PMBUS_HAVE_EIN;
+		info->format[PSC_POWER_AVERAGE] = direct;
+		info->m[PSC_POWER_AVERAGE] = 1;
+	}
+
 	/* Sensors detected on all pages */
 	for (page = 0; page < info->pages; page++) {
 		if (pmbus_check_word_register(client, page, PMBUS_READ_VOUT)) {
