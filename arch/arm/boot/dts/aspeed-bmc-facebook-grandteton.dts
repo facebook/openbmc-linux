@@ -802,6 +802,446 @@
 
 };
 
+&i3c0 {
+	pinctrl-names = "default";
+	i3c-scl-hz = <2000000>;
+	sda-tx-hold-ns = <70>;
+	i3c-pp-scl-hi-period-ns = <190>;
+	i3c-pp-scl-lo-period-ns = <190>;
+	status = "okay";
+	jdec-spd;
+
+	// SPD5118
+	spd_0_0: spd@50,51180000 {
+		reg = <0x50 0xe 0x51180000>;
+		assigned-address = <0x50>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_0_1: spd@51,51181000 {
+		reg = <0x51 0xe 0x51181000>;
+		assigned-address = <0x51>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_0_2: spd@52,51182000 {
+		reg = <0x52 0xe 0x51182000>;
+		assigned-address = <0x52>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_0_3: spd@53,51183000 {
+		reg = <0x53 0xe 0x51183000>;
+		assigned-address = <0x53>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_0_4: spd@54,51184000 {
+		reg = <0x54 0xe 0x51184000>;
+		assigned-address = <0x54>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_0_5: spd@55,51185000 {
+		reg = <0x55 0xe 0x51185000>;
+		assigned-address = <0x55>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_0_6: spd@56,51186000 {
+		reg = <0x56 0xe 0x51186000>;
+		assigned-address = <0x56>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_0_7: spd@57,51187000 {
+		reg = <0x57 0xe 0x51187000>;
+		assigned-address = <0x57>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+
+	// PMIC
+	pmic_0_0: pmic@48,50100000 {
+		reg = <0x48 0xe 0x50100000>;
+		assigned-address = <0x48>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_0_1: pmic@49,50101000 {
+		reg = <0x49 0xe 0x50101000>;
+		assigned-address = <0x49>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_0_2: pmic@4a,50102000 {
+		reg = <0x4a 0xe 0x50102000>;
+		assigned-address = <0x4a>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_0_3: pmic@4b,50103000 {
+		reg = <0x4b 0xe 0x50103000>;
+		assigned-address = <0x4b>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_0_4: pmic@4c,50104000 {
+		reg = <0x4c 0xe 0x50104000>;
+		assigned-address = <0x4c>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_0_5: pmic@4d,50105000 {
+		reg = <0x4d 0xe 0x50105000>;
+		assigned-address = <0x4d>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_0_6: pmic@4e,50106000 {
+		reg = <0x4e 0xe 0x50106000>;
+		assigned-address = <0x4e>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+    pmic_0_7: pmic@4f,50107000 {
+		reg = <0x4e 0xe 0x50107000>;
+		assigned-address = <0x4f>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+};
+
+&i3c1 {
+	pinctrl-names = "default";
+	i3c-scl-hz = <2000000>;
+	sda-tx-hold-ns = <70>;
+	i3c-pp-scl-hi-period-ns = <190>;
+	i3c-pp-scl-lo-period-ns = <190>;
+	status = "okay";
+	jdec-spd;
+
+	// SPD5118
+	spd_1_0: spd@50,51180000 {
+		reg = <0x50 0xe 0x51180000>;
+		assigned-address = <0x50>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_1_1: spd@51,51181000 {
+		reg = <0x51 0xe 0x51181000>;
+		assigned-address = <0x51>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_1_2: spd@52,51182000 {
+		reg = <0x52 0xe 0x51182000>;
+		assigned-address = <0x52>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_1_3: spd@53,51183000 {
+		reg = <0x53 0xe 0x51183000>;
+		assigned-address = <0x53>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_1_4: spd@54,51184000 {
+		reg = <0x54 0xe 0x51184000>;
+		assigned-address = <0x54>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_1_5: spd@55,51185000 {
+		reg = <0x55 0xe 0x51185000>;
+		assigned-address = <0x55>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_1_6: spd@56,51186000 {
+		reg = <0x56 0xe 0x51186000>;
+		assigned-address = <0x56>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_1_7: spd@57,51187000 {
+		reg = <0x57 0xe 0x51187000>;
+		assigned-address = <0x57>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+
+	// PMIC
+	pmic_1_0: pmic@48,50100000 {
+		reg = <0x48 0xe 0x50100000>;
+		assigned-address = <0x48>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_1_1: pmic@49,50101000 {
+		reg = <0x49 0xe 0x50101000>;
+		assigned-address = <0x49>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_1_2: pmic@4a,50102000 {
+		reg = <0x4a 0xe 0x50102000>;
+		assigned-address = <0x4a>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_1_3: pmic@4b,50103000 {
+		reg = <0x4b 0xe 0x50103000>;
+		assigned-address = <0x4b>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_1_4: pmic@4c,50104000 {
+		reg = <0x4c 0xe 0x50104000>;
+		assigned-address = <0x4c>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_1_5: pmic@4d,50105000 {
+		reg = <0x4d 0xe 0x50105000>;
+		assigned-address = <0x4d>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_1_6: pmic@4e,50106000 {
+		reg = <0x4e 0xe 0x50106000>;
+		assigned-address = <0x4e>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+    pmic_1_7: pmic@4f,50107000 {
+		reg = <0x4e 0xe 0x50107000>;
+		assigned-address = <0x4f>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+};
+
+&i3c2 {
+	pinctrl-names = "default";
+	i3c-scl-hz = <2000000>;
+	sda-tx-hold-ns = <70>;
+	i3c-pp-scl-hi-period-ns = <190>;
+	i3c-pp-scl-lo-period-ns = <190>;
+	status = "okay";
+	jdec-spd;
+
+	// SPD5118
+	spd_2_0: spd@50,51180000 {
+		reg = <0x50 0xe 0x51180000>;
+		assigned-address = <0x50>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_2_1: spd@51,51181000 {
+		reg = <0x51 0xe 0x51181000>;
+		assigned-address = <0x51>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_2_2: spd@52,51182000 {
+		reg = <0x52 0xe 0x51182000>;
+		assigned-address = <0x52>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_2_3: spd@53,51183000 {
+		reg = <0x53 0xe 0x51183000>;
+		assigned-address = <0x53>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_2_4: spd@54,51184000 {
+		reg = <0x54 0xe 0x51184000>;
+		assigned-address = <0x54>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_2_5: spd@55,51185000 {
+		reg = <0x55 0xe 0x51185000>;
+		assigned-address = <0x55>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_2_6: spd@56,51186000 {
+		reg = <0x56 0xe 0x51186000>;
+		assigned-address = <0x56>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_2_7: spd@57,51187000 {
+		reg = <0x57 0xe 0x51187000>;
+		assigned-address = <0x57>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+
+	// PMIC
+	pmic_2_0: pmic@48,50100000 {
+		reg = <0x48 0xe 0x50100000>;
+		assigned-address = <0x48>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_2_1: pmic@49,50101000 {
+		reg = <0x49 0xe 0x50101000>;
+		assigned-address = <0x49>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_2_2: pmic@4a,50102000 {
+		reg = <0x4a 0xe 0x50102000>;
+		assigned-address = <0x4a>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_2_3: pmic@4b,50103000 {
+		reg = <0x4b 0xe 0x50103000>;
+		assigned-address = <0x4b>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_2_4: pmic@4c,50104000 {
+		reg = <0x4c 0xe 0x50104000>;
+		assigned-address = <0x4c>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_2_5: pmic@4d,50105000 {
+		reg = <0x4d 0xe 0x50105000>;
+		assigned-address = <0x4d>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_2_6: pmic@4e,50106000 {
+		reg = <0x4e 0xe 0x50106000>;
+		assigned-address = <0x4e>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+    pmic_2_7: pmic@4f,50107000 {
+		reg = <0x4e 0xe 0x50107000>;
+		assigned-address = <0x4f>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+};
+
+&i3c3 {
+	pinctrl-names = "default";
+	i3c-scl-hz = <2000000>;
+	sda-tx-hold-ns = <70>;
+	i3c-pp-scl-hi-period-ns = <190>;
+	i3c-pp-scl-lo-period-ns = <190>;
+	status = "okay";
+	jdec-spd;
+
+	// SPD5118
+	spd_3_0: spd@50,51180000 {
+		reg = <0x50 0xe 0x51180000>;
+		assigned-address = <0x50>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_3_1: spd@51,51181000 {
+		reg = <0x51 0xe 0x51181000>;
+		assigned-address = <0x51>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_3_2: spd@52,51182000 {
+		reg = <0x52 0xe 0x51182000>;
+		assigned-address = <0x52>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_3_3: spd@53,51183000 {
+		reg = <0x53 0xe 0x51183000>;
+		assigned-address = <0x53>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_3_4: spd@54,51184000 {
+		reg = <0x54 0xe 0x51184000>;
+		assigned-address = <0x54>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_3_5: spd@55,51185000 {
+		reg = <0x55 0xe 0x51185000>;
+		assigned-address = <0x55>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_3_6: spd@56,51186000 {
+		reg = <0x56 0xe 0x51186000>;
+		assigned-address = <0x56>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	spd_3_7: spd@57,51187000 {
+		reg = <0x57 0xe 0x51187000>;
+		assigned-address = <0x57>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+
+	// PMIC
+	pmic_3_0: pmic@48,50100000 {
+		reg = <0x48 0xe 0x50100000>;
+		assigned-address = <0x48>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_3_1: pmic@49,50101000 {
+		reg = <0x49 0xe 0x50101000>;
+		assigned-address = <0x49>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_3_2: pmic@4a,50102000 {
+		reg = <0x4a 0xe 0x50102000>;
+		assigned-address = <0x4a>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_3_3: pmic@4b,50103000 {
+		reg = <0x4b 0xe 0x50103000>;
+		assigned-address = <0x4b>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_3_4: pmic@4c,50104000 {
+		reg = <0x4c 0xe 0x50104000>;
+		assigned-address = <0x4c>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_3_5: pmic@4d,50105000 {
+		reg = <0x4d 0xe 0x50105000>;
+		assigned-address = <0x4d>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+	pmic_3_6: pmic@4e,50106000 {
+		reg = <0x4e 0xe 0x50106000>;
+		assigned-address = <0x4e>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+    pmic_3_7: pmic@4f,50107000 {
+		reg = <0x4e 0xe 0x50107000>;
+		assigned-address = <0x4f>;
+		dcr = <0xda>;
+		bcr = <0x6>;
+	};
+};
+
 &adc0 {
 	ref_voltage = <2500>;
 	status = "okay";
