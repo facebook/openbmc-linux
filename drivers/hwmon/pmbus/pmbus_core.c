@@ -45,15 +45,6 @@ struct pmbus_sensor {
 #define to_pmbus_sensor(_attr) \
 	container_of(_attr, struct pmbus_sensor, attribute)
 
-struct pmbus_power_average_sensor {
-	struct pmbus_sensor sensor;
-	u64 energy_count;
-	u32 sample_count;
-};
-
-#define to_pmbus_power_average_sensor(_attr) \
-	container_of(to_pmbus_sensor(_attr), struct pmbus_power_average_sensor, sensor)
-
 struct pmbus_boolean {
 	char name[PMBUS_NAME_SIZE];	/* sysfs boolean name */
 	struct sensor_device_attribute attribute;
@@ -591,23 +582,6 @@ static int pmbus_get_status(struct i2c_client *client, int page, int reg)
 	return status;
 }
 
-int pmbus_query_register(struct i2c_client *client, int reg)
-{
-	int rv;
-	union i2c_smbus_data data;
-
-	data.block[0] = 1;
-	data.block[1] = reg;
-
-	rv = i2c_smbus_xfer(client->adapter, client->addr, client->flags,
-			    I2C_SMBUS_WRITE, PMBUS_QUERY,
-			    I2C_SMBUS_BLOCK_PROC_CALL, &data);
-	if (rv < 0)
-		return rv;
-	return data.block[1];
-}
-EXPORT_SYMBOL_NS_GPL(pmbus_query_register, PMBUS);
-
 static void pmbus_update_sensor_data(struct i2c_client *client, struct pmbus_sensor *sensor)
 {
 	if (sensor->data < 0 || sensor->update)
@@ -641,7 +615,7 @@ static s64 pmbus_reg2data_linear(struct pmbus_data *data,
 		val = val * 1000LL;
 
 	/* scale result to micro-units for power sensors */
-	if (sensor->class == PSC_POWER || sensor->class == PSC_POWER_AVERAGE)
+	if (sensor->class == PSC_POWER)
 		val = val * 1000LL;
 
 	if (exponent >= 0)
@@ -678,7 +652,7 @@ static s64 pmbus_reg2data_direct(struct pmbus_data *data,
 	}
 
 	/* scale result to micro-units for power sensors */
-	if (sensor->class == PSC_POWER || sensor->class == PSC_POWER_AVERAGE) {
+	if (sensor->class == PSC_POWER) {
 		R += 3;
 		b *= 1000;
 	}
@@ -885,69 +859,6 @@ static u16 pmbus_data2reg(struct pmbus_data *data,
 		break;
 	}
 	return regval;
-}
-
-static u64 pmbus_energy_count(struct pmbus_data *data,
-                              struct pmbus_power_average_sensor *sensor,
-                              u32 accumulator_current,
-                              u8 rollover)
-{
-        s64 val;
-        u64 accumulator_max;
-
-        sensor->sensor.data = accumulator_current;
-        val = pmbus_reg2data(data, &sensor->sensor);
-        sensor->sensor.data = 0x7FFF;
-        accumulator_max = (u64)pmbus_reg2data(data, &sensor->sensor);
-        return rollover * accumulator_max + val;
-}
-
-static ssize_t pmbus_show_power_average_sensor(struct device *dev,
-					       struct device_attribute *devattr, char *buf)
-{
-	struct pmbus_power_average_sensor *sensor = to_pmbus_power_average_sensor(devattr);
-	struct i2c_client *client = to_i2c_client(dev->parent);
-	struct pmbus_data *data = i2c_get_clientdata(client);
-	u64 last_energy_count = sensor->energy_count;
-	u32 last_sample_count = sensor->sample_count;
-	u8 buffer[I2C_SMBUS_BLOCK_MAX];
-	s16 accumulator_current;
-	u64 energy_count_diff;
-	u32 sample_count_diff;
-	ssize_t ret;
-
-	mutex_lock(&data->update_lock);
-	ret = pmbus_set_page(client, sensor->sensor.page, sensor->sensor.phase);
-	if (ret < 0)
-		goto unlock;
-
-	ret = i2c_smbus_read_i2c_block_data(client, sensor->sensor.reg, 8, buffer);
-	if (ret < 0)
-		goto unlock;
-
-	accumulator_current = buffer[1] + (buffer[2] << 8);
-	sensor->sample_count = buffer[4] + (buffer[5] << 8) + (buffer[6] << 16);
-	sensor->energy_count = pmbus_energy_count(data, sensor, accumulator_current, buffer[3]);
-
-	if (sensor->sample_count == last_sample_count) {
-		ret = -ENODATA;
-		goto unlock;
-	}
-	if (sensor->energy_count < last_energy_count)
-		energy_count_diff = sensor->energy_count +
-			(pmbus_energy_count(data, sensor, 0xFFFF, 0xFF) + 1) - last_energy_count;
-	else
-		energy_count_diff = sensor->energy_count - last_energy_count;
-
-	if (sensor->sample_count < last_sample_count)
-		sample_count_diff = sensor->sample_count + (0xFFFFFF + 1) - last_sample_count;
-	else
-		sample_count_diff = sensor->sample_count - last_sample_count;
-
-	ret = sysfs_emit(buf, "%llu\n", div_u64(energy_count_diff, sample_count_diff));
-unlock:
-	mutex_unlock(&data->update_lock);
-	return ret;
 }
 
 /*
@@ -1207,15 +1118,9 @@ static struct pmbus_sensor *pmbus_add_sensor(struct pmbus_data *data,
 
 	a = &sensor->attribute;
 
-	if (reg != PMBUS_READ_EIN) {
-	  pmbus_dev_attr_init(a, sensor->name,
-			  readonly ? 0444 : 0644,
-			  pmbus_show_sensor, pmbus_set_sensor);
-	} else {
-	  pmbus_dev_attr_init(a, sensor->name,
-			  readonly ? 0444 : 0644,
-			  pmbus_show_power_average_sensor, NULL);
-	}
+	pmbus_dev_attr_init(a, sensor->name,
+			readonly ? 0444 : 0644,
+			pmbus_show_sensor, pmbus_set_sensor);
 
 	if (pmbus_add_attribute(data, &a->attr))
 		return NULL;
@@ -1796,15 +1701,7 @@ static const struct pmbus_sensor_attr power_attributes[] = {
 		.sreg = PMBUS_STATUS_IOUT,
 		.limit = pout_limit_attrs,
 		.nlimit = ARRAY_SIZE(pout_limit_attrs),
-	}, {
-		.reg = PMBUS_READ_EIN,
-                .class = PSC_POWER_AVERAGE,
-                .paged = true,
-                .update = true,
-                .compare = true,
-                .label = "ein",
-                .func = PMBUS_HAVE_EIN,
-        }
+	}
 };
 
 /* Temperature atributes */

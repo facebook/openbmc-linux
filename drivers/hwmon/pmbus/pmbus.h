@@ -94,7 +94,6 @@ enum pmbus_regs {
 	PMBUS_STATUS_FAN_12		= 0x81,
 	PMBUS_STATUS_FAN_34		= 0x82,
 
-	PMBUS_READ_EIN			= 0x86,
 	PMBUS_READ_VIN			= 0x88,
 	PMBUS_READ_IIN			= 0x89,
 	PMBUS_READ_VCAP			= 0x8A,
@@ -374,7 +373,6 @@ enum pmbus_sensor_classes {
 	PSC_TEMPERATURE,
 	PSC_FAN,
 	PSC_PWM,
-	PSC_POWER_AVERAGE,
 	PSC_NUM_CLASSES		/* Number of power sensor classes */
 };
 
@@ -405,7 +403,6 @@ enum pmbus_sensor_classes {
 #define PMBUS_HAVE_PWM12	BIT(20)
 #define PMBUS_HAVE_PWM34	BIT(21)
 #define PMBUS_HAVE_SAMPLES	BIT(22)
-#define PMBUS_HAVE_EIN		BIT(23)
 
 #define PMBUS_PHASE_VIRTUAL	BIT(30)	/* Phases on this page are virtual */
 #define PMBUS_PAGE_VIRTUAL	BIT(31)	/* Page is virtual */
@@ -494,7 +491,6 @@ int pmbus_update_byte_data(struct i2c_client *client, int page, u8 reg,
 void pmbus_clear_faults(struct i2c_client *client);
 bool pmbus_check_byte_register(struct i2c_client *client, int page, int reg);
 bool pmbus_check_word_register(struct i2c_client *client, int page, int reg);
-int pmbus_query_register(struct i2c_client *client, int reg);
 int pmbus_do_probe(struct i2c_client *client, struct pmbus_driver_info *info);
 int pmbus_do_remove(struct i2c_client *client);
 const struct pmbus_driver_info *pmbus_get_driver_info(struct i2c_client

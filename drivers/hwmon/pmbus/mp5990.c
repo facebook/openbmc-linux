@@ -45,7 +45,6 @@ static struct pmbus_driver_info mp5990_info = {
 	.format[PSC_CURRENT_OUT] = direct,
 	.format[PSC_POWER] = direct,
 	.format[PSC_TEMPERATURE] = direct,
-	.format[PSC_POWER_AVERAGE] = direct,
 	.m[PSC_VOLTAGE_IN] = 32,
 	.b[PSC_VOLTAGE_IN] = 0,
 	.R[PSC_VOLTAGE_IN] = 0,
@@ -61,13 +60,9 @@ static struct pmbus_driver_info mp5990_info = {
 	.m[PSC_TEMPERATURE] = 1,
 	.b[PSC_TEMPERATURE] = 0,
 	.R[PSC_TEMPERATURE] = 0,
-	.m[PSC_POWER_AVERAGE] = 1,
-	.b[PSC_POWER_AVERAGE] = 0,
-	.R[PSC_POWER_AVERAGE] = 0,
 	.func[0] = PMBUS_HAVE_VIN  | PMBUS_HAVE_VOUT |
 				PMBUS_HAVE_IOUT | PMBUS_HAVE_POUT |
-				PMBUS_HAVE_TEMP | PMBUS_PAGE_VIRTUAL |
-				PMBUS_HAVE_EIN,
+				PMBUS_HAVE_TEMP | PMBUS_PAGE_VIRTUAL,
 	.read_byte_data = mp5990_read_byte_data,
 
 };
