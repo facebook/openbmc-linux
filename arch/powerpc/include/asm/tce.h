@@ -13,7 +13,7 @@
 
 /*
  * Tces come in two formats, one for the virtual bus and a different
- * format for PCI.  PCI TCEs can have hardware or software maintianed
+ * format for PCI.  PCI TCEs can have hardware or software maintained
  * coherency.
  */
 #define TCE_VB			0
