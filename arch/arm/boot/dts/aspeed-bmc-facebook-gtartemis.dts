@@ -1658,6 +1658,10 @@
 	pinctrl-0 = <&pinctrl_jtagm_default>;
 };
 
+&uhci {
+	status = "okay";
+};
+
 &ehci1 {
 	status = "okay";
 };
