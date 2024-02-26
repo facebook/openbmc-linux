@@ -79,6 +79,7 @@ enum {
 #define NCSI_OEM_MFR_MLX_ID             0x8119
 #define NCSI_OEM_MFR_BCM_ID             0x113d
 #define NCSI_OEM_MFR_INTEL_ID           0x157
+#define NCSI_OEM_MFR_META_ID            0x1d9b
 /* Intel specific OEM command */
 #define NCSI_OEM_INTEL_CMD_GMA          0x06   /* CMD ID for Get MAC */
 #define NCSI_OEM_INTEL_CMD_KEEP_PHY     0x20   /* CMD ID for Keep PHY up */
