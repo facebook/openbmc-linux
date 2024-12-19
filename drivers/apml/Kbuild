@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Kbuild for AMD APML driver
+#
+# Copyright (C) 2022 Advanced Micro Devices, Inc.
+#
+
+obj-$(CONFIG_APML_SBRMI) += apml_sbrmi.o
+apml_sbrmi-objs	 = sbrmi.o sbrmi-common.o
+obj-$(CONFIG_APML_SBTSI) += apml_sbtsi.o
+obj-$(CONFIG_APML_SBRMI) += apml_alertl.o

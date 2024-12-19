@@ -21,17 +21,24 @@
 #define START_CMD	0x80
 #define TRIGGER_MAILBOX	0x01
 
+/* Mailbox error with additional data */
+#define ERR_WITH_DATA	0x5
+
 /* Default message lengths as per APML command protocol */
 /* MSR */
 #define MSR_RD_REG_LEN		0xa
 #define MSR_WR_REG_LEN		0x8
+#define MSR_WR_REG_LEN_v21	0x9
 #define MSR_RD_DATA_LEN		0x8
 #define MSR_WR_DATA_LEN		0x7
+#define MSR_WR_DATA_LEN_v21	0x8
 /* CPUID */
 #define CPUID_RD_DATA_LEN	0x8
 #define CPUID_WR_DATA_LEN	0x8
+#define CPUID_WR_DATA_LEN_v21	0x9
 #define CPUID_RD_REG_LEN	0xa
 #define CPUID_WR_REG_LEN	0x9
+#define CPUID_WR_REG_LEN_v21	0xa
 
 /* CPUID MSR Command Ids */
 #define CPUID_MCA_CMD	0x73
@@ -63,7 +70,20 @@ enum sbrmi_reg {
 	SBRMI_THREAD128CS	= 0x4b,
 };
 
-/* input for bulk write to CPUID and MSR protocol */
+/* input for bulk write to v21 of CPUID and MSR protocol */
+struct cpu_msr_indata_v21 {
+	u8 wr_len;	/* const value */
+	u8 rd_len;	/* const value */
+	u8 proto_cmd;	/* const value */
+	u16 thread;	/* thread number */
+	union {
+		u8 reg_offset[4];	/* input value */
+		u32 value;
+	};
+	u8 ext; /* extended function */
+} __packed;
+
+/* input for bulk write to v20 of CPUID and MSR protocol */
 struct cpu_msr_indata {
 	u8 wr_len;	/* const value */
 	u8 rd_len;	/* const value */
@@ -86,16 +106,16 @@ struct cpu_msr_outdata {
 	};
 } __packed;
 
-#define prepare_mca_msr_input_message(input, thread_id, data_in)	\
+#define prepare_mca_msr_input_message(input, thread_id, data_in, wr_data_len)	\
 	input.rd_len = MSR_RD_DATA_LEN,					\
-	input.wr_len = MSR_WR_DATA_LEN,					\
+	input.wr_len = wr_data_len,					\
 	input.proto_cmd = RD_MCA_CMD,					\
 	input.thread = thread_id << 1,					\
 	input.value =  data_in
 
-#define prepare_cpuid_input_message(input, thread_id, func, ext_func)	\
+#define prepare_cpuid_input_message(input, thread_id, func, ext_func, wr_data_len)	\
 	input.rd_len = CPUID_RD_DATA_LEN,				\
-	input.wr_len = CPUID_WR_DATA_LEN,				\
+	input.wr_len = wr_data_len,				\
 	input.proto_cmd = RD_CPUID_CMD,					\
 	input.thread = thread_id << 1,					\
 	input.value =  func,						\
@@ -151,25 +171,12 @@ static int sbrmi_wait_status(struct apml_sbrmi_device *rmi_dev,
 	return ret;
 }
 
-/* MCA MSR protocol */
-int rmi_mca_msr_read(struct apml_sbrmi_device *rmi_dev,
-		     struct apml_message *msg)
+static int msr_datain_v20(struct apml_sbrmi_device *rmi_dev,
+			  struct apml_message *msg)
 {
-	struct cpu_msr_outdata output = {0};
 	struct cpu_msr_indata input = {0};
 	int ret, val = 0;
-	int hw_status;
 	u16 thread;
-
-	/* cache the rev value to identify if protocol is supported or not */
-	if (!rmi_dev->rev) {
-		ret = sbrmi_get_rev(rmi_dev);
-		if (ret < 0)
-			return ret;
-	}
-	/* MCA MSR protocol for REV 0x10 is not supported*/
-	if (rmi_dev->rev == 0x10)
-		return -EOPNOTSUPP;
 
 	thread = msg->data_in.reg_in[THREAD_LOW_INDEX] |
 		 msg->data_in.reg_in[THREAD_HI_INDEX] << 8;
@@ -181,15 +188,72 @@ int rmi_mca_msr_read(struct apml_sbrmi_device *rmi_dev,
 	}
 	ret = regmap_write(rmi_dev->regmap, SBRMI_THREAD128CS, val);
 	if (ret < 0)
-		goto exit_unlock;
+		return ret;
 
 	prepare_mca_msr_input_message(input, thread,
-				      msg->data_in.mb_in[RD_WR_DATA_INDEX]);
+				      msg->data_in.mb_in[RD_WR_DATA_INDEX],
+				      MSR_WR_DATA_LEN);
 
 	ret = regmap_bulk_write(rmi_dev->regmap, CPUID_MCA_CMD,
 				&input, MSR_WR_REG_LEN);
-	if (ret < 0)
-		goto exit_unlock;
+	return ret;
+}
+
+static int msr_datain_v21(struct apml_sbrmi_device *rmi_dev,
+				struct apml_message *msg)
+{
+	struct cpu_msr_indata_v21 input = {0};
+	int ret;
+	u16 thread;
+
+	thread = msg->data_in.reg_in[THREAD_LOW_INDEX] |
+		 msg->data_in.reg_in[THREAD_HI_INDEX] << 8;
+
+	prepare_mca_msr_input_message(input, thread,
+				      msg->data_in.mb_in[RD_WR_DATA_INDEX],
+				      MSR_WR_DATA_LEN_v21);
+
+	ret = regmap_bulk_write(rmi_dev->regmap, CPUID_MCA_CMD,
+				&input, MSR_WR_REG_LEN_v21);
+	return ret;
+}
+
+/* MCA MSR protocol */
+int rmi_mca_msr_read(struct apml_sbrmi_device *rmi_dev,
+		     struct apml_message *msg)
+{
+	struct cpu_msr_outdata output = {0};
+	int ret;
+	int hw_status;
+
+	if (!rmi_dev->regmap)
+		return ENODEV;
+
+	/* cache the rev value to identify if protocol is supported or not */
+	if (!rmi_dev->rev) {
+		ret = sbrmi_get_rev(rmi_dev);
+		if (ret < 0)
+			return ret;
+	}
+
+	switch(rmi_dev->rev) {
+	/* MCA MSR protocol for REV 0x10 is not supported*/
+	case 0x10:
+		return -EOPNOTSUPP;
+	case 0x20:
+		ret = msr_datain_v20(rmi_dev, msg);
+		if (ret < 0)
+			goto exit_unlock;
+
+		break;
+	case 0x21:
+		ret = msr_datain_v21(rmi_dev, msg);
+		if (ret < 0)
+			goto exit_unlock;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
 
 	ret = sbrmi_wait_status(rmi_dev, &hw_status, HW_ALERT_MASK);
 	if (ret < 0)
@@ -220,25 +284,12 @@ exit_unlock:
 	return ret;
 }
 
-/* CPUID protocol */
-int rmi_cpuid_read(struct apml_sbrmi_device *rmi_dev,
-		   struct apml_message *msg)
+static int cpuid_datain_v20(struct apml_sbrmi_device *rmi_dev,
+			    struct apml_message *msg)
 {
 	struct cpu_msr_indata input = {0};
-	struct cpu_msr_outdata output = {0};
-	int val = 0;
-	int ret, hw_status;
+	int ret, val = 0;
 	u16 thread;
-
-	/* cache the rev value to identify if protocol is supported or not */
-	if (!rmi_dev->rev) {
-		ret = sbrmi_get_rev(rmi_dev);
-		if (ret < 0)
-			return ret;
-	}
-	/* CPUID protocol for REV 0x10 is not supported*/
-	if (rmi_dev->rev == 0x10)
-		return -EOPNOTSUPP;
 
 	thread = msg->data_in.reg_in[THREAD_LOW_INDEX] |
 		 msg->data_in.reg_in[THREAD_HI_INDEX] << 8;
@@ -250,16 +301,71 @@ int rmi_cpuid_read(struct apml_sbrmi_device *rmi_dev,
 	}
 	ret = regmap_write(rmi_dev->regmap, SBRMI_THREAD128CS, val);
 	if (ret < 0)
-		goto exit_unlock;
-
+		return ret;
 	prepare_cpuid_input_message(input, thread,
 				    msg->data_in.mb_in[RD_WR_DATA_INDEX],
-				    msg->data_in.reg_in[EXT_FUNC_INDEX]);
+				    msg->data_in.reg_in[EXT_FUNC_INDEX],
+				    CPUID_WR_DATA_LEN);
 
 	ret = regmap_bulk_write(rmi_dev->regmap, CPUID_MCA_CMD,
 				&input, CPUID_WR_REG_LEN);
-	if (ret < 0)
-		goto exit_unlock;
+	return ret;
+}
+
+static int cpuid_datain_v21(struct apml_sbrmi_device *rmi_dev,
+			    struct apml_message *msg)
+{
+	struct cpu_msr_indata_v21 input = {0};
+	int ret;
+	u16 thread;
+
+	thread = msg->data_in.reg_in[THREAD_LOW_INDEX] |
+		 msg->data_in.reg_in[THREAD_HI_INDEX] << 8;
+
+	prepare_cpuid_input_message(input, thread,
+				    msg->data_in.mb_in[RD_WR_DATA_INDEX],
+				    msg->data_in.reg_in[EXT_FUNC_INDEX],
+				    CPUID_WR_DATA_LEN_v21);
+
+	ret = regmap_bulk_write(rmi_dev->regmap, CPUID_MCA_CMD,
+				&input, CPUID_WR_REG_LEN_v21);
+	return ret;
+}
+
+/* CPUID protocol */
+int rmi_cpuid_read(struct apml_sbrmi_device *rmi_dev,
+		   struct apml_message *msg)
+{
+	struct cpu_msr_outdata output = {0};
+	int ret, hw_status;
+
+	if (!rmi_dev->regmap)
+		return ENODEV;
+
+	/* cache the rev value to identify if protocol is supported or not */
+	if (!rmi_dev->rev) {
+		ret = sbrmi_get_rev(rmi_dev);
+		if (ret < 0)
+			return ret;
+	}
+
+	switch(rmi_dev->rev) {
+	/* CPUID protocol for REV 0x10 is not supported*/
+	case 0x10:
+		return -EOPNOTSUPP;
+	case 0x20:
+		ret = cpuid_datain_v20(rmi_dev, msg);
+		if (ret < 0)
+			goto exit_unlock;
+		break;
+	case 0x21:
+		ret = cpuid_datain_v21(rmi_dev, msg);
+		if (ret < 0)
+			goto exit_unlock;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
 
 	ret = sbrmi_wait_status(rmi_dev, &hw_status, HW_ALERT_MASK);
 	if (ret < 0)
@@ -313,6 +419,9 @@ int rmi_mailbox_xfer(struct apml_sbrmi_device *rmi_dev,
 	int sw_status;
 	u8 byte = 0;
 
+	if (!rmi_dev->regmap)
+		return ENODEV;
+
 	msg->fw_ret_code = 0;
 
 	ret = esmi_oob_clear_status_alert(rmi_dev);
@@ -359,7 +468,7 @@ int rmi_mailbox_xfer(struct apml_sbrmi_device *rmi_dev,
 		goto exit_unlock;
 
 	ret = regmap_read(rmi_dev->regmap, SBRMI_OUTBNDMSG7, &ec);
-	if (ret || ec)
+	if (ret || (ec && ec != ERR_WITH_DATA))
 		goto exit_clear_alert;
 
 	/*
