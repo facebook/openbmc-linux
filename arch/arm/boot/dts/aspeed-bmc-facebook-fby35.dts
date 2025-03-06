@@ -323,6 +323,7 @@
 
 &i3c2 {
         status = "okay";
+        sda-tx-hold-ns = <20>;
         i3c-pp-scl-hi-period-ns = <100>;
         i3c-pp-scl-lo-period-ns = <100>;
         i3c-od-scl-hi-period-ns = <380>;
@@ -337,6 +338,7 @@
 
 &i3c3 {
         status = "okay";
+        sda-tx-hold-ns = <20>;
         i3c-pp-scl-hi-period-ns = <100>;
         i3c-pp-scl-lo-period-ns = <100>;
         i3c-od-scl-hi-period-ns = <380>;
@@ -351,6 +353,7 @@
 
 &i3c4 {
         status = "okay";
+        sda-tx-hold-ns = <20>;
         i3c-pp-scl-hi-period-ns = <100>;
         i3c-pp-scl-lo-period-ns = <100>;
         i3c-od-scl-hi-period-ns = <380>;
@@ -365,6 +368,7 @@
 
 &i3c5 {
         status = "okay";
+        sda-tx-hold-ns = <20>;
         i3c-pp-scl-hi-period-ns = <100>;
         i3c-pp-scl-lo-period-ns = <100>;
         i3c-od-scl-hi-period-ns = <380>;
