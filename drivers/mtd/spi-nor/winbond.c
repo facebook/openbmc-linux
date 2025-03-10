@@ -8,6 +8,13 @@
 
 #include "core.h"
 
+#define WINBOND_NOR_OP_SELDIE 0xc2 /* Select active die */
+
+#define WINBOND_NOR_SELDIE_OP(buf)                                             \
+	SPI_MEM_OP(SPI_MEM_OP_CMD(WINBOND_NOR_OP_SELDIE, 0),                   \
+		   SPI_MEM_OP_NO_ADDR, SPI_MEM_OP_NO_DUMMY,                    \
+		   SPI_MEM_OP_DATA_OUT(1, buf, 0))
+
 static int
 w25q256_post_bfpt_fixups(struct spi_nor *nor,
 			 const struct sfdp_parameter_header *bfpt_header,
@@ -30,6 +37,72 @@ w25q256_post_bfpt_fixups(struct spi_nor *nor,
 
 static struct spi_nor_fixups w25q256_fixups = {
 	.post_bfpt = w25q256_post_bfpt_fixups,
+};
+
+/**
+ * winbond_nor_select_die() - Set active die.
+ * @nor:	pointer to 'struct spi_nor'.
+ * @die:	die to set active.
+ *
+ * Return: 0 on success, -errno otherwise.
+ */
+static int winbond_nor_select_die(struct spi_nor *nor, u8 die)
+{
+	int ret;
+
+	nor->bouncebuf[0] = die;
+
+	if (nor->spimem) {
+		struct spi_mem_op op = WINBOND_NOR_SELDIE_OP(nor->bouncebuf);
+
+		spi_nor_spimem_setup_op(nor, &op, nor->reg_proto);
+
+		ret = spi_mem_exec_op(nor->spimem, &op);
+	} else {
+		ret = spi_nor_controller_ops_write_reg(
+			nor, WINBOND_NOR_OP_SELDIE, nor->bouncebuf, 1);
+	}
+
+	if (ret)
+		dev_dbg(nor->dev, "error %d selecting die %d\n", ret, die);
+
+	return ret;
+}
+
+static int winbond_multi_die_ready(struct spi_nor *nor)
+{
+	int ret, i;
+
+	for (i = 0; i < 2; i++) {
+		ret = winbond_nor_select_die(nor, i);
+		if (ret)
+			return ret;
+
+		if (!spi_nor_sr_ready(nor))
+			return 0;
+	}
+
+	return 1;
+}
+
+static int
+w25q0xjv_post_bfpt_fixups(struct spi_nor *nor,
+			  const struct sfdp_parameter_header *bfpt_header,
+			  const struct sfdp_bfpt *bfpt)
+{
+	/*
+	 * SFDP supports dice numbers, but this information is only available in
+	 * optional additional tables which are not provided by these chips.
+	 * Dice number has an impact though, because these devices need extra
+	 * care when reading the busy bit.
+	 */
+	nor->params->ready = winbond_multi_die_ready;
+
+	return 0;
+}
+
+static const struct spi_nor_fixups w25q0xjv_fixups = {
+	.post_bfpt = w25q0xjv_post_bfpt_fixups,
 };
 
 static const struct flash_info winbond_parts[] = {
@@ -103,7 +176,9 @@ static const struct flash_info winbond_parts[] = {
 	{ "w25q512jvq", INFO(0xef4020, 0, 64 * 1024, 1024,
 			     SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
 	{ "w25q01jvtb", INFO(0xef4021, 0, 64 * 1024, 2048,
-					 SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ | SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB) },
+			     SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
+				     SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB)
+				.fixups = &w25q0xjv_fixups },
 	{ "w25q01jv-im", INFO(0xef7021, 0, 64 * 1024, 2048, 
 				SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
 };
