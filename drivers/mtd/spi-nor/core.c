@@ -544,7 +544,7 @@ static void spi_nor_clear_sr(struct spi_nor *nor)
  *
  * Return: 1 if ready, 0 if not ready, -errno on errors.
  */
-static int spi_nor_sr_ready(struct spi_nor *nor)
+int spi_nor_sr_ready(struct spi_nor *nor)
 {
 	int ret = spi_nor_read_sr(nor, nor->bouncebuf);
 
@@ -655,6 +655,8 @@ static int spi_nor_ready(struct spi_nor *nor)
 
 	if (nor->flags & SNOR_F_READY_XSR_RDY)
 		sr = spi_nor_xsr_ready(nor);
+	else if (nor->params->ready)
+		sr = nor->params->ready(nor);
 	else
 		sr = spi_nor_sr_ready(nor);
 	if (sr < 0)
