@@ -71,13 +71,13 @@
         compatible = "spi-gpio";
         #address-cells = <1>;
         #size-cells = <0>;
-    
+
         gpio-sck = <&gpio0 ASPEED_GPIO(X, 3) GPIO_ACTIVE_HIGH>;
         gpio-mosi = <&gpio0 ASPEED_GPIO(X, 4) GPIO_ACTIVE_HIGH>;
         gpio-miso = <&gpio0 ASPEED_GPIO(X, 5) GPIO_ACTIVE_HIGH>;
         num-chipselects = <1>;
         cs-gpios = <&gpio0 ASPEED_GPIO(X, 0) GPIO_ACTIVE_LOW>;
-    
+
         tpmdev@0 {
             compatible = "tcg,tpm_tis-spi";
             spi-max-frequency = <33000000>;
@@ -225,6 +225,11 @@
     multi-master;
     bus-frequency = <100000>;
     aspeed,hw-timeout-ms = <1000>;
+
+    sbtsi@4C {
+        compatible = "amd,sbtsi";
+        reg = <0x4C>;
+    };
 };
 
 &i2c2 {
@@ -359,25 +364,18 @@
                  &pinctrl_gpiu6_default &pinctrl_gpiu7_default>;
 };
 
-&peci0 {
-    status = "okay";
-
-    peci-client@30 {
-        compatible = "intel,peci-client";
-        reg = <0x30>;
-        cpu-id= <0x606C1>;
-    };
-};
-
 &jtag1 {
     status = "okay";
     pinctrl-names = "default";
     pinctrl-0 = <&pinctrl_jtagm_default>;
 };
 
-&lpc_snoop {
-    status = "okay";
-    snoop-ports = <0x80>;
+&lpc_pcc {
+	rec-mode = <0x1>;
+	port-addr = <0x80>;
+	port-addr-hbits-select = <0x1>;
+	port-addr-xbits = <0x3>;
+	status = "okay";
 };
 
 &lpc_ctrl {
@@ -407,4 +405,3 @@
 &vhub {
       status = "okay";
 };
-
