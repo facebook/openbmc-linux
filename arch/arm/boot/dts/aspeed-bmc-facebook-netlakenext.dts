@@ -253,6 +253,11 @@
         reg = <0x4A>;
     };
 
+    ina230@40 {
+        compatible = "ti,ina230";
+        reg = <0x40>;
+    };
+
     next_eeprom@56 {
         compatible = "atmel,24c128";
         reg = <0x56>;
