@@ -316,7 +316,7 @@ static const char *debug_stream_format2str(const enum atomisp_input_format
 		return "user-def-8-type-8";
 
 	default:
-		assert(!"Unknown stream format");
+		assert(false && "Unknown stream format");
 		return "unknown-stream-format";
 	}
 };
@@ -383,7 +383,7 @@ static const char *debug_frame_format2str(const enum ia_css_frame_format
 		return "CSI_MIPI_YUV420_10";
 
 	default:
-		assert(!"Unknown frame format");
+		assert(false && "Unknown frame format");
 		return "unknown-frame-format";
 	}
 }
