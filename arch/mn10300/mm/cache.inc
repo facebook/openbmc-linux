@@ -9,7 +9,6 @@
  * 2 of the Licence, or (at your option) any later version.
  */
 
-
 ###############################################################################
 #
 # Invalidate the instruction cache.

@@ -9,7 +9,6 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-
 #if defined(CONFIG_MB93090_MB00)
 #define LED_ADDR (0x21200000+4)
 
