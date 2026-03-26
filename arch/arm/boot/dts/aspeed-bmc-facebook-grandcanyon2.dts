@@ -336,12 +336,12 @@
 			reg = <9>;
 			type = <PCA955X_TYPE_GPIO>;
 		};
-		// P12V_NIC_FAULT_N
+		// PWRGD_P12V_NIC_A
 		gpio@10 {
 			reg = <10>;
 			type = <PCA955X_TYPE_GPIO>;
 		};
-		// P3V3_NIC_FAULT_N
+		// PWRGD_P3V3_NIC_A
 		gpio@11 {
 			reg = <11>;
 			type = <PCA955X_TYPE_GPIO>;
@@ -472,6 +472,101 @@
 	multi-master;
 	aspeed,hw-timeout-ms = <1000>;
 	status = "okay";
+
+	pca9557@19 {
+		compatible = "nxp,pca9557";
+		reg = <0x19>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		gpio-controller;
+		#gpio-cells = <2>;
+
+		// E1SA_1_12VEFUSE_PGOOD
+		gpio@0 {
+			reg = <0>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// FM_BMC_RST_A_R_RTCRST
+		gpio@1 {
+			reg = <1>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// SMB_NIC_A_INA233_ALRT_N
+		gpio@2 {
+			reg = <2>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// E1SA_1_12VEFUSE_FLT_R_N
+		gpio@3 {
+			reg = <3>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// E1SA_1_3V3EFUSE_FLT_R_N
+		gpio@4 {
+			reg = <4>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// E1SA_2_12VEFUSE_FLT_R_N
+		gpio@5 {
+			reg = <5>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// E1SA_2_3V3EFUSE_FLT_R_N
+		gpio@6 {
+			reg = <6>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// E1SA_2_12VEFUSE_PGOOD
+		gpio@7 {
+			reg = <7>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+	};
+
+	pca9557@1b {
+		compatible = "nxp,pca9557";
+		reg = <0x1b>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		gpio-controller;
+		#gpio-cells = <2>;
+
+		// ALRT_P12V_STBY_SCC_N
+		gpio@0 {
+			reg = <0>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// P3V3_STBY_A_PG_R
+		gpio@1 {
+			reg = <1>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// P5V_A_1_PG
+		gpio@2 {
+			reg = <2>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// P5V_A_2_PG
+		gpio@3 {
+			reg = <3>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// P5V_A_3_PG
+		gpio@4 {
+			reg = <4>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// P5V_A_4_PG
+		gpio@5 {
+			reg = <5>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+		// FM_HSC_FAULT_N
+		gpio@6 {
+			reg = <6>;
+			type = <PCA955X_TYPE_GPIO>;
+		};
+	};
 };
 
 // [T5]: To E1.S SSD_1 [T7]: To IOCM
