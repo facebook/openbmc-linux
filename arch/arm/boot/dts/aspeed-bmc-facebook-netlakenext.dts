@@ -19,7 +19,6 @@
         serial3 = &uart3;
         serial4 = &uart4;
 
-        i2c22 = &imux22;
         i2c23 = &imux23;
         i2c24 = &imux24;
         i2c25 = &imux25;
@@ -280,12 +279,6 @@
         compatible = "nxp,pca9846";
         i2c-mux-idle-disconnect;
         reg = <0x71>;
-
-        imux22: i2c@0 {
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <0>;
-        };
 
         imux23: i2c@1 {
             #address-cells = <1>;
