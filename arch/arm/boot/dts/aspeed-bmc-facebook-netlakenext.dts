@@ -208,6 +208,7 @@
         status = "okay";
         m25p,fast-read;
         label = "pnor";
+        spi-rx-bus-width = <1>;
     };
 };
 
