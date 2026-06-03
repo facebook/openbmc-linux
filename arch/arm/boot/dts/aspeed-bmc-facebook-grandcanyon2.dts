@@ -172,7 +172,7 @@
                      &pinctrl_tach3_default
                      &pinctrl_tach4_default>;
         fan@0 {
-                aspeed,min-rpm = <30>;
+                aspeed,min-rpm = <1>;
                 aspeed,tach-ch = <0x00>;
         };
         fan@2 {
