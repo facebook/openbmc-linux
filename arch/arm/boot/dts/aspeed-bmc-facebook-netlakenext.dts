@@ -240,9 +240,11 @@
 
 &i2c1 {
     status = "okay";
-    multi-master;
-    bus-frequency = <100000>;
-    aspeed,hw-timeout-ms = <1000>;
+
+    sbrmi@3C {
+        compatible = "amd,sbrmi";
+        reg = <0x3C>;
+    };
 
     sbtsi@4C {
         compatible = "amd,sbtsi";
