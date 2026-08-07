@@ -19,8 +19,6 @@
         serial3 = &uart3;
         serial4 = &uart4;
 
-        i2c20 = &imux20;
-        i2c21 = &imux21;
         i2c23 = &imux23;
         i2c24 = &imux24;
         i2c25 = &imux25;
@@ -220,36 +218,10 @@
 
 &i2c0 {
     status = "okay";
-    i2cswitch@70 {
-        compatible = "nxp,pca9542";
-        reg = <0x70>;
-
-        imux20: i2c@0 {
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <0>;
-        };
-
-        imux21: i2c@1 {
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <1>;
-        };
-    };
 };
 
 &i2c1 {
     status = "okay";
-
-    sbrmi@3C {
-        compatible = "amd,sbrmi";
-        reg = <0x3C>;
-    };
-
-    sbtsi@4C {
-        compatible = "amd,sbtsi";
-        reg = <0x4C>;
-    };
 };
 
 &i2c2 {
@@ -288,6 +260,16 @@
 
 &i2c5 {
     status = "okay";
+
+    sbrmi@3C {
+        compatible = "amd,sbrmi";
+        reg = <0x3C>;
+    };
+
+    sbtsi@4C {
+        compatible = "amd,sbtsi";
+        reg = <0x4C>;
+    };
 };
 
 &i2c6 {
