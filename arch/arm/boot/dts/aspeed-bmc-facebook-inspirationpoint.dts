@@ -1568,10 +1568,6 @@
 	status = "okay";
 };
 
-&pcie {
-	status = "okay";
-};
-
 /* override setup mtd parttion layout */
 &fitro {
 	reg = <0x1A0000 0x3E60000>;
