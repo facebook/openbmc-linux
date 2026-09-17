@@ -3,7 +3,7 @@
 
 /dts-v1/;
 
-#include "aspeed-g6.dtsi"
+#include "aspeed-g6-i2c-new-mode.dtsi"
 #include <dt-bindings/gpio/aspeed-gpio.h>
 #include <dt-bindings/leds/leds-pca955x.h>
 #include <dt-bindings/i2c/i2c.h>
@@ -218,18 +218,26 @@
 
 &i2c0 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
 };
 
 &i2c1 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
 };
 
 &i2c2 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
 };
 
 &i2c3 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
 };
 
 &i2c4 {
@@ -260,6 +268,8 @@
 
 &i2c5 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
 
     sbrmi@3C {
         compatible = "amd,sbrmi";
@@ -274,10 +284,14 @@
 
 &i2c6 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
 };
 
 &i2c7 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
     i2cswitch@71 {
         compatible = "nxp,pca9846";
         i2c-mux-idle-disconnect;
@@ -305,6 +319,8 @@
 
 &i2c8 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
     // MEZZ EEPROM
     eeprom@50 {
         compatible = "st,24c64";
@@ -314,6 +330,8 @@
 
 &i2c9 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
     max31790@21 {
         compatible = "max31790";
         reg = <0x21>;
@@ -332,6 +350,8 @@
 
 &i2c10 {
     status = "okay";
+    /delete-property/ buff-mode;
+	byte-mode; 
     tmp75@48 {
         compatible = "ti,tmp75";
         reg = <0x48>;
