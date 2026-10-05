@@ -2023,6 +2023,7 @@ static const struct spi_nor_manufacturer *manufacturers[] = {
 	&spi_nor_macronix,
 	&spi_nor_micron,
 	&spi_nor_st,
+	&spi_nor_puya,
 	&spi_nor_spansion,
 	&spi_nor_sst,
 	&spi_nor_winbond,
