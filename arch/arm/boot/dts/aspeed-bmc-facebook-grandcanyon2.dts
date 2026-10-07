@@ -68,6 +68,13 @@
 			reg = <0>;
 		};
 	};
+
+	edac: sdram@1e6e0000 {
+		compatible = "aspeed,ast2600-sdram-edac", "syscon";
+		reg = <0x1e6e0000 0x174>;
+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+		status = "okay";
+	};
 };
 
 &uart1 {
